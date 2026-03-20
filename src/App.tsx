@@ -39,7 +39,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 import { Transaction, KPI, ChartData, Supplier, TransactionStatus } from './types';
-import { db, auth } from './firebase';
+import { db, auth, DEFAULT_USER_UID } from './firebase';
 import { 
   collection, 
   onSnapshot, 
@@ -53,14 +53,14 @@ import {
   getDocFromServer,
   Timestamp,
   writeBatch
-} from 'firebase/firestore';
+} from './firebase';
 import { 
   signInWithPopup, 
   GoogleAuthProvider, 
   onAuthStateChanged,
   signOut,
   User
-} from 'firebase/auth';
+} from './firebase';
 
 enum OperationType {
   CREATE = 'create',
