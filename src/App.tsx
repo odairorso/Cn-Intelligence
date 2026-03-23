@@ -1132,7 +1132,11 @@ export default function App() {
   const fetchTransactions = async () => {
     try {
       const data = await api.getTransactions('guest');
-      setTransactions(data.sort((a: any, b: any) => b.id.localeCompare(a.id)));
+      const parseDate = (d: string) => {
+        const parts = d.split('/');
+        return parts.length === 3 ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime() : 0;
+      };
+      setTransactions(data.sort((a: any, b: any) => parseDate(b.vencimento) - parseDate(a.vencimento)));
     } catch (error) {
       console.error('Failed to fetch transactions:', error);
     }
