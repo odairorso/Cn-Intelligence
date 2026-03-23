@@ -8,11 +8,20 @@ export default async function handler(req, res) {
 
   if (req.method === 'PUT') {
     try {
-      const { status, pagamento } = req.body;
-      const pDate = parseDateToPg(pagamento);
-      const rows = pDate
-        ? await sql`UPDATE transactions SET status = ${status}, pagamento = ${pDate} WHERE id = ${id} RETURNING *`
-        : await sql`UPDATE transactions SET status = ${status} WHERE id = ${id} RETURNING *`;
+      const { status, pagamento, vencimento, fornecedor, descricao, empresa, valor } = req.body;
+      const pDate = pagamento ? parseDateToPg(pagamento) : null;
+      const vDate = vencimento ? parseDateToPg(vencimento) : null;
+      const rows = await sql`
+        UPDATE transactions SET
+          status     = COALESCE(${status}, status),
+          pagamento  = ${pDate},
+          vencimento = COALESCE(${vDate}, vencimento),
+          fornecedor = COALESCE(${fornecedor}, fornecedor),
+          descricao  = COALESCE(${descricao}, descricao),
+          empresa    = COALESCE(${empresa}, empresa),
+          valor      = COALESCE(${valor !== undefined ? Number(valor) : null}, valor)
+        WHERE id = ${id}
+        RETURNING *`;
       return res.json(rows[0]);
     } catch (e) {
       console.error(e);
