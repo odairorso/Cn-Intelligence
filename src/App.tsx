@@ -1166,33 +1166,67 @@ export default function App() {
         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         
         let allDataMatrix: any[] = [];
-        
+
+        // Colunas consideradas "cabeçalho padrão"
+        const KNOWN_COLS = ['FORNECEDOR','FORNECEDORES','NOME','FAVORECIDO','CLIENTE','VALOR','VENCIMENTO','DATA','PAGAMENTO','SITUAÇÃO','SITUACAO'];
+
+        // Heurística de mapeamento posicional para abas sem cabeçalho padrão
+        const isDateSerial = (v: any) => typeof v === 'number' && v > 40000 && v < 70000;
+        const buildPositionalRow = (row: any[], sheetName: string): any => {
+          const r: any = { _aba_origem: sheetName };
+          const strings = row.map((v, i) => ({ v, i })).filter(x => typeof x.v === 'string' && String(x.v).trim() !== '');
+          const dates   = row.map((v, i) => ({ v, i })).filter(x => isDateSerial(x.v));
+          const nums    = row.map((v, i) => ({ v, i })).filter(x => typeof x.v === 'number' && !isDateSerial(x.v) && x.v > 0);
+          if (strings[0]) r['FORNECEDOR']  = strings[0].v;
+          if (strings[1]) r['DESCRIÇÃO']   = strings[1].v;
+          if (dates[0])   r['VENCIMENTO']  = dates[0].v;
+          if (dates[1])   r['DATA PAGAMENTO'] = dates[1].v;
+          if (nums[0])    r['VALOR']       = nums[0].v;
+          if (strings[2]) r['EMPRESA']     = strings[2].v;
+          // último string pode ser status
+          const last = strings[strings.length - 1];
+          if (last && last !== strings[0] && last !== strings[1] && last !== strings[2]) r['SITUAÇÃO'] = last.v;
+          return r;
+        };
+
         // Iterar sobre todas as abas do Excel
         for (const sheetName of workbook.SheetNames) {
+          // Ignora abas de sumário que não são lançamentos
+          if (['CASHFLOW'].includes(sheetName.trim().toUpperCase())) continue;
+
           const worksheet = workbook.Sheets[sheetName];
-          
+
           // Ler como matriz para evitar cruzamento de colunas
           const sheetMatrix = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true }) as any[][];
-          
-          if (sheetMatrix.length < 2) continue; // Pula abas vazias
-          
-          // Tratamento rigoroso de cabeçalhos vazios, forçando os índices
-          const headers = sheetMatrix[0].map(h => String(h || '').trim().toUpperCase());
-          
-          for (let i = 1; i < sheetMatrix.length; i++) {
-            const row = sheetMatrix[i];
-            if (!row || row.length === 0) continue; // Pula linha vazia
-            
-            const rowData: any = { _aba_origem: sheetName };
-            
-            // Mapeia os valores usando o índice real do cabeçalho da aba
-            headers.forEach((header, index) => {
-              if (header && row[index] !== undefined && row[index] !== null && row[index] !== '') {
-                rowData[header] = row[index];
-              }
-            });
-            
-            allDataMatrix.push(rowData);
+
+          if (sheetMatrix.length < 1) continue; // Pula abas vazias
+
+          // Verifica se a primeira linha contém colunas padrão
+          const firstRowUpper = sheetMatrix[0].map(h => String(h || '').trim().toUpperCase());
+          const hasStandardHeader = firstRowUpper.some(h => KNOWN_COLS.includes(h));
+
+          if (hasStandardHeader) {
+            // Fluxo normal: primeira linha = cabeçalho
+            const headers = firstRowUpper;
+            for (let i = 1; i < sheetMatrix.length; i++) {
+              const row = sheetMatrix[i];
+              if (!row || row.length === 0) continue;
+              const rowData: any = { _aba_origem: sheetName };
+              headers.forEach((header, index) => {
+                if (header && row[index] !== undefined && row[index] !== null && row[index] !== '') {
+                  rowData[header] = row[index];
+                }
+              });
+              allDataMatrix.push(rowData);
+            }
+          } else {
+            // Aba sem cabeçalho padrão (ex: ABRIL, Manutençao): mapeia todas as linhas por posição
+            for (let i = 0; i < sheetMatrix.length; i++) {
+              const row = sheetMatrix[i];
+              if (!row || row.length === 0) continue;
+              const rowData = buildPositionalRow(row, sheetName);
+              if (rowData['FORNECEDOR']) allDataMatrix.push(rowData);
+            }
           }
         }
 
@@ -1252,7 +1286,7 @@ export default function App() {
         let totalFinanceiro = 0;
 
         for (const row of allDataMatrix) {
-          const rawFornecedor = getRowValue(row, ['FORNECEDOR', 'FORNECEDORES', 'FORNECEDOR_NOME', 'NOME', 'FAVORECIDO', 'CLIENTE']);
+          const rawFornecedor = getRowValue(row, ['FORNECEDOR', 'FORNECEDORES', 'FORNECEDOR_NOME', 'NOME', 'FAVORECIDO', 'CLIENTE', 'OBSERVAÇAO']);
           if (!rawFornecedor || String(rawFornecedor).toUpperCase().includes('TOTAL')) continue;
 
           const rawValor = getRowValue(row, ['VALOR', 'VALOR TOTAL', 'TOTAL', 'VALOR_TOTAL', 'QUANTIA', 'PREÇO', 'PRECO', 'SAIDA', 'SAÍDA', 'PAGAMENTO']);
@@ -1343,7 +1377,7 @@ export default function App() {
           }
 
           const rawDescricao = getRowValue(row, ['DESCRIÇÃO', 'DESCRICAO', 'OBSERVACAO', 'OBSERVAÇÃO', 'OBS 1', 'OBS 2', 'OBS', 'DETALHE']);
-          const rawEmpresa = getRowValue(row, ['EMPRESA', 'UNIDADE', 'LOJA']);
+          const rawEmpresa = getRowValue(row, ['EMPRESA', 'UNIDADE', 'LOJA', 'OBS 2', 'GRUPO']);
 
           txBatch.push({
             uid: 'guest',
