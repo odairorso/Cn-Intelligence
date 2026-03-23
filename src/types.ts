@@ -22,7 +22,6 @@ export interface Transaction {
   pagamento?: string;
   valor: number;
   status: TransactionStatus;
-  mes?: string;
 }
 
 export interface KPI {

@@ -39,127 +39,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 import { Transaction, KPI, ChartData, Supplier, TransactionStatus } from './types';
-import { db, auth, DEFAULT_USER_UID } from './firebase';
-import { 
-  collection, 
-  onSnapshot, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs,
-  doc, 
-  query, 
-  where,
-  getDocFromServer,
-  Timestamp,
-  writeBatch
-} from './firebase';
-import { 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  onAuthStateChanged,
-  signOut,
-  User
-} from './firebase';
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
-
-interface ErrorBoundaryProps {
-  children: React.ReactNode;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: any;
-}
-
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    (this as any).state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: any): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  render() {
-    const self = this as any;
-    if (self.state.hasError) {
-      let message = "Ocorreu um erro inesperado.";
-      try {
-        const errInfo = JSON.parse(self.state.error.message);
-        if (errInfo.error.includes('Missing or insufficient permissions')) {
-          message = "Você não tem permissão para realizar esta operação. Verifique as regras de segurança.";
-        }
-      } catch (e) {
-        // Not a JSON error
-      }
-      return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-background text-on-surface p-8 text-center">
-          <h2 className="text-2xl font-bold mb-4">Ops! Algo deu errado.</h2>
-          <p className="text-on-surface-variant mb-6">{message}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="bg-primary text-background px-6 py-2 rounded-lg font-bold"
-          >
-            Recarregar Aplicativo
-          </button>
-        </div>
-      );
-    }
-    return self.props.children;
-  }
-}
+import { api } from './api';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -316,27 +196,57 @@ interface LancamentosTabProps {
 const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNewTxModal, setEditingTx }: LancamentosTabProps) => {
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('TODOS');
+  const [monthFilter, setMonthFilter] = useState('TODOS');
+  const [yearFilter, setYearFilter] = useState('TODOS');
   
-  const filtered = useMemo(() => {
-    return transactions
-      .filter(tx => {
-        const matchesSearch = tx.fornecedor.toLowerCase().includes(filter.toLowerCase()) || 
-                             tx.descricao.toLowerCase().includes(filter.toLowerCase());
-        const matchesStatus = statusFilter === 'TODOS' || tx.status === statusFilter;
-        return matchesSearch && matchesStatus;
-      })
-      .sort((a, b) => {
-        const dateA = a.vencimento.split('/').reverse().join('');
-        const dateB = b.vencimento.split('/').reverse().join('');
-        return dateB.localeCompare(dateA);
-      });
-  }, [transactions, filter, statusFilter]);
+  // Extrair meses e anos únicos para os filtros
+  const availableYears = useMemo(() => {
+    const years = transactions.map(tx => {
+      const parts = tx.vencimento.split('/');
+      return parts.length === 3 ? parts[2] : null;
+    }).filter(Boolean);
+    return [...new Set(years)].sort().reverse();
+  }, [transactions]);
+
+  const availableMonths = [
+    { value: '01', label: 'Janeiro' },
+    { value: '02', label: 'Fevereiro' },
+    { value: '03', label: 'Março' },
+    { value: '04', label: 'Abril' },
+    { value: '05', label: 'Maio' },
+    { value: '06', label: 'Junho' },
+    { value: '07', label: 'Julho' },
+    { value: '08', label: 'Agosto' },
+    { value: '09', label: 'Setembro' },
+    { value: '10', label: 'Outubro' },
+    { value: '11', label: 'Novembro' },
+    { value: '12', label: 'Dezembro' }
+  ];
+
+  const filtered = transactions.filter(tx => {
+    const matchesSearch = tx.fornecedor.toLowerCase().includes(filter.toLowerCase()) || 
+                         (tx.descricao && tx.descricao.toLowerCase().includes(filter.toLowerCase()));
+    const matchesStatus = statusFilter === 'TODOS' || tx.status === statusFilter;
+    
+    let matchesMonth = true;
+    let matchesYear = true;
+    
+    if (monthFilter !== 'TODOS' || yearFilter !== 'TODOS') {
+      const parts = tx.vencimento.split('/');
+      if (parts.length === 3) {
+        if (monthFilter !== 'TODOS') matchesMonth = parts[1] === monthFilter;
+        if (yearFilter !== 'TODOS') matchesYear = parts[2] === yearFilter;
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesMonth && matchesYear;
+  });
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between gap-4">
-        <div className="flex gap-3 flex-grow max-w-2xl">
-          <div className="bg-surface-variant/20 flex items-center px-4 py-2.5 rounded-xl gap-3 border border-white/5 flex-grow">
+        <div className="flex flex-wrap gap-3 flex-grow max-w-4xl">
+          <div className="bg-surface-variant/20 flex items-center px-4 py-2.5 rounded-xl gap-3 border border-white/5 flex-grow min-w-[200px]">
             <Search size={18} className="text-on-surface-variant" />
             <input 
               type="text" 
@@ -346,20 +256,43 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
               onChange={(e) => setFilter(e.target.value)}
             />
           </div>
+          
           <select 
-            className="bg-surface-variant/20 border border-white/5 text-on-surface text-sm rounded-xl px-4 py-2.5 outline-none"
+            className="bg-surface border border-white/10 text-on-surface text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="TODOS">Todos Status</option>
-            <option value="PAGO">PAGO</option>
-            <option value="PENDENTE">PENDENTE</option>
-            <option value="VENCIDO">VENCIDO</option>
+            <option value="TODOS" className="bg-surface text-on-surface">Todos Status</option>
+            <option value="PAGO" className="bg-surface text-on-surface">PAGO</option>
+            <option value="PENDENTE" className="bg-surface text-on-surface">PENDENTE</option>
+            <option value="VENCIDO" className="bg-surface text-on-surface">VENCIDO</option>
+          </select>
+
+          <select 
+            className="bg-surface border border-white/10 text-on-surface text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+          >
+            <option value="TODOS" className="bg-surface text-on-surface">Todos os Meses</option>
+            {availableMonths.map(m => (
+              <option key={m.value} value={m.value} className="bg-surface text-on-surface">{m.label}</option>
+            ))}
+          </select>
+
+          <select 
+            className="bg-surface border border-white/10 text-on-surface text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary"
+            value={yearFilter}
+            onChange={(e) => setYearFilter(e.target.value)}
+          >
+            <option value="TODOS" className="bg-surface text-on-surface">Todos os Anos</option>
+            {availableYears.map(y => (
+              <option key={y} value={y || ''} className="bg-surface text-on-surface">{y}</option>
+            ))}
           </select>
         </div>
         <button 
           onClick={() => setShowNewTxModal(true)}
-          className="bg-primary text-background px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:opacity-90 transition-opacity"
+          className="bg-primary text-background px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:opacity-90 transition-opacity whitespace-nowrap"
         >
           <Plus size={18} /> Novo Lançamento
         </button>
@@ -740,118 +673,6 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
 
 // --- Modals ---
 
-interface ImportPreviewModalProps {
-  previewData: any[];
-  headers: string[];
-  onConfirm: () => void;
-  onCancel: () => void;
-  importProgress?: { current: number; total: number } | null;
-}
-
-const ImportPreviewModal = ({ previewData, headers, onConfirm, onCancel, importProgress }: ImportPreviewModalProps) => {
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-  };
-
-  const getStatusColor = (status: string) => {
-    const s = String(status).toUpperCase();
-    if (s.includes('PAGO')) return 'bg-green-500/80 text-white font-bold';
-    if (s.includes('VENCIDO')) return 'bg-red-500/80 text-white font-bold';
-    return 'bg-yellow-500/80 text-black font-bold';
-  };
-
-  const progressPercent = importProgress ? Math.round((importProgress.current / importProgress.total) * 100) : 0;
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-      <motion.div 
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="glass-card p-6 w-full max-w-3xl border border-white/10 shadow-2xl overflow-y-auto max-h-[85vh]"
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold font-headline">
-            {importProgress ? 'Importando...' : 'Preview da Importação'}
-          </h3>
-          {!importProgress && (
-            <button 
-              onClick={onCancel}
-              className="p-2 hover:bg-white/5 rounded-lg transition-colors"
-            >
-              <X size={20} />
-            </button>
-          )}
-        </div>
-        
-        {importProgress ? (
-          <div className="py-12 text-center">
-            <div className="text-4xl font-bold text-primary mb-4">{progressPercent}%</div>
-            <div className="w-full bg-surface rounded-full h-4 mb-2">
-              <div 
-                className="bg-primary h-4 rounded-full transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            <p className="text-on-surface-variant">
-              Processando {importProgress.current} de {importProgress.total} registros...
-            </p>
-          </div>
-        ) : (
-          <>
-            <p className="text-sm text-on-surface-variant mb-4">
-              Os seguintes dados serão importados ({previewData.length} registros):
-            </p>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/10">
-                    <th className="text-left py-3 px-4 text-xs font-bold text-on-surface-variant uppercase">Fornecedor</th>
-                    <th className="text-left py-3 px-4 text-xs font-bold text-on-surface-variant uppercase">Descrição</th>
-                    <th className="text-left py-3 px-4 text-xs font-bold text-on-surface-variant uppercase">Vencimento</th>
-                    <th className="text-right py-3 px-4 text-xs font-bold text-on-surface-variant uppercase">Valor</th>
-                    <th className="text-center py-3 px-4 text-xs font-bold text-on-surface-variant uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewData.map((row, idx) => (
-                    <tr key={idx} className="border-b border-white/5 hover:bg-white/5">
-                      <td className="py-3 px-4">{row.fornecedor}</td>
-                      <td className="py-3 px-4 text-on-surface-variant">{row.descricao}</td>
-                      <td className="py-3 px-4">{row.vencimento}</td>
-                      <td className="py-3 px-4 text-right font-mono">{formatCurrency(row.valor)}</td>
-                      <td className="py-3 px-4 text-center">
-                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${getStatusColor(row.status)}`}>
-                          {row.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex gap-4 mt-6">
-              <button 
-                onClick={onCancel}
-                className="flex-1 px-4 py-3 rounded-lg border border-white/10 text-sm font-bold hover:bg-white/5 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={onConfirm}
-                className="flex-1 px-4 py-3 rounded-lg bg-primary text-background text-sm font-bold hover:opacity-90 transition-opacity"
-              >
-                Confirmar Importação
-              </button>
-            </div>
-          </>
-        )}
-      </motion.div>
-    </div>
-  );
-};
-
 interface NewTxModalProps {
   suppliers: Supplier[];
   setShowNewTxModal: (show: boolean) => void;
@@ -870,44 +691,20 @@ const NewTxModal = ({ suppliers, setShowNewTxModal }: NewTxModalProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser) return;
-
-    const isLocal = auth.currentUser.uid === 'local-user-123';
-    const vencimentoFormatted = formData.vencimento.split('-').reverse().join('/');
-    const pagamentoFormatted = formData.status === 'PAGO' 
-      ? (formData.pagamento ? formData.pagamento.split('-').reverse().join('/') : new Date().toLocaleDateString('pt-BR')) 
-      : undefined;
 
     try {
-      if (isLocal) {
-        const newTx: Transaction = {
-          id: 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-          fornecedor: formData.fornecedor,
-          descricao: formData.descricao,
-          empresa: formData.empresa,
-          vencimento: vencimentoFormatted,
-          pagamento: pagamentoFormatted,
-          valor: Number(formData.valor),
-          status: formData.status
-        };
-        const txs = JSON.parse(window.localStorage.getItem('local_transactions') || '[]');
-        txs.push(newTx);
-        window.localStorage.setItem('local_transactions', JSON.stringify(txs));
-      } else {
-        const newTx = {
-          uid: auth.currentUser.uid,
-          ...formData,
-          valor: Number(formData.valor),
-          vencimento: vencimentoFormatted,
-          pagamento: pagamentoFormatted,
-          createdAt: Timestamp.now()
-        };
-        await addDoc(collection(db, 'transactions'), newTx);
-      }
+      const newTx = {
+        uid: 'guest',
+        ...formData,
+        valor: Number(formData.valor),
+        vencimento: formData.vencimento.split('-').reverse().join('/'),
+        pagamento: formData.status === 'PAGO' ? (formData.pagamento ? formData.pagamento.split('-').reverse().join('/') : new Date().toLocaleDateString('pt-BR')) : null,
+      };
+      await api.createTransaction(newTx);
       setShowNewTxModal(false);
-      window.location.reload();
+      window.location.reload(); // Recarrega para ver as mudanças
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'transactions');
+      console.error('Failed to create transaction:', error);
     }
   };
 
@@ -1040,7 +837,7 @@ const EditTxModal = ({ transaction, suppliers, onClose, onSave }: EditTxModalPro
       ...transaction,
       ...formData,
       vencimento: formData.vencimento.split('-').reverse().join('/'),
-      pagamento: formData.status === 'PAGO' ? formData.pagamento.split('-').reverse().join('/') : undefined,
+      pagamento: formData.status === 'PAGO' ? formData.pagamento.split('-').reverse().join('/') : null,
       valor: parseFloat(formData.valor)
     });
     onClose();
@@ -1176,31 +973,17 @@ const NewSupplierModal = ({ setShowNewSupplierModal }: NewSupplierModalProps) =>
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser) return;
-
-    const isLocal = auth.currentUser.uid === 'local-user-123';
 
     try {
-      if (isLocal) {
-        const newSupplier: Supplier = {
-          id: 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-          ...formData
-        };
-        const sups = JSON.parse(window.localStorage.getItem('local_suppliers') || '[]');
-        sups.push(newSupplier);
-        window.localStorage.setItem('local_suppliers', JSON.stringify(sups));
-      } else {
-        const newSupplier = {
-          ...formData,
-          uid: auth.currentUser.uid,
-          createdAt: Timestamp.now()
-        };
-        await addDoc(collection(db, 'suppliers'), newSupplier);
-      }
+      const newSupplier = {
+        ...formData,
+        uid: 'guest'
+      };
+      await api.createSupplier(newSupplier);
       setShowNewSupplierModal(false);
       window.location.reload();
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'suppliers');
+      console.error('Failed to create supplier:', error);
     }
   };
 
@@ -1331,18 +1114,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [isAuthReady, setIsAuthReady] = useState(true);
 
   const [showNewTxModal, setShowNewTxModal] = useState(false);
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
-  const [showImportPreview, setShowImportPreview] = useState(false);
-  const [previewData, setPreviewData] = useState<any[]>([]);
-  const [importRawData, setImportRawData] = useState<any[]>([]);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
-  const [filterPeriod, setFilterPeriod] = useState<string>('all');
-  const [filterMonth, setFilterMonth] = useState<string>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -1352,134 +1129,94 @@ export default function App() {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const isLocalMode = user?.uid === 'local-user-123';
-
-  const localStore = {
-    saveTransactions: (txs: Transaction[]) => {
-      window.localStorage.setItem('local_transactions', JSON.stringify(txs));
-    },
-    loadTransactions: (): Transaction[] => {
-      const data = window.localStorage.getItem('local_transactions');
-      return data ? JSON.parse(data) : [];
-    },
-    saveSuppliers: (sups: Supplier[]) => {
-      window.localStorage.setItem('local_suppliers', JSON.stringify(sups));
-    },
-    loadSuppliers: (): Supplier[] => {
-      const data = window.localStorage.getItem('local_suppliers');
-      return data ? JSON.parse(data) : [];
-    },
-    generateId: () => 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+  const fetchTransactions = async () => {
+    try {
+      const data = await api.getTransactions('guest');
+      setTransactions(data.sort((a: any, b: any) => b.id.localeCompare(a.id)));
+    } catch (error) {
+      console.error('Failed to fetch transactions:', error);
+    }
   };
 
-  // --- Firebase Auth ---
+  const fetchSuppliers = async () => {
+    try {
+      const data = await api.getSuppliers('guest');
+      setSuppliers(data);
+    } catch (error) {
+      console.error('Failed to fetch suppliers:', error);
+    }
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setIsAuthReady(true);
-    });
-    return () => unsubscribe();
+    fetchTransactions();
+    fetchSuppliers();
   }, []);
-
-  const handleLogin = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error('Erro ao fazer login:', error);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error('Erro ao fazer logout:', error);
-    }
-  };
-
-  // --- Data Sync ---
-  useEffect(() => {
-    if (!user) {
-      setTransactions([]);
-      setSuppliers([]);
-      return;
-    }
-
-    if (isLocalMode) {
-      const txs = localStore.loadTransactions();
-      const sups = localStore.loadSuppliers();
-      setTransactions(txs);
-      setSuppliers(sups);
-      return;
-    }
-
-    const qTransactions = query(collection(db, 'transactions'), where('uid', '==', user.uid));
-    const unsubscribeTransactions = onSnapshot(qTransactions, (snapshot) => {
-      const txs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
-      setTransactions(txs.sort((a, b) => b.id.localeCompare(a.id)));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'transactions');
-    });
-
-    const qSuppliers = query(collection(db, 'suppliers'), where('uid', '==', user.uid));
-    const unsubscribeSuppliers = onSnapshot(qSuppliers, (snapshot) => {
-      const sups = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Supplier));
-      setSuppliers(sups);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'suppliers');
-    });
-
-    return () => {
-      unsubscribeTransactions();
-      unsubscribeSuppliers();
-    };
-  }, [user, isLocalMode]);
 
   // --- Handlers ---
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
 
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        showNotification('Processando arquivo Excel...', 'info');
+        showNotification('Processando arquivo... Por favor, aguarde.', 'info');
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         
-        const allSheetsData: any[] = [];
-        const sheetNames = workbook.SheetNames;
+        let allDataMatrix: any[] = [];
         
-        for (const sheetName of sheetNames) {
+        // Iterar sobre todas as abas do Excel
+        for (const sheetName of workbook.SheetNames) {
           const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' }) as any[];
-          for (const row of jsonData) {
-            row._sheetName = sheetName;
+          
+          // Ler como matriz para evitar cruzamento de colunas
+          const sheetMatrix = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true }) as any[][];
+          
+          if (sheetMatrix.length < 2) continue; // Pula abas vazias
+          
+          // Tratamento rigoroso de cabeçalhos vazios, forçando os índices
+          const headers = sheetMatrix[0].map(h => String(h || '').trim().toUpperCase());
+          
+          for (let i = 1; i < sheetMatrix.length; i++) {
+            const row = sheetMatrix[i];
+            if (!row || row.length === 0) continue; // Pula linha vazia
+            
+            const rowData: any = { _aba_origem: sheetName };
+            
+            // Mapeia os valores usando o índice real do cabeçalho da aba
+            headers.forEach((header, index) => {
+              if (header && row[index] !== undefined && row[index] !== null && row[index] !== '') {
+                rowData[header] = row[index];
+              }
+            });
+            
+            allDataMatrix.push(rowData);
           }
-          allSheetsData.push(...jsonData);
         }
 
-        if (allSheetsData.length === 0) {
-          showNotification('A planilha parece estar vazia.', 'error');
+        console.log(`Planilha lida. Total de linhas: ${allDataMatrix.length}`);
+
+        if (allDataMatrix.length === 0) {
+          showNotification('A planilha parece estar vazia em todas as abas.', 'error');
           return;
         }
 
         const getRowValue = (row: any, keys: string[]) => {
-          const rowKeys = Object.keys(row);
           for (const key of keys) {
-            const foundKey = rowKeys.find(rk => rk.trim().toUpperCase() === key.toUpperCase());
-            if (foundKey) {
-              const val = row[foundKey];
-              if (val !== undefined && val !== null && val !== '') return val;
+            const foundKey = Object.keys(row).find(rk => rk === key.toUpperCase());
+            if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && row[foundKey] !== '') {
+              return row[foundKey];
             }
           }
-          for (const key of keys) {
-            const foundKey = rowKeys.find(rk => rk.toUpperCase().includes(key.toUpperCase()));
-            if (foundKey) {
-              const val = row[foundKey];
-              if (val !== undefined && val !== null && val !== '') return val;
+          // Partial match apenas para descrição e observações
+          if (keys.includes('DESCRIÇÃO') || keys.includes('OBSERVACAO')) {
+            for (const key of keys) {
+              const foundKey = Object.keys(row).find(rk => rk.toUpperCase().includes(key.toUpperCase()));
+              if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && row[foundKey] !== '') {
+                return row[foundKey];
+              }
             }
           }
           return undefined;
@@ -1490,76 +1227,190 @@ export default function App() {
           if (!val) return 0;
           const str = String(val).replace(/[R$\s]/g, '').trim();
           if (str === '' || str.toUpperCase() === 'TOTAL') return 0;
+          
+          // Trata formatos como 1.500,00 ou 1500,00 ou 1500.00
           if (str.includes(',') && str.includes('.')) {
-            const parts = str.split(',');
-            if (parts.length === 2) {
-              return Number(parts[0].replace(/\./g, '') + '.' + parts[1]);
-            }
+             // Ex: 1.500,00 -> remove ponto, troca virgula por ponto
+             return Number(str.replace(/\./g, '').replace(',', '.'));
+          } else if (str.includes(',')) {
+             // Ex: 1500,00
+             return Number(str.replace(',', '.'));
+          } else if ((str.match(/\./g) || []).length > 1) {
+             // Ex: 1.500.000 -> remove todos os pontos
+             return Number(str.replace(/\./g, ''));
           }
-          if (str.includes(',')) {
-            return Number(str.replace(/\./g, '').replace(',', '.'));
-          }
-          const n = Number(str.replace(/\./g, ''));
+          
+          const n = Number(str);
           return isNaN(n) ? 0 : n;
         };
 
-        const formatDate = (val: any): string => {
-          if (!val) return '';
-          if (val instanceof Date) return val.toLocaleDateString('pt-BR');
-          const str = String(val).trim();
-          if (!str) return '';
-          if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) return str;
-          if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-            const [y, m, d] = str.split('-');
-            return `${d}/${m}/${y}`;
-          }
-          return str;
-        };
+        const localSuppliers = new Set(suppliers.map(s => s.nome));
+        
+        let txBatch: Omit<Transaction, 'id'>[] = [];
+        let supBatch: Omit<Supplier, 'id'>[] = [];
+        let totalImported = 0;
+        let totalFinanceiro = 0;
 
-        const headers = Object.keys(allSheetsData[0] || {}).slice(0, 10);
+        for (const row of allDataMatrix) {
+          const rawFornecedor = getRowValue(row, ['FORNECEDOR', 'FORNECEDORES', 'FORNECEDOR_NOME', 'NOME', 'FAVORECIDO', 'CLIENTE']);
+          if (!rawFornecedor || String(rawFornecedor).toUpperCase().includes('TOTAL')) continue;
 
-        const previewRows: any[] = [];
-        let previewCount = 0;
-        for (const row of allSheetsData) {
-          if (previewCount >= 5) break;
-          
-          const rawFornecedor = getRowValue(row, ['Fornecedor', 'fornecedor', 'FORNECEDOR', 'FORNECEDORES', 'Fornecedores', 'FORNECEDOR_NOME', 'Nome', 'NOME', 'Favorecido', 'FAVORECIDO', 'CLIENTE', 'Cliente']);
-          const rawDescricao = getRowValue(row, ['Descricao', 'descricao', 'DESCRIÇÃO', 'OBSERVACAO', 'Observacao', 'OBS', 'Obs', 'DETALHE', 'Detalhe']);
-          
-          const fornecedorStr = String(rawFornecedor || '').trim().toUpperCase();
-          if (!rawFornecedor || fornecedorStr === '' || fornecedorStr.includes('TOTAL') || fornecedorStr.includes('FORNECEDOR') || fornecedorStr.includes('CLIENTE')) {
-            if (!rawDescricao) continue;
-          }
-
-          const rawValor = getRowValue(row, ['Valor', 'valor', 'VALOR', 'VALOR TOTAL', 'Valor Total', 'Total', 'total', 'VALOR_TOTAL', 'Quantia', 'Preço', 'Preco']);
+          const rawValor = getRowValue(row, ['VALOR', 'VALOR TOTAL', 'TOTAL', 'VALOR_TOTAL', 'QUANTIA', 'PREÇO', 'PRECO', 'SAIDA', 'SAÍDA', 'PAGAMENTO']);
           const sanitizedValor = parseValor(rawValor);
+          
+          if (sanitizedValor === 0 && !rawValor) continue;
+          if (String(rawFornecedor).toUpperCase() === 'FORNECEDOR' || String(rawFornecedor).toUpperCase() === 'CLIENTE') continue;
 
-          const rawPagamento = getRowValue(row, ['DATA PAGAMENTO', 'Data Pagamento', 'pagamento', 'PAGAMENTO', 'Data Pago', 'DATA PAGO', 'Pago em', 'PAGO EM']);
-          const rawStatus = String(getRowValue(row, ['Status', 'status', 'SITUAÇÃO', 'Situacao', 'SITUACAO', 'Situação', 'PAGO', 'Pago', 'SIT 2', 'SIT2']) || '').toUpperCase();
+          const formatDate = (val: any, sheetName?: string) => {
+            if (!val) return undefined;
+            if (val instanceof Date) {
+              const dt = new Date(val);
+              let day = dt.getUTCDate();
+              let month = dt.getUTCMonth() + 1;
+              let year = dt.getUTCFullYear();
+              
+              if (month > 12) {
+                let temp = month;
+                month = day;
+                day = temp;
+              }
+              
+              if (month > 12) month = 12;
+              if (day > 31) day = 28;
+              
+              return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+            }
+            const str = String(val).trim();
+            if (str.includes('/')) {
+              const parts = str.split('/');
+              if (parts.length === 3) {
+                let p0 = Number(parts[0]);
+                let p1 = Number(parts[1]);
+                let p2 = parts[2];
+                
+                if (p2.length === 2) p2 = '20' + p2;
+                
+                let day = p0;
+                let month = p1;
+                
+                if (p0 > 12) {
+                  day = p0;
+                  month = p1;
+                } else if (p1 > 12) {
+                  day = p1;
+                  month = p0;
+                } else {
+                  if (sheetName && sheetName.toUpperCase().includes('MAR')) {
+                     if (p0 === 3) { month = p0; day = p1; }
+                     else if (p1 === 3) { month = p1; day = p0; }
+                     else { day = p0; month = p1; }
+                  } else {
+                     day = p0;
+                     month = p1;
+                  }
+                }
+                
+                if (month > 12) {
+                  let temp = month;
+                  month = day;
+                  day = temp;
+                }
+                
+                if (month > 12) month = 12;
+                if (day > 31) day = 28;
+                
+                return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${p2}`;
+              }
+            }
+            return str;
+          };
+
+          const fornecedorNome = String(rawFornecedor).trim();
+          
+          const rawVencimento = getRowValue(row, ['VENCIMENTO', 'DATA VENCIMENTO', 'DATA', 'VENC']);
+          const rawPagamento = getRowValue(row, ['DATA PAGAMENTO', 'PAGAMENTO', 'DATA PAGO', 'PAGO EM']);
+
+          const vencimentoDate = formatDate(rawVencimento, row._aba_origem);
+          const pagamentoDate = rawPagamento ? formatDate(rawPagamento, row._aba_origem) : undefined;
+          
+          const rawStatus = String(getRowValue(row, ['STATUS', 'SITUAÇÃO', 'SITUACAO', 'PAGO', 'SIT 2']) || '').toUpperCase();
           let status: TransactionStatus = 'PENDENTE';
           
-          if (rawStatus.includes('PAGO') || (rawPagamento && String(rawPagamento).trim() !== '')) {
+          if (pagamentoDate || rawStatus.includes('PAGO')) {
             status = 'PAGO';
           } else if (rawStatus.includes('VENCIDO')) {
             status = 'VENCIDO';
           }
 
-          const rawVencimento = getRowValue(row, ['Vencimento', 'vencimento', 'VENCIMENTO', 'DATA VENCIMENTO', 'Data Vencimento', 'Data', 'DATA', 'Venc', 'VENC']);
+          const rawDescricao = getRowValue(row, ['DESCRIÇÃO', 'DESCRICAO', 'OBSERVACAO', 'OBSERVAÇÃO', 'OBS 1', 'OBS 2', 'OBS', 'DETALHE']);
+          const rawEmpresa = getRowValue(row, ['EMPRESA', 'UNIDADE', 'LOJA']);
 
-          previewRows.push({
-            fornecedor: String(rawFornecedor || 'Sem fornecedor').trim(),
+          txBatch.push({
+            uid: 'guest',
+            fornecedor: fornecedorNome,
             descricao: String(rawDescricao || '-'),
-            vencimento: formatDate(rawVencimento),
+            empresa: String(rawEmpresa || 'Geral'),
+            vencimento: vencimentoDate,
+            pagamento: pagamentoDate || undefined,
             valor: sanitizedValor,
             status: status
           });
-          previewCount++;
+          
+          totalImported++;
+          totalFinanceiro += sanitizedValor;
+
+          // Handle supplier
+          if (!localSuppliers.has(fornecedorNome) && fornecedorNome !== 'Desconhecido') {
+            supBatch.push({
+              uid: 'guest',
+              nome: fornecedorNome,
+              email: '',
+              telefone: '',
+              cnpj: ''
+            });
+            localSuppliers.add(fornecedorNome);
+          }
+
+          // Lotes menores (250) e usar await com try-catch individual por lote para evitar queda
+          if (txBatch.length >= 250) {
+            try {
+              console.log(`Enviando lote de ${txBatch.length} transações...`);
+              await api.createTransactionsBatch(txBatch);
+              txBatch = [];
+            } catch (err) {
+              console.error('Erro no lote de transações', err);
+              txBatch = [];
+            }
+          }
+          if (supBatch.length >= 250) {
+            try {
+              await api.createSuppliersBatch(supBatch);
+              supBatch = [];
+            } catch (err) {
+              console.error('Erro no lote de fornecedores', err);
+              supBatch = [];
+            }
+          }
         }
 
-        setImportRawData(allSheetsData);
-        setPreviewData(previewRows);
-        setShowImportPreview(true);
-        showNotification(`${sheetNames.length} abas encontradas com ${allSheetsData.length} linhas. Verifique o preview.`, 'info');
+        console.log(`Total mapeado para envio: ${totalImported} linhas. Financeiro: R$ ${totalFinanceiro}`);
+
+        // Lotes finais
+        if (txBatch.length > 0) {
+          try {
+            console.log(`Enviando lote final de ${txBatch.length} transações...`);
+            await api.createTransactionsBatch(txBatch);
+          } catch(err) { console.error(err); }
+        }
+        if (supBatch.length > 0) {
+          try {
+            await api.createSuppliersBatch(supBatch);
+          } catch(err) { console.error(err); }
+        }
+
+        showNotification(`${totalImported} lançamentos processados na importação!`, 'success');
+        fetchTransactions();
+        fetchSuppliers();
       } catch (err) {
         console.error('Erro ao processar arquivo:', err);
         showNotification('Erro ao processar o arquivo. Verifique o formato.', 'error');
@@ -1570,305 +1421,45 @@ export default function App() {
     reader.readAsArrayBuffer(file);
   };
 
-  const confirmImport = async () => {
-    if (!user || importRawData.length === 0) return;
-
-    try {
-      showNotification('Importando lançamentos... Por favor, aguarde.', 'info');
-      
-      const getRowValue = (row: any, keys: string[]) => {
-        const rowKeys = Object.keys(row);
-        for (const key of keys) {
-          const foundKey = rowKeys.find(rk => rk.trim().toUpperCase() === key.toUpperCase());
-          if (foundKey) {
-            const val = row[foundKey];
-            if (val !== undefined && val !== null && val !== '') return val;
-          }
-        }
-        for (const key of keys) {
-          const foundKey = rowKeys.find(rk => rk.toUpperCase().includes(key.toUpperCase()));
-          if (foundKey) {
-            const val = row[foundKey];
-            if (val !== undefined && val !== null && val !== '') return val;
-          }
-        }
-        return undefined;
-      };
-
-      const parseValor = (val: any): number => {
-        if (typeof val === 'number') return val;
-        if (!val) return 0;
-        const str = String(val).replace(/[R$\s]/g, '').trim();
-        if (str === '' || str.toUpperCase() === 'TOTAL') return 0;
-        if (str.includes(',') && str.includes('.')) {
-          const parts = str.split(',');
-          if (parts.length === 2) {
-            return Number(parts[0].replace(/\./g, '') + '.' + parts[1]);
-          }
-        }
-        if (str.includes(',')) {
-          return Number(str.replace(/\./g, '').replace(',', '.'));
-        }
-        const n = Number(str.replace(/\./g, ''));
-        return isNaN(n) ? 0 : n;
-      };
-
-      const formatDate = (val: any): string => {
-        if (!val) return '';
-        if (val instanceof Date) return val.toLocaleDateString('pt-BR');
-        const str = String(val).trim();
-        if (!str) return '';
-        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)) return str;
-        if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-          const [y, m, d] = str.split('-');
-          return `${d}/${m}/${y}`;
-        }
-        return str;
-      };
-
-      const newSuppliers: Supplier[] = [];
-      let totalImported = 0;
-      const totalRows = importRawData.length;
-
-      if (isLocalMode) {
-        const existingTxs = localStore.loadTransactions();
-        const existingSups = localStore.loadSuppliers();
-        const localSuppliersSet = new Set(existingSups.map(s => s.nome));
-        
-        let processedCount = 0;
-        for (const row of importRawData) {
-          processedCount++;
-          if (processedCount % 100 === 0) {
-            setImportProgress({ current: processedCount, total: totalRows });
-            await new Promise(r => setTimeout(r, 0));
-          }
-          
-          const rawFornecedor = getRowValue(row, ['Fornecedor', 'fornecedor', 'FORNECEDOR', 'FORNECEDORES', 'Fornecedores', 'FORNECEDOR_NOME', 'Nome', 'NOME', 'Favorecido', 'FAVORECIDO', 'CLIENTE', 'Cliente']);
-          const rawDescricao = getRowValue(row, ['Descricao', 'descricao', 'DESCRIÇÃO', 'OBSERVACAO', 'Observacao', 'OBS', 'Obs', 'DETALHE', 'Detalhe']);
-          
-          const fornecedorStr = String(rawFornecedor || '').trim().toUpperCase();
-          if (!rawFornecedor || fornecedorStr === '' || fornecedorStr.includes('TOTAL') || fornecedorStr.includes('FORNECEDOR') || fornecedorStr.includes('CLIENTE')) {
-            if (!rawDescricao) continue;
-          }
-
-          const rawValor = getRowValue(row, ['Valor', 'valor', 'VALOR', 'VALOR TOTAL', 'Valor Total', 'Total', 'total', 'VALOR_TOTAL', 'Quantia', 'Preço', 'Preco']);
-          const sanitizedValor = parseValor(rawValor);
-          const fornecedorNome = String(rawFornecedor || 'Sem fornecedor').trim();
-          const rawPagamento = getRowValue(row, ['DATA PAGAMENTO', 'Data Pagamento', 'pagamento', 'PAGAMENTO', 'Data Pago', 'DATA PAGO', 'Pago em', 'PAGO EM']);
-          const rawStatus = String(getRowValue(row, ['Status', 'status', 'SITUAÇÃO', 'Situacao', 'SITUACAO', 'Situação', 'PAGO', 'Pago', 'SIT 2', 'SIT2']) || '').toUpperCase();
-          
-          let status: TransactionStatus = 'PENDENTE';
-          if (rawStatus.includes('PAGO') || (rawPagamento && String(rawPagamento).trim() !== '')) {
-            status = 'PAGO';
-          } else if (rawStatus.includes('VENCIDO')) {
-            status = 'VENCIDO';
-          }
-          
-          const pagamentoDate = (status === 'PAGO' && rawPagamento) ? formatDate(rawPagamento) : undefined;
-          const rawVencimento = getRowValue(row, ['Vencimento', 'vencimento', 'VENCIMENTO', 'DATA VENCIMENTO', 'Data Vencimento', 'Data', 'DATA', 'Venc', 'VENC']);
-          const rawEmpresa = getRowValue(row, ['Empresa', 'empresa', 'EMPRESA', 'UNIDADE', 'Unidade', 'LOJA', 'Loja']);
-
-          const newTx: Transaction = {
-            id: localStore.generateId(),
-            fornecedor: fornecedorNome,
-            descricao: String(rawDescricao || '-'),
-            empresa: String(rawEmpresa || 'Geral'),
-            vencimento: formatDate(rawVencimento),
-            valor: sanitizedValor,
-            status: status,
-            pagamento: pagamentoDate,
-            mes: String(row._sheetName || '')
-          };
-          existingTxs.push(newTx);
-          totalImported++;
-
-          if (!localSuppliersSet.has(fornecedorNome) && fornecedorNome !== 'Desconhecido') {
-            const newSup: Supplier = {
-              id: localStore.generateId(),
-              nome: fornecedorNome,
-              email: '',
-              telefone: '',
-              cnpj: '',
-              endereco: '',
-              cidade: '',
-              estado: '',
-              categoria: '',
-              observacoes: ''
-            };
-            existingSups.push(newSup);
-            localSuppliersSet.add(fornecedorNome);
-            newSuppliers.push(newSup);
-          }
-        }
-
-        localStore.saveTransactions(existingTxs);
-        localStore.saveSuppliers(existingSups);
-        setTransactions(existingTxs);
-        setSuppliers(existingSups);
-        setImportProgress(null);
-      } else {
-        const localSuppliersSet = new Set(suppliers.map(s => s.nome));
-        let batch = writeBatch(db);
-        let count = 0;
-
-        for (const row of importRawData) {
-          const rawFornecedor = getRowValue(row, ['Fornecedor', 'fornecedor', 'FORNECEDOR', 'FORNECEDORES', 'Fornecedores', 'FORNECEDOR_NOME', 'Nome', 'NOME', 'Favorecido', 'FAVORECIDO', 'CLIENTE', 'Cliente']);
-          const rawDescricao = getRowValue(row, ['Descricao', 'descricao', 'DESCRIÇÃO', 'OBSERVACAO', 'Observacao', 'OBS', 'Obs', 'DETALHE', 'Detalhe']);
-          
-          const fornecedorStr = String(rawFornecedor || '').trim().toUpperCase();
-          if (!rawFornecedor || fornecedorStr === '' || fornecedorStr.includes('TOTAL') || fornecedorStr.includes('FORNECEDOR') || fornecedorStr.includes('CLIENTE')) {
-            if (!rawDescricao) continue;
-          }
-
-          const rawValor = getRowValue(row, ['Valor', 'valor', 'VALOR', 'VALOR TOTAL', 'Valor Total', 'Total', 'total', 'VALOR_TOTAL', 'Quantia', 'Preço', 'Preco']);
-          const sanitizedValor = parseValor(rawValor);
-          const fornecedorNome = String(rawFornecedor || 'Sem fornecedor').trim();
-          const rawPagamento = getRowValue(row, ['DATA PAGAMENTO', 'Data Pagamento', 'pagamento', 'PAGAMENTO', 'Data Pago', 'DATA PAGO', 'Pago em', 'PAGO EM']);
-          const rawStatus = String(getRowValue(row, ['Status', 'status', 'SITUAÇÃO', 'Situacao', 'SITUACAO', 'Situação', 'PAGO', 'Pago', 'SIT 2', 'SIT2']) || '').toUpperCase();
-          
-          let status: TransactionStatus = 'PENDENTE';
-          if (rawStatus.includes('PAGO') || (rawPagamento && String(rawPagamento).trim() !== '')) {
-            status = 'PAGO';
-          } else if (rawStatus.includes('VENCIDO')) {
-            status = 'VENCIDO';
-          }
-          
-          const pagamentoDate = (status === 'PAGO' && rawPagamento) ? formatDate(rawPagamento) : undefined;
-          const rawVencimento = getRowValue(row, ['Vencimento', 'vencimento', 'VENCIMENTO', 'DATA VENCIMENTO', 'Data Vencimento', 'Data', 'DATA', 'Venc', 'VENC']);
-          const rawEmpresa = getRowValue(row, ['Empresa', 'empresa', 'EMPRESA', 'UNIDADE', 'Unidade', 'LOJA', 'Loja']);
-
-          const txRef = doc(collection(db, 'transactions'));
-          const txData: any = {
-            uid: user.uid,
-            fornecedor: fornecedorNome,
-            descricao: String(rawDescricao || '-'),
-            empresa: String(rawEmpresa || 'Geral'),
-            vencimento: formatDate(rawVencimento),
-            valor: sanitizedValor,
-            status: status,
-            createdAt: Timestamp.now()
-          };
-          
-          if (pagamentoDate) {
-            txData.pagamento = pagamentoDate;
-          }
-          
-          batch.set(txRef, txData);
-          count++;
-          totalImported++;
-
-          if (!localSuppliersSet.has(fornecedorNome) && fornecedorNome !== 'Desconhecido') {
-            const supRef = doc(collection(db, 'suppliers'));
-            batch.set(supRef, {
-              uid: user.uid,
-              nome: fornecedorNome,
-              email: '',
-              telefone: '',
-              cnpj: '',
-              endereco: '',
-              cidade: '',
-              estado: '',
-              categoria: '',
-              observacoes: '',
-              createdAt: Timestamp.now()
-            });
-            localSuppliersSet.add(fornecedorNome);
-            count++;
-          }
-
-          if (count >= 450) {
-            await batch.commit();
-            batch = writeBatch(db);
-            count = 0;
-          }
-        }
-
-        if (count > 0) {
-          await batch.commit();
-        }
-      }
-
-      setShowImportPreview(false);
-      setPreviewData([]);
-      setImportRawData([]);
-      setImportProgress(null);
-      showNotification(`${totalImported} lançamentos importados com sucesso!`, 'success');
-    } catch (err) {
-      console.error('Erro ao importar:', err);
-      setImportProgress(null);
-      showNotification('Erro ao importar os dados. Tente novamente.', 'error');
-    }
-  };
-
   const markAsPaid = async (id: string) => {
     try {
-      if (isLocalMode) {
-        const txs = localStore.loadTransactions();
-        const idx = txs.findIndex(t => t.id === id);
-        if (idx !== -1) {
-          txs[idx].status = 'PAGO';
-          txs[idx].pagamento = new Date().toLocaleDateString('pt-BR');
-          localStore.saveTransactions(txs);
-          setTransactions(txs);
-        }
-      } else {
-        await updateDoc(doc(db, 'transactions', id), {
-          status: 'PAGO',
-          pagamento: new Date().toLocaleDateString('pt-BR')
-        });
-      }
+      await api.updateTransaction(id, {
+        status: 'PAGO',
+        pagamento: new Date().toLocaleDateString('pt-BR')
+      });
       showNotification('Lançamento marcado como pago!', 'success');
+      fetchTransactions();
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `transactions/${id}`);
+      console.error('Failed to mark as paid:', error);
     }
   };
 
   const updateTransaction = async (updatedTx: Transaction) => {
     try {
-      if (isLocalMode) {
-        const txs = localStore.loadTransactions();
-        const idx = txs.findIndex(t => t.id === updatedTx.id);
-        if (idx !== -1) {
-          txs[idx] = updatedTx;
-          localStore.saveTransactions(txs);
-          setTransactions(txs);
-        }
-      } else {
-        const { id, ...data } = updatedTx;
-        await updateDoc(doc(db, 'transactions', id), data);
+      const { id, ...data } = updatedTx;
+      if (id) {
+        await api.updateTransaction(id, data);
+        showNotification('Lançamento atualizado!', 'success');
+        fetchTransactions();
       }
-      showNotification('Lançamento atualizado!', 'success');
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `transactions/${updatedTx.id}`);
+      console.error('Failed to update transaction:', error);
     }
   };
 
   const syncSuppliers = async () => {
-    if (!user) return;
-    
-    if (isLocalMode) {
-      showNotification('No modo local, fornecedores são sincronizados automaticamente.', 'info');
-      return;
-    }
-    
     const transactionSuppliers = new Set<string>(transactions.map(tx => tx.fornecedor));
     const existingNames = new Set<string>(suppliers.map(s => s.nome));
     let count = 0;
 
     for (const nome of transactionSuppliers) {
       if (!existingNames.has(nome) && nome !== 'Desconhecido') {
-        await addDoc(collection(db, 'suppliers'), {
-          uid: user.uid,
+        await api.createSupplier({
+          uid: 'guest',
           nome: nome,
           email: '',
           telefone: '',
-          cnpj: '',
-          endereco: '',
-          cidade: '',
-          estado: '',
-          categoria: '',
-          observacoes: '',
-          createdAt: Timestamp.now()
+          cnpj: ''
         });
         count++;
       }
@@ -1876,6 +1467,7 @@ export default function App() {
 
     if (count > 0) {
       showNotification(`${count} novos fornecedores sincronizados!`, 'success');
+      fetchSuppliers();
     } else {
       showNotification('Todos os fornecedores já estão cadastrados.', 'info');
     }
@@ -1883,202 +1475,61 @@ export default function App() {
 
   const deleteTransaction = async (id: string) => {
     try {
-      if (isLocalMode) {
-        const txs = localStore.loadTransactions().filter(t => t.id !== id);
-        localStore.saveTransactions(txs);
-        setTransactions(txs);
-      } else {
-        await deleteDoc(doc(db, 'transactions', id));
-      }
+      await api.deleteTransaction(id);
       showNotification('Lançamento excluído.', 'info');
+      fetchTransactions();
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `transactions/${id}`);
-    }
-  };
-
-  const cleanEmptyTransactions = async () => {
-    try {
-      if (isLocalMode) {
-        const txs = localStore.loadTransactions();
-        const beforeCount = txs.length;
-        const cleaned = txs.filter(tx => {
-          if (tx.valor <= 0) return false;
-          if (!tx.fornecedor || tx.fornecedor.trim() === '') return false;
-          const forn = tx.fornecedor.toUpperCase();
-          if (forn === 'CLIENTE' || forn === 'SEM FORNECEDOR') return false;
-          if (forn.includes('DESCRIÇÃO') || forn.includes('FORNECEDOR')) return false;
-          if (tx.descricao && (tx.descricao.toUpperCase().includes('VENCIMENTO') || tx.descricao.toUpperCase().includes('PAGAMENTO'))) return false;
-          return true;
-        });
-        const removed = beforeCount - cleaned.length;
-        localStore.saveTransactions(cleaned);
-        setTransactions(cleaned);
-        showNotification(`${removed} lançamentos vazios/removidos. ${cleaned.length} registros mantidos.`, 'success');
-      } else {
-        const q = query(collection(db, 'transactions'), where('uid', '==', user.uid));
-        const snapshot = await getDocs(q);
-        let removed = 0;
-        const batch = writeBatch(db);
-        snapshot.forEach(docSnap => {
-          const tx = docSnap.data();
-          if (tx.valor <= 0 || !tx.fornecedor || tx.fornecedor.trim() === '' || tx.fornecedor === 'Sem fornecedor' || tx.fornecedor.toUpperCase() === 'CLIENTE') {
-            batch.delete(docSnap.ref);
-            removed++;
-          }
-        });
-        await batch.commit();
-        showNotification(`${removed} lançamentos vazios removidos.`, 'success');
-      }
-    } catch (error) {
-      console.error('Erro ao limpar lançamentos vazios:', error);
-      showNotification('Erro ao limpar lançamentos vazios.', 'error');
+      console.error('Failed to delete transaction:', error);
     }
   };
 
   const deleteSupplier = async (id: string) => {
     try {
-      if (isLocalMode) {
-        const sups = localStore.loadSuppliers().filter(s => s.id !== id);
-        localStore.saveSuppliers(sups);
-        setSuppliers(sups);
-      } else {
-        await deleteDoc(doc(db, 'suppliers', id));
-      }
+      await api.deleteSupplier(id);
       showNotification('Fornecedor excluído.', 'info');
+      fetchSuppliers();
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `suppliers/${id}`);
+      console.error('Failed to delete supplier:', error);
     }
   };
 
   const resetSystem = async () => {
-    if (!user) return;
-    const msg = isLocalMode 
-      ? 'ATENÇÃO: Isso apagará TODOS os seus lançamentos e fornecedores locais. Deseja continuar?'
-      : 'ATENÇÃO: Isso apagará TODOS os seus lançamentos e fornecedores da nuvem. Deseja continuar?';
-    if (!window.confirm(msg)) return;
+    if (!window.confirm('ATENÇÃO: Isso apagará TODOS os seus lançamentos e fornecedores da nuvem. Deseja continuar?')) return;
     
     try {
       showNotification('Iniciando limpeza de dados...', 'info');
       
-      if (isLocalMode) {
-        window.localStorage.setItem('local_transactions', JSON.stringify([]));
-        window.localStorage.setItem('local_suppliers', JSON.stringify([]));
-        setTransactions([]);
-        setSuppliers([]);
-      } else {
-        const txQuery = query(collection(db, 'transactions'), where('uid', '==', user.uid));
-        const txSnapshot = await getDocs(txQuery);
-        
-        const supQuery = query(collection(db, 'suppliers'), where('uid', '==', user.uid));
-        const supSnapshot = await getDocs(supQuery);
-        
-        const allDocs = [...txSnapshot.docs, ...supSnapshot.docs];
-        
-        if (allDocs.length === 0) {
-          showNotification('Nenhum dado encontrado para apagar.', 'info');
-          return;
-        }
-
-        let batch = writeBatch(db);
-        let count = 0;
-        for (const docSnap of allDocs) {
-          batch.delete(docSnap.ref);
-          count++;
-          if (count === 500) {
-            await batch.commit();
-            batch = writeBatch(db);
-            count = 0;
-          }
-        }
-        if (count > 0) await batch.commit();
-      }
+      await api.resetDatabase();
       
       showNotification('Sistema resetado com sucesso!', 'success');
+      fetchTransactions();
+      fetchSuppliers();
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, 'reset-total');
+      console.error('Failed to reset system:', error);
+      showNotification('Erro ao resetar o sistema.', 'error');
     }
   };
 
   // --- Computed Stats ---
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter(tx => {
-      const year = tx.vencimento.substring(tx.vencimento.length - 4);
-      const month = tx.vencimento.substring(3, 5);
-      const yearMatch = filterPeriod === 'all' || year === filterPeriod;
-      const monthMatch = filterMonth === 'all' || month === filterMonth;
-      return yearMatch && monthMatch;
-    });
-  }, [transactions, filterPeriod, filterMonth]);
-
   const stats = useMemo(() => {
-    const total = filteredTransactions.reduce((acc, tx) => acc + tx.valor, 0);
-    const pagos = filteredTransactions.filter(tx => tx.status === 'PAGO').length;
-    const pendentes = filteredTransactions.filter(tx => tx.status === 'PENDENTE').length;
-    const vencidos = filteredTransactions.filter(tx => tx.status === 'VENCIDO').length;
+    const total = transactions.reduce((acc, tx) => acc + tx.valor, 0);
+    const pagos = transactions.filter(tx => tx.status === 'PAGO').length;
+    const pendentes = transactions.filter(tx => tx.status === 'PENDENTE').length;
+    const vencidos = transactions.filter(tx => tx.status === 'VENCIDO').length;
     
     const kpis: KPI[] = [
       { label: 'VALOR TOTAL', value: total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), color: '#78dc77' },
-      { label: 'REGISTROS', value: filteredTransactions.length.toString(), description: 'Volume operacional', color: '#78dc77' },
-      { label: 'EMPRESAS', value: [...new Set(filteredTransactions.map(t => t.empresa))].length.toString(), description: 'Unidades ativas', color: '#78dc77' },
+      { label: 'REGISTROS', value: transactions.length.toString(), description: 'Volume operacional', color: '#78dc77' },
+      { label: 'EMPRESAS', value: [...new Set(transactions.map(t => t.empresa))].length.toString(), description: 'Unidades ativas', color: '#78dc77' },
       { label: 'PENDENTES', value: pendentes.toString(), description: 'Aguardando conciliação', color: '#fabd00' },
       { label: 'PAGOS', value: pagos.toString(), description: 'Liquidados', color: '#78dc77' },
       { label: 'VENCIDOS', value: vencidos.toString(), description: 'Ação imediata necessária', color: '#ffb3b0' },
     ];
 
     return { total, pagos, pendentes, vencidos, kpis };
-  }, [filteredTransactions]);
+  }, [transactions]);
 
-  if (!isAuthReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <RefreshCw className="animate-spin text-primary" size={48} />
-      </div>
-    );
-  }
-
-  if (!user) {
-    const handleLocalLogin = () => {
-      const mockUser = {
-        uid: 'local-user-123',
-        email: 'local@test.com',
-        displayName: 'Usuário Local',
-        photoURL: null,
-        emailVerified: true,
-        isAnonymous: false,
-        providerData: []
-      } as any;
-      setUser(mockUser);
-    };
-
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card p-12 max-w-md w-full text-center space-y-8 border border-white/10 shadow-2xl"
-        >
-          <div className="space-y-4">
-            <h1 className="text-4xl font-extrabold font-headline tracking-tighter text-white">CN Intelligence</h1>
-            <p className="text-on-surface-variant">Gestão financeira avançada para o Grupo CN.</p>
-          </div>
-          <button 
-            onClick={handleLogin}
-            className="w-full bg-primary text-background py-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:opacity-90 transition-all shadow-lg"
-          >
-            <LayoutDashboard size={20} /> Entrar com Google
-          </button>
-          <button 
-            onClick={handleLocalLogin}
-            className="w-full bg-secondary/20 text-secondary py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-secondary/30 transition-all border border-secondary/30"
-          >
-            <FileSpreadsheet size={18} /> Acesso Local (Teste)
-          </button>
-          <p className="text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">Acesso restrito a colaboradores autorizados</p>
-        </motion.div>
-      </div>
-    );
-  }
-
+  // Removida a tela de loading de isAuthReady para permitir a renderização direta
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
@@ -2122,22 +1573,6 @@ export default function App() {
           <button className="p-2 text-on-surface-variant hover:bg-white/5 rounded-full transition-colors hidden sm:block">
             <Bell size={20} />
           </button>
-          <button 
-            onClick={handleLogout}
-            className="p-2 text-on-surface-variant hover:bg-white/5 rounded-full transition-colors flex items-center gap-2"
-            title="Sair"
-          >
-            <Settings size={20} />
-            <span className="text-xs font-bold hidden md:block">SAIR</span>
-          </button>
-          <div className="h-8 w-8 rounded-full bg-surface-variant overflow-hidden border border-white/10">
-            <img 
-              src={user.photoURL || "https://picsum.photos/seed/user/64/64"} 
-              alt={user.displayName || "User"} 
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover"
-            />
-          </div>
         </div>
       </header>
 
@@ -2193,54 +1628,24 @@ export default function App() {
             </h2>
             <div className="flex flex-wrap gap-3">
               <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-primary border border-primary/20 flex items-center gap-2">
-                <LayoutDashboard size={14} /> {filterPeriod === 'all' ? 'TODOS' : filterPeriod}{filterMonth !== 'all' ? '/' + filterMonth : ''}
+                <LayoutDashboard size={14} /> Grupo CN 2024-2025
               </span>
               <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-surface-variant flex items-center gap-2">
-                <CheckCircle size={14} /> {filteredTransactions.length} de {transactions.length} registros
+                <CheckCircle size={14} /> {transactions.length} registros
               </span>
               <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-surface-variant flex items-center gap-2">
-                <Calendar size={14} /> {[...new Set(filteredTransactions.map(t => t.vencimento.substring(0, 7)))].length} períodos
+                <Calendar size={14} /> {[...new Set(transactions.map(t => t.vencimento.substring(0, 7)))].length} períodos
               </span>
             </div>
-            
           </div>
 
-          {/* Actions + Filtro */}
-          <div className="flex flex-wrap gap-3 items-center">
-            <select 
-              value={filterPeriod}
-              onChange={e => { setFilterPeriod(e.target.value); setFilterMonth('all'); }}
-              className="bg-surface border border-white/10 rounded-lg px-3 py-2 text-sm font-medium focus:border-primary outline-none"
-            >
-              <option value="all">Todos os Anos</option>
-              <option value="2024">2024</option>
-              <option value="2025">2025</option>
-              <option value="2026">2026</option>
-            </select>
-            <select 
-              value={filterMonth}
-              onChange={e => setFilterMonth(e.target.value)}
-              className="bg-surface border border-white/10 rounded-lg px-3 py-2 text-sm font-medium focus:border-primary outline-none"
-            >
-              <option value="all">Todos os Meses</option>
-              <option value="01">Janeiro</option>
-              <option value="02">Fevereiro</option>
-              <option value="03">Março</option>
-              <option value="04">Abril</option>
-              <option value="05">Maio</option>
-              <option value="06">Junho</option>
-              <option value="07">Julho</option>
-              <option value="08">Agosto</option>
-              <option value="09">Setembro</option>
-              <option value="10">Outubro</option>
-              <option value="11">Novembro</option>
-              <option value="12">Dezembro</option>
-            </select>
+          {/* Actions */}
+          <div className="flex flex-wrap gap-3">
             <button 
               onClick={() => fileInputRef.current?.click()}
               className="bg-surface-variant/20 text-on-surface px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-surface-variant/40 transition-all border border-white/5"
             >
-              <FileSpreadsheet size={18} className="text-primary" /> Importar
+              <FileSpreadsheet size={18} className="text-primary" /> Importar CSV
             </button>
             <input 
               type="file" 
@@ -2270,7 +1675,7 @@ export default function App() {
             )}
             {activeTab === 'lancamentos' && (
               <LancamentosTab 
-                transactions={filteredTransactions} 
+                transactions={transactions} 
                 markAsPaid={markAsPaid} 
                 deleteTransaction={deleteTransaction} 
                 setShowNewTxModal={setShowNewTxModal} 
@@ -2280,13 +1685,13 @@ export default function App() {
             {activeTab === 'fornecedores' && (
               <FornecedoresTab 
                 suppliers={suppliers} 
-                transactions={filteredTransactions} 
+                transactions={transactions} 
                 deleteSupplier={deleteSupplier} 
                 setShowNewSupplierModal={setShowNewSupplierModal} 
                 syncSuppliers={syncSuppliers}
               />
             )}
-            {activeTab === 'relatorios' && <RelatoriosTab transactions={filteredTransactions} />}
+            {activeTab === 'relatorios' && <RelatoriosTab transactions={transactions} />}
             {activeTab === 'configuracoes' && (
               <div className="glass-card p-10 text-center space-y-6">
                 <Settings size={48} className="mx-auto text-on-surface-variant opacity-20" />
@@ -2297,32 +1702,66 @@ export default function App() {
                   </p>
                 </div>
                 
-                <div className="pt-8 border-t border-white/5 space-y-6">
-                  <div className="bg-surface-variant/20 p-6 rounded-xl border border-white/5">
-                    <h4 className="text-sm font-bold text-secondary mb-4 uppercase tracking-widest">Limpeza de Dados</h4>
-                    <button 
-                      onClick={cleanEmptyTransactions}
-                      className="bg-secondary/10 text-secondary px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-secondary/20 transition-all mx-auto border border-secondary/20"
-                    >
-                      <Trash2 size={18} /> Limpar Registros Vazios
-                    </button>
-                    <p className="text-[10px] text-on-surface-variant mt-3">
-                      Remove lançamentos sem valor, cabeçalhos e dados inválidos.
-                    </p>
+                <div className="pt-8 border-t border-white/5">
+                  <h4 className="text-sm font-bold text-tertiary mb-4 uppercase tracking-widest">Limpeza de Dados</h4>
+                  <div className="space-y-4 max-w-md mx-auto">
+                    <div className="glass-card p-4 flex items-center justify-between">
+                      <div className="text-left">
+                        <p className="text-sm font-bold text-on-surface">Limpar Duplicados</p>
+                        <p className="text-[10px] text-on-surface-variant">Remove lançamentos com fornecedor + vencimento + valor + empresa iguais, mantendo apenas o mais antigo.</p>
+                      </div>
+                      <button 
+                        onClick={async () => {
+                          if (!window.confirm('Isso removerá duplicados mantendo apenas o registro mais antigo. Continuar?')) return;
+                          try {
+                            const result = await api.cleanDuplicates();
+                            showNotification(`${result.deleted} duplicados removidos!`, 'success');
+                            fetchTransactions();
+                          } catch (error) {
+                            showNotification('Erro ao limpar duplicados.', 'error');
+                          }
+                        }}
+                        className="bg-secondary/10 text-secondary px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-secondary/20 transition-all border border-secondary/20 whitespace-nowrap ml-4"
+                      >
+                        <Trash2 size={14} /> Limpar Duplicados
+                      </button>
+                    </div>
+
+                    <div className="glass-card p-4 flex items-center justify-between">
+                      <div className="text-left">
+                        <p className="text-sm font-bold text-on-surface">Limpar Dados Suspeitos</p>
+                        <p className="text-[10px] text-on-surface-variant">Remove valores &gt; R$ 500k, &lt; R$ 0.01, nulos, ou com fornecedor inválido.</p>
+                      </div>
+                      <button 
+                        onClick={async () => {
+                          if (!window.confirm('Isso removerá dados suspeitos (valores extremos ou inválidos). Continuar?')) return;
+                          try {
+                            const result = await api.cleanSuspicious();
+                            showNotification(`${result.deleted} registros suspeitos removidos!`, 'success');
+                            fetchTransactions();
+                          } catch (error) {
+                            showNotification('Erro ao limpar dados suspeitos.', 'error');
+                          }
+                        }}
+                        className="bg-tertiary/10 text-tertiary px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-tertiary/20 transition-all border border-tertiary/20 whitespace-nowrap ml-4"
+                      >
+                        <Trash2 size={14} /> Limpar Suspeitos
+                      </button>
+                    </div>
                   </div>
-                
-                  <div>
-                    <h4 className="text-sm font-bold text-tertiary mb-4 uppercase tracking-widest">Zona de Perigo</h4>
-                    <button 
-                      onClick={resetSystem}
-                      className="bg-tertiary/10 text-tertiary px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-tertiary/20 transition-all mx-auto border border-tertiary/20"
-                    >
-                      <Trash2 size={18} /> Resetar Todo o Sistema
-                    </button>
-                    <p className="text-[10px] text-on-surface-variant mt-3">
-                      Isso apagará todos os seus lançamentos e fornecedores salvos.
-                    </p>
-                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-white/5">
+                  <h4 className="text-sm font-bold text-tertiary mb-4 uppercase tracking-widest">Zona de Perigo</h4>
+                  <button 
+                    onClick={resetSystem}
+                    className="bg-tertiary/10 text-tertiary px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-tertiary/20 transition-all mx-auto border border-tertiary/20"
+                  >
+                    <Trash2 size={18} /> Resetar Todo o Sistema
+                  </button>
+                  <p className="text-[10px] text-on-surface-variant mt-3">
+                    Isso apagará todos os seus lançamentos e fornecedores salvos na nuvem.
+                  </p>
                 </div>
               </div>
             )}
@@ -2349,21 +1788,6 @@ export default function App() {
           suppliers={suppliers}
           onClose={() => setEditingTx(null)}
           onSave={updateTransaction}
-        />
-      )}
-
-      {showImportPreview && (
-        <ImportPreviewModal
-          previewData={previewData}
-          headers={Object.keys(importRawData[0] || {})}
-          onConfirm={confirmImport}
-          onCancel={() => {
-            setShowImportPreview(false);
-            setPreviewData([]);
-            setImportRawData([]);
-            setImportProgress(null);
-          }}
-          importProgress={importProgress}
         />
       )}
 

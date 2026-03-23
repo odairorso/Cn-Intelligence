@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: transactions
+    // Document ID: auto-generated
+    // Fields:
+    //   - uid: string (required) - ID do usuário dono do registro
+    //   - fornecedor: string (required) - Nome do fornecedor
+    //   - descricao: string (required) - Descrição do lançamento
+    //   - empresa: string (required) - Nome da empresa (CN, FACEMS, etc.)
+    //   - vencimento: string (required) - Data de vencimento (DD/MM/YYYY)
+    //   - pagamento: string (optional) - Data de pagamento (DD/MM/YYYY)
+    //   - valor: number (required) - Valor do lançamento
+    //   - status: string (required, enum: PAGO, PENDENTE, VENCIDO)
+    //   - createdAt: timestamp (optional)
+    //
+    // Collection: suppliers
+    // Document ID: auto-generated
+    // Fields:
+    //   - uid: string (required) - ID do usuário dono do registro
+    //   - nome: string (required) - Nome do fornecedor
+    //   - cnpj: string (optional)
+    //   - email: string (optional)
+    //   - telefone: string (optional)
+    //   - createdAt: timestamp (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+    
+    function isValidTransaction(data) {
+      return data.uid is string &&
+             data.fornecedor is string && data.fornecedor.size() > 0 && data.fornecedor.size() < 200 &&
+             data.descricao is string && data.descricao.size() < 500 &&
+             data.empresa is string &&
+             data.vencimento is string &&
+             data.valor is number &&
+             data.status in ['PAGO', 'PENDENTE', 'VENCIDO'];
+    }
+    
+    function isValidSupplier(data) {
+      return data.uid is string &&
+             data.nome is string && data.nome.size() > 0 && data.nome.size() < 200;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /transactions/{txId} {
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow create: if isAuthenticated() && 
+                      request.resource.data.uid == request.auth.uid &&
+                      isValidTransaction(request.resource.data);
+      allow update: if isAuthenticated() && 
+                      resource.data.uid == request.auth.uid &&
+                      request.resource.data.uid == request.auth.uid &&
+                      isValidTransaction(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    match /suppliers/{supId} {
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow create: if isAuthenticated() && 
+                      request.resource.data.uid == request.auth.uid &&
+                      isValidSupplier(request.resource.data);
+      allow update: if isAuthenticated() && 
+                      resource.data.uid == request.auth.uid &&
+                      request.resource.data.uid == request.auth.uid &&
+                      isValidSupplier(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+    
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
