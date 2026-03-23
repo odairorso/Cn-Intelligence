@@ -1587,29 +1587,28 @@ export default function App() {
   };
 
   const markAsPaid = async (id: string) => {
-    try {
-      await api.updateTransaction(id, {
-        status: 'PAGO',
-        pagamento: new Date().toLocaleDateString('pt-BR')
-      });
-      showNotification('Lançamento marcado como pago!', 'success');
-      fetchTransactions();
-    } catch (error) {
-      console.error('Failed to mark as paid:', error);
-    }
+    const today = new Date().toLocaleDateString('pt-BR');
+    // Optimistic update — sem re-fetch
+    setTransactions(prev => prev.map(tx =>
+      tx.id === id ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: today } : tx
+    ));
+    showNotification('Lançamento marcado como pago!', 'success');
+    api.updateTransaction(id, { status: 'PAGO', pagamento: today }).catch(err => {
+      console.error('Failed to mark as paid:', err);
+      fetchTransactions(); // rollback se falhar
+    });
   };
 
   const updateTransaction = async (updatedTx: Transaction) => {
-    try {
-      const { id, ...data } = updatedTx;
-      if (id) {
-        await api.updateTransaction(id, data);
-        showNotification('Lançamento atualizado!', 'success');
-        fetchTransactions();
-      }
-    } catch (error) {
-      console.error('Failed to update transaction:', error);
-    }
+    const { id, ...data } = updatedTx;
+    if (!id) return;
+    // Optimistic update — sem re-fetch
+    setTransactions(prev => prev.map(tx => tx.id === id ? updatedTx : tx));
+    showNotification('Lançamento atualizado!', 'success');
+    api.updateTransaction(id, data).catch(err => {
+      console.error('Failed to update transaction:', err);
+      fetchTransactions(); // rollback se falhar
+    });
   };
 
   const syncSuppliers = async () => {
@@ -1639,13 +1638,13 @@ export default function App() {
   };
 
   const deleteTransaction = async (id: string) => {
-    try {
-      await api.deleteTransaction(id);
-      showNotification('Lançamento excluído.', 'info');
-      fetchTransactions();
-    } catch (error) {
-      console.error('Failed to delete transaction:', error);
-    }
+    // Optimistic update — sem re-fetch
+    setTransactions(prev => prev.filter(tx => tx.id !== id));
+    showNotification('Lançamento excluído.', 'info');
+    api.deleteTransaction(id).catch(err => {
+      console.error('Failed to delete transaction:', err);
+      fetchTransactions(); // rollback se falhar
+    });
   };
 
   const deleteSupplier = async (id: string) => {
