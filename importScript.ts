@@ -3,9 +3,8 @@ import * as xlsx from 'xlsx';
 import * as fs from 'fs';
 import 'dotenv/config';
 
-// Configuração do PostgreSQL usando o banco Neon fornecido
 const client = new Client({
-  connectionString: "postgresql://neondb_owner:npg_c9LaAv3hXNmD@ep-young-mouse-aclmtaes-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+  connectionString: process.env.DATABASE_URL
 });
 
 const filePath = './Fluxo de caixa - Grupo CN 2024_2025.xlsx';
