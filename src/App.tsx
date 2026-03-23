@@ -298,7 +298,64 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
         </button>
       </div>
 
-      <div className="glass-card overflow-hidden">
+      {/* Mobile: cards */}
+      <div className="space-y-3 md:hidden">
+        {filtered.length === 0 ? (
+          <div className="glass-card p-8 text-center text-on-surface-variant italic text-sm">
+            Nenhum lançamento encontrado.
+          </div>
+        ) : (
+          filtered.map((tx) => (
+            <div key={tx.id} className={cn(
+              "glass-card p-4 border-l-4",
+              tx.status === 'PAGO' && "border-primary/60",
+              tx.status === 'PENDENTE' && "border-secondary/60",
+              tx.status === 'VENCIDO' && "border-tertiary/60"
+            )}>
+              <div className="flex justify-between items-start gap-2 mb-2">
+                <span className="font-semibold text-sm leading-tight flex-1">{tx.fornecedor}</span>
+                <span className="font-bold text-sm whitespace-nowrap">
+                  {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-on-surface-variant mb-3">
+                <span><span className="font-bold text-on-surface">Venc:</span> {tx.vencimento}</span>
+                {tx.pagamento && <span><span className="font-bold text-on-surface">Pago:</span> {tx.pagamento}</span>}
+                <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded">{tx.empresa}</span>
+              </div>
+              {tx.descricao && tx.descricao !== '-' && (
+                <p className="text-[11px] text-on-surface-variant mb-3 truncate">{tx.descricao}</p>
+              )}
+              <div className="flex justify-between items-center">
+                <span className={cn(
+                  "text-[10px] font-bold px-2 py-0.5 rounded-full border",
+                  tx.status === 'PAGO' && "bg-primary/20 text-primary border-primary/30",
+                  tx.status === 'PENDENTE' && "bg-secondary/20 text-secondary border-secondary/30",
+                  tx.status === 'VENCIDO' && "bg-tertiary/20 text-tertiary border-tertiary/30"
+                )}>
+                  {tx.status}
+                </span>
+                <div className="flex gap-2">
+                  {tx.status !== 'PAGO' && (
+                    <button onClick={() => markAsPaid(tx.id)} className="p-2 text-primary bg-primary/10 rounded-lg">
+                      <Check size={16} />
+                    </button>
+                  )}
+                  <button onClick={() => setEditingTx(tx)} className="p-2 text-on-surface-variant bg-white/5 rounded-lg">
+                    <Edit size={16} />
+                  </button>
+                  <button onClick={() => deleteTransaction(tx.id)} className="p-2 text-tertiary bg-tertiary/10 rounded-lg">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop: table */}
+      <div className="glass-card overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -341,7 +398,7 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
                   <td className="px-8 py-4">
                     <div className="flex gap-2">
                       {tx.status !== 'PAGO' && (
-                        <button 
+                        <button
                           onClick={() => markAsPaid(tx.id)}
                           className="p-1.5 text-primary hover:bg-primary/10 rounded transition-colors"
                           title="Marcar como pago"
@@ -349,14 +406,14 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
                           <Check size={16} />
                         </button>
                       )}
-                      <button 
+                      <button
                         onClick={() => setEditingTx(tx)}
                         className="p-1.5 text-on-surface-variant hover:bg-white/10 rounded transition-colors"
                         title="Editar"
                       >
                         <Edit size={16} />
                       </button>
-                      <button 
+                      <button
                         onClick={() => deleteTransaction(tx.id)}
                         className="p-1.5 text-tertiary hover:bg-tertiary/10 rounded transition-colors"
                         title="Excluir"
@@ -615,13 +672,45 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
       </div>
 
       <div className="glass-card overflow-hidden">
-        <div className="px-8 py-6 border-b border-white/5 flex justify-between items-center">
-          <h4 className="text-lg font-bold font-headline">Lançamentos no Período</h4>
+        <div className="px-6 py-4 md:px-8 md:py-6 border-b border-white/5 flex justify-between items-center">
+          <h4 className="text-base md:text-lg font-bold font-headline">Lançamentos no Período</h4>
           <span className="text-xs text-on-surface-variant font-bold uppercase tracking-widest">
-            {filteredData.length} registros encontrados
+            {filteredData.length} registros
           </span>
         </div>
-        <div className="overflow-x-auto">
+
+        {/* Mobile: cards */}
+        <div className="divide-y divide-white/5 md:hidden">
+          {filteredData.length === 0 ? (
+            <p className="px-6 py-10 text-center text-on-surface-variant italic text-sm">
+              Nenhum lançamento encontrado.
+            </p>
+          ) : (
+            filteredData.map((tx) => (
+              <div key={tx.id} className="px-4 py-3 flex flex-col gap-1">
+                <div className="flex justify-between items-start gap-2">
+                  <span className="font-semibold text-sm flex-1 leading-tight">{tx.fornecedor}</span>
+                  <span className="font-bold text-sm whitespace-nowrap">
+                    {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-on-surface-variant">
+                  <span>Venc: {tx.vencimento}</span>
+                  {tx.pagamento && <span>Pago: {tx.pagamento}</span>}
+                  <span className={cn(
+                    "font-bold",
+                    tx.status === 'PAGO' && "text-primary",
+                    tx.status === 'PENDENTE' && "text-secondary",
+                    tx.status === 'VENCIDO' && "text-tertiary"
+                  )}>{tx.status}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop: table */}
+        <div className="overflow-x-auto hidden md:block">
           <table className="w-full text-left">
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
@@ -1657,7 +1746,7 @@ export default function App() {
         {/* Dashboard Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
           <div>
-            <h2 className="text-4xl font-extrabold font-headline text-on-surface mb-3 tracking-tight">
+            <h2 className="text-2xl md:text-4xl font-extrabold font-headline text-on-surface mb-3 tracking-tight">
               {activeTab === 'dashboard' && '💰 Dashboard Fluxo de Caixa'}
               {activeTab === 'lancamentos' && '📋 Gestão de Lançamentos'}
               {activeTab === 'fornecedores' && '🏢 Fornecedores'}
