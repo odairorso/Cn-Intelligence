@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Lançamento financeiro de fluxo de caixa.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "ID do usuário dono do registro" },
+        "fornecedor": { "type": "string", "description": "Nome do fornecedor" },
+        "descricao": { "type": "string", "description": "Descrição do lançamento" },
+        "empresa": { "type": "string", "description": "Nome da empresa (CN, FACEMS, etc.)" },
+        "vencimento": { "type": "string", "description": "Data de vencimento (DD/MM/YYYY)" },
+        "pagamento": { "type": "string", "description": "Data de pagamento (DD/MM/YYYY)" },
+        "valor": { "type": "number", "description": "Valor do lançamento" },
+        "status": { "type": "string", "enum": ["PAGO", "PENDENTE", "VENCIDO"] },
+        "createdAt": { "type": "object", "description": "Timestamp de criação" }
+      },
+      "required": ["uid", "fornecedor", "descricao", "empresa", "vencimento", "valor", "status"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Cadastro de fornecedor.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "ID do usuário dono do registro" },
+        "nome": { "type": "string", "description": "Nome do fornecedor" },
+        "cnpj": { "type": "string", "description": "CNPJ do fornecedor" },
+        "email": { "type": "string", "description": "E-mail de contato" },
+        "telefone": { "type": "string", "description": "Telefone de contato" },
+        "createdAt": { "type": "object", "description": "Timestamp de criação" }
+      },
+      "required": ["uid", "nome"]
+    }
+  },
+  "firestore": {
+    "transactions": {
+      "schema": "Transaction",
+      "description": "Coleção de lançamentos financeiros."
+    },
+    "suppliers": {
+      "schema": "Supplier",
+      "description": "Coleção de fornecedores cadastrados."
+    }
+  }
+}

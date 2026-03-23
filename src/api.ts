@@ -39,6 +39,15 @@ export const api = {
     return res.json();
   },
 
+  async createTransactionsBatch(data: Omit<Transaction, 'id'>[]): Promise<void> {
+    const res = await fetch(`${API_BASE}/transactions/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to create transactions batch');
+  },
+
   async updateTransaction(id: string, data: Partial<Transaction>): Promise<Transaction> {
     const res = await fetch(`${API_BASE}/transactions/${id}`, {
       method: 'PUT',
@@ -72,10 +81,42 @@ export const api = {
     return res.json();
   },
 
+  async createSuppliersBatch(data: Omit<Supplier, 'id'>[]): Promise<void> {
+    const res = await fetch(`${API_BASE}/suppliers/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to create suppliers batch');
+  },
+
   async deleteSupplier(id: string): Promise<void> {
     const res = await fetch(`${API_BASE}/suppliers/${id}`, {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error('Failed to delete supplier');
+  },
+
+  async resetDatabase(): Promise<void> {
+    const res = await fetch(`${API_BASE}/reset`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to reset database');
+  },
+
+  async cleanDuplicates(): Promise<{ deleted: number }> {
+    const res = await fetch(`${API_BASE}/clean-duplicates`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to clean duplicates');
+    return res.json();
+  },
+
+  async cleanSuspicious(): Promise<{ deleted: number }> {
+    const res = await fetch(`${API_BASE}/clean-suspicious`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to clean suspicious data');
+    return res.json();
   },
 };
