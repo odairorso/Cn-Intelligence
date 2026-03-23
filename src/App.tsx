@@ -193,11 +193,14 @@ interface LancamentosTabProps {
   setEditingTx: (tx: Transaction) => void;
 }
 
+const PAGE_SIZE = 50;
+
 const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNewTxModal, setEditingTx }: LancamentosTabProps) => {
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [monthFilter, setMonthFilter] = useState('TODOS');
   const [yearFilter, setYearFilter] = useState('TODOS');
+  const [page, setPage] = useState(0);
   
   // Extrair meses e anos únicos para os filtros
   const availableYears = useMemo(() => {
@@ -223,24 +226,33 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
     { value: '12', label: 'Dezembro' }
   ];
 
-  const filtered = transactions.filter(tx => {
-    const matchesSearch = tx.fornecedor.toLowerCase().includes(filter.toLowerCase()) || 
-                         (tx.descricao && tx.descricao.toLowerCase().includes(filter.toLowerCase()));
-    const matchesStatus = statusFilter === 'TODOS' || tx.status === statusFilter;
-    
-    let matchesMonth = true;
-    let matchesYear = true;
-    
-    if (monthFilter !== 'TODOS' || yearFilter !== 'TODOS') {
-      const parts = tx.vencimento.split('/');
-      if (parts.length === 3) {
-        if (monthFilter !== 'TODOS') matchesMonth = parts[1] === monthFilter;
-        if (yearFilter !== 'TODOS') matchesYear = parts[2] === yearFilter;
+  const filtered = useMemo(() => {
+    const searchLower = filter.toLowerCase();
+    return transactions.filter(tx => {
+      const matchesSearch = tx.fornecedor.toLowerCase().includes(searchLower) || 
+                           (tx.descricao && tx.descricao.toLowerCase().includes(searchLower));
+      const matchesStatus = statusFilter === 'TODOS' || tx.status === statusFilter;
+      
+      let matchesMonth = true;
+      let matchesYear = true;
+      
+      if (monthFilter !== 'TODOS' || yearFilter !== 'TODOS') {
+        const parts = tx.vencimento.split('/');
+        if (parts.length === 3) {
+          if (monthFilter !== 'TODOS') matchesMonth = parts[1] === monthFilter;
+          if (yearFilter !== 'TODOS') matchesYear = parts[2] === yearFilter;
+        }
       }
-    }
 
-    return matchesSearch && matchesStatus && matchesMonth && matchesYear;
-  });
+      return matchesSearch && matchesStatus && matchesMonth && matchesYear;
+    });
+  }, [transactions, filter, statusFilter, monthFilter, yearFilter]);
+
+  // Reset page when filters change
+  useEffect(() => { setPage(0); }, [filter, statusFilter, monthFilter, yearFilter]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -305,7 +317,7 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
             Nenhum lançamento encontrado.
           </div>
         ) : (
-          filtered.map((tx) => (
+          paginated.map((tx) => (
             <div key={tx.id} className={cn(
               "glass-card p-4 border-l-4",
               tx.status === 'PAGO' && "border-primary/60",
@@ -371,7 +383,7 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-white/5">
-              {filtered.map((tx) => (
+              {paginated.map((tx) => (
                 <tr key={tx.id} className="hover:bg-white/5 transition-colors">
                   <td className="px-8 py-4 font-semibold">{tx.fornecedor}</td>
                   <td className="px-8 py-4 text-on-surface-variant">{tx.descricao}</td>
@@ -428,6 +440,32 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
           </table>
         </div>
       </div>
+
+      {/* Paginação */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-4 pt-2">
+          <span className="text-xs text-on-surface-variant">
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} de {filtered.length} lançamentos
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="p-2 rounded-lg bg-white/5 text-on-surface-variant disabled:opacity-30 hover:bg-white/10 transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-xs font-bold px-2">{page + 1} / {totalPages}</span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page === totalPages - 1}
+              className="p-2 rounded-lg bg-white/5 text-on-surface-variant disabled:opacity-30 hover:bg-white/10 transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
