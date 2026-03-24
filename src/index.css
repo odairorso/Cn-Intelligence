@@ -5,32 +5,46 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-headline: "Manrope", sans-serif;
   
-  --color-primary: #78dc77;
-  --color-secondary: #fabd00;
-  --color-tertiary: #ffb3b0;
-  --color-background: #0e1321;
-  --color-surface: #161b2a;
-  --color-surface-variant: #2f3444;
-  --color-on-surface: #dee2f7;
-  --color-on-surface-variant: #c6c6cd;
+  --color-primary: #10b981; /* Emerald 500 */
+  --color-primary-dark: #059669;
+  --color-secondary: #f59e0b; /* Amber 500 */
+  --color-tertiary: #ef4444; /* Red 500 */
+  --color-background: #020617; /* Slate 950 */
+  --color-surface: #0f172a; /* Slate 900 */
+  --color-surface-variant: #1e293b; /* Slate 800 */
+  --color-on-surface: #f1f5f9; /* Slate 100 */
+  --color-on-surface-variant: #94a3b8; /* Slate 400 */
+  --color-border-glow: rgba(16, 185, 129, 0.2);
 }
 
 @layer base {
   body {
     @apply bg-background text-on-surface font-sans antialiased;
-    background: linear-gradient(135deg, #1a1f2e 0%, #16213e 100%);
+    background: radial-gradient(circle at top left, #0f172a 0%, #020617 100%);
     min-height: 100vh;
   }
 }
 
 .glass-card {
-  @apply bg-surface-variant/10 backdrop-blur-xl border border-white/5 rounded-2xl;
+  @apply bg-surface/40 backdrop-blur-2xl border border-white/5 rounded-sm;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  @apply border-primary/20 bg-surface/50;
+  box-shadow: 0 0 20px var(--color-border-glow);
+}
+
+.premium-gradient-text {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary;
 }
 
 .on-surface {
-  color: #dee2f7;
+  color: var(--color-on-surface);
 }
 
 .on-surface-variant {
-  color: #c6c6cd;
+  color: var(--color-on-surface-variant);
 }
+
