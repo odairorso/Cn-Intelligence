@@ -818,9 +818,10 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
 interface NewTxModalProps {
   suppliers: Supplier[];
   setShowNewTxModal: (show: boolean) => void;
+  onSuccess: () => void;
 }
 
-const NewTxModal = ({ suppliers, setShowNewTxModal }: NewTxModalProps) => {
+const NewTxModal = ({ suppliers, setShowNewTxModal, onSuccess }: NewTxModalProps) => {
   const [formData, setFormData] = useState({
     fornecedor: suppliers[0]?.nome || '',
     descricao: '',
@@ -844,11 +845,12 @@ const NewTxModal = ({ suppliers, setShowNewTxModal }: NewTxModalProps) => {
       };
       await api.createTransaction(newTx);
       setShowNewTxModal(false);
-      window.location.reload(); // Recarrega para ver as mudanças
+      onSuccess();
     } catch (error) {
       console.error('Failed to create transaction:', error);
     }
   };
+
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
@@ -863,12 +865,14 @@ const NewTxModal = ({ suppliers, setShowNewTxModal }: NewTxModalProps) => {
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor</label>
             <select 
-              className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+              className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+              style={{ backgroundColor: '#161b2a' }}
               value={formData.fornecedor}
               onChange={e => setFormData({...formData, fornecedor: e.target.value})}
             >
-              {suppliers.map(s => <option key={s.id} value={s.nome}>{s.nome}</option>)}
+              {suppliers.map(s => <option key={s.id} value={s.nome} className="bg-[#161b2a] text-on-surface">{s.nome}</option>)}
             </select>
+
           </div>
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Descrição</label>
@@ -883,27 +887,31 @@ const NewTxModal = ({ suppliers, setShowNewTxModal }: NewTxModalProps) => {
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Empresa</label>
               <select 
-                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+                style={{ backgroundColor: '#161b2a' }}
                 value={formData.empresa}
                 onChange={e => setFormData({...formData, empresa: e.target.value})}
               >
-                <option>CN</option>
-                <option>FACEMS</option>
-                <option>LAB</option>
-                <option>CEI</option>
-                <option>UNOPAR</option>
+                <option className="bg-[#161b2a]">CN</option>
+                <option className="bg-[#161b2a]">FACEMS</option>
+                <option className="bg-[#161b2a]">LAB</option>
+                <option className="bg-[#161b2a]">CEI</option>
+                <option className="bg-[#161b2a]">UNOPAR</option>
               </select>
+
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Status</label>
               <select 
-                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+                style={{ backgroundColor: '#161b2a' }}
                 value={formData.status}
                 onChange={e => setFormData({...formData, status: e.target.value as TransactionStatus})}
               >
-                <option value="PENDENTE">PENDENTE</option>
-                <option value="PAGO">PAGO</option>
+                <option value="PENDENTE" className="bg-[#161b2a] text-on-surface">PENDENTE</option>
+                <option value="PAGO" className="bg-[#161b2a] text-on-surface">PAGO</option>
               </select>
+
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -941,18 +949,18 @@ const NewTxModal = ({ suppliers, setShowNewTxModal }: NewTxModalProps) => {
             <button 
               type="button"
               onClick={() => setShowNewTxModal(false)}
-              className="flex-1 px-4 py-2 rounded-lg border border-white/10 text-sm font-bold hover:bg-white/5"
+              className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
             >
               Cancelar
             </button>
             <button 
               type="submit"
-              className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-sm font-black uppercase tracking-widest hover:bg-primary-dark transition-all"
+              className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
             >
               Salvar Lançamento
             </button>
-
           </div>
+
         </form>
       </motion.div>
     </div>
@@ -1000,16 +1008,17 @@ const EditTxModal = ({ transaction, suppliers, onClose, onSave }: EditTxModalPro
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor</label>
             <select 
-              className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all"
+              className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+              style={{ backgroundColor: '#161b2a' }}
               value={formData.fornecedor}
               onChange={e => setFormData({...formData, fornecedor: e.target.value})}
             >
-
-              <option value={transaction.fornecedor}>{transaction.fornecedor}</option>
+              <option value={transaction.fornecedor} className="bg-[#161b2a] text-on-surface">{transaction.fornecedor}</option>
               {suppliers.filter(s => s.nome !== transaction.fornecedor).map(s => (
-                <option key={s.id} value={s.nome}>{s.nome}</option>
+                <option key={s.id} value={s.nome} className="bg-[#161b2a] text-on-surface">{s.nome}</option>
               ))}
             </select>
+
           </div>
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Descrição</label>
@@ -1039,14 +1048,16 @@ const EditTxModal = ({ transaction, suppliers, onClose, onSave }: EditTxModalPro
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Status</label>
               <select 
-                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+                style={{ backgroundColor: '#161b2a' }} // Forçar fundo escuro em alguns navegadores
                 value={formData.status}
                 onChange={e => setFormData({...formData, status: e.target.value as TransactionStatus})}
               >
-                <option value="PENDENTE">PENDENTE</option>
-                <option value="PAGO">PAGO</option>
-                <option value="VENCIDO">VENCIDO</option>
+                <option value="PENDENTE" className="bg-[#161b2a] text-on-surface">PENDENTE</option>
+                <option value="PAGO" className="bg-[#161b2a] text-on-surface">PAGO</option>
+                <option value="VENCIDO" className="bg-[#161b2a] text-on-surface">VENCIDO</option>
               </select>
+
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -1195,9 +1206,11 @@ const SupplierDetailModal = ({ supplier, transactions, onClose }: { supplier: Su
 
 interface NewSupplierModalProps {
   setShowNewSupplierModal: (show: boolean) => void;
+  onSuccess: () => void;
 }
 
-const NewSupplierModal = ({ setShowNewSupplierModal }: NewSupplierModalProps) => {
+const NewSupplierModal = ({ setShowNewSupplierModal, onSuccess }: NewSupplierModalProps) => {
+
 
 
   const [formData, setFormData] = useState({
@@ -1222,7 +1235,8 @@ const NewSupplierModal = ({ setShowNewSupplierModal }: NewSupplierModalProps) =>
       };
       await api.createSupplier(newSupplier);
       setShowNewSupplierModal(false);
-      window.location.reload();
+      onSuccess();
+
     } catch (error) {
       console.error('Failed to create supplier:', error);
     }
@@ -1333,17 +1347,18 @@ const NewSupplierModal = ({ setShowNewSupplierModal }: NewSupplierModalProps) =>
             <button 
               type="button"
               onClick={() => setShowNewSupplierModal(false)}
-              className="flex-1 px-4 py-2 rounded-lg border border-white/10 text-sm font-bold hover:bg-white/5"
+              className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
             >
               Cancelar
             </button>
             <button 
               type="submit"
-              className="flex-1 px-4 py-2 rounded-lg bg-primary text-background text-sm font-bold hover:opacity-90"
+              className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:opacity-90 shadow-lg shadow-primary/10 transition-all"
             >
               Cadastrar Fornecedor
             </button>
           </div>
+
         </form>
       </motion.div>
     </div>
@@ -1544,24 +1559,36 @@ export default function App() {
           if (String(rawFornecedor).toUpperCase() === 'FORNECEDOR' || String(rawFornecedor).toUpperCase() === 'CLIENTE') continue;
 
           const formatDate = (val: any, sheetName?: string) => {
-            if (!val) return undefined;
+            if (!val) {
+              // Se não tem data, tenta inferir do nome da aba
+              if (sheetName) {
+                const s = sheetName.toUpperCase();
+                const months = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+                const fullMonths = ['JANEIRO','FEVEREIRO','MARÇO','MARCO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
+                
+                let foundMonth = -1;
+                fullMonths.forEach((m, i) => { if (s.includes(m)) foundMonth = i + 1; });
+                if (foundMonth === -1) months.forEach((m, i) => { if (s.includes(m)) foundMonth = i + 1; });
+                
+                let foundYear = new Date().getFullYear();
+                const yearMatch = s.match(/20\d{2}/);
+                if (yearMatch) foundYear = parseInt(yearMatch[0]);
+                
+                if (foundMonth !== -1) {
+                  return `01/${String(foundMonth).padStart(2, '0')}/${foundYear}`;
+                }
+              }
+              return undefined;
+            }
+            
             if (val instanceof Date) {
               const dt = new Date(val);
               let day = dt.getUTCDate();
               let month = dt.getUTCMonth() + 1;
               let year = dt.getUTCFullYear();
-              
-              if (month > 12) {
-                let temp = month;
-                month = day;
-                day = temp;
-              }
-              
-              if (month > 12) month = 12;
-              if (day > 31) day = 28;
-              
               return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
             }
+
             const str = String(val).trim();
             if (str.includes('/')) {
               const parts = str.split('/');
@@ -1569,43 +1596,21 @@ export default function App() {
                 let p0 = Number(parts[0]);
                 let p1 = Number(parts[1]);
                 let p2 = parts[2];
-                
                 if (p2.length === 2) p2 = '20' + p2;
-                
-                let day = p0;
-                let month = p1;
-                
-                if (p0 > 12) {
-                  day = p0;
-                  month = p1;
-                } else if (p1 > 12) {
-                  day = p1;
-                  month = p0;
-                } else {
-                  if (sheetName && sheetName.toUpperCase().includes('MAR')) {
-                     if (p0 === 3) { month = p0; day = p1; }
-                     else if (p1 === 3) { month = p1; day = p0; }
-                     else { day = p0; month = p1; }
-                  } else {
-                     day = p0;
-                     month = p1;
-                  }
+                return `${String(p0).padStart(2, '0')}/${String(p1).padStart(2, '0')}/${p2}`;
+              } else if (parts.length === 2) {
+                // DD/MM -> assume ano atual ou do sheet
+                let foundYear = new Date().getFullYear();
+                if (sheetName) {
+                  const yearMatch = sheetName.match(/20\d{2}/);
+                  if (yearMatch) foundYear = parseInt(yearMatch[0]);
                 }
-                
-                if (month > 12) {
-                  let temp = month;
-                  month = day;
-                  day = temp;
-                }
-                
-                if (month > 12) month = 12;
-                if (day > 31) day = 28;
-                
-                return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${p2}`;
+                return `${String(parts[0]).padStart(2, '0')}/${String(parts[1]).padStart(2, '0')}/${foundYear}`;
               }
             }
             return str;
           };
+
 
           const fornecedorNome = String(rawFornecedor).trim();
           
@@ -2071,17 +2076,26 @@ export default function App() {
       </AnimatePresence>
 
       {showNewTxModal && (
-
         <NewTxModal 
           suppliers={suppliers} 
           setShowNewTxModal={setShowNewTxModal} 
+          onSuccess={() => {
+            fetchTransactions();
+            showNotification('Lançamento salvo com sucesso!', 'success');
+          }}
         />
       )}
+
       {showNewSupplierModal && (
         <NewSupplierModal 
           setShowNewSupplierModal={setShowNewSupplierModal} 
+          onSuccess={() => {
+            fetchSuppliers();
+            showNotification('Fornecedor cadastrado com sucesso!', 'success');
+          }}
         />
       )}
+
 
       {editingTx && (
         <EditTxModal 

@@ -75,8 +75,9 @@ app.post('/api/transactions/batch', async (req, res) => {
       await client.query(
         `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [uid || 'guest', fornecedor, descricao || '-', empresa || 'Geral', vDate || new Date().toISOString().split('T')[0], pDate, valor, status || 'PENDENTE']
+        [uid || 'guest', fornecedor, descricao || '-', empresa || 'Geral', vDate, pDate, valor, status || 'PENDENTE']
       );
+
     }
     
     await client.query('COMMIT');
