@@ -56,28 +56,31 @@ function KPIComponent({ kpi, index }: any) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
-      className="glass-card p-6 border-l-4"
-      style={{ borderLeftColor: kpi.color }}
+      className="glass-card p-6 border-t-2"
+      style={{ borderTopColor: kpi.color }}
     >
-      <p className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant mb-2 font-headline">
-        {kpi.label}
-      </p>
-      <h3 className="text-2xl font-bold font-headline text-on-surface">
-        {kpi.value}
-      </h3>
-      {kpi.trend && (
-        <div className="mt-2 text-[10px] text-primary flex items-center gap-1">
-          <TrendingUp size={14} /> {kpi.trend}
-        </div>
-      )}
-      {kpi.description && (
-        <p className="mt-2 text-[10px] text-on-surface-variant">
-          {kpi.description}
+      <div className="flex flex-col">
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-on-surface-variant/80 mb-2 font-headline">
+          {kpi.label}
         </p>
-      )}
+        <h3 className="text-3xl font-black font-headline text-on-surface">
+          {kpi.value}
+        </h3>
+        {kpi.trend && (
+          <div className="mt-3 text-[10px] font-bold text-primary flex items-center gap-1.5 bg-primary/10 w-fit px-2 py-0.5 rounded-full">
+            <TrendingUp size={12} /> {kpi.trend}
+          </div>
+        )}
+        {kpi.description && (
+          <p className="mt-2 text-[10px] text-on-surface-variant/60 font-medium">
+            {kpi.description}
+          </p>
+        )}
+      </div>
     </motion.div>
   );
 }
+
 
 // --- Tab Components ---
 
@@ -125,8 +128,9 @@ const DashboardTab = ({ stats, transactions, markAsPaid }: DashboardTabProps) =>
                       dataKey="value"
                     >
                       {statusChartData.map((_entry, index) => (
-                        <Cell key={`cell-${index}`} fill={[ '#78dc77', '#fabd00', '#ffb3b0' ][index]} />
+                        <Cell key={`cell-${index}`} fill={[ '#10b981', '#f59e0b', '#ef4444' ][index]} />
                       ))}
+
                     </Pie>
                     <Tooltip 
                       contentStyle={{ backgroundColor: '#161b2a', border: 'none', borderRadius: '8px' }}
@@ -157,11 +161,12 @@ const DashboardTab = ({ stats, transactions, markAsPaid }: DashboardTabProps) =>
               </div>
             ) : (
               transactions.slice(0, 5).map((tx) => (
-                <div key={tx.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border-l-2 border-primary/40">
+                <div key={tx.id} className="flex items-center justify-between p-4 bg-white/5 rounded-sm border-l-2 border-primary/40 hover:bg-white/10 transition-colors">
                   <div className="flex flex-col">
-                    <span className="text-sm font-semibold">{tx.fornecedor}</span>
-                    <span className="text-[10px] text-on-surface-variant">{tx.vencimento}</span>
+                    <span className="text-sm font-bold text-on-surface">{tx.fornecedor}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60">{tx.vencimento}</span>
                   </div>
+
                   <div className="flex items-center gap-4">
                     <span className="text-sm font-bold">
                       {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -258,19 +263,20 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between gap-4">
         <div className="flex flex-wrap gap-3 flex-grow max-w-4xl">
-          <div className="bg-surface-variant/20 flex items-center px-4 py-2.5 rounded-xl gap-3 border border-white/5 flex-grow min-w-[200px]">
+          <div className="bg-surface-variant/20 flex items-center px-4 py-2.5 rounded-sm border border-white/5 flex-grow min-w-[200px] focus-within:border-primary/40 transition-all">
             <Search size={18} className="text-on-surface-variant" />
             <input 
               type="text" 
               placeholder="Buscar fornecedor ou descrição..."
-              className="bg-transparent border-none text-sm text-on-surface focus:ring-0 p-0 outline-none w-full"
+              className="bg-transparent border-none text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-0 p-0 outline-none w-full ml-3"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
           </div>
+
           
           <select 
-            className="bg-surface border border-white/10 text-on-surface text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary"
+            className="bg-surface border border-white/10 text-on-surface text-sm rounded-sm px-4 py-2.5 outline-none focus:border-primary hover:bg-surface-variant/20 transition-all"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -281,7 +287,7 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
           </select>
 
           <select 
-            className="bg-surface border border-white/10 text-on-surface text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary"
+            className="bg-surface border border-white/10 text-on-surface text-sm rounded-sm px-4 py-2.5 outline-none focus:border-primary hover:bg-surface-variant/20 transition-all"
             value={monthFilter}
             onChange={(e) => setMonthFilter(e.target.value)}
           >
@@ -292,7 +298,7 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
           </select>
 
           <select 
-            className="bg-surface border border-white/10 text-on-surface text-sm rounded-xl px-4 py-2.5 outline-none focus:border-primary"
+            className="bg-surface border border-white/10 text-on-surface text-sm rounded-sm px-4 py-2.5 outline-none focus:border-primary hover:bg-surface-variant/20 transition-all"
             value={yearFilter}
             onChange={(e) => setYearFilter(e.target.value)}
           >
@@ -301,13 +307,15 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
               <option key={y} value={y || ''} className="bg-surface text-on-surface">{y}</option>
             ))}
           </select>
+
         </div>
         <button 
           onClick={() => setShowNewTxModal(true)}
-          className="bg-primary text-background px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:opacity-90 transition-opacity whitespace-nowrap"
+          className="bg-primary text-background px-6 py-2.5 rounded-sm text-sm font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all whitespace-nowrap shadow-lg shadow-primary/10"
         >
-          <Plus size={18} /> Novo Lançamento
+          <Plus size={18} strokeWidth={3} /> Novo Lançamento
         </button>
+
       </div>
 
       {/* Mobile: cards */}
@@ -680,7 +688,8 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
                 itemStyle={{ color: '#dee2f7' }}
                 formatter={(value: number) => [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Valor']}
               />
-              <Area type="monotone" dataKey="value" stroke="#78dc77" fill="#78dc7720" />
+              <Area type="monotone" dataKey="value" stroke="#10b981" fill="#10b98120" strokeWidth={3} />
+
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -703,7 +712,8 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
                 itemStyle={{ color: '#dee2f7' }}
                 formatter={(value: number) => [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Valor']}
               />
-              <Bar dataKey="value" fill="#78dc77" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="value" fill="#10b981" radius={[2, 2, 0, 0]} />
+
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -840,7 +850,8 @@ const NewTxModal = ({ suppliers, setShowNewTxModal }: NewTxModalProps) => {
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="glass-card p-8 w-full max-w-md border border-white/10 shadow-2xl overflow-y-auto max-h-[90vh]"
+        className="glass-card p-10 w-full max-w-lg border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-y-auto max-h-[90vh]"
+
       >
         <h3 className="text-xl font-bold font-headline mb-6">Novo Lançamento</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -931,10 +942,11 @@ const NewTxModal = ({ suppliers, setShowNewTxModal }: NewTxModalProps) => {
             </button>
             <button 
               type="submit"
-              className="flex-1 px-4 py-2 rounded-lg bg-primary text-background text-sm font-bold hover:opacity-90"
+              className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-sm font-black uppercase tracking-widest hover:bg-primary-dark transition-all"
             >
               Salvar Lançamento
             </button>
+
           </div>
         </form>
       </motion.div>
@@ -975,17 +987,19 @@ const EditTxModal = ({ transaction, suppliers, onClose, onSave }: EditTxModalPro
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="glass-card p-8 w-full max-w-lg border border-white/10 shadow-2xl"
+        className="glass-card p-10 w-full max-w-lg border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+
       >
         <h3 className="text-xl font-bold font-headline mb-6">Editar Lançamento</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor</label>
             <select 
-              className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+              className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all"
               value={formData.fornecedor}
               onChange={e => setFormData({...formData, fornecedor: e.target.value})}
             >
+
               <option value={transaction.fornecedor}>{transaction.fornecedor}</option>
               {suppliers.filter(s => s.nome !== transaction.fornecedor).map(s => (
                 <option key={s.id} value={s.nome}>{s.nome}</option>
@@ -996,10 +1010,11 @@ const EditTxModal = ({ transaction, suppliers, onClose, onSave }: EditTxModalPro
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Descrição</label>
             <input 
               type="text" required
-              className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+              className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all"
               value={formData.descricao}
               onChange={e => setFormData({...formData, descricao: e.target.value})}
             />
+
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -1060,21 +1075,22 @@ const EditTxModal = ({ transaction, suppliers, onClose, onSave }: EditTxModalPro
               />
             </div>
           )}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-6">
             <button 
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 rounded-lg border border-white/10 text-sm font-bold hover:bg-white/5"
+              className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
             >
               Cancelar
             </button>
             <button 
               type="submit"
-              className="flex-1 px-4 py-2 rounded-lg bg-primary text-background text-sm font-bold hover:opacity-90"
+              className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
             >
               Salvar Alterações
             </button>
           </div>
+
         </form>
       </motion.div>
     </div>
@@ -1128,10 +1144,11 @@ const NewSupplierModal = ({ setShowNewSupplierModal }: NewSupplierModalProps) =>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Nome do Fornecedor</label>
               <input 
                 type="text" required
-                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all"
                 value={formData.nome}
                 onChange={e => setFormData({...formData, nome: e.target.value})}
               />
+
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">CNPJ</label>
@@ -1513,6 +1530,8 @@ export default function App() {
           txBatch.push({
             uid: 'guest',
             fornecedor: fornecedorNome,
+
+
             descricao: String(rawDescricao || '-'),
             empresa: String(rawEmpresa || 'Geral'),
             vencimento: vencimentoDate,
@@ -1529,6 +1548,8 @@ export default function App() {
             supBatch.push({
               uid: 'guest',
               nome: fornecedorNome,
+
+
               email: '',
               telefone: '',
               cnpj: ''
@@ -1682,12 +1703,13 @@ export default function App() {
     const vencidos = transactions.filter(tx => tx.status === 'VENCIDO').length;
     
     const kpis: KPI[] = [
-      { label: 'VALOR TOTAL', value: total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), color: '#78dc77' },
-      { label: 'REGISTROS', value: transactions.length.toString(), description: 'Volume operacional', color: '#78dc77' },
-      { label: 'EMPRESAS', value: [...new Set(transactions.map(t => t.empresa))].length.toString(), description: 'Unidades ativas', color: '#78dc77' },
-      { label: 'PENDENTES', value: pendentes.toString(), description: 'Aguardando conciliação', color: '#fabd00' },
-      { label: 'PAGOS', value: pagos.toString(), description: 'Liquidados', color: '#78dc77' },
-      { label: 'VENCIDOS', value: vencidos.toString(), description: 'Ação imediata necessária', color: '#ffb3b0' },
+      { label: 'VALOR TOTAL', value: total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), color: '#10b981' },
+      { label: 'REGISTROS', value: transactions.length.toString(), description: 'Volume operacional', color: '#10b981' },
+      { label: 'EMPRESAS', value: [...new Set(transactions.map(t => t.empresa))].length.toString(), description: 'Unidades ativas', color: '#10b981' },
+      { label: 'PENDENTES', value: pendentes.toString(), description: 'Aguardando conciliação', color: '#f59e0b' },
+      { label: 'PAGOS', value: pagos.toString(), description: 'Liquidados', color: '#10b981' },
+      { label: 'VENCIDOS', value: vencidos.toString(), description: 'Ação imediata necessária', color: '#ef4444' },
+
     ];
 
     return { total, pagos, pendentes, vencidos, kpis };
@@ -1697,9 +1719,10 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="bg-surface border-b border-white/5 flex justify-between items-center w-full px-4 md:px-8 py-4 fixed top-0 z-50">
+      <header className="bg-surface/80 backdrop-blur-md border-b border-white/5 flex justify-between items-center w-full px-4 md:px-8 py-5 fixed top-0 z-50">
         <div className="flex items-center gap-4 md:gap-8">
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white font-headline">CN Intelligence</h1>
+          <h1 className="text-xl md:text-2xl font-black tracking-tighter premium-gradient-text font-headline">CN INTELLIGENCE</h1>
+
           <nav className="hidden lg:flex gap-6">
             <button 
               onClick={() => setActiveTab('dashboard')}
@@ -1741,43 +1764,44 @@ export default function App() {
       </header>
 
       {/* Mobile Navigation (Bottom Bar) */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-white/10 z-50 flex justify-around items-center py-3 px-2">
+      <nav className="lg:hidden fixed bottom-6 left-6 right-6 bg-surface/90 backdrop-blur-xl border border-white/10 z-50 flex justify-around items-center py-4 px-4 rounded-sm shadow-2xl">
         <button 
           onClick={() => setActiveTab('dashboard')}
-          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'dashboard' ? "text-primary" : "text-on-surface-variant")}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'dashboard' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
-          <LayoutDashboard size={20} />
-          <span className="text-[10px] font-bold uppercase">Dash</span>
+          <LayoutDashboard size={22} strokeWidth={activeTab === 'dashboard' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Dash</span>
         </button>
         <button 
           onClick={() => setActiveTab('lancamentos')}
-          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'lancamentos' ? "text-primary" : "text-on-surface-variant")}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'lancamentos' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
-          <FileText size={20} />
-          <span className="text-[10px] font-bold uppercase">Lanç</span>
+          <FileText size={22} strokeWidth={activeTab === 'lancamentos' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Lanç</span>
         </button>
         <button 
           onClick={() => setActiveTab('fornecedores')}
-          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'fornecedores' ? "text-primary" : "text-on-surface-variant")}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'fornecedores' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
-          <Building2 size={20} />
-          <span className="text-[10px] font-bold uppercase">Forn</span>
+          <Building2 size={22} strokeWidth={activeTab === 'fornecedores' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Forn</span>
         </button>
         <button 
           onClick={() => setActiveTab('relatorios')}
-          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'relatorios' ? "text-primary" : "text-on-surface-variant")}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'relatorios' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
-          <BarChart3 size={20} />
-          <span className="text-[10px] font-bold uppercase">Relat</span>
+          <BarChart3 size={22} strokeWidth={activeTab === 'relatorios' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Relat</span>
         </button>
         <button 
           onClick={() => setActiveTab('configuracoes')}
-          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'configuracoes' ? "text-primary" : "text-on-surface-variant")}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'configuracoes' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
-          <Settings size={20} />
-          <span className="text-[10px] font-bold uppercase">Config</span>
+          <Settings size={22} strokeWidth={activeTab === 'configuracoes' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Config</span>
         </button>
       </nav>
+
 
       <main className="flex-grow pt-24 pb-24 lg:pb-12 px-4 md:px-8 max-w-[1600px] mx-auto w-full">
         {/* Dashboard Header */}

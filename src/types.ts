@@ -2,6 +2,7 @@ export type TransactionStatus = 'PAGO' | 'PENDENTE' | 'VENCIDO';
 
 export interface Supplier {
   id: string;
+  uid: string;
   nome: string;
   email?: string;
   telefone?: string;
@@ -15,6 +16,7 @@ export interface Supplier {
 
 export interface Transaction {
   id: string;
+  uid: string;
   fornecedor: string;
   descricao: string;
   empresa: string;
@@ -23,6 +25,7 @@ export interface Transaction {
   valor: number;
   status: TransactionStatus;
 }
+
 
 export interface KPI {
   label: string;
