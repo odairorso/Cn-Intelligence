@@ -484,16 +484,17 @@ interface FornecedoresTabProps {
   deleteSupplier: (id: string) => void;
   setShowNewSupplierModal: (show: boolean) => void;
   syncSuppliers: () => void;
+  onSelectSupplier: (s: Supplier) => void;
 }
 
-const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSupplierModal, syncSuppliers }: FornecedoresTabProps) => (
+const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSupplierModal, syncSuppliers, onSelectSupplier }: FornecedoresTabProps) => (
   <div className="space-y-6">
     <div className="flex justify-between items-center">
       <div className="flex items-center gap-4">
         <h3 className="text-xl font-bold font-headline">Gestão de Fornecedores</h3>
         <button 
           onClick={syncSuppliers}
-          className="bg-white/5 text-on-surface-variant px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-white/10 transition-colors"
+          className="bg-white/5 text-on-surface-variant px-4 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-white/10 transition-colors"
           title="Sincronizar fornecedores dos lançamentos"
         >
           <RefreshCw size={14} /> Sincronizar
@@ -501,7 +502,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
       </div>
       <button 
         onClick={() => setShowNewSupplierModal(true)}
-        className="bg-primary text-background px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:opacity-90 transition-opacity"
+        className="bg-primary text-background px-6 py-2.5 rounded-sm text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all"
       >
         <UserPlus size={18} /> Novo Fornecedor
       </button>
@@ -509,40 +510,44 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
 
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {suppliers.map(s => (
-        <div key={s.id} className="glass-card p-6 flex flex-col gap-4 relative group">
+        <div key={s.id} className="glass-card p-6 flex flex-col gap-4 relative group cursor-pointer hover:border-primary/40" onClick={() => onSelectSupplier(s)}>
           <button 
-            onClick={() => deleteSupplier(s.id)}
-            className="absolute top-4 right-4 p-2 text-tertiary opacity-0 group-hover:opacity-100 transition-opacity hover:bg-tertiary/10 rounded"
+            onClick={(e) => { e.stopPropagation(); deleteSupplier(s.id); }}
+            className="absolute top-4 right-4 p-2 text-tertiary opacity-0 group-hover:opacity-100 transition-opacity hover:bg-tertiary/10 rounded-sm"
           >
             <Trash2 size={16} />
           </button>
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xl">
+            <div className="w-12 h-12 rounded-sm bg-primary/20 flex items-center justify-center text-primary font-bold text-xl border border-primary/10">
               {s.nome.charAt(0)}
             </div>
             <div>
               <h4 className="font-bold text-on-surface">{s.nome}</h4>
-              <p className="text-xs text-on-surface-variant">{s.cnpj || 'CNPJ não informado'}</p>
+              <p className="text-[10px] font-black text-on-surface-variant/60 tracking-wider mt-0.5">{s.cnpj || 'CNPJ NÃO INFORMADO'}</p>
             </div>
           </div>
-          <div className="space-y-2 text-sm">
-            <p className="flex items-center gap-2 text-on-surface-variant">
-              <FileText size={14} /> {s.email || 'E-mail não informado'}
+          <div className="space-y-2 text-sm mt-2">
+            <p className="flex items-center gap-2 text-on-surface-variant/80 text-xs font-medium">
+              <FileText size={14} className="opacity-40" /> {s.email || 'E-mail não informado'}
             </p>
-            <p className="flex items-center gap-2 text-on-surface-variant">
-              <HelpCircle size={14} /> {s.telefone || 'Telefone não informado'}
+            <p className="flex items-center gap-2 text-on-surface-variant/80 text-xs font-medium">
+              <HelpCircle size={14} className="opacity-40" /> {s.telefone || 'Telefone não informado'}
             </p>
           </div>
-          <div className="mt-auto pt-4 border-t border-white/5">
-            <p className="text-xs font-bold text-primary uppercase tracking-widest">
+          <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center">
+            <p className="text-[10px] font-black text-primary uppercase tracking-widest">
               {transactions.filter(tx => tx.fornecedor === s.nome).length} Lançamentos
             </p>
+            <button className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest hover:text-primary transition-colors">
+              Detalhes →
+            </button>
           </div>
         </div>
       ))}
     </div>
   </div>
 );
+
 
 interface RelatoriosTabProps {
   transactions: Transaction[];
@@ -1097,11 +1102,104 @@ const EditTxModal = ({ transaction, suppliers, onClose, onSave }: EditTxModalPro
   );
 };
 
+const SupplierDetailModal = ({ supplier, transactions, onClose }: { supplier: Supplier, transactions: Transaction[], onClose: () => void }) => {
+  const supplierTransactions = useMemo(() => 
+    transactions.filter(t => t.fornecedor === supplier.nome)
+    .sort((a, b) => {
+      const dateA = a.vencimento.split('/').reverse().join('');
+      const dateB = b.vencimento.split('/').reverse().join('');
+      return dateB.localeCompare(dateA);
+    }),
+  [transactions, supplier]);
+
+  const kpis = useMemo(() => {
+    const total = supplierTransactions.reduce((acc, t) => acc + t.valor, 0);
+    const pago = supplierTransactions.filter(t => t.status === 'PAGO').reduce((acc, t) => acc + t.valor, 0);
+    const aberto = total - pago;
+    return { total, pago, aberto };
+  }, [supplierTransactions]);
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-background/90 backdrop-blur-md">
+      <motion.div 
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="glass-card w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+      >
+        {/* Header Detalhes */}
+        <div className="p-8 border-b border-white/5 flex justify-between items-start bg-surface-variant/10">
+          <div className="flex items-center gap-6">
+            <div className="w-16 h-16 rounded-sm bg-primary/20 flex items-center justify-center text-primary font-black text-2xl border border-primary/20 shadow-lg shadow-primary/10">
+              {supplier.nome.charAt(0)}
+            </div>
+            <div>
+              <h2 className="text-2xl font-black font-headline premium-gradient-text tracking-tighter uppercase">{supplier.nome}</h2>
+              <p className="text-xs font-bold text-on-surface-variant/60 tracking-[0.2em] mt-1">{supplier.cnpj || 'CNPJ NÃO INFORMADO'}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-sm transition-colors text-on-surface-variant">
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* KPIs Internos */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-white/5">
+          <div className="p-6 bg-surface/40">
+            <p className="text-[10px] font-black uppercase text-on-surface-variant/40 tracking-widest mb-1">Total Movimentado</p>
+            <p className="text-xl font-black font-headline">{kpis.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+          </div>
+          <div className="p-6 bg-surface/40">
+            <p className="text-[10px] font-black uppercase text-primary/60 tracking-widest mb-1">Total Liquidado</p>
+            <p className="text-xl font-black font-headline text-primary">{kpis.pago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+          </div>
+          <div className="p-6 bg-surface/40">
+            <p className="text-[10px] font-black uppercase text-secondary/60 tracking-widest mb-1">Saldo em Aberto</p>
+            <p className="text-xl font-black font-headline text-secondary">{kpis.aberto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+          </div>
+        </div>
+
+        {/* Lista de Histórico */}
+        <div className="flex-grow overflow-y-auto p-8">
+          <h4 className="text-xs font-black uppercase tracking-[0.3em] text-on-surface-variant/40 mb-6">Histórico Financeiro</h4>
+          <div className="space-y-3">
+            {supplierTransactions.map((tx) => (
+              <div key={tx.id} className="flex items-center justify-between p-4 bg-white/5 rounded-sm border-l-2 hover:bg-white/10 transition-all group" style={{ borderLeftColor: tx.status === 'PAGO' ? '#10b981' : '#f59e0b' }}>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-on-surface group-hover:text-white">{tx.descricao}</span>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-tighter">{tx.vencimento}</span>
+                    <span className="w-1 h-1 rounded-full bg-white/10" />
+                    <span className="text-[10px] font-black text-primary/60 uppercase">{tx.empresa}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-6">
+                  <span className="text-sm font-black font-headline">{tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  <span className={cn(
+                    "text-[9px] font-black px-2 py-0.5 rounded-sm border uppercase tracking-widest",
+                    tx.status === 'PAGO' ? "bg-primary/20 text-primary border-primary/30" : "bg-secondary/20 text-secondary border-secondary/30"
+                  )}>
+                    {tx.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {supplierTransactions.length === 0 && (
+              <p className="text-sm text-on-surface-variant text-center py-12">Nenhum lançamento encontrado para este fornecedor.</p>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 interface NewSupplierModalProps {
   setShowNewSupplierModal: (show: boolean) => void;
 }
 
 const NewSupplierModal = ({ setShowNewSupplierModal }: NewSupplierModalProps) => {
+
+
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -1263,7 +1361,9 @@ export default function App() {
 
   const [showNewTxModal, setShowNewTxModal] = useState(false);
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
+  const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -1877,8 +1977,10 @@ export default function App() {
                 deleteSupplier={deleteSupplier} 
                 setShowNewSupplierModal={setShowNewSupplierModal} 
                 syncSuppliers={syncSuppliers}
+                onSelectSupplier={setDetailSupplier}
               />
             )}
+
             {activeTab === 'relatorios' && <RelatoriosTab transactions={transactions} />}
             {activeTab === 'configuracoes' && (
               <div className="glass-card p-10 text-center space-y-6">
@@ -1958,7 +2060,18 @@ export default function App() {
       </main>
 
       {/* Modals */}
+      <AnimatePresence>
+        {detailSupplier && (
+          <SupplierDetailModal 
+            supplier={detailSupplier}
+            transactions={transactions}
+            onClose={() => setDetailSupplier(null)}
+          />
+        )}
+      </AnimatePresence>
+
       {showNewTxModal && (
+
         <NewTxModal 
           suppliers={suppliers} 
           setShowNewTxModal={setShowNewTxModal} 
