@@ -46,6 +46,43 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const toInputDate = (value?: string | null) => {
+  if (!value) return '';
+  const v = String(value).trim();
+  if (v.includes('/')) {
+    const [dd, mm, yyyy] = v.split('/');
+    if (dd && mm && yyyy) return `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  }
+  if (v.includes('T')) return v.slice(0, 10);
+  if (v.match(/^\d{4}-\d{2}-\d{2}$/)) return v;
+  return '';
+};
+
+const toDisplayDate = (value?: string | null) => {
+  if (!value) return '';
+  const v = String(value).trim();
+  if (v.includes('/')) return v;
+  if (v.includes('T')) {
+    const d = new Date(v);
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+  }
+  if (v.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const [yyyy, mm, dd] = v.split('-');
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  return v;
+};
+
+const dateSortKey = (value?: string | null) => {
+  if (!value) return 0;
+  const v = String(value).trim();
+  if (v.includes('/')) {
+    const [dd, mm, yyyy] = v.split('/');
+    return new Date(`${yyyy}-${mm}-${dd}`).getTime();
+  }
+  return new Date(v).getTime() || 0;
+};
+
 const normalizeSupplierName = (value: string) =>
   String(value || '')
     .normalize('NFD')
@@ -1514,20 +1551,22 @@ interface EditTxModalProps {
 const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxModalProps) => {
   const [formData, setFormData] = useState({
     ...transaction,
-    // Convert dates from DD/MM/YYYY to YYYY-MM-DD for input[type="date"]
-    vencimento: transaction.vencimento.split('/').reverse().join('-'),
-    pagamento: transaction.pagamento ? transaction.pagamento.split('/').reverse().join('-') : '',
+    vencimento: toInputDate(transaction.vencimento),
+    pagamento: toInputDate(transaction.pagamento),
     valor: transaction.valor.toString(),
     banco: transaction.banco || ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const pagamentoValue = formData.status === 'PAGO'
+      ? (formData.pagamento ? formData.pagamento.split('-').reverse().join('/') : null)
+      : null;
     onSave({
       ...transaction,
       ...formData,
       vencimento: formData.vencimento.split('-').reverse().join('/'),
-      pagamento: formData.status === 'PAGO' ? formData.pagamento.split('-').reverse().join('/') : null,
+      pagamento: pagamentoValue || undefined,
       valor: parseFloat(formData.valor)
     });
     onClose();
@@ -1958,11 +1997,12 @@ export default function App() {
   const fetchTransactions = async () => {
     try {
       const data = await api.getTransactions('guest');
-      const parseDate = (d: string) => {
-        const parts = d.split('/');
-        return parts.length === 3 ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime() : 0;
-      };
-      setTransactions(data.sort((a: any, b: any) => parseDate(b.vencimento) - parseDate(a.vencimento)));
+      const normalized = data.map((tx: any) => ({
+        ...tx,
+        vencimento: toDisplayDate(tx.vencimento),
+        pagamento: tx.pagamento ? toDisplayDate(tx.pagamento) : undefined,
+      }));
+      setTransactions(normalized.sort((a: any, b: any) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento)));
     } catch (error) {
       console.error('Failed to fetch transactions:', error);
     }
@@ -2303,7 +2343,16 @@ export default function App() {
     if (!id) return;
     try {
       const saved = await api.updateTransaction(id, data);
-      setTransactions(prev => prev.map(tx => tx.id === id ? { ...tx, ...saved } as Transaction : tx));
+      const normalizedSaved = {
+        ...saved,
+        vencimento: toDisplayDate(saved.vencimento),
+        pagamento: saved.pagamento ? toDisplayDate(saved.pagamento) : undefined,
+      } as Transaction;
+      setTransactions(prev =>
+        prev
+          .map(tx => tx.id === id ? { ...tx, ...normalizedSaved } as Transaction : tx)
+          .sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento))
+      );
       showNotification('Lançamento atualizado!', 'success');
     } catch (err) {
       console.error('Failed to update transaction:', err);

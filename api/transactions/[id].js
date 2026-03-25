@@ -23,7 +23,13 @@ export default async function handler(req, res) {
           banco      = ${banco !== undefined ? banco : null}
         WHERE id = ${id}
         RETURNING *`;
-      return res.json(rows[0]);
+      const tx = rows[0];
+      return res.json({
+        ...tx,
+        vencimento: tx.vencimento ? new Date(tx.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
+        pagamento: tx.pagamento ? new Date(tx.pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
+        valor: Number(tx.valor),
+      });
     } catch (e) {
       console.error(e);
       return res.status(500).json({ error: e.message });
