@@ -179,6 +179,9 @@ type PdfImportDraft = {
   fornecedor: string;
   vencimento: string;
   valor: number;
+  descricao: string;
+  empresa: string;
+  cnpj: string;
   rawText: string;
   duplicate: boolean;
 };
@@ -2816,6 +2819,46 @@ export default function App() {
     };
   };
 
+  const shouldRejectSupplierName = (name: string) => {
+    const value = String(name || '').trim().toUpperCase();
+    if (!value) return true;
+    if (value.includes('DATA DO DOCUMENTO')) return true;
+    if (value.includes('VENCIMENTO')) return true;
+    if (value.includes('NOSSO NUMERO')) return true;
+    const onlyNumericLike = value.replace(/[^0-9]/g, '').length >= Math.max(8, value.length - 2);
+    if (onlyNumericLike) return true;
+    if ((value.match(/[A-Z]/g) || []).length < 3) return true;
+    return false;
+  };
+
+  const resolveSupplierName = (detectedName: string, sourceText: string) => {
+    const cleanDetected = String(detectedName || '').trim();
+    const validDetected = shouldRejectSupplierName(cleanDetected) ? '' : cleanDetected;
+    const normalizedDetected = normalizeSupplierName(validDetected);
+    const normalizedSource = normalizeSupplierName(sourceText);
+
+    if (normalizedDetected.includes('EDITORA') || normalizedSource.includes('EDITORA')) {
+      const editoraMatch = suppliers
+        .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
+        .filter((x) => x.key.includes('EDITORA'))
+        .sort((a, b) => b.key.length - a.key.length)[0];
+      if (editoraMatch) return editoraMatch.supplier.nome;
+    }
+
+    if (validDetected) {
+      const direct = suppliers.find((s) => isSupplierMatch(validDetected, s.nome));
+      if (direct) return direct.nome;
+    }
+
+    const byText = suppliers
+      .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
+      .filter((x) => x.key.length >= 5 && normalizedSource.includes(x.key))
+      .sort((a, b) => b.key.length - a.key.length)[0];
+
+    if (byText) return byText.supplier.nome;
+    return validDetected || 'Fornecedor não identificado';
+  };
+
   const extractBoletoData = (text: string, fileName: string): PdfImportDraft => {
     const normalizedText = text.toUpperCase().replace(/\s+/g, ' ');
     let fornecedor = 'Fornecedor não identificado';
@@ -2832,8 +2875,21 @@ export default function App() {
     for (const pattern of fornecedorPatterns) {
       const match = normalizedText.match(pattern);
       if (match?.[1]) {
-        fornecedor = match[1].trim().replace(/\s+/g, ' ');
-        break;
+        const candidate = match[1].trim().replace(/\s+/g, ' ');
+        if (!shouldRejectSupplierName(candidate)) {
+          fornecedor = candidate;
+          break;
+        }
+      }
+    }
+
+    if (fornecedor === 'Fornecedor não identificado') {
+      const bestSupplier = suppliers
+        .map((s) => ({ supplier: s, score: normalizedText.includes(normalizeSupplierName(s.nome)) ? normalizeSupplierName(s.nome).length : 0 }))
+        .filter((x) => x.score > 0)
+        .sort((a, b) => b.score - a.score)[0];
+      if (bestSupplier) {
+        fornecedor = bestSupplier.supplier.nome;
       }
     }
 
@@ -2879,9 +2935,38 @@ export default function App() {
       fornecedor,
       vencimento,
       valor,
+      descricao: '',
+      empresa: '',
+      cnpj: '',
       rawText: text.slice(0, 500),
       duplicate: false,
     };
+  };
+
+  const extractBoletoWithGemini = async (text: string, fileName: string): Promise<PdfImportDraft> => {
+    try {
+      const response = await fetch('/api/extract-boleto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, fileName }),
+      });
+      if (!response.ok) throw new Error('API error');
+      const data = await response.json();
+      return {
+        fileName,
+        fornecedor: data.fornecedor || 'Fornecedor não identificado',
+        vencimento: data.vencimento || '',
+        valor: typeof data.valor === 'number' ? data.valor : 0,
+        descricao: data.descricao || '',
+        empresa: data.empresa || '',
+        cnpj: data.cnpj || '',
+        rawText: text.slice(0, 500),
+        duplicate: false,
+      };
+    } catch {
+      const fallback = extractBoletoData(text, fileName);
+      return { ...fallback, descricao: '', empresa: '', cnpj: '' };
+    }
   };
 
   const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2894,7 +2979,7 @@ export default function App() {
     }
 
     setIsProcessingPdf(true);
-    showNotification(`Processando ${pdfFiles.length} boleto(s)...`, 'info');
+    showNotification(`Processando ${pdfFiles.length} boleto(s) com IA...`, 'info');
 
     try {
       const existingKeys = new Set(
@@ -2919,7 +3004,8 @@ export default function App() {
           fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
         }
 
-        const data = extractBoletoData(fullText, file.name);
+        const data = await extractBoletoWithGemini(fullText, file.name);
+        data.fornecedor = resolveSupplierName(data.fornecedor, fullText);
         const key = boletoDuplicateKey(data.fornecedor, data.vencimento, data.valor);
         data.duplicate = existingKeys.has(key) || batchKeys.has(key);
         batchKeys.add(key);
@@ -2933,7 +3019,7 @@ export default function App() {
 
       setPdfExtractedRows(extractedRows);
       setShowPdfImportModal(true);
-      showNotification('Boletos lidos. Revise e confirme os lançamentos.', 'success');
+      showNotification('Boletos lidos pela IA. Revise e confirme os lançamentos.', 'success');
     } catch (error) {
       console.error('Error processing PDF:', error);
       showNotification('Erro ao processar PDF. Tente novamente.', 'error');
@@ -2953,11 +3039,16 @@ export default function App() {
         return;
       }
 
-      const txList = nonDuplicateRows.map((row) => ({
+      const canonicalRows = nonDuplicateRows.map((row) => ({
+        ...row,
+        fornecedor: resolveSupplierName(row.fornecedor, row.rawText),
+      }));
+
+      const txList = canonicalRows.map((row) => ({
         uid: 'guest',
         fornecedor: row.fornecedor,
-        descricao: `Importado de boleto PDF (${row.fileName})`,
-        empresa: 'CN',
+        descricao: row.descricao || `Importado de boleto PDF (${row.fileName})`,
+        empresa: row.empresa || 'CN',
         vencimento: row.vencimento,
         pagamento: null as any,
         valor: row.valor,
@@ -2971,10 +3062,9 @@ export default function App() {
         await api.createTransactionsBatch(txList as any);
       }
 
-      const supplierNames = new Set(suppliers.map((s) => normalizeSupplierName(s.nome)));
-      const newSuppliers = nonDuplicateRows
+      const newSuppliers = canonicalRows
         .filter((row) => row.fornecedor !== 'Fornecedor não identificado')
-        .filter((row) => !supplierNames.has(normalizeSupplierName(row.fornecedor)))
+        .filter((row) => !suppliers.some((s) => isSupplierMatch(row.fornecedor, s.nome)))
         .map((row) => ({
           uid: 'guest',
           nome: row.fornecedor,
@@ -3794,13 +3884,17 @@ export default function App() {
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                       <div className="md:col-span-3">
                         <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Arquivo</p>
-                        <p className="text-xs text-on-surface-variant truncate">{row.fileName}</p>
+                        <p className="text-xs text-on-surface-variant truncate">
+                          {row.fileName.length > 55 ? `boleto_${index + 1}.pdf` : row.fileName}
+                        </p>
                       </div>
                       <div className="md:col-span-3">
                         <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Fornecedor</p>
                         <input
+                          list="supplier-suggestions"
                           value={row.fornecedor}
                           onChange={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, fornecedor: e.target.value } : item))}
+                          onBlur={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, fornecedor: resolveSupplierName(e.target.value, item.rawText) } : item))}
                           className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
@@ -3829,8 +3923,44 @@ export default function App() {
                         </span>
                       </div>
                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mt-2">
+                      <div className="md:col-span-5">
+                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Descrição</p>
+                        <input
+                          value={row.descricao}
+                          onChange={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, descricao: e.target.value } : item))}
+                          placeholder="Descrição do boleto"
+                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="md:col-span-3">
+                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Empresa</p>
+                        <select
+                          value={row.empresa}
+                          onChange={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, empresa: e.target.value } : item))}
+                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                        >
+                          <option value="">Selecione</option>
+                          <option value="CN">CN</option>
+                          <option value="FACEMS">FACEMS</option>
+                          <option value="LAB">LAB</option>
+                          <option value="CEI">CEI</option>
+                          <option value="UNOPAR">UNOPAR</option>
+                        </select>
+                      </div>
+                      {row.cnpj && (
+                        <div className="md:col-span-4 flex items-end">
+                          <p className="text-xs text-on-surface-variant">CNPJ: {row.cnpj}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
+                <datalist id="supplier-suggestions">
+                  {suppliers.map((supplier) => (
+                    <option key={supplier.id || supplier.nome} value={supplier.nome} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
