@@ -60,7 +60,29 @@ try {
 
   let totalFinanceiro = 0;
   let totalImported = 0;
-  let dateSamples = [];
+  const anos: Record<string, number> = {};
+  let dateSamples: any[] = [];
+
+  const parseAno = (val: any): number | null => {
+    if (!val) return null;
+    if (typeof val === 'number') {
+      const excelEpoch = Date.UTC(1899, 11, 30);
+      const dt = new Date(excelEpoch + val * 24 * 60 * 60 * 1000);
+      const y = dt.getUTCFullYear();
+      return Number.isFinite(y) ? y : null;
+    }
+    if (val instanceof Date) return val.getUTCFullYear();
+    const str = String(val).trim();
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) {
+        let y = Number(parts[2]);
+        if (parts[2].length === 2) y = Number(`20${parts[2]}`);
+        return Number.isFinite(y) ? y : null;
+      }
+    }
+    return null;
+  };
 
   for (const row of allDataMatrix) {
     const rawFornecedor = getRowValue(row, ['FORNECEDOR', 'FORNECEDORES', 'FORNECEDOR_NOME', 'NOME', 'FAVORECIDO', 'CLIENTE']);
@@ -72,18 +94,29 @@ try {
     if (sanitizedValor === 0 && !rawValor) continue;
     if (String(rawFornecedor).toUpperCase() === 'FORNECEDOR' || String(rawFornecedor).toUpperCase() === 'CLIENTE') continue;
 
-    const rawVencimento = getRowValue(row, ['VENCIMENTO', 'DATA VENCIMENTO', 'DATA', 'VENC']);
+    const rawVencimento = getRowValue(row, ['VENCIMENTO', 'DATA VENCIMENTO', 'VENC']);
     if (rawVencimento !== undefined && dateSamples.length < 5) {
       dateSamples.push(rawVencimento);
     }
+    const ano = parseAno(rawVencimento);
+    if (ano) anos[ano] = (anos[ano] || 0) + 1;
 
     totalFinanceiro += sanitizedValor;
     totalImported++;
   }
 
-  console.log(`Linhas lidas simulando App: ${totalImported}`);
-  console.log(`Total Financeiro: R$ ${totalFinanceiro.toLocaleString('pt-BR')}`);
-  console.log('Amostras de Vencimento cru:', dateSamples);
+  console.log('=== RESULTADO DA ANALISE DO EXCEL ===');
+  console.log(`Total de linhas com fornecedor valido: ${totalImported}`);
+  console.log(`Total Financeiro (soma de todos os valores): R$ ${totalFinanceiro.toLocaleString('pt-BR')}`);
+  console.log('--- Distribuicao por ANO (vencimento) ---');
+  Object.entries(anos)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .forEach(([ano, qtd]) => console.log(`  ${ano}: ${qtd} lancamentos`));
+  console.log('--- Total VALIDAS vs INVALIDAS ---');
+  const totalTodasLinhas = allDataMatrix.length;
+  console.log(`  Total linhas na matriz (todas abas): ${totalTodasLinhas}`);
+  console.log(`  Linhas com fornecedor valido: ${totalImported}`);
+  console.log(`  Amostras de Vencimento cru (Date):`, dateSamples);
 
 } catch (error) {
   console.error('Erro ao ler a planilha:', error);
