@@ -119,6 +119,8 @@ const isRevenueTransaction = (tx: Pick<Transaction, 'fornecedor' | 'descricao'>)
   
   // Receita Federal é imposto (despesa), nunca receita.
   if (text.includes('RECEITA FEDERAL')) return false;
+  // Taxas de matrícula/editora que são despesas
+  if (text.includes('MATRICULA ANHANGUERA') || text.includes('EDITORA E DISTRIBUIDORA ANHANGUERA')) return false;
 
   return (
     text.includes('REPASSE') ||
