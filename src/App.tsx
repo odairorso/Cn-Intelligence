@@ -53,8 +53,15 @@ const toInputDate = (value?: string | null) => {
     const [dd, mm, yyyy] = v.split('/');
     if (dd && mm && yyyy) return `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
   }
+  if (v.match(/^\d{4}-\d{2}-\d{2}/)) return v.slice(0, 10);
   if (v.includes('T')) return v.slice(0, 10);
-  if (v.match(/^\d{4}-\d{2}-\d{2}$/)) return v;
+  const parsed = new Date(v);
+  if (!Number.isNaN(parsed.getTime())) {
+    const yyyy = parsed.getUTCFullYear();
+    const mm = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(parsed.getUTCDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
   return '';
 };
 
@@ -62,14 +69,16 @@ const toDisplayDate = (value?: string | null) => {
   if (!value) return '';
   const v = String(value).trim();
   if (v.includes('/')) return v;
+  if (v.match(/^\d{4}-\d{2}-\d{2}/)) {
+    const [yyyy, mm, dd] = v.slice(0, 10).split('-');
+    return `${dd}/${mm}/${yyyy}`;
+  }
   if (v.includes('T')) {
     const d = new Date(v);
     if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
   }
-  if (v.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    const [yyyy, mm, dd] = v.split('-');
-    return `${dd}/${mm}/${yyyy}`;
-  }
+  const parsed = new Date(v);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
   return v;
 };
 
@@ -1630,6 +1639,16 @@ const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxM
     valor: transaction.valor.toString(),
     banco: transaction.banco || ''
   });
+
+  useEffect(() => {
+    setFormData({
+      ...transaction,
+      vencimento: toInputDate(transaction.vencimento),
+      pagamento: toInputDate(transaction.pagamento),
+      valor: transaction.valor.toString(),
+      banco: transaction.banco || ''
+    });
+  }, [transaction]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
