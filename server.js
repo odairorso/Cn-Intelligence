@@ -403,7 +403,11 @@ Responda APENAS com JSON válido no formato:
       },
     });
 
-    const extracted = JSON.parse(response.text);
+    let rawText = response.text;
+    if (rawText) {
+      rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    }
+    const extracted = JSON.parse(rawText);
 
     // Normalize vencimento to DD/MM/YYYY
     if (extracted.vencimento) {
