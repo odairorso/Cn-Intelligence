@@ -2031,7 +2031,6 @@ const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxMod
         const dd = String(dt.getUTCDate()).padStart(2, '0');
         return `${yyyy}-${mm}-${dd}`;
       };
-
       const newTxList = Array.from({ length: parcelas }, (_, i) => {
         const vencimentoParcela = addMonthsToInputDate(formData.vencimento, i);
         const pagamentoParcela = formData.status === 'PAGO'
@@ -2868,6 +2867,8 @@ export default function App() {
     const fornecedorPatterns = [
       /BENEFICIÁRIO[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/,
       /CEDENTE[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/,
+      /VENDEDOR[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/,
+      /EMISSOR[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/,
       /RAZÃO SOCIAL[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/,
       /SACADO[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/,
     ];
@@ -2910,6 +2911,8 @@ export default function App() {
     const valuePatterns = [
       /VALOR\s+(?:DO\s+)?DOCUMENTO[:\s]+R?\$?\s*([\d.,]+)/,
       /VALOR\s+COBRADO[:\s]+R?\$?\s*([\d.,]+)/,
+      /VALOR\s+TOTAL[:\s]+R?\$?\s*([\d.,]+)/,
+      /VLR\s+PAGAR[:\s]+R?\$?\s*([\d.,]+)/,
       /R\$\s*([\d]{1,3}(?:\.[\d]{3})*,[\d]{2})/,
     ];
 

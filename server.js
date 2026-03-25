@@ -192,14 +192,14 @@ app.put('/api/transactions/:id', async (req, res) => {
 
     const result = await pool.query(
       `UPDATE transactions SET
-        status = COALESCE($1, status),
-        pagamento = COALESCE($2::date, pagamento),
-        fornecedor = COALESCE($3, fornecedor),
-        descricao = COALESCE($4, descricao),
-        empresa = COALESCE($5, empresa),
-        vencimento = COALESCE($6::date, vencimento),
-        valor = COALESCE($7, valor),
-        banco = COALESCE($8, banco),
+        status = $1,
+        pagamento = $2::date,
+        fornecedor = $3,
+        descricao = $4,
+        empresa = $5,
+        vencimento = $6::date,
+        valor = $7,
+        banco = $8,
         updated_at = NOW()
       WHERE id = $9 RETURNING *`,
       [status, pDate, fornecedor, descricao, empresa, vDate, valor, banco, id]
@@ -395,7 +395,7 @@ Responda APENAS com JSON válido no formato:
 }`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
