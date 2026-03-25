@@ -27,7 +27,9 @@ import {
   X,
   Edit,
   RefreshCw,
-  CreditCard
+  CreditCard,
+  FileUp,
+  Loader2
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, 
@@ -114,12 +116,23 @@ const normalizeCompanyKey = (value: string) => {
 
 const isRevenueTransaction = (tx: Pick<Transaction, 'fornecedor' | 'descricao'>) => {
   const text = normalizeSupplierName(`${tx.fornecedor} ${tx.descricao}`);
+  
+  // Receita Federal é imposto (despesa), nunca receita.
+  if (text.includes('RECEITA FEDERAL')) return false;
+
   return (
     text.includes('REPASSE') ||
-    text.includes('RECEITA') ||
     text.includes('MENSALIDADE') ||
     text.includes('ENTRADA') ||
-    text.includes('CREDITO')
+    text.includes('CREDITO') ||
+    text.includes('EDUCBANK') ||
+    text.includes('KROTON') ||
+    text.includes('ANHANGUERA') ||
+    text.includes('ADIANTAMENTO') ||
+    text.includes('CHEQUE') ||
+    text.includes('PERMUTA') ||
+    text.includes('CARTAO CREDITO') ||
+    text.includes('REDE')
   );
 };
 
@@ -2683,8 +2696,17 @@ export default function App() {
   const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [showPayModal, setShowPayModal] = useState<{ id: string; valor: number } | null>(null);
+  const [showPdfImportModal, setShowPdfImportModal] = useState(false);
+  const [pdfExtractedData, setPdfExtractedData] = useState<{
+    fornecedor: string;
+    vencimento: string;
+    valor: number;
+    rawText: string;
+  } | null>(null);
+  const [isProcessingPdf, setIsProcessingPdf] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const currentBrandLogo = brandLogo || defaultBrandLogo;
@@ -2764,6 +2786,180 @@ export default function App() {
   }, []);
 
   // --- Handlers ---
+
+  // PDF Import Handler
+  const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      showNotification('Selecione um arquivo PDF válido.', 'error');
+      return;
+    }
+
+    setIsProcessingPdf(true);
+    showNotification('Processando boleto PDF...', 'info');
+
+    try {
+      // Load pdf.js from CDN using script tag
+      const loadPdfJs = (): Promise<any> => {
+        return new Promise((resolve, reject) => {
+          if ((window as any).pdfjsLib) {
+            resolve((window as any).pdfjsLib);
+            return;
+          }
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.js';
+          script.onload = () => {
+            const lib = (window as any).pdfjsLib;
+            lib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.min.js';
+            resolve(lib);
+          };
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      };
+
+      const pdfjsLib = await loadPdfJs();
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      let fullText = '';
+      
+      // Extract text from all pages
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+        fullText += pageText + '\n';
+      }
+
+      console.log('PDF Text extracted:', fullText);
+
+      // Extract data using regex patterns
+      const extractedData = extractBoletoData(fullText);
+      
+      setPdfExtractedData(extractedData);
+      setShowPdfImportModal(true);
+      showNotification('Dados extraídos com sucesso!', 'success');
+    } catch (error) {
+      console.error('Error processing PDF:', error);
+      showNotification('Erro ao processar PDF. Tente novamente.', 'error');
+    } finally {
+      setIsProcessingPdf(false);
+      if (event.target) event.target.value = '';
+    }
+  };
+
+  // Extract boleto data from text
+  const extractBoletoData = (text: string) => {
+    const normalizedText = text.toUpperCase().replace(/\s+/g, ' ');
+    
+    // Extract supplier name - look for common patterns
+    let fornecedor = 'Fornecedor não identificado';
+    
+    // Pattern: after "BENEFICIÁRIO" or "CEDENTE"
+    const beneficiarioPatterns = [
+      /BENEFICIÁRIO[:\s]+([A-Z\s]+?)(?:\s+CNPJ|\s+CPF|\s+AG|\d{2}\/\d{2}\/\d{4})/,
+      /CEDENTE[:\s]+([A-Z\s]+?)(?:\s+CNPJ|\s+CPF|\s+AG|\d{2}\/\d{2}\/\d{4})/,
+      /RAZÃO SOCIAL[:\s]+([A-Z\s]+?)(?:\s+CNPJ|\s+CPF)/,
+    ];
+    
+    for (const pattern of beneficiarioPatterns) {
+      const match = normalizedText.match(pattern);
+      if (match && match[1]) {
+        fornecedor = match[1].trim().replace(/\s+/g, ' ');
+        break;
+      }
+    }
+
+    // Extract due date - look for date patterns
+    let vencimento = '';
+    const datePatterns = [
+      /VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/,
+      /(\d{2}\/\d{2}\/\d{4})/g,
+    ];
+    
+    for (const pattern of datePatterns) {
+      const match = normalizedText.match(pattern);
+      if (match && match[1]) {
+        vencimento = match[1];
+        break;
+      }
+    }
+
+    // Extract value - look for R$ patterns
+    let valor = 0;
+    const valuePatterns = [
+      /VALOR\s+(?:DO\s+)?DOCUMENTO[:\s]+R?\$?\s*([\d.,]+)/,
+      /R\$\s*([\d.,]+)/,
+      /VALOR[:\s]+([\d.,]+)/,
+    ];
+    
+    for (const pattern of valuePatterns) {
+      const match = normalizedText.match(pattern);
+      if (match && match[1]) {
+        const valueStr = match[1]
+          .replace(/\./g, '')
+          .replace(',', '.');
+        const parsedValue = parseFloat(valueStr);
+        if (!isNaN(parsedValue) && parsedValue > 0) {
+          valor = parsedValue;
+          break;
+        }
+      }
+    }
+
+    return {
+      fornecedor,
+      vencimento,
+      valor,
+      rawText: text.substring(0, 500) // First 500 chars for reference
+    };
+  };
+
+  // Confirm PDF import and create transaction
+  const handleConfirmPdfImport = async (data: { fornecedor: string; vencimento: string; valor: number }) => {
+    try {
+      const newTransaction = {
+        uid: 'guest',
+        fornecedor: data.fornecedor,
+        descricao: 'Importado de boleto PDF',
+        empresa: 'CN',
+        vencimento: data.vencimento,
+        pagamento: null,
+        valor: data.valor,
+        status: 'PENDENTE' as TransactionStatus,
+        banco: null,
+      };
+
+      await api.createTransaction(newTransaction);
+      
+      // Sync supplier if new
+      const existingSupplier = suppliers.find(s => 
+        normalizeSupplierName(s.nome) === normalizeSupplierName(data.fornecedor)
+      );
+      if (!existingSupplier && data.fornecedor !== 'Fornecedor não identificado') {
+        await api.createSupplier({
+          uid: 'guest',
+          nome: data.fornecedor,
+          email: '',
+          telefone: '',
+          cnpj: ''
+        });
+        fetchSuppliers();
+      }
+
+      setShowPdfImportModal(false);
+      setPdfExtractedData(null);
+      fetchTransactions();
+      showNotification('Boleto importado com sucesso!', 'success');
+    } catch (error) {
+      console.error('Error creating transaction from PDF:', error);
+      showNotification('Erro ao salvar lançamento.', 'error');
+    }
+  };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
