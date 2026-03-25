@@ -101,6 +101,28 @@ const normalizeSupplierName = (value: string) =>
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '');
 
+const normalizeCompanyKey = (value: string) => {
+  const normalized = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return normalized || 'GERAL';
+};
+
+const isRevenueTransaction = (tx: Pick<Transaction, 'fornecedor' | 'descricao'>) => {
+  const text = normalizeSupplierName(`${tx.fornecedor} ${tx.descricao}`);
+  return (
+    text.includes('REPASSE') ||
+    text.includes('RECEITA') ||
+    text.includes('MENSALIDADE') ||
+    text.includes('ENTRADA') ||
+    text.includes('CREDITO')
+  );
+};
+
 const levenshteinDistance = (a: string, b: string) => {
   const m = a.length;
   const n = b.length;
@@ -731,7 +753,14 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
   const [selectedCompany, setSelectedCompany] = useState<string>('TODOS');
 
   const companies = useMemo(() => {
-    return [...new Set(transactions.map(tx => tx.empresa))].sort();
+    const map = new Map<string, string>();
+    for (const tx of transactions) {
+      const companyKey = normalizeCompanyKey(tx.empresa);
+      if (!map.has(companyKey)) map.set(companyKey, companyKey);
+    }
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
   }, [transactions]);
 
   const filteredData = useMemo(() => {
@@ -741,7 +770,7 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
       const month = tx.vencimento.includes('/') ? parts[1] : parts[1];
       const matchesYear = selectedYear === 'TODOS' || year === selectedYear;
       const matchesMonth = selectedMonth === 'TODOS' || month === selectedMonth;
-      const matchesCompany = selectedCompany === 'TODOS' || tx.empresa === selectedCompany;
+      const matchesCompany = selectedCompany === 'TODOS' || normalizeCompanyKey(tx.empresa) === selectedCompany;
       return matchesYear && matchesMonth && matchesCompany;
     });
   }, [transactions, selectedYear, selectedMonth, selectedCompany]);
@@ -750,6 +779,7 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
     const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const data = Array.from({ length: 12 }, (_, i) => ({ name: months[i], value: 0 }));
     for (const tx of filteredData) {
+      if (isRevenueTransaction(tx)) continue;
       const parts = tx.vencimento.includes('/') ? tx.vencimento.split('/') : tx.vencimento.split('-');
       const m = tx.vencimento.includes('/') ? parts[1] : parts[1];
       const idx = parseInt(m, 10) - 1;
@@ -761,11 +791,23 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
   const companyData = useMemo(() => {
     const map = new Map<string, number>();
     for (const tx of filteredData) {
-      map.set(tx.empresa, (map.get(tx.empresa) || 0) + tx.valor);
+      if (isRevenueTransaction(tx)) continue;
+      const companyKey = normalizeCompanyKey(tx.empresa);
+      map.set(companyKey, (map.get(companyKey) || 0) + tx.valor);
     }
     return Array.from(map.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
+  }, [filteredData]);
+
+  const periodTotals = useMemo(() => {
+    let receitas = 0;
+    let despesas = 0;
+    for (const tx of filteredData) {
+      if (isRevenueTransaction(tx)) receitas += tx.valor;
+      else despesas += tx.valor;
+    }
+    return { receitas, despesas, saldo: receitas - despesas };
   }, [filteredData]);
 
   return (
@@ -812,21 +854,23 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
             onChange={e => setSelectedCompany(e.target.value)}
           >
             <option value="TODOS" className="bg-surface text-on-surface">Todas</option>
-            {companies.map(c => <option key={c} value={c} className="bg-surface text-on-surface">{c}</option>)}
+            {companies.map(c => <option key={c.value} value={c.value} className="bg-surface text-on-surface">{c.label}</option>)}
           </select>
         </div>
         <div className="flex-grow"></div>
         <div className="text-right">
-          <p className="text-[10px] font-bold text-on-surface-variant uppercase">Total no Período</p>
+          <p className="text-[10px] font-bold text-on-surface-variant uppercase">Despesas no Período</p>
           <p className="text-xl font-bold text-primary">
-            {filteredData.reduce((acc, tx) => acc + tx.valor, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            {periodTotals.despesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
           </p>
+          <p className="text-[11px] text-on-surface-variant mt-1">Receitas: {periodTotals.receitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+          <p className={cn("text-[11px] font-semibold", periodTotals.saldo >= 0 ? "text-primary" : "text-tertiary")}>Saldo: {periodTotals.saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="glass-card p-8 min-h-[400px]">
-          <h4 className="text-lg font-bold font-headline mb-6">Fluxo Mensal ({selectedYear})</h4>
+          <h4 className="text-lg font-bold font-headline mb-6">Despesas Mensais ({selectedYear})</h4>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
