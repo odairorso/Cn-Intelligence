@@ -37,7 +37,14 @@ import {
   AreaChart, Area, Legend, CartesianGrid
 } from 'recharts';
 import * as XLSX from 'xlsx';
+import * as pdfjsLib from 'pdfjs-dist';
 import { motion, AnimatePresence } from 'motion/react';
+
+// Initialize PDF.js worker using standard local file reference
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString();
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -114,16 +121,11 @@ const normalizeCompanyKey = (value: string) => {
   return normalized || 'GERAL';
 };
 
-const isRevenueTransaction = (tx: Pick<Transaction, 'fornecedor' | 'descricao' | 'valor'>) => {
+const isRevenueTransaction = (tx: Pick<Transaction, 'fornecedor' | 'descricao'>) => {
   const text = normalizeSupplierName(`${tx.fornecedor} ${tx.descricao}`);
   
   // Receita Federal é imposto (despesa), nunca receita.
   if (text.includes('RECEITA FEDERAL')) return false;
-  // Taxas de matrícula/editora que são despesas
-  if (text.includes('MATRICULA ANHANGUERA') || text.includes('EDITORA E DISTRIBUIDORA ANHANGUERA')) return false;
-
-  // Se o valor for menor ou igual a 1000, forçamos como despesa (não é receita).
-  if (tx.valor <= 1000) return false;
 
   return (
     text.includes('REPASSE') ||
@@ -2805,27 +2807,8 @@ export default function App() {
     showNotification('Processando boleto PDF...', 'info');
 
     try {
-      // Load pdf.js from CDN using script tag
-      const loadPdfJs = (): Promise<any> => {
-        return new Promise((resolve, reject) => {
-          if ((window as any).pdfjsLib) {
-            resolve((window as any).pdfjsLib);
-            return;
-          }
-          const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.js';
-          script.onload = () => {
-            const lib = (window as any).pdfjsLib;
-            lib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.min.js';
-            resolve(lib);
-          };
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      };
-
-      const pdfjsLib = await loadPdfJs();
       const arrayBuffer = await file.arrayBuffer();
+      // Usar a biblioteca importada nativamente
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       
       let fullText = '';
@@ -3074,24 +3057,15 @@ export default function App() {
           const str = String(val).replace(/[R$\s]/g, '').trim();
           if (str === '' || str.toUpperCase() === 'TOTAL') return 0;
           
-          // Trata formatos brasileiros padrão como 72.705,39 ou 1.500,00 ou 1500,00
+          // Trata formatos como 1.500,00 ou 1500,00 ou 1500.00
           if (str.includes(',') && str.includes('.')) {
-             // Conta quantos pontos e vírgulas tem e onde estão para descobrir o formato
-             const lastDot = str.lastIndexOf('.');
-             const lastComma = str.lastIndexOf(',');
-             
-             if (lastComma > lastDot) {
-               // Formato BR: 72.705,39 (vírgula como decimal)
-               return Number(str.replace(/\./g, '').replace(',', '.'));
-             } else {
-               // Formato US: 72,705.39 (ponto como decimal)
-               return Number(str.replace(/,/g, ''));
-             }
+             // Ex: 1.500,00 -> remove ponto, troca virgula por ponto
+             return Number(str.replace(/\./g, '').replace(',', '.'));
           } else if (str.includes(',')) {
-             // Ex: 1500,00 -> vira 1500.00
+             // Ex: 1500,00
              return Number(str.replace(',', '.'));
           } else if ((str.match(/\./g) || []).length > 1) {
-             // Ex: 1.500.000 -> remove todos os pontos (não tem casas decimais)
+             // Ex: 1.500.000 -> remove todos os pontos
              return Number(str.replace(/\./g, ''));
           }
           
@@ -3375,33 +3349,27 @@ export default function App() {
 
   // --- Computed Stats ---
   const stats = useMemo(() => {
-    let totalDespesas = 0;
-    let totalReceitas = 0;
+    let total = 0;
     let pagos = 0;
     let pendentes = 0;
     let vencidos = 0;
     const empresasSet = new Set<string>();
     for (const tx of transactions) {
-      if (isRevenueTransaction(tx)) {
-        totalReceitas += tx.valor;
-      } else {
-        totalDespesas += tx.valor;
-      }
-      
+      total += tx.valor;
       if (tx.status === 'PAGO') pagos++;
       else if (tx.status === 'VENCIDO') vencidos++;
       else pendentes++;
       empresasSet.add(tx.empresa);
     }
     const kpis: KPI[] = [
-      { label: 'TOTAL DESPESAS', value: totalDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), color: '#ef4444' },
-      { label: 'TOTAL RECEITAS', value: totalReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), color: '#10b981' },
-      { label: 'EMPRESAS', value: empresasSet.size.toString(), description: 'Unidades ativas', color: '#3b82f6' },
+      { label: 'VALOR TOTAL', value: total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), color: '#10b981' },
+      { label: 'REGISTROS', value: transactions.length.toString(), description: 'Volume operacional', color: '#10b981' },
+      { label: 'EMPRESAS', value: empresasSet.size.toString(), description: 'Unidades ativas', color: '#10b981' },
       { label: 'PENDENTES', value: pendentes.toString(), description: 'Aguardando conciliação', color: '#f59e0b' },
       { label: 'PAGOS', value: pagos.toString(), description: 'Liquidados', color: '#10b981' },
       { label: 'VENCIDOS', value: vencidos.toString(), description: 'Ação imediata necessária', color: '#ef4444' },
     ];
-    return { totalDespesas, totalReceitas, pagos, pendentes, vencidos, kpis };
+    return { total, pagos, pendentes, vencidos, kpis };
   }, [transactions]);
 
   // Removida a tela de loading de isAuthReady para permitir a renderização direta
@@ -3553,25 +3521,6 @@ export default function App() {
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
-            {activeTab === 'lancamentos' && (
-              <>
-                <button 
-                  onClick={() => pdfInputRef.current?.click()}
-                  className="bg-primary/20 text-primary px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/30 transition-all border border-primary/20"
-                >
-                  {isProcessingPdf ? <Loader2 size={18} className="animate-spin" /> : <FileUp size={18} />} 
-                  Ler Boleto PDF
-                </button>
-                <input 
-                  type="file" 
-                  ref={pdfInputRef} 
-                  onChange={handlePdfUpload} 
-                  accept="application/pdf" 
-                  className="hidden" 
-                />
-              </>
-            )}
-
             <button 
               onClick={() => fileInputRef.current?.click()}
               className="bg-surface-variant/20 text-on-surface px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-surface-variant/40 transition-all border border-white/5"
@@ -3757,70 +3706,6 @@ export default function App() {
           />
         )}
       </AnimatePresence>
-
-      {showPdfImportModal && pdfExtractedData && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-surface border border-white/10 p-6 md:p-8 rounded-2xl w-full max-w-lg shadow-2xl">
-            <h3 className="text-xl font-bold font-headline mb-6 flex items-center gap-2">
-              <FileText className="text-primary" /> Confirmar Dados do Boleto
-            </h3>
-            
-            <div className="space-y-4 mb-8">
-              <div className="bg-surface-variant/20 p-4 rounded-xl border border-white/5 space-y-3">
-                <div>
-                  <label className="text-[10px] font-bold text-on-surface-variant uppercase">Fornecedor Identificado</label>
-                  <input 
-                    type="text"
-                    className="w-full bg-surface-variant/40 border border-white/10 rounded-lg px-3 py-2 text-sm mt-1 focus:border-primary outline-none"
-                    value={pdfExtractedData.fornecedor}
-                    onChange={(e) => setPdfExtractedData({...pdfExtractedData, fornecedor: e.target.value})}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] font-bold text-on-surface-variant uppercase">Vencimento</label>
-                    <input 
-                      type="text"
-                      placeholder="DD/MM/YYYY"
-                      className="w-full bg-surface-variant/40 border border-white/10 rounded-lg px-3 py-2 text-sm mt-1 focus:border-primary outline-none"
-                      value={pdfExtractedData.vencimento}
-                      onChange={(e) => setPdfExtractedData({...pdfExtractedData, vencimento: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-on-surface-variant uppercase">Valor (R$)</label>
-                    <input 
-                      type="number"
-                      step="0.01"
-                      className="w-full bg-surface-variant/40 border border-white/10 rounded-lg px-3 py-2 text-sm mt-1 focus:border-primary outline-none"
-                      value={pdfExtractedData.valor}
-                      onChange={(e) => setPdfExtractedData({...pdfExtractedData, valor: Number(e.target.value)})}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <button 
-                onClick={() => {
-                  setShowPdfImportModal(false);
-                  setPdfExtractedData(null);
-                }}
-                className="px-5 py-2.5 rounded-xl text-sm font-bold text-on-surface-variant hover:text-white hover:bg-white/5 transition-all"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={() => handleConfirmPdfImport(pdfExtractedData)}
-                className="bg-primary text-background px-6 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/20"
-              >
-                Confirmar e Salvar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showNewTxModal && (
         <NewTxModal 
