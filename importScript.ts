@@ -232,8 +232,8 @@ async function importData() {
       const rawVencimento = getRowValue(row, ['VENCIMENTO', 'DATA VENCIMENTO', 'VENC']);
       const rawPagamento = getRowValue(row, ['DATA PAGAMENTO', 'PAGAMENTO', 'DATA PAGO', 'PAGO EM']);
       
-      const rawDescricao = getRowValue(row, ['DESCRIÇÃO', 'DESCRICAO', 'OBSERVACAO', 'OBSERVAÇÃO', 'OBS 1', 'OBS 2', 'OBS', 'DETALHE']);
-      const rawEmpresa = getRowValue(row, ['EMPRESA', 'UNIDADE', 'LOJA']);
+      const rawDescricao = getRowValue(row, ['DESCRIÇÃO', 'DESCRICAO', 'OBSERVACAO', 'OBSERVAÇÃO', 'OBS 1', 'OBS', 'DETALHE']);
+      const rawEmpresa = getRowValue(row, ['EMPRESA', 'UNIDADE', 'LOJA', 'OBS 2', 'GRUPO']);
 
       const vencimentoDate = parseDateToPg(rawVencimento, row._aba_origem);
       const pagamentoDatePg = rawPagamento ? parseDateToPg(rawPagamento, row._aba_origem) : null;
