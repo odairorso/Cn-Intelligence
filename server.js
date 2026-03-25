@@ -38,6 +38,17 @@ const parseDateToPg = (val) => {
   return null;
 };
 
+// Banks API
+app.get('/api/banks', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM banks WHERE ativo = true ORDER BY nome ASC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching banks:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Transactions API
 app.get('/api/transactions', async (req, res) => {
   try {
@@ -92,16 +103,17 @@ app.post('/api/transactions/batch', async (req, res) => {
 });
 app.post('/api/transactions', async (req, res) => {
   try {
-    const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status } = req.body;
+    const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco } = req.body;
+
     
     // Convert DD/MM/YYYY back to YYYY-MM-DD
     const vDate = vencimento.split('/').reverse().join('-');
     const pDate = pagamento ? pagamento.split('/').reverse().join('-') : null;
 
     const result = await pool.query(
-      `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [uid || 'guest', fornecedor, descricao || '-', empresa || 'Geral', vDate, pDate, valor, status || 'PENDENTE']
+      `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [uid || 'guest', fornecedor, descricao || '-', empresa || 'Geral', vDate, pDate, valor, status || 'PENDENTE', banco || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
