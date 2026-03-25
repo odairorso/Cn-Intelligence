@@ -125,21 +125,34 @@ app.post('/api/transactions', async (req, res) => {
 app.put('/api/transactions/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, pagamento } = req.body;
+    const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco } = req.body;
     
-    let query = 'UPDATE transactions SET status = $1';
-    let values = [status, id];
-    
-    if (pagamento) {
-      const pDate = pagamento.split('/').reverse().join('-');
-      query += ', pagamento = $3 WHERE id = $2 RETURNING *';
-      values = [status, id, pDate];
-    } else {
-      query += ' WHERE id = $2 RETURNING *';
-    }
+    const pDate = pagamento ? pagamento.split('/').reverse().join('-') : null;
+    const vDate = vencimento ? vencimento.split('/').reverse().join('-') : null;
 
-    const result = await pool.query(query, values);
-    res.json(result.rows[0]);
+    const result = await pool.query(
+      `UPDATE transactions SET
+        status = COALESCE($1, status),
+        pagamento = COALESCE($2::date, pagamento),
+        fornecedor = COALESCE($3, fornecedor),
+        descricao = COALESCE($4, descricao),
+        empresa = COALESCE($5, empresa),
+        vencimento = COALESCE($6::date, vencimento),
+        valor = COALESCE($7, valor),
+        banco = COALESCE($8, banco),
+        updated_at = NOW()
+      WHERE id = $9 RETURNING *`,
+      [status, pDate, fornecedor, descricao, empresa, vDate, valor, banco, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    
+    const tx = result.rows[0];
+    res.json({
+      ...tx,
+      vencimento: tx.vencimento ? new Date(tx.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
+      pagamento: tx.pagamento ? new Date(tx.pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
+      valor: Number(tx.valor)
+    });
   } catch (error) {
     console.error('Error updating transaction:', error);
     res.status(500).json({ error: 'Internal server error' });
