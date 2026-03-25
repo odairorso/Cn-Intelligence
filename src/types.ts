@@ -24,6 +24,7 @@ export interface Transaction {
   pagamento?: string;
   valor: number;
   status: TransactionStatus;
+  banco?: string;
 }
 
 
@@ -39,4 +40,12 @@ export interface ChartData {
   name: string;
   value: number;
   projected?: number;
+}
+
+export interface Bank {
+  id: string;
+  uid: string;
+  nome: string;
+  saldo: number;
+  ativo: boolean;
 }

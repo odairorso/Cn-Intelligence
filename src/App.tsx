@@ -1731,9 +1731,11 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchTransactions();
-    fetchSuppliers();
-    fetchBanks();
+    api.setupTables().catch(console.error).finally(() => {
+      fetchTransactions();
+      fetchSuppliers();
+      fetchBanks();
+    });
   }, []);
 
   // --- Handlers ---

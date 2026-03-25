@@ -129,6 +129,13 @@ export const api = {
     return res.json();
   },
 
+  async setupTables(): Promise<void> {
+    const res = await fetch(`${API_BASE}/setup-tables`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to setup tables');
+  },
+
   async getBanks(uid: string): Promise<Bank[]> {
     const res = await fetch(`${API_BASE}/banks?uid=${uid}`);
     if (!res.ok) throw new Error('Failed to fetch banks');
