@@ -41,10 +41,64 @@ const parseDateToPg = (val) => {
 // Banks API
 app.get('/api/banks', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM banks WHERE ativo = true ORDER BY nome ASC');
+    const { uid } = req.query;
+    const result = await pool.query(
+      'SELECT * FROM banks WHERE ($1::text IS NULL OR uid = $1) AND ativo = true ORDER BY nome ASC',
+      [uid || null]
+    );
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching banks:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/banks', async (req, res) => {
+  try {
+    const { uid, nome, agencia, conta, saldo } = req.body;
+    const result = await pool.query(
+      `INSERT INTO banks (uid, nome, agencia, conta, saldo)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [uid || 'guest', nome, agencia || null, conta || null, saldo ?? 0]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating bank:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.put('/api/banks/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nome, agencia, conta, saldo, ativo } = req.body;
+    const result = await pool.query(
+      `UPDATE banks SET
+        nome = COALESCE($1, nome),
+        agencia = COALESCE($2, agencia),
+        conta = COALESCE($3, conta),
+        saldo = COALESCE($4, saldo),
+        ativo = COALESCE($5, ativo),
+        updated_at = NOW()
+      WHERE id = $6
+      RETURNING *`,
+      [nome, agencia, conta, saldo, ativo, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating bank:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/api/banks/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM banks WHERE id = $1', [id]);
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting bank:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
