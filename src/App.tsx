@@ -155,7 +155,7 @@ const isSupplierMatch = (transactionSupplier: string, supplierName: string) => {
 };
 
 // --- Types ---
-type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'bancos' | 'configuracoes';
+type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'receitas' | 'bancos' | 'configuracoes';
 
 // --- Components ---
 
@@ -172,7 +172,7 @@ function KPIComponent({ kpi, index }: any) {
         <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-on-surface-variant/80 mb-2 font-headline">
           {kpi.label}
         </p>
-        <h3 className="text-3xl font-black font-headline text-on-surface">
+        <h3 className="text-xl lg:text-2xl xl:text-3xl font-black font-headline text-on-surface break-words leading-tight">
           {kpi.value}
         </h3>
         {kpi.trend && (
@@ -201,99 +201,420 @@ interface DashboardTabProps {
 
 const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) => {
   const statusChartData = [
-    { name: 'Pagos', value: stats.pagos },
-    { name: 'Pendentes', value: stats.pendentes },
-    { name: 'Vencidos', value: stats.vencidos },
+    { name: 'Pagos', value: stats.pagos, color: '#10b981' },
+    { name: 'Pendentes', value: stats.pendentes, color: '#f59e0b' },
+    { name: 'Vencidos', value: stats.vencidos, color: '#ef4444' },
   ];
 
+  // Dados para gráfico de evolução mensal
+  const monthlyEvolution = useMemo(() => {
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const currentYear = new Date().getFullYear();
+    
+    return months.map((month, idx) => {
+      const monthTx = transactions.filter(tx => {
+        const parts = tx.vencimento.split('/');
+        if (parts.length === 3) {
+          return parseInt(parts[1]) === idx + 1 && parts[2] === String(currentYear);
+        }
+        return false;
+      });
+      
+      const pagos = monthTx.filter(tx => tx.status === 'PAGO').reduce((acc, tx) => acc + tx.valor, 0);
+      const pendentes = monthTx.filter(tx => tx.status === 'PENDENTE').reduce((acc, tx) => acc + tx.valor, 0);
+      const vencidos = monthTx.filter(tx => tx.status === 'VENCIDO').reduce((acc, tx) => acc + tx.valor, 0);
+      
+      return { name: month, pagos, pendentes, vencidos, total: pagos + pendentes + vencidos };
+    });
+  }, [transactions]);
+
+  // Top 5 fornecedores por valor
+  const topSuppliers = useMemo(() => {
+    const supplierMap = new Map<string, number>();
+    transactions.forEach(tx => {
+      const current = supplierMap.get(tx.fornecedor) || 0;
+      supplierMap.set(tx.fornecedor, current + tx.valor);
+    });
+    return Array.from(supplierMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, value]) => ({ name, value }));
+  }, [transactions]);
+
+  // Calcular percentuais
+  const totalTransactions = transactions.length || 1;
+  const pagosPercent = Math.round((stats.pagos / totalTransactions) * 100);
+  const pendentesPercent = Math.round((stats.pendentes / totalTransactions) * 100);
+  const vencidosPercent = Math.round((stats.vencidos / totalTransactions) * 100);
+
   return (
-    <div className="space-y-10">
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
+    <div className="space-y-8">
+      {/* KPIs Modernizados */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4">
         {stats.kpis.map((kpi: any, i: number) => (
-          <KPIComponent key={i} kpi={kpi} index={i} />
+          <motion.div 
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.08 }}
+            className="relative overflow-hidden glass-card p-5 group hover:border-primary/40 transition-all duration-300"
+          >
+            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full" />
+            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/60 mb-2">
+              {kpi.label}
+            </p>
+            <h3 className="text-lg xl:text-2xl font-black font-headline text-on-surface group-hover:text-primary transition-colors break-words leading-tight">
+              {kpi.value}
+            </h3>
+            {kpi.description && (
+              <p className="text-[9px] text-on-surface-variant/50 mt-1 font-medium">
+                {kpi.description}
+              </p>
+            )}
+          </motion.div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="glass-card p-8 min-h-[400px] flex flex-col">
-          <h4 className="text-lg font-bold font-headline mb-6">Status dos Lançamentos</h4>
-          <div className="flex-grow flex items-center justify-center relative">
+      {/* Cards de Status com Barras de Progresso */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+          className="glass-card p-6 border-l-4 border-primary"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                <CheckCircle size={20} className="text-primary" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/60">Pagos</p>
+                <p className="text-2xl font-black text-primary">{stats.pagos}</p>
+              </div>
+            </div>
+            <span className="text-3xl font-black text-primary/20">{pagosPercent}%</span>
+          </div>
+          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${pagosPercent}%` }}
+              transition={{ delay: 0.5, duration: 0.8 }}
+              className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full"
+            />
+          </div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="glass-card p-6 border-l-4 border-secondary"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-secondary/20 flex items-center justify-center">
+                <Calendar size={20} className="text-secondary" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/60">Pendentes</p>
+                <p className="text-2xl font-black text-secondary">{stats.pendentes}</p>
+              </div>
+            </div>
+            <span className="text-3xl font-black text-secondary/20">{pendentesPercent}%</span>
+          </div>
+          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${pendentesPercent}%` }}
+              transition={{ delay: 0.6, duration: 0.8 }}
+              className="h-full bg-gradient-to-r from-secondary to-secondary/60 rounded-full"
+            />
+          </div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4 }}
+          className="glass-card p-6 border-l-4 border-tertiary"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-tertiary/20 flex items-center justify-center">
+                <TrendingUp size={20} className="text-tertiary" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/60">Vencidos</p>
+                <p className="text-2xl font-black text-tertiary">{stats.vencidos}</p>
+              </div>
+            </div>
+            <span className="text-3xl font-black text-tertiary/20">{vencidosPercent}%</span>
+          </div>
+          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${vencidosPercent}%` }}
+              transition={{ delay: 0.7, duration: 0.8 }}
+              className="h-full bg-gradient-to-r from-tertiary to-tertiary/60 rounded-full"
+            />
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Gráficos Principais */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Gráfico de Evolução Mensal */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="glass-card p-6"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h4 className="text-lg font-bold font-headline">Evolução Mensal</h4>
+              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Fluxo de caixa 2026</p>
+            </div>
+            <div className="flex items-center gap-4 text-[10px]">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-primary" /> Pagos</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-secondary" /> Pendentes</span>
+            </div>
+          </div>
+          {transactions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-[280px] text-on-surface-variant opacity-20">
+              <BarChart3 size={64} />
+              <p className="text-xs uppercase tracking-widest mt-4">Sem dados</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart data={monthlyEvolution}>
+                <defs>
+                  <linearGradient id="gradientPagos" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="gradientPendentes" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
+                <XAxis dataKey="name" stroke="#c6c6cd" fontSize={10} axisLine={false} tickLine={false} />
+                <YAxis 
+                  stroke="#c6c6cd" 
+                  fontSize={10} 
+                  axisLine={false} 
+                  tickLine={false}
+                  tickFormatter={(value) => value >= 1000 ? `${(value/1000).toFixed(0)}k` : String(value)}
+                />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1a1f2e', border: '1px solid #ffffff15', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}
+                  itemStyle={{ color: '#dee2f7', fontSize: '12px' }}
+                  formatter={(value: number) => [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), '']}
+                />
+                <Area type="monotone" dataKey="pagos" stroke="#10b981" fill="url(#gradientPagos)" strokeWidth={2.5} />
+                <Area type="monotone" dataKey="pendentes" stroke="#f59e0b" fill="url(#gradientPendentes)" strokeWidth={2.5} />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </motion.div>
+
+        {/* Status dos Lançamentos - Donut Moderno */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="glass-card p-6"
+        >
+          <div className="mb-6">
+            <h4 className="text-lg font-bold font-headline">Status dos Lançamentos</h4>
+            <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Distribuição atual</p>
+          </div>
+          <div className="flex items-center justify-center relative">
             {transactions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center text-on-surface-variant opacity-20">
+              <div className="flex flex-col items-center justify-center h-[280px] text-on-surface-variant opacity-20">
                 <PieChartIcon size={64} />
                 <p className="text-xs uppercase tracking-widest mt-4">Sem dados</p>
               </div>
             ) : (
               <>
-                <ResponsiveContainer width="100%" height={250}>
+                <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
                     <Pie
                       data={statusChartData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
+                      innerRadius={70}
+                      outerRadius={95}
+                      paddingAngle={4}
                       dataKey="value"
+                      cornerRadius={6}
                     >
-                      {statusChartData.map((_entry, index) => (
-                        <Cell key={`cell-${index}`} fill={[ '#10b981', '#f59e0b', '#ef4444' ][index]} />
+                      {statusChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
-
                     </Pie>
                     <Tooltip 
-                      contentStyle={{ backgroundColor: '#161b2a', border: 'none', borderRadius: '8px' }}
+                      contentStyle={{ backgroundColor: '#1a1f2e', border: '1px solid #ffffff15', borderRadius: '12px' }}
                       itemStyle={{ color: '#dee2f7' }}
+                      formatter={(value: number) => [`${value} lançamentos`, '']}
                     />
-                    <Legend verticalAlign="bottom" height={36}/>
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-2xl font-bold">
-                    {Math.round((stats.pagos / (transactions.length || 1)) * 100)}%
-                  </span>
-                  <span className="text-[10px] uppercase text-on-surface-variant font-bold">Pagos</span>
+                  <span className="text-4xl font-black">{pagosPercent}%</span>
+                  <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-widest">Liquidados</span>
                 </div>
               </>
             )}
           </div>
-        </div>
-
-        <div className="glass-card p-8 min-h-[400px]">
-          <h4 className="text-lg font-bold font-headline mb-6">Últimos Lançamentos</h4>
-          <div className="space-y-4">
-            {transactions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full py-10 text-on-surface-variant opacity-40">
-                <FileText size={48} className="mb-4" />
-                <p className="text-sm font-medium">Nenhum lançamento encontrado</p>
-                <p className="text-[10px] uppercase tracking-widest mt-1">Importe sua planilha para começar</p>
+          {/* Legenda customizada */}
+          <div className="flex justify-center gap-6 mt-4">
+            {statusChartData.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
+                <span className="text-xs font-medium text-on-surface-variant">{item.name}: {item.value}</span>
               </div>
-            ) : (
-              transactions.slice(0, 5).map((tx) => (
-                <div key={tx.id} className="flex items-center justify-between p-4 bg-white/5 rounded-sm border-l-2 border-primary/40 hover:bg-white/10 transition-colors">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-on-surface">{tx.fornecedor}</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60">{tx.vencimento}</span>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Seção Inferior: Top Fornecedores + Últimos Lançamentos */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Top Fornecedores */}
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.7 }}
+          className="glass-card p-6"
+        >
+          <div className="mb-6">
+            <h4 className="text-lg font-bold font-headline">Top Fornecedores</h4>
+            <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Por volume financeiro</p>
+          </div>
+          {topSuppliers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-on-surface-variant opacity-40">
+              <Building2 size={32} className="mb-3" />
+              <p className="text-xs">Nenhum fornecedor</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {topSuppliers.map((supplier, idx) => {
+                const maxValue = topSuppliers[0]?.value || 1;
+                const percent = Math.round((supplier.value / maxValue) * 100);
+                return (
+                  <div key={idx} className="group">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <span className="w-6 h-6 rounded bg-primary/20 flex items-center justify-center text-[10px] font-black text-primary">
+                          {idx + 1}
+                        </span>
+                        <span className="text-sm font-semibold truncate max-w-[140px]">{supplier.name}</span>
+                      </div>
+                      <span className="text-xs font-bold text-primary">
+                        {supplier.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percent}%` }}
+                        transition={{ delay: 0.8 + idx * 0.1, duration: 0.6 }}
+                        className="h-full bg-gradient-to-r from-primary to-primary/40 rounded-full"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </motion.div>
+
+        {/* Últimos Lançamentos */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+          className="glass-card p-6 lg:col-span-2"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h4 className="text-lg font-bold font-headline">Últimos Lançamentos</h4>
+              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Atividade recente</p>
+            </div>
+            <span className="text-[10px] font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
+              {transactions.length} total
+            </span>
+          </div>
+          {transactions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-on-surface-variant opacity-40">
+              <FileText size={48} className="mb-4" />
+              <p className="text-sm font-medium">Nenhum lançamento encontrado</p>
+              <p className="text-[10px] uppercase tracking-widest mt-1">Importe sua planilha para começar</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {transactions.slice(0, 6).map((tx, idx) => (
+                <motion.div 
+                  key={tx.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.9 + idx * 0.05 }}
+                  className="flex items-center justify-between p-4 bg-white/[0.03] rounded-xl border border-white/5 hover:bg-white/[0.06] hover:border-primary/20 transition-all group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "w-10 h-10 rounded-lg flex items-center justify-center",
+                      tx.status === 'PAGO' && "bg-primary/20",
+                      tx.status === 'PENDENTE' && "bg-secondary/20",
+                      tx.status === 'VENCIDO' && "bg-tertiary/20"
+                    )}>
+                      {tx.status === 'PAGO' && <CheckCircle size={18} className="text-primary" />}
+                      {tx.status === 'PENDENTE' && <Calendar size={18} className="text-secondary" />}
+                      {tx.status === 'VENCIDO' && <TrendingUp size={18} className="text-tertiary" />}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-on-surface group-hover:text-white transition-colors">{tx.fornecedor}</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50">{tx.vencimento}</span>
+                        <span className="w-1 h-1 rounded-full bg-white/20" />
+                        <span className="text-[10px] font-bold text-primary/60 uppercase">{tx.empresa}</span>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <span className={cn("text-sm font-bold", tx.valor < 0 ? "text-tertiary" : "text-primary")}>
-                      {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </span>
+                    <div className="text-right">
+                      <span className={cn("text-sm font-black", tx.valor < 0 ? "text-tertiary" : "text-primary")}>
+                        {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </span>
+                      <div className="mt-0.5">
+                        <span className={cn(
+                          "text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest",
+                          tx.status === 'PAGO' && "bg-primary/20 text-primary",
+                          tx.status === 'PENDENTE' && "bg-secondary/20 text-secondary",
+                          tx.status === 'VENCIDO' && "bg-tertiary/20 text-tertiary"
+                        )}>
+                          {tx.status}
+                        </span>
+                      </div>
+                    </div>
                     {tx.status !== 'PAGO' && (
                       <button 
                         onClick={() => onMarkAsPaid(tx)}
-                        className="p-1.5 bg-primary/20 text-primary rounded-full hover:bg-primary/40 transition-colors"
+                        className="p-2 bg-primary/10 text-primary rounded-lg opacity-0 group-hover:opacity-100 hover:bg-primary/20 transition-all"
                       >
-                        <Check size={14} />
+                        <Check size={16} />
                       </button>
                     )}
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </motion.div>
       </div>
     </div>
   );
@@ -995,6 +1316,241 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
                       )}>
                         {tx.status}
                       </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface ReceitasTabProps {
+  transactions: Transaction[];
+}
+
+const ReceitasTab = ({ transactions }: ReceitasTabProps) => {
+  const revenueTransactions = useMemo(
+    () => transactions.filter(tx => isRevenueTransaction(tx)),
+    [transactions]
+  );
+
+  const years = useMemo(() => {
+    const y = revenueTransactions.map(tx => {
+      const dateParts = tx.vencimento.includes('-') ? tx.vencimento.split('-') : tx.vencimento.split('/');
+      return tx.vencimento.includes('-') ? dateParts[0] : dateParts[2];
+    });
+    return [...new Set(y)].filter(Boolean).sort().reverse();
+  }, [revenueTransactions]);
+
+  const [selectedYear, setSelectedYear] = useState<string>(() => {
+    const y = revenueTransactions.map(tx => {
+      const dateParts = tx.vencimento.includes('-') ? tx.vencimento.split('-') : tx.vencimento.split('/');
+      return tx.vencimento.includes('-') ? dateParts[0] : dateParts[2];
+    });
+    const uniqueYears = [...new Set(y)].filter(Boolean).sort().reverse();
+    return uniqueYears[0] || new Date().getFullYear().toString();
+  });
+
+  const [selectedMonth, setSelectedMonth] = useState<string>('TODOS');
+  const [selectedCompany, setSelectedCompany] = useState<string>('TODOS');
+
+  const companies = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const tx of revenueTransactions) {
+      const companyKey = normalizeCompanyKey(tx.empresa);
+      if (!map.has(companyKey)) map.set(companyKey, companyKey);
+    }
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+  }, [revenueTransactions]);
+
+  const filteredData = useMemo(() => {
+    return revenueTransactions.filter(tx => {
+      const parts = tx.vencimento.includes('/') ? tx.vencimento.split('/') : tx.vencimento.split('-');
+      const year = tx.vencimento.includes('/') ? parts[2] : parts[0];
+      const month = tx.vencimento.includes('/') ? parts[1] : parts[1];
+      const matchesYear = selectedYear === 'TODOS' || year === selectedYear;
+      const matchesMonth = selectedMonth === 'TODOS' || month === selectedMonth;
+      const matchesCompany = selectedCompany === 'TODOS' || normalizeCompanyKey(tx.empresa) === selectedCompany;
+      return matchesYear && matchesMonth && matchesCompany;
+    });
+  }, [revenueTransactions, selectedYear, selectedMonth, selectedCompany]);
+
+  const monthlyData = useMemo(() => {
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const data = Array.from({ length: 12 }, (_, i) => ({ name: months[i], value: 0 }));
+    for (const tx of filteredData) {
+      const parts = tx.vencimento.includes('/') ? tx.vencimento.split('/') : tx.vencimento.split('-');
+      const m = tx.vencimento.includes('/') ? parts[1] : parts[1];
+      const idx = parseInt(m, 10) - 1;
+      if (idx >= 0 && idx < 12) data[idx].value += tx.valor;
+    }
+    return data;
+  }, [filteredData]);
+
+  const companyData = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const tx of filteredData) {
+      const companyKey = normalizeCompanyKey(tx.empresa);
+      map.set(companyKey, (map.get(companyKey) || 0) + tx.valor);
+    }
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredData]);
+
+  const totalReceitas = useMemo(
+    () => filteredData.reduce((acc, tx) => acc + tx.valor, 0),
+    [filteredData]
+  );
+
+  return (
+    <div className="space-y-8">
+      <div className="glass-card p-6 flex flex-wrap gap-4 items-end">
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase">Ano</label>
+          <select
+            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+            value={selectedYear}
+            onChange={e => setSelectedYear(e.target.value)}
+          >
+            <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
+            {years.map(y => <option key={y} value={y} className="bg-surface text-on-surface">{y}</option>)}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase">Mês</label>
+          <select
+            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+            value={selectedMonth}
+            onChange={e => setSelectedMonth(e.target.value)}
+          >
+            <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
+            <option value="01" className="bg-surface text-on-surface">Janeiro</option>
+            <option value="02" className="bg-surface text-on-surface">Fevereiro</option>
+            <option value="03" className="bg-surface text-on-surface">Março</option>
+            <option value="04" className="bg-surface text-on-surface">Abril</option>
+            <option value="05" className="bg-surface text-on-surface">Maio</option>
+            <option value="06" className="bg-surface text-on-surface">Junho</option>
+            <option value="07" className="bg-surface text-on-surface">Julho</option>
+            <option value="08" className="bg-surface text-on-surface">Agosto</option>
+            <option value="09" className="bg-surface text-on-surface">Setembro</option>
+            <option value="10" className="bg-surface text-on-surface">Outubro</option>
+            <option value="11" className="bg-surface text-on-surface">Novembro</option>
+            <option value="12" className="bg-surface text-on-surface">Dezembro</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase">Empresa</label>
+          <select
+            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+            value={selectedCompany}
+            onChange={e => setSelectedCompany(e.target.value)}
+          >
+            <option value="TODOS" className="bg-surface text-on-surface">Todas</option>
+            {companies.map(c => <option key={c.value} value={c.value} className="bg-surface text-on-surface">{c.label}</option>)}
+          </select>
+        </div>
+        <div className="flex-grow"></div>
+        <div className="text-right">
+          <p className="text-[10px] font-bold text-on-surface-variant uppercase">Receitas no Período</p>
+          <p className="text-xl font-bold text-primary">
+            {totalReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          </p>
+          <p className="text-[11px] text-on-surface-variant mt-1">{filteredData.length} lançamentos de receita</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="glass-card p-8 min-h-[400px]">
+          <h4 className="text-lg font-bold font-headline mb-6">Receitas Mensais ({selectedYear})</h4>
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={monthlyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+              <XAxis dataKey="name" stroke="#c6c6cd" fontSize={10} axisLine={false} tickLine={false} />
+              <YAxis
+                stroke="#c6c6cd"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(value) => `R$ ${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`}
+              />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#161b2a', border: 'none', borderRadius: '8px' }}
+                itemStyle={{ color: '#dee2f7' }}
+                formatter={(value: number) => [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Receita']}
+              />
+              <Area type="monotone" dataKey="value" stroke="#10b981" fill="#10b98120" strokeWidth={3} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="glass-card p-8 min-h-[400px]">
+          <h4 className="text-lg font-bold font-headline mb-6">Receitas por Empresa</h4>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={companyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+              <XAxis dataKey="name" stroke="#c6c6cd" fontSize={10} axisLine={false} tickLine={false} />
+              <YAxis
+                stroke="#c6c6cd"
+                fontSize={10}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(value) => `R$ ${value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value}`}
+              />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#161b2a', border: 'none', borderRadius: '8px' }}
+                itemStyle={{ color: '#dee2f7' }}
+                formatter={(value: number) => [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Receita']}
+              />
+              <Bar dataKey="value" fill="#10b981" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="glass-card overflow-hidden">
+        <div className="px-6 py-4 md:px-8 md:py-6 border-b border-white/5 flex justify-between items-center">
+          <h4 className="text-base md:text-lg font-bold font-headline">Receitas no Período</h4>
+          <span className="text-xs text-on-surface-variant font-bold uppercase tracking-widest">
+            {filteredData.length} registros
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
+                <th className="px-8 py-4">Fornecedor</th>
+                <th className="px-8 py-4">Descrição</th>
+                <th className="px-8 py-4">Empresa</th>
+                <th className="px-8 py-4">Vencimento</th>
+                <th className="px-8 py-4">Pagamento</th>
+                <th className="px-8 py-4">Valor</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm divide-y divide-white/5">
+              {filteredData.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-8 py-12 text-center text-on-surface-variant italic">
+                    Nenhuma receita encontrada para os filtros selecionados.
+                  </td>
+                </tr>
+              ) : (
+                filteredData.map((tx) => (
+                  <tr key={tx.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-8 py-4 font-semibold">{tx.fornecedor}</td>
+                    <td className="px-8 py-4 text-on-surface-variant">{tx.descricao}</td>
+                    <td className="px-8 py-4">{normalizeCompanyKey(tx.empresa)}</td>
+                    <td className="px-8 py-4">{tx.vencimento}</td>
+                    <td className="px-8 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
+                    <td className="px-8 py-4 font-bold text-primary">
+                      {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </td>
                   </tr>
                 ))
