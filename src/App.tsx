@@ -114,13 +114,16 @@ const normalizeCompanyKey = (value: string) => {
   return normalized || 'GERAL';
 };
 
-const isRevenueTransaction = (tx: Pick<Transaction, 'fornecedor' | 'descricao'>) => {
+const isRevenueTransaction = (tx: Pick<Transaction, 'fornecedor' | 'descricao' | 'valor'>) => {
   const text = normalizeSupplierName(`${tx.fornecedor} ${tx.descricao}`);
   
   // Receita Federal é imposto (despesa), nunca receita.
   if (text.includes('RECEITA FEDERAL')) return false;
   // Taxas de matrícula/editora que são despesas
   if (text.includes('MATRICULA ANHANGUERA') || text.includes('EDITORA E DISTRIBUIDORA ANHANGUERA')) return false;
+
+  // Se o valor for menor ou igual a 1000, forçamos como despesa (não é receita).
+  if (tx.valor <= 1000) return false;
 
   return (
     text.includes('REPASSE') ||
