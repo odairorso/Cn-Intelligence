@@ -887,20 +887,20 @@ const BancosTab = ({ banks, transactions, setShowNewBankModal, setEditingBank, d
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-xs text-on-surface-variant">Saldo Inicial</span>
-                <span className="text-sm font-bold">
+                <span className="text-sm font-bold" style={{ color: Number(bank.saldo) < 0 ? '#ef4444' : undefined }}>
                   {Number(bank.saldo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-xs text-on-surface-variant">Total Pago</span>
-                <span className="text-sm font-bold text-tertiary">
+                <span className="text-sm font-bold text-tertiary" style={{ color: (bankTotals[bank.nome] || 0) < 0 ? '#ef4444' : undefined }}>
                   {bankTotals[bank.nome]?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || 'R$ 0,00'}
                 </span>
               </div>
               <div className="pt-2 border-t border-white/5">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-primary">Saldo Atual</span>
-                  <span className="text-lg font-black text-primary">
+                  <span className="text-lg font-black" style={{ color: (Number(bank.saldo) - (bankTotals[bank.nome] || 0)) < 0 ? '#ef4444' : '#3b82f6' }}>
                     {(Number(bank.saldo) - (bankTotals[bank.nome] || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </span>
                 </div>
@@ -2043,7 +2043,7 @@ export default function App() {
               let day = dt.getUTCDate();
               let month = dt.getUTCMonth() + 1;
               let year = dt.getUTCFullYear();
-              if (year < 2024 || year > 2026) return undefined;
+              if (!Number.isFinite(year) || year < 1990 || year > 2035) return undefined;
               return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
             }
 
@@ -2053,7 +2053,7 @@ export default function App() {
               const y = dt.getUTCFullYear();
               const m = dt.getUTCMonth() + 1;
               const d = dt.getUTCDate();
-              if (!Number.isFinite(y) || y < 2024 || y > 2026) return undefined;
+              if (!Number.isFinite(y) || y < 1990 || y > 2035) return undefined;
               return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
             }
 
@@ -2066,7 +2066,7 @@ export default function App() {
                 let p2 = parts[2];
                 if (p2.length === 2) p2 = '20' + p2;
                 const y = Number(p2);
-                if (y < 2024 || y > 2026) return undefined;
+                if (!Number.isFinite(y) || y < 1990 || y > 2035) return undefined;
                 return `${String(p0).padStart(2, '0')}/${String(p1).padStart(2, '0')}/${p2}`;
               }
             }
