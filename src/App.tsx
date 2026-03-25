@@ -860,7 +860,7 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, deleteTransaction, setShow
                 <th className="px-8 py-4">Conta</th>
                 <th className="px-8 py-4">Valor</th>
                 <th className="px-8 py-4">Status</th>
-                <th className="px-8 py-4">Ações</th>
+                <th className="px-8 py-4 sticky right-0 bg-[#0f1115] z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)]">Ações</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-white/5">
@@ -889,8 +889,8 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, deleteTransaction, setShow
                       {tx.status}
                     </span>
                   </td>
-                  <td className="px-8 py-4">
-                    <div className="flex gap-2">
+                  <td className="px-8 py-4 sticky right-0 bg-[#0f1115] z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] group-hover:bg-[#1a1c23] transition-colors">
+                    <div className="flex gap-2 justify-end">
                       {tx.status !== 'PAGO' && (
                         <button
                           onClick={() => onMarkAsPaid(tx)}
