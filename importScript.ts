@@ -112,8 +112,8 @@ async function importData() {
   };
 
   // Helper para conversão de datas pro formato aceito pelo PG (YYYY-MM-DD)
-  const parseDateToPg = (val: any, sheetName?: string): string => {
-    if (!val) return new Date().toISOString().split('T')[0];
+  const parseDateToPg = (val: any, sheetName?: string): string | null => {
+    if (!val) return null;
     
     // Se a data já vier como string direto do Excel (ex: "20/03/2026")
     if (typeof val === 'string' && val.includes('/')) {
@@ -165,6 +165,19 @@ async function importData() {
       }
     }
     
+    if (typeof val === 'number') {
+      const excelEpoch = Date.UTC(1899, 11, 30);
+      const dt = new Date(excelEpoch + val * 24 * 60 * 60 * 1000);
+      const y = dt.getUTCFullYear();
+      const m = dt.getUTCMonth() + 1;
+      const d = dt.getUTCDate();
+      // Se year inválido (ex: 1938, 2002, 2028) — aceita todos os anos válidos do Excel
+      if (!Number.isFinite(y)) return null;
+      // Validação de sanidade: ano entre 1990 e 2035 é plausível para dados financeiros
+      if (y < 1990 || y > 2035) return null;
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+
     // Se o XLSX converteu para Date (ele as vezes inverte mês e dia na leitura se o Windows tiver confuso)
     if (val instanceof Date) {
       const dt = new Date(val);
@@ -183,21 +196,26 @@ async function importData() {
       if (month > 12) month = 12;
       if (day > 31) day = 28;
       
+      if (!Number.isFinite(year) || year < 1990 || year > 2035) return null;
       return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
     
     // Fallback pra string não padronizada que chegou aqui (ex: "18-18-2025" ou lixo)
-    return new Date().toISOString().split('T')[0];
+    return null;
   };
 
   try {
     await client.query('BEGIN');
     
-    // Zerando o banco antes da importação limpa
-    console.log('Limpando dados antigos...');
-    await client.query('TRUNCATE TABLE transactions RESTART IDENTITY CASCADE');
-    await client.query('TRUNCATE TABLE suppliers RESTART IDENTITY CASCADE');
-    console.log('Banco zerado. Iniciando importação nova...');
+    const shouldReset = process.env.RESET_BEFORE_IMPORT === 'true';
+    if (shouldReset) {
+      console.log('Limpando dados antigos...');
+      await client.query('TRUNCATE TABLE transactions RESTART IDENTITY CASCADE');
+      await client.query('TRUNCATE TABLE suppliers RESTART IDENTITY CASCADE');
+      console.log('Banco zerado. Iniciando importação nova...');
+    } else {
+      console.log('Importação sem limpeza prévia (dados manuais preservados).');
+    }
 
     for (const row of allDataMatrix) {
       const rawFornecedor = getRowValue(row, ['FORNECEDOR', 'FORNECEDORES', 'FORNECEDOR_NOME', 'NOME', 'FAVORECIDO', 'CLIENTE']);
@@ -211,7 +229,7 @@ async function importData() {
 
       const fornecedorNome = String(rawFornecedor).trim();
       
-      const rawVencimento = getRowValue(row, ['VENCIMENTO', 'DATA VENCIMENTO', 'DATA', 'VENC']);
+      const rawVencimento = getRowValue(row, ['VENCIMENTO', 'DATA VENCIMENTO', 'VENC']);
       const rawPagamento = getRowValue(row, ['DATA PAGAMENTO', 'PAGAMENTO', 'DATA PAGO', 'PAGO EM']);
       
       const rawDescricao = getRowValue(row, ['DESCRIÇÃO', 'DESCRICAO', 'OBSERVACAO', 'OBSERVAÇÃO', 'OBS 1', 'OBS 2', 'OBS', 'DETALHE']);
@@ -219,6 +237,7 @@ async function importData() {
 
       const vencimentoDate = parseDateToPg(rawVencimento, row._aba_origem);
       const pagamentoDatePg = rawPagamento ? parseDateToPg(rawPagamento, row._aba_origem) : null;
+      if (!vencimentoDate) continue;
       
       const rawStatus = String(getRowValue(row, ['STATUS', 'SITUAÇÃO', 'SITUACAO', 'PAGO', 'SIT 2']) || '').toUpperCase();
       let status = 'PENDENTE';
