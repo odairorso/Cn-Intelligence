@@ -281,6 +281,7 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, deleteTransaction, setShow
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [monthFilter, setMonthFilter] = useState('TODOS');
   const [yearFilter, setYearFilter] = useState('TODOS');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [page, setPage] = useState(0);
   
   // Extrair meses e anos únicos para os filtros
@@ -326,11 +327,15 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, deleteTransaction, setShow
       }
 
       return matchesSearch && matchesStatus && matchesMonth && matchesYear;
+    }).sort((a, b) => {
+      const keyA = dateSortKey(a.vencimento);
+      const keyB = dateSortKey(b.vencimento);
+      return sortOrder === 'desc' ? keyB - keyA : keyA - keyB;
     });
-  }, [transactions, filter, statusFilter, monthFilter, yearFilter]);
+  }, [transactions, filter, statusFilter, monthFilter, yearFilter, sortOrder]);
 
   // Reset page when filters change
-  useEffect(() => { setPage(0); }, [filter, statusFilter, monthFilter, yearFilter]);
+  useEffect(() => { setPage(0); }, [filter, statusFilter, monthFilter, yearFilter, sortOrder]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -383,6 +388,14 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, deleteTransaction, setShow
               <option key={y} value={y || ''} className="bg-surface text-on-surface">{y}</option>
             ))}
           </select>
+
+          <button
+            onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+            className="bg-surface border border-white/10 text-on-surface-variant text-xs font-bold uppercase px-3 py-2.5 rounded-sm hover:bg-surface-variant/20 hover:text-on-surface transition-all whitespace-nowrap"
+            title={sortOrder === 'desc' ? 'Mais recentes primeiro' : 'Mais antigos primeiro'}
+          >
+            {sortOrder === 'desc' ? '↓ Recentes' : '↑ Antigos'}
+          </button>
 
         </div>
         <button 
@@ -1360,6 +1373,7 @@ const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxMod
     pagamento: '',
     valor: '',
     parcelas: '1',
+    valorTipo: 'parcela' as 'parcela' | 'total',
     status: 'PENDENTE' as TransactionStatus,
     banco: ''
   });
@@ -1391,7 +1405,7 @@ const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxMod
           empresa: formData.empresa,
           vencimento: toDisplayDate(vencimentoParcela),
           pagamento: formData.status === 'PAGO' ? toDisplayDate(pagamentoParcela) : null,
-          valor: Number(formData.valor),
+          valor: Number(formData.valorTipo === 'total' ? (Number(formData.valor) / parcelas).toFixed(2) : formData.valor),
           status: formData.status,
           banco: formData.status === 'PAGO' ? formData.banco : null,
         };
@@ -1506,18 +1520,50 @@ const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxMod
                 onChange={e => setFormData({...formData, valor: e.target.value})}
               />
             </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Parcelas</label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                value={formData.parcelas}
+                onChange={e => setFormData({ ...formData, parcelas: e.target.value })}
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Parcelas</label>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
-              value={formData.parcelas}
-              onChange={e => setFormData({ ...formData, parcelas: e.target.value })}
-            />
-          </div>
+          {Number(formData.parcelas) > 1 && (
+            <div className="flex items-center gap-3 p-3 bg-surface-variant/10 rounded-lg border border-white/5">
+              <span className="text-xs font-bold text-on-surface-variant uppercase">Tipo do valor:</span>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="valorTipo"
+                  value="parcela"
+                  checked={formData.valorTipo === 'parcela'}
+                  onChange={() => setFormData({ ...formData, valorTipo: 'parcela' })}
+                  className="accent-primary"
+                />
+                <span className="text-xs text-on-surface">Por parcela</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="valorTipo"
+                  value="total"
+                  checked={formData.valorTipo === 'total'}
+                  onChange={() => setFormData({ ...formData, valorTipo: 'total' })}
+                  className="accent-primary"
+                />
+                <span className="text-xs text-on-surface">Valor total (divide)</span>
+              </label>
+              {formData.valorTipo === 'total' && formData.valor && (
+                <span className="text-[10px] text-primary ml-auto">
+                  = R$ {(Number(formData.valor) / Number(formData.parcelas)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/parcela
+                </span>
+              )}
+            </div>
+          )}
           {formData.status === 'PAGO' && (
             <>
               <div>
