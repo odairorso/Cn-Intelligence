@@ -26,7 +26,8 @@ import {
   Menu,
   X,
   Edit,
-  RefreshCw
+  RefreshCw,
+  CreditCard
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, 
@@ -38,7 +39,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-import { Transaction, KPI, ChartData, Supplier, TransactionStatus } from './types';
+import { Transaction, KPI, ChartData, Supplier, TransactionStatus, Bank } from './types';
 import { api } from './api';
 
 function cn(...inputs: ClassValue[]) {
@@ -46,7 +47,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 // --- Types ---
-type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'configuracoes';
+type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'bancos' | 'configuracoes';
 
 // --- Components ---
 
@@ -87,10 +88,10 @@ function KPIComponent({ kpi, index }: any) {
 interface DashboardTabProps {
   stats: any;
   transactions: Transaction[];
-  markAsPaid: (id: string) => void;
+  onMarkAsPaid: (tx: Transaction) => void;
 }
 
-const DashboardTab = ({ stats, transactions, markAsPaid }: DashboardTabProps) => {
+const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) => {
   const statusChartData = [
     { name: 'Pagos', value: stats.pagos },
     { name: 'Pendentes', value: stats.pendentes },
@@ -173,7 +174,7 @@ const DashboardTab = ({ stats, transactions, markAsPaid }: DashboardTabProps) =>
                     </span>
                     {tx.status !== 'PAGO' && (
                       <button 
-                        onClick={() => markAsPaid(tx.id)}
+                        onClick={() => onMarkAsPaid(tx)}
                         className="p-1.5 bg-primary/20 text-primary rounded-full hover:bg-primary/40 transition-colors"
                       >
                         <Check size={14} />
@@ -192,7 +193,7 @@ const DashboardTab = ({ stats, transactions, markAsPaid }: DashboardTabProps) =>
 
 interface LancamentosTabProps {
   transactions: Transaction[];
-  markAsPaid: (id: string) => void;
+  onMarkAsPaid: (tx: Transaction) => void;
   deleteTransaction: (id: string) => void;
   setShowNewTxModal: (show: boolean) => void;
   setEditingTx: (tx: Transaction) => void;
@@ -200,7 +201,7 @@ interface LancamentosTabProps {
 
 const PAGE_SIZE = 50;
 
-const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNewTxModal, setEditingTx }: LancamentosTabProps) => {
+const LancamentosTab = ({ transactions, onMarkAsPaid, deleteTransaction, setShowNewTxModal, setEditingTx }: LancamentosTabProps) => {
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [monthFilter, setMonthFilter] = useState('TODOS');
@@ -357,7 +358,7 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
                 </span>
                 <div className="flex gap-2">
                   {tx.status !== 'PAGO' && (
-                    <button onClick={() => markAsPaid(tx.id)} className="p-2 text-primary bg-primary/10 rounded-lg">
+                    <button onClick={() => onMarkAsPaid(tx)} className="p-2 text-primary bg-primary/10 rounded-lg">
                       <Check size={16} />
                     </button>
                   )}
@@ -385,6 +386,7 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
                 <th className="px-8 py-4">Empresa</th>
                 <th className="px-8 py-4">Vencimento</th>
                 <th className="px-8 py-4">Pagamento</th>
+                <th className="px-8 py-4">Conta</th>
                 <th className="px-8 py-4">Valor</th>
                 <th className="px-8 py-4">Status</th>
                 <th className="px-8 py-4">Ações</th>
@@ -402,6 +404,7 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
                   </td>
                   <td className="px-8 py-4">{tx.vencimento}</td>
                   <td className="px-8 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
+                  <td className="px-8 py-4 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold">{tx.banco || '-'}</td>
                   <td className="px-8 py-4 font-bold">
                     {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </td>
@@ -419,7 +422,7 @@ const LancamentosTab = ({ transactions, markAsPaid, deleteTransaction, setShowNe
                     <div className="flex gap-2">
                       {tx.status !== 'PAGO' && (
                         <button
-                          onClick={() => markAsPaid(tx.id)}
+                          onClick={() => onMarkAsPaid(tx)}
                           className="p-1.5 text-primary hover:bg-primary/10 rounded transition-colors"
                           title="Marcar como pago"
                         >
@@ -813,15 +816,266 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
   );
 };
 
+interface BancosTabProps {
+  banks: Bank[];
+  transactions: Transaction[];
+  setShowNewBankModal: (show: boolean) => void;
+  deleteBank: (id: string) => void;
+}
+
+const BancosTab = ({ banks, transactions, setShowNewBankModal, deleteBank }: BancosTabProps) => {
+  const bankTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    banks.forEach(bank => {
+      totals[bank.nome] = 0;
+    });
+    transactions.filter(tx => tx.status === 'PAGO' && tx.banco).forEach(tx => {
+      if (tx.banco && totals[tx.banco] !== undefined) {
+        totals[tx.banco] += tx.valor;
+      }
+    });
+    return totals;
+  }, [banks, transactions]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h3 className="text-xl font-bold font-headline">Contas Bancárias</h3>
+          <p className="text-sm text-on-surface-variant mt-1">Gerencie suas contas bancárias e acompanhe os saldos</p>
+        </div>
+        <button 
+          onClick={() => setShowNewBankModal(true)}
+          className="bg-primary text-background px-6 py-2.5 rounded-sm text-sm font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
+        >
+          <Plus size={18} strokeWidth={3} /> Nova Conta
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {banks.map(bank => (
+          <div key={bank.id} className="glass-card p-6 relative group">
+            <button 
+              onClick={() => deleteBank(bank.id)}
+              className="absolute top-4 right-4 p-2 text-tertiary opacity-0 group-hover:opacity-100 transition-opacity hover:bg-tertiary/10 rounded-sm"
+            >
+              <Trash2 size={16} />
+            </button>
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-sm bg-primary/20 flex items-center justify-center text-primary">
+                <CreditCard size={24} />
+              </div>
+              <div>
+                <h4 className="font-bold text-on-surface">{bank.nome}</h4>
+                <p className="text-[10px] text-on-surface-variant/60">
+                  {bank.ativo ? 'Ativo' : 'Inativo'}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-on-surface-variant">Saldo Inicial</span>
+                <span className="text-sm font-bold">
+                  {Number(bank.saldo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-on-surface-variant">Total Pago</span>
+                <span className="text-sm font-bold text-tertiary">
+                  {bankTotals[bank.nome]?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || 'R$ 0,00'}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-white/5">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-primary">Saldo Atual</span>
+                  <span className="text-lg font-black text-primary">
+                    {(Number(bank.saldo) - (bankTotals[bank.nome] || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        {banks.length === 0 && (
+          <div className="col-span-full glass-card p-12 text-center">
+            <CreditCard size={48} className="mx-auto text-on-surface-variant opacity-20 mb-4" />
+            <p className="text-on-surface-variant">Nenhuma conta bancária cadastrada</p>
+            <p className="text-xs text-on-surface-variant/60 mt-1">Clique em "Nova Conta" para adicionar</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // --- Modals ---
+
+interface NewBankModalProps {
+  setShowNewBankModal: (show: boolean) => void;
+  onSuccess: () => void;
+}
+
+const NewBankModal = ({ setShowNewBankModal, onSuccess }: NewBankModalProps) => {
+  const [formData, setFormData] = useState({
+    nome: '',
+    saldo: '',
+    ativo: true
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.createBank({
+        uid: 'guest',
+        nome: formData.nome,
+        saldo: Number(formData.saldo) || 0,
+        ativo: formData.ativo
+      });
+      setShowNewBankModal(false);
+      onSuccess();
+    } catch (error) {
+      console.error('Failed to create bank:', error);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="glass-card p-10 w-full max-w-md border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+      >
+        <h3 className="text-xl font-bold font-headline mb-6">Nova Conta Bancária</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Nome do Banco</label>
+            <select 
+              className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+              style={{ backgroundColor: '#161b2a' }}
+              value={formData.nome}
+              onChange={e => setFormData({...formData, nome: e.target.value})}
+              required
+            >
+              <option value="" className="bg-[#161b2a] text-on-surface">Selecione...</option>
+              <option value="Sicredi CN" className="bg-[#161b2a] text-on-surface">Sicredi CN</option>
+              <option value="BB Cei" className="bg-[#161b2a] text-on-surface">BB Cei</option>
+              <option value="BB Facems" className="bg-[#161b2a] text-on-surface">BB Facems</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Saldo Inicial (R$)</label>
+            <input 
+              type="number" step="0.01"
+              className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+              value={formData.saldo}
+              onChange={e => setFormData({...formData, saldo: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input 
+                type="checkbox"
+                className="w-4 h-4 rounded border-white/20 bg-surface-variant/20 text-primary focus:ring-primary"
+                checked={formData.ativo}
+                onChange={e => setFormData({...formData, ativo: e.target.checked})}
+              />
+              <span className="text-sm text-on-surface">Conta ativa</span>
+            </label>
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button 
+              type="button"
+              onClick={() => setShowNewBankModal(false)}
+              className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
+            >
+              Cancelar
+            </button>
+            <button 
+              type="submit"
+              className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
+            >
+              Salvar Banco
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+};
+
+interface SelectBankModalProps {
+  transactionId: string;
+  valor: number;
+  banks: Bank[];
+  onClose: () => void;
+  onConfirm: (banco: string) => void;
+}
+
+const SelectBankModal = ({ transactionId, valor, banks, onClose, onConfirm }: SelectBankModalProps) => {
+  const [selectedBank, setSelectedBank] = useState('');
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="glass-card p-10 w-full max-w-md border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+      >
+        <h3 className="text-xl font-bold font-headline mb-2">Confirmar Pagamento</h3>
+        <p className="text-sm text-on-surface-variant mb-6">
+          Selecione o banco para registrar o pagamento de <span className="font-bold text-primary">{valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+        </p>
+        
+        <div className="space-y-3 mb-6">
+          {banks.filter(b => b.ativo).map(bank => (
+            <button
+              key={bank.id}
+              onClick={() => setSelectedBank(bank.nome)}
+              className={cn(
+                "w-full p-4 rounded-lg border text-left transition-all",
+                selectedBank === bank.nome 
+                  ? "border-primary bg-primary/10" 
+                  : "border-white/10 hover:border-primary/40"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <CreditCard size={20} className={selectedBank === bank.nome ? "text-primary" : "text-on-surface-variant"} />
+                <span className={selectedBank === bank.nome ? "text-primary font-bold" : "text-on-surface"}>
+                  {bank.nome}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <button 
+            onClick={onClose}
+            className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
+          >
+            Cancelar
+          </button>
+          <button 
+            onClick={() => selectedBank && onConfirm(selectedBank)}
+            disabled={!selectedBank}
+            className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Confirmar
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
 
 interface NewTxModalProps {
   suppliers: Supplier[];
+  banks: Bank[];
   setShowNewTxModal: (show: boolean) => void;
   onSuccess: () => void;
 }
 
-const NewTxModal = ({ suppliers, setShowNewTxModal, onSuccess }: NewTxModalProps) => {
+const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxModalProps) => {
   const [formData, setFormData] = useState({
     fornecedor: suppliers[0]?.nome || '',
     descricao: '',
@@ -829,7 +1083,8 @@ const NewTxModal = ({ suppliers, setShowNewTxModal, onSuccess }: NewTxModalProps
     vencimento: new Date().toISOString().split('T')[0],
     pagamento: '',
     valor: '',
-    status: 'PENDENTE' as TransactionStatus
+    status: 'PENDENTE' as TransactionStatus,
+    banco: ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -838,10 +1093,14 @@ const NewTxModal = ({ suppliers, setShowNewTxModal, onSuccess }: NewTxModalProps
     try {
       const newTx = {
         uid: 'guest',
-        ...formData,
-        valor: Number(formData.valor),
+        fornecedor: formData.fornecedor,
+        descricao: formData.descricao,
+        empresa: formData.empresa,
         vencimento: formData.vencimento.split('-').reverse().join('/'),
         pagamento: formData.status === 'PAGO' ? (formData.pagamento ? formData.pagamento.split('-').reverse().join('/') : new Date().toLocaleDateString('pt-BR')) : null,
+        valor: Number(formData.valor),
+        status: formData.status,
+        banco: formData.status === 'PAGO' ? formData.banco : null,
       };
       await api.createTransaction(newTx);
       setShowNewTxModal(false);
@@ -862,17 +1121,32 @@ const NewTxModal = ({ suppliers, setShowNewTxModal, onSuccess }: NewTxModalProps
       >
         <h3 className="text-xl font-bold font-headline mb-6">Novo Lançamento</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor</label>
-            <select 
-              className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
-              style={{ backgroundColor: '#161b2a' }}
-              value={formData.fornecedor}
-              onChange={e => setFormData({...formData, fornecedor: e.target.value})}
-            >
-              {suppliers.map(s => <option key={s.id} value={s.nome} className="bg-[#161b2a] text-on-surface">{s.nome}</option>)}
-            </select>
-
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor</label>
+              <select 
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+                style={{ backgroundColor: '#161b2a' }}
+                value={formData.fornecedor}
+                onChange={e => setFormData({...formData, fornecedor: e.target.value})}
+              >
+                {suppliers.map(s => <option key={s.id} value={s.nome} className="bg-[#161b2a] text-on-surface">{s.nome}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Banco / Conta</label>
+              <select 
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+                style={{ backgroundColor: '#161b2a' }}
+                value={formData.banco}
+                onChange={e => setFormData({...formData, banco: e.target.value})}
+              >
+                <option value="" className="bg-[#161b2a] text-on-surface">Não informado</option>
+                {banks.filter(b => b.ativo).map(b => (
+                  <option key={b.id} value={b.nome} className="bg-[#161b2a] text-on-surface">{b.nome}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Descrição</label>
@@ -935,15 +1209,32 @@ const NewTxModal = ({ suppliers, setShowNewTxModal, onSuccess }: NewTxModalProps
             </div>
           </div>
           {formData.status === 'PAGO' && (
-            <div>
-              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Data de Pagamento</label>
-              <input 
-                type="date" required
-                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
-                value={formData.pagamento}
-                onChange={e => setFormData({...formData, pagamento: e.target.value})}
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Data de Pagamento</label>
+                <input 
+                  type="date" required
+                  className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                  value={formData.pagamento}
+                  onChange={e => setFormData({...formData, pagamento: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Banco</label>
+                <select 
+                  className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+                  style={{ backgroundColor: '#161b2a' }}
+                  value={formData.banco}
+                  onChange={e => setFormData({...formData, banco: e.target.value})}
+                  required
+                >
+                  <option value="" className="bg-[#161b2a] text-on-surface">Selecione...</option>
+                  {banks.filter(b => b.ativo).map(b => (
+                    <option key={b.id} value={b.nome} className="bg-[#161b2a] text-on-surface">{b.nome}</option>
+                  ))}
+                </select>
+              </div>
+            </>
           )}
           <div className="flex gap-3 pt-4">
             <button 
@@ -970,17 +1261,19 @@ const NewTxModal = ({ suppliers, setShowNewTxModal, onSuccess }: NewTxModalProps
 interface EditTxModalProps {
   transaction: Transaction;
   suppliers: Supplier[];
+  banks: Bank[];
   onClose: () => void;
   onSave: (tx: Transaction) => void;
 }
 
-const EditTxModal = ({ transaction, suppliers, onClose, onSave }: EditTxModalProps) => {
+const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxModalProps) => {
   const [formData, setFormData] = useState({
     ...transaction,
     // Convert dates from DD/MM/YYYY to YYYY-MM-DD for input[type="date"]
     vencimento: transaction.vencimento.split('/').reverse().join('-'),
     pagamento: transaction.pagamento ? transaction.pagamento.split('/').reverse().join('-') : '',
-    valor: transaction.valor.toString()
+    valor: transaction.valor.toString(),
+    banco: transaction.banco || ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1005,20 +1298,35 @@ const EditTxModal = ({ transaction, suppliers, onClose, onSave }: EditTxModalPro
       >
         <h3 className="text-xl font-bold font-headline mb-6">Editar Lançamento</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor</label>
-            <select 
-              className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
-              style={{ backgroundColor: '#161b2a' }}
-              value={formData.fornecedor}
-              onChange={e => setFormData({...formData, fornecedor: e.target.value})}
-            >
-              <option value={transaction.fornecedor} className="bg-[#161b2a] text-on-surface">{transaction.fornecedor}</option>
-              {suppliers.filter(s => s.nome !== transaction.fornecedor).map(s => (
-                <option key={s.id} value={s.nome} className="bg-[#161b2a] text-on-surface">{s.nome}</option>
-              ))}
-            </select>
-
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor</label>
+              <select 
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+                style={{ backgroundColor: '#161b2a' }}
+                value={formData.fornecedor}
+                onChange={e => setFormData({...formData, fornecedor: e.target.value})}
+              >
+                <option value={transaction.fornecedor} className="bg-[#161b2a] text-on-surface">{transaction.fornecedor}</option>
+                {suppliers.filter(s => s.nome !== transaction.fornecedor).map(s => (
+                  <option key={s.id} value={s.nome} className="bg-[#161b2a] text-on-surface">{s.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Banco / Conta</label>
+              <select 
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+                style={{ backgroundColor: '#161b2a' }}
+                value={formData.banco}
+                onChange={e => setFormData({...formData, banco: e.target.value})}
+              >
+                <option value="" className="bg-[#161b2a] text-on-surface">Não informado</option>
+                {banks.map(b => (
+                  <option key={b.id} value={b.nome} className="bg-[#161b2a] text-on-surface">{b.nome}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Descrição</label>
@@ -1371,13 +1679,16 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [banks, setBanks] = useState<Bank[]>([]);
   const [user, setUser] = useState<any>(null);
   const [isAuthReady, setIsAuthReady] = useState(true);
 
   const [showNewTxModal, setShowNewTxModal] = useState(false);
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
+  const [showNewBankModal, setShowNewBankModal] = useState(false);
   const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [showPayModal, setShowPayModal] = useState<{ id: string; valor: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1410,9 +1721,19 @@ export default function App() {
     }
   };
 
+  const fetchBanks = async () => {
+    try {
+      const data = await api.getBanks('guest');
+      setBanks(data);
+    } catch (error) {
+      console.error('Failed to fetch banks:', error);
+    }
+  };
+
   useEffect(() => {
     fetchTransactions();
     fetchSuppliers();
+    fetchBanks();
   }, []);
 
   // --- Handlers ---
@@ -1570,7 +1891,11 @@ export default function App() {
                 fullMonths.forEach((m, i) => { if (s.includes(m)) foundMonth = i + 1; });
                 if (foundMonth === -1) months.forEach((m, i) => { if (s.includes(m)) foundMonth = i + 1; });
                 
-                let foundYear = new Date().getFullYear();
+                let foundYear = 2024;
+                if (file && file.name) {
+                  const fileYearMatch = file.name.match(/20\d{2}/);
+                  if (fileYearMatch) foundYear = parseInt(fileYearMatch[0]);
+                }
                 const yearMatch = s.match(/20\d{2}/);
                 if (yearMatch) foundYear = parseInt(yearMatch[0]);
                 
@@ -1600,7 +1925,11 @@ export default function App() {
                 return `${String(p0).padStart(2, '0')}/${String(p1).padStart(2, '0')}/${p2}`;
               } else if (parts.length === 2) {
                 // DD/MM -> assume ano atual ou do sheet
-                let foundYear = new Date().getFullYear();
+                let foundYear = 2024;
+                if (file && file.name) {
+                  const fileYearMatch = file.name.match(/20\d{2}/);
+                  if (fileYearMatch) foundYear = parseInt(fileYearMatch[0]);
+                }
                 if (sheetName) {
                   const yearMatch = sheetName.match(/20\d{2}/);
                   if (yearMatch) foundYear = parseInt(yearMatch[0]);
@@ -1632,17 +1961,18 @@ export default function App() {
           const rawDescricao = getRowValue(row, ['DESCRIÇÃO', 'DESCRICAO', 'OBSERVACAO', 'OBSERVAÇÃO', 'OBS 1', 'OBS 2', 'OBS', 'DETALHE']);
           const rawEmpresa = getRowValue(row, ['EMPRESA', 'UNIDADE', 'LOJA', 'OBS 2', 'GRUPO']);
 
+          const rawBanco = getRowValue(row, ['BANCO', 'CONTA', 'INSTITUIÇÃO', 'INSTITUICAO']);
+
           txBatch.push({
             uid: 'guest',
             fornecedor: fornecedorNome,
-
-
             descricao: String(rawDescricao || '-'),
             empresa: String(rawEmpresa || 'Geral'),
             vencimento: vencimentoDate,
             pagamento: pagamentoDate || undefined,
             valor: sanitizedValor,
-            status: status
+            status: status,
+            banco: rawBanco ? String(rawBanco) : undefined
           });
           
           totalImported++;
@@ -1712,17 +2042,24 @@ export default function App() {
     reader.readAsArrayBuffer(file);
   };
 
-  const markAsPaid = async (id: string) => {
+  const markAsPaid = async (id: string, banco: string) => {
     const today = new Date().toLocaleDateString('pt-BR');
-    // Optimistic update — sem re-fetch
     setTransactions(prev => prev.map(tx =>
-      tx.id === id ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: today } : tx
+      tx.id === id ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: today, banco } : tx
     ));
     showNotification('Lançamento marcado como pago!', 'success');
-    api.updateTransaction(id, { status: 'PAGO', pagamento: today }).catch(err => {
+    api.updateTransaction(id, { status: 'PAGO', pagamento: today, banco }).catch(err => {
       console.error('Failed to mark as paid:', err);
-      fetchTransactions(); // rollback se falhar
+      fetchTransactions();
     });
+  };
+
+  const handleMarkAsPaidClick = (tx: Transaction) => {
+    if (banks.filter(b => b.ativo).length > 0) {
+      setShowPayModal({ id: tx.id, valor: tx.valor });
+    } else {
+      markAsPaid(tx.id, '');
+    }
   };
 
   const updateTransaction = async (updatedTx: Transaction) => {
@@ -1780,6 +2117,16 @@ export default function App() {
       fetchSuppliers();
     } catch (error) {
       console.error('Failed to delete supplier:', error);
+    }
+  };
+
+  const deleteBank = async (id: string) => {
+    try {
+      await api.deleteBank(id);
+      showNotification('Banco excluído.', 'info');
+      fetchBanks();
+    } catch (error) {
+      console.error('Failed to delete bank:', error);
     }
   };
 
@@ -1854,6 +2201,12 @@ export default function App() {
               Relatórios
             </button>
             <button 
+              onClick={() => setActiveTab('bancos')}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'bancos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+            >
+              Bancos
+            </button>
+            <button 
               onClick={() => setActiveTab('configuracoes')}
               className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'configuracoes' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
@@ -1899,6 +2252,13 @@ export default function App() {
           <span className="text-[9px] font-black uppercase tracking-tighter">Relat</span>
         </button>
         <button 
+          onClick={() => setActiveTab('bancos')}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'bancos' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
+        >
+          <CreditCard size={22} strokeWidth={activeTab === 'bancos' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Bancos</span>
+        </button>
+        <button 
           onClick={() => setActiveTab('configuracoes')}
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'configuracoes' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
@@ -1917,6 +2277,7 @@ export default function App() {
               {activeTab === 'lancamentos' && '📋 Gestão de Lançamentos'}
               {activeTab === 'fornecedores' && '🏢 Fornecedores'}
               {activeTab === 'relatorios' && '📈 Relatórios Financeiros'}
+              {activeTab === 'bancos' && '🏦 Bancos'}
               {activeTab === 'configuracoes' && '⚙️ Configurações'}
             </h2>
             <div className="flex flex-wrap gap-3">
@@ -1963,13 +2324,13 @@ export default function App() {
               <DashboardTab 
                 stats={stats} 
                 transactions={transactions} 
-                markAsPaid={markAsPaid} 
+                onMarkAsPaid={handleMarkAsPaidClick} 
               />
             )}
             {activeTab === 'lancamentos' && (
               <LancamentosTab 
                 transactions={transactions} 
-                markAsPaid={markAsPaid} 
+                onMarkAsPaid={handleMarkAsPaidClick} 
                 deleteTransaction={deleteTransaction} 
                 setShowNewTxModal={setShowNewTxModal} 
                 setEditingTx={setEditingTx}
@@ -1987,6 +2348,14 @@ export default function App() {
             )}
 
             {activeTab === 'relatorios' && <RelatoriosTab transactions={transactions} />}
+            {activeTab === 'bancos' && (
+              <BancosTab 
+                banks={banks}
+                transactions={transactions}
+                setShowNewBankModal={setShowNewBankModal}
+                deleteBank={deleteBank}
+              />
+            )}
             {activeTab === 'configuracoes' && (
               <div className="glass-card p-10 text-center space-y-6">
                 <Settings size={48} className="mx-auto text-on-surface-variant opacity-20" />
@@ -2077,7 +2446,8 @@ export default function App() {
 
       {showNewTxModal && (
         <NewTxModal 
-          suppliers={suppliers} 
+          suppliers={suppliers}
+          banks={banks}
           setShowNewTxModal={setShowNewTxModal} 
           onSuccess={() => {
             fetchTransactions();
@@ -2096,11 +2466,35 @@ export default function App() {
         />
       )}
 
+      {showNewBankModal && (
+        <NewBankModal 
+          setShowNewBankModal={setShowNewBankModal} 
+          onSuccess={() => {
+            fetchBanks();
+            showNotification('Banco cadastrado com sucesso!', 'success');
+          }}
+        />
+      )}
+
+      {showPayModal && (
+        <SelectBankModal 
+          transactionId={showPayModal.id}
+          valor={showPayModal.valor}
+          banks={banks}
+          onClose={() => setShowPayModal(null)}
+          onConfirm={(banco) => {
+            markAsPaid(showPayModal.id, banco);
+            setShowPayModal(null);
+          }}
+        />
+      )}
+
 
       {editingTx && (
         <EditTxModal 
           transaction={editingTx}
           suppliers={suppliers}
+          banks={banks}
           onClose={() => setEditingTx(null)}
           onSave={updateTransaction}
         />
