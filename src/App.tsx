@@ -712,43 +712,37 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
 
   const filteredData = useMemo(() => {
     return transactions.filter(tx => {
-      const dateParts = tx.vencimento.includes('-') ? tx.vencimento.split('-') : tx.vencimento.split('/');
-      const year = tx.vencimento.includes('-') ? dateParts[0] : dateParts[2];
-      const month = tx.vencimento.includes('-') ? dateParts[1] : dateParts[1];
-      
+      const parts = tx.vencimento.includes('/') ? tx.vencimento.split('/') : tx.vencimento.split('-');
+      const year = tx.vencimento.includes('/') ? parts[2] : parts[0];
+      const month = tx.vencimento.includes('/') ? parts[1] : parts[1];
       const matchesYear = selectedYear === 'TODOS' || year === selectedYear;
       const matchesMonth = selectedMonth === 'TODOS' || month === selectedMonth;
       const matchesCompany = selectedCompany === 'TODOS' || tx.empresa === selectedCompany;
-      
       return matchesYear && matchesMonth && matchesCompany;
     });
   }, [transactions, selectedYear, selectedMonth, selectedCompany]);
 
   const monthlyData = useMemo(() => {
     const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const data = months.map((name, index) => {
-      const monthNum = (index + 1).toString().padStart(2, '0');
-      const value = filteredData
-        .filter(tx => {
-          const dateParts = tx.vencimento.includes('-') ? tx.vencimento.split('-') : tx.vencimento.split('/');
-          const m = tx.vencimento.includes('-') ? dateParts[1] : dateParts[1];
-          return m === monthNum;
-        })
-        .reduce((acc, tx) => acc + tx.valor, 0);
-      return { name, value };
-    });
+    const data = Array.from({ length: 12 }, (_, i) => ({ name: months[i], value: 0 }));
+    for (const tx of filteredData) {
+      const parts = tx.vencimento.includes('/') ? tx.vencimento.split('/') : tx.vencimento.split('-');
+      const m = tx.vencimento.includes('/') ? parts[1] : parts[1];
+      const idx = parseInt(m, 10) - 1;
+      if (idx >= 0 && idx < 12) data[idx].value += tx.valor;
+    }
     return data;
   }, [filteredData]);
 
   const companyData = useMemo(() => {
-    const data = companies.map(name => {
-      const value = filteredData
-        .filter(tx => tx.empresa === name)
-        .reduce((acc, tx) => acc + tx.valor, 0);
-      return { name, value };
-    });
-    return data.sort((a, b) => b.value - a.value);
-  }, [filteredData, companies]);
+    const map = new Map<string, number>();
+    for (const tx of filteredData) {
+      map.set(tx.empresa, (map.get(tx.empresa) || 0) + tx.valor);
+    }
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredData]);
 
   return (
     <div className="space-y-8">
@@ -1365,6 +1359,7 @@ const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxMod
     vencimento: new Date().toISOString().split('T')[0],
     pagamento: '',
     valor: '',
+    parcelas: '1',
     status: 'PENDENTE' as TransactionStatus,
     banco: ''
   });
@@ -1373,18 +1368,40 @@ const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxMod
     e.preventDefault();
 
     try {
-      const newTx = {
-        uid: 'guest',
-        fornecedor: formData.fornecedor,
-        descricao: formData.descricao,
-        empresa: formData.empresa,
-        vencimento: formData.vencimento.split('-').reverse().join('/'),
-        pagamento: formData.status === 'PAGO' ? (formData.pagamento ? formData.pagamento.split('-').reverse().join('/') : new Date().toLocaleDateString('pt-BR')) : null,
-        valor: Number(formData.valor),
-        status: formData.status,
-        banco: formData.status === 'PAGO' ? formData.banco : null,
+      const parcelas = Math.max(1, Number(formData.parcelas) || 1);
+      const addMonthsToInputDate = (baseDate: string, monthsToAdd: number) => {
+        const [year, month, day] = baseDate.split('-').map(Number);
+        const dt = new Date(Date.UTC(year, (month || 1) - 1 + monthsToAdd, day || 1));
+        const yyyy = dt.getUTCFullYear();
+        const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(dt.getUTCDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
       };
-      await api.createTransaction(newTx);
+
+      const newTxList = Array.from({ length: parcelas }, (_, i) => {
+        const vencimentoParcela = addMonthsToInputDate(formData.vencimento, i);
+        const pagamentoParcela = formData.status === 'PAGO'
+          ? (formData.pagamento ? addMonthsToInputDate(formData.pagamento, i) : new Date().toISOString().split('T')[0])
+          : '';
+
+        return {
+          uid: 'guest',
+          fornecedor: formData.fornecedor,
+          descricao: parcelas > 1 ? `${formData.descricao} (${i + 1}/${parcelas})` : formData.descricao,
+          empresa: formData.empresa,
+          vencimento: toDisplayDate(vencimentoParcela),
+          pagamento: formData.status === 'PAGO' ? toDisplayDate(pagamentoParcela) : null,
+          valor: Number(formData.valor),
+          status: formData.status,
+          banco: formData.status === 'PAGO' ? formData.banco : null,
+        };
+      });
+
+      if (newTxList.length === 1) {
+        await api.createTransaction(newTxList[0]);
+      } else {
+        await api.createTransactionsBatch(newTxList);
+      }
       setShowNewTxModal(false);
       onSuccess();
     } catch (error) {
@@ -1490,6 +1507,17 @@ const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxMod
               />
             </div>
           </div>
+          <div>
+            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Parcelas</label>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+              value={formData.parcelas}
+              onChange={e => setFormData({ ...formData, parcelas: e.target.value })}
+            />
+          </div>
           {formData.status === 'PAGO' && (
             <>
               <div>
@@ -1559,14 +1587,11 @@ const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxM
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const pagamentoValue = formData.status === 'PAGO'
-      ? (formData.pagamento ? formData.pagamento.split('-').reverse().join('/') : null)
-      : null;
     onSave({
       ...transaction,
       ...formData,
-      vencimento: formData.vencimento.split('-').reverse().join('/'),
-      pagamento: pagamentoValue || undefined,
+      vencimento: toDisplayDate(formData.vencimento),
+      pagamento: formData.status === 'PAGO' && formData.pagamento ? toDisplayDate(formData.pagamento) : null,
       valor: parseFloat(formData.valor)
     });
     onClose();
@@ -2436,21 +2461,26 @@ export default function App() {
 
   // --- Computed Stats ---
   const stats = useMemo(() => {
-    const total = transactions.reduce((acc, tx) => acc + tx.valor, 0);
-    const pagos = transactions.filter(tx => tx.status === 'PAGO').length;
-    const pendentes = transactions.filter(tx => tx.status === 'PENDENTE').length;
-    const vencidos = transactions.filter(tx => tx.status === 'VENCIDO').length;
-    
+    let total = 0;
+    let pagos = 0;
+    let pendentes = 0;
+    let vencidos = 0;
+    const empresasSet = new Set<string>();
+    for (const tx of transactions) {
+      total += tx.valor;
+      if (tx.status === 'PAGO') pagos++;
+      else if (tx.status === 'VENCIDO') vencidos++;
+      else pendentes++;
+      empresasSet.add(tx.empresa);
+    }
     const kpis: KPI[] = [
       { label: 'VALOR TOTAL', value: total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), color: '#10b981' },
       { label: 'REGISTROS', value: transactions.length.toString(), description: 'Volume operacional', color: '#10b981' },
-      { label: 'EMPRESAS', value: [...new Set(transactions.map(t => t.empresa))].length.toString(), description: 'Unidades ativas', color: '#10b981' },
+      { label: 'EMPRESAS', value: empresasSet.size.toString(), description: 'Unidades ativas', color: '#10b981' },
       { label: 'PENDENTES', value: pendentes.toString(), description: 'Aguardando conciliação', color: '#f59e0b' },
       { label: 'PAGOS', value: pagos.toString(), description: 'Liquidados', color: '#10b981' },
       { label: 'VENCIDOS', value: vencidos.toString(), description: 'Ação imediata necessária', color: '#ef4444' },
-
     ];
-
     return { total, pagos, pendentes, vencidos, kpis };
   }, [transactions]);
 
