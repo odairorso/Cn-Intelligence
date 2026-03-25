@@ -3229,6 +3229,12 @@ export default function App() {
               Relatórios
             </button>
             <button 
+              onClick={() => setActiveTab('receitas')}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'receitas' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+            >
+              Receitas
+            </button>
+            <button 
               onClick={() => setActiveTab('bancos')}
               className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'bancos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
@@ -3280,6 +3286,13 @@ export default function App() {
           <span className="text-[9px] font-black uppercase tracking-tighter">Relat</span>
         </button>
         <button 
+          onClick={() => setActiveTab('receitas')}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'receitas' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
+        >
+          <Wallet size={22} strokeWidth={activeTab === 'receitas' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Rec</span>
+        </button>
+        <button 
           onClick={() => setActiveTab('bancos')}
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'bancos' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
@@ -3305,6 +3318,7 @@ export default function App() {
               {activeTab === 'lancamentos' && '📋 Gestão de Lançamentos'}
               {activeTab === 'fornecedores' && '🏢 Fornecedores'}
               {activeTab === 'relatorios' && '📈 Relatórios Financeiros'}
+              {activeTab === 'receitas' && '💸 Receitas'}
               {activeTab === 'bancos' && '🏦 Bancos'}
               {activeTab === 'configuracoes' && '⚙️ Configurações'}
             </h2>
@@ -3376,6 +3390,7 @@ export default function App() {
             )}
 
             {activeTab === 'relatorios' && <RelatoriosTab transactions={transactions} />}
+            {activeTab === 'receitas' && <ReceitasTab transactions={transactions} />}
             {activeTab === 'bancos' && (
               <BancosTab 
                 banks={banks}
