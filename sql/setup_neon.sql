@@ -72,6 +72,8 @@ CREATE TABLE IF NOT EXISTS banks (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     uid VARCHAR(255) NOT NULL,
     nome VARCHAR(255) NOT NULL,
+    agencia VARCHAR(100),
+    conta VARCHAR(100),
     saldo DECIMAL(15, 2) DEFAULT 0,
     ativo BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

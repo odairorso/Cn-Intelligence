@@ -870,6 +870,11 @@ const BancosTab = ({ banks, transactions, setShowNewBankModal, deleteBank }: Ban
                 <p className="text-[10px] text-on-surface-variant/60">
                   {bank.ativo ? 'Ativo' : 'Inativo'}
                 </p>
+                {(bank.agencia || bank.conta) && (
+                  <p className="text-[10px] text-on-surface-variant/60 mt-1">
+                    {bank.agencia ? `Ag ${bank.agencia}` : ''}{bank.agencia && bank.conta ? ' • ' : ''}{bank.conta ? `Conta ${bank.conta}` : ''}
+                  </p>
+                )}
               </div>
             </div>
             <div className="space-y-2">
@@ -918,6 +923,8 @@ interface NewBankModalProps {
 const NewBankModal = ({ setShowNewBankModal, onSuccess }: NewBankModalProps) => {
   const [formData, setFormData] = useState({
     nome: '',
+    agencia: '',
+    conta: '',
     saldo: '',
     ativo: true
   });
@@ -928,6 +935,8 @@ const NewBankModal = ({ setShowNewBankModal, onSuccess }: NewBankModalProps) => 
       await api.createBank({
         uid: 'guest',
         nome: formData.nome,
+        agencia: formData.agencia || undefined,
+        conta: formData.conta || undefined,
         saldo: Number(formData.saldo) || 0,
         ativo: formData.ativo
       });
@@ -949,18 +958,42 @@ const NewBankModal = ({ setShowNewBankModal, onSuccess }: NewBankModalProps) => 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Nome do Banco</label>
-            <select 
-              className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
-              style={{ backgroundColor: '#161b2a' }}
+            <input 
+              type="text"
+              list="bank-suggestions"
+              className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
               value={formData.nome}
               onChange={e => setFormData({...formData, nome: e.target.value})}
+              placeholder="Ex: Sicredi Matriz, Itaú PJ, Caixa CEI"
               required
-            >
-              <option value="" className="bg-[#161b2a] text-on-surface">Selecione...</option>
-              <option value="Sicredi CN" className="bg-[#161b2a] text-on-surface">Sicredi CN</option>
-              <option value="BB Cei" className="bg-[#161b2a] text-on-surface">BB Cei</option>
-              <option value="BB Facems" className="bg-[#161b2a] text-on-surface">BB Facems</option>
-            </select>
+            />
+            <datalist id="bank-suggestions">
+              <option value="Sicredi CN" />
+              <option value="BB Cei" />
+              <option value="BB Facems" />
+            </datalist>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Agência</label>
+              <input 
+                type="text"
+                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                value={formData.agencia}
+                onChange={e => setFormData({...formData, agencia: e.target.value})}
+                placeholder="Ex: 1234"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta</label>
+              <input 
+                type="text"
+                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                value={formData.conta}
+                onChange={e => setFormData({...formData, conta: e.target.value})}
+                placeholder="Ex: 12345-6"
+              />
+            </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Saldo Inicial (R$)</label>
@@ -1872,7 +1905,7 @@ export default function App() {
         let totalFinanceiro = 0;
 
         for (const row of allDataMatrix) {
-          const rawFornecedor = getRowValue(row, ['FORNECEDOR', 'FORNECEDORES', 'FORNECEDOR_NOME', 'NOME', 'FAVORECIDO', 'CLIENTE', 'OBSERVAÇAO']);
+          const rawFornecedor = getRowValue(row, ['FORNECEDOR', 'FORNECEDORES', 'FORNECEDOR_NOME', 'NOME', 'FAVORECIDO', 'CLIENTE']);
           if (!rawFornecedor || String(rawFornecedor).toUpperCase().includes('TOTAL')) continue;
 
           const rawValor = getRowValue(row, ['VALOR', 'VALOR TOTAL', 'TOTAL', 'VALOR_TOTAL', 'QUANTIA', 'PREÇO', 'PRECO', 'SAIDA', 'SAÍDA', 'PAGAMENTO']);
@@ -1881,39 +1914,26 @@ export default function App() {
           if (sanitizedValor === 0 && !rawValor) continue;
           if (String(rawFornecedor).toUpperCase() === 'FORNECEDOR' || String(rawFornecedor).toUpperCase() === 'CLIENTE') continue;
 
-          const formatDate = (val: any, sheetName?: string) => {
-            if (!val) {
-              // Se não tem data, tenta inferir do nome da aba
-              if (sheetName) {
-                const s = sheetName.toUpperCase();
-                const months = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
-                const fullMonths = ['JANEIRO','FEVEREIRO','MARÇO','MARCO','ABRIL','MAIO','JUNHO','JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO'];
-                
-                let foundMonth = -1;
-                fullMonths.forEach((m, i) => { if (s.includes(m)) foundMonth = i + 1; });
-                if (foundMonth === -1) months.forEach((m, i) => { if (s.includes(m)) foundMonth = i + 1; });
-                
-                let foundYear = 2024;
-                if (file && file.name) {
-                  const fileYearMatch = file.name.match(/20\d{2}/);
-                  if (fileYearMatch) foundYear = parseInt(fileYearMatch[0]);
-                }
-                const yearMatch = s.match(/20\d{2}/);
-                if (yearMatch) foundYear = parseInt(yearMatch[0]);
-                
-                if (foundMonth !== -1) {
-                  return `01/${String(foundMonth).padStart(2, '0')}/${foundYear}`;
-                }
-              }
-              return undefined;
-            }
+          const formatDate = (val: any) => {
+            if (!val) return undefined;
             
             if (val instanceof Date) {
               const dt = new Date(val);
               let day = dt.getUTCDate();
               let month = dt.getUTCMonth() + 1;
               let year = dt.getUTCFullYear();
+              if (year < 2024 || year > 2026) return undefined;
               return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+            }
+
+            if (typeof val === 'number') {
+              const excelEpoch = Date.UTC(1899, 11, 30);
+              const dt = new Date(excelEpoch + val * 24 * 60 * 60 * 1000);
+              const y = dt.getUTCFullYear();
+              const m = dt.getUTCMonth() + 1;
+              const d = dt.getUTCDate();
+              if (!Number.isFinite(y) || y < 2024 || y > 2026) return undefined;
+              return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
             }
 
             const str = String(val).trim();
@@ -1924,32 +1944,23 @@ export default function App() {
                 let p1 = Number(parts[1]);
                 let p2 = parts[2];
                 if (p2.length === 2) p2 = '20' + p2;
+                const y = Number(p2);
+                if (y < 2024 || y > 2026) return undefined;
                 return `${String(p0).padStart(2, '0')}/${String(p1).padStart(2, '0')}/${p2}`;
-              } else if (parts.length === 2) {
-                // DD/MM -> assume ano atual ou do sheet
-                let foundYear = 2024;
-                if (file && file.name) {
-                  const fileYearMatch = file.name.match(/20\d{2}/);
-                  if (fileYearMatch) foundYear = parseInt(fileYearMatch[0]);
-                }
-                if (sheetName) {
-                  const yearMatch = sheetName.match(/20\d{2}/);
-                  if (yearMatch) foundYear = parseInt(yearMatch[0]);
-                }
-                return `${String(parts[0]).padStart(2, '0')}/${String(parts[1]).padStart(2, '0')}/${foundYear}`;
               }
             }
-            return str;
+            return undefined;
           };
 
 
           const fornecedorNome = String(rawFornecedor).trim();
           
-          const rawVencimento = getRowValue(row, ['VENCIMENTO', 'DATA VENCIMENTO', 'DATA', 'VENC']);
+          const rawVencimento = getRowValue(row, ['VENCIMENTO', 'DATA VENCIMENTO', 'VENC']);
           const rawPagamento = getRowValue(row, ['DATA PAGAMENTO', 'PAGAMENTO', 'DATA PAGO', 'PAGO EM']);
 
-          const vencimentoDate = formatDate(rawVencimento, row._aba_origem);
-          const pagamentoDate = rawPagamento ? formatDate(rawPagamento, row._aba_origem) : undefined;
+          const vencimentoDate = formatDate(rawVencimento);
+          const pagamentoDate = rawPagamento ? formatDate(rawPagamento) : undefined;
+          if (!vencimentoDate) continue;
           
           const rawStatus = String(getRowValue(row, ['STATUS', 'SITUAÇÃO', 'SITUACAO', 'PAGO', 'SIT 2']) || '').toUpperCase();
           let status: TransactionStatus = 'PENDENTE';
