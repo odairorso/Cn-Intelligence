@@ -3545,6 +3545,21 @@ export default function App() {
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
             <button 
+              onClick={() => pdfInputRef.current?.click()}
+              className="bg-primary/20 text-primary px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/30 transition-all border border-primary/20"
+            >
+              {isProcessingPdf ? <Loader2 size={18} className="animate-spin" /> : <FileUp size={18} />} 
+              Ler Boleto PDF
+            </button>
+            <input 
+              type="file" 
+              ref={pdfInputRef} 
+              onChange={handlePdfUpload} 
+              accept="application/pdf" 
+              className="hidden" 
+            />
+
+            <button 
               onClick={() => fileInputRef.current?.click()}
               className="bg-surface-variant/20 text-on-surface px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-surface-variant/40 transition-all border border-white/5"
             >
@@ -3729,6 +3744,70 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {showPdfImportModal && pdfExtractedData && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-surface border border-white/10 p-6 md:p-8 rounded-2xl w-full max-w-lg shadow-2xl">
+            <h3 className="text-xl font-bold font-headline mb-6 flex items-center gap-2">
+              <FileText className="text-primary" /> Confirmar Dados do Boleto
+            </h3>
+            
+            <div className="space-y-4 mb-8">
+              <div className="bg-surface-variant/20 p-4 rounded-xl border border-white/5 space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold text-on-surface-variant uppercase">Fornecedor Identificado</label>
+                  <input 
+                    type="text"
+                    className="w-full bg-surface-variant/40 border border-white/10 rounded-lg px-3 py-2 text-sm mt-1 focus:border-primary outline-none"
+                    value={pdfExtractedData.fornecedor}
+                    onChange={(e) => setPdfExtractedData({...pdfExtractedData, fornecedor: e.target.value})}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-on-surface-variant uppercase">Vencimento</label>
+                    <input 
+                      type="text"
+                      placeholder="DD/MM/YYYY"
+                      className="w-full bg-surface-variant/40 border border-white/10 rounded-lg px-3 py-2 text-sm mt-1 focus:border-primary outline-none"
+                      value={pdfExtractedData.vencimento}
+                      onChange={(e) => setPdfExtractedData({...pdfExtractedData, vencimento: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-on-surface-variant uppercase">Valor (R$)</label>
+                    <input 
+                      type="number"
+                      step="0.01"
+                      className="w-full bg-surface-variant/40 border border-white/10 rounded-lg px-3 py-2 text-sm mt-1 focus:border-primary outline-none"
+                      value={pdfExtractedData.valor}
+                      onChange={(e) => setPdfExtractedData({...pdfExtractedData, valor: Number(e.target.value)})}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => {
+                  setShowPdfImportModal(false);
+                  setPdfExtractedData(null);
+                }}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold text-on-surface-variant hover:text-white hover:bg-white/5 transition-all"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={() => handleConfirmPdfImport(pdfExtractedData)}
+                className="bg-primary text-background px-6 py-2.5 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/20"
+              >
+                Confirmar e Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showNewTxModal && (
         <NewTxModal 
