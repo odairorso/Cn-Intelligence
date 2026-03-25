@@ -38,14 +38,10 @@ import {
 } from 'recharts';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
 import { motion, AnimatePresence } from 'motion/react';
 
-// Initialize PDF.js worker using standard local file reference
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-/* @vite-ignore */
-).toString();
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -2909,7 +2905,12 @@ export default function App() {
 
       for (const file of pdfFiles) {
         const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let pdf: any;
+        try {
+          pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        } catch {
+          pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true } as any).promise;
+        }
         let fullText = '';
 
         for (let i = 1; i <= pdf.numPages; i++) {
