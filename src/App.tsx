@@ -44,6 +44,7 @@ import { motion, AnimatePresence } from 'motion/react';
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
   import.meta.url
+/* @vite-ignore */
 ).toString();
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
