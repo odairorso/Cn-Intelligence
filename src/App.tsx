@@ -178,6 +178,15 @@ const isSupplierMatch = (transactionSupplier: string, supplierName: string) => {
 // --- Types ---
 type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'receitas' | 'bancos' | 'configuracoes';
 
+type PdfImportDraft = {
+  fileName: string;
+  fornecedor: string;
+  vencimento: string;
+  valor: number;
+  rawText: string;
+  duplicate: boolean;
+};
+
 // --- Components ---
 
 function KPIComponent({ kpi, index }: any) {
@@ -2705,12 +2714,7 @@ export default function App() {
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [showPayModal, setShowPayModal] = useState<{ id: string; valor: number } | null>(null);
   const [showPdfImportModal, setShowPdfImportModal] = useState(false);
-  const [pdfExtractedData, setPdfExtractedData] = useState<{
-    fornecedor: string;
-    vencimento: string;
-    valor: number;
-    rawText: string;
-  } | null>(null);
+  const [pdfExtractedRows, setPdfExtractedRows] = useState<PdfImportDraft[]>([]);
   const [isProcessingPdf, setIsProcessingPdf] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2795,43 +2799,140 @@ export default function App() {
 
   // --- Handlers ---
 
-  // PDF Import Handler
+  const boletoDuplicateKey = (fornecedor: string, vencimento: string, valor: number) =>
+    `${normalizeSupplierName(fornecedor)}|${vencimento}|${Number(valor || 0).toFixed(2)}`;
+
+  const parseLinhaDigitavel = (text: string) => {
+    const digits = (text.match(/\d/g) || []).join('');
+    if (digits.length < 47) return null;
+    const line = digits.slice(0, 47);
+    const fator = Number(line.slice(5, 9));
+    const valor = Number(line.slice(9, 19)) / 100;
+    if (!Number.isFinite(fator)) return null;
+    const base = new Date(Date.UTC(1997, 9, 7));
+    const dueDate = new Date(base.getTime() + fator * 24 * 60 * 60 * 1000);
+    const dd = String(dueDate.getUTCDate()).padStart(2, '0');
+    const mm = String(dueDate.getUTCMonth() + 1).padStart(2, '0');
+    const yyyy = String(dueDate.getUTCFullYear());
+    return {
+      vencimento: `${dd}/${mm}/${yyyy}`,
+      valor: Number.isFinite(valor) ? valor : 0,
+    };
+  };
+
+  const extractBoletoData = (text: string, fileName: string): PdfImportDraft => {
+    const normalizedText = text.toUpperCase().replace(/\s+/g, ' ');
+    let fornecedor = 'Fornecedor não identificado';
+    let vencimento = '';
+    let valor = 0;
+
+    const fornecedorPatterns = [
+      /BENEFICIÁRIO[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/,
+      /CEDENTE[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/,
+      /RAZÃO SOCIAL[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/,
+      /SACADO[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/,
+    ];
+
+    for (const pattern of fornecedorPatterns) {
+      const match = normalizedText.match(pattern);
+      if (match?.[1]) {
+        fornecedor = match[1].trim().replace(/\s+/g, ' ');
+        break;
+      }
+    }
+
+    const datePatterns = [
+      /VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/,
+      /DATA DE VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/,
+      /\b(\d{2}\/\d{2}\/\d{4})\b/,
+    ];
+
+    for (const pattern of datePatterns) {
+      const match = normalizedText.match(pattern);
+      if (match?.[1]) {
+        vencimento = match[1];
+        break;
+      }
+    }
+
+    const valuePatterns = [
+      /VALOR\s+(?:DO\s+)?DOCUMENTO[:\s]+R?\$?\s*([\d.,]+)/,
+      /VALOR\s+COBRADO[:\s]+R?\$?\s*([\d.,]+)/,
+      /R\$\s*([\d]{1,3}(?:\.[\d]{3})*,[\d]{2})/,
+    ];
+
+    for (const pattern of valuePatterns) {
+      const match = normalizedText.match(pattern);
+      if (match?.[1]) {
+        const parsed = Number(match[1].replace(/\./g, '').replace(',', '.'));
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          valor = parsed;
+          break;
+        }
+      }
+    }
+
+    const linhaInfo = parseLinhaDigitavel(normalizedText);
+    if (linhaInfo) {
+      if (!vencimento) vencimento = linhaInfo.vencimento;
+      if (!valor && linhaInfo.valor > 0) valor = linhaInfo.valor;
+    }
+
+    return {
+      fileName,
+      fornecedor,
+      vencimento,
+      valor,
+      rawText: text.slice(0, 500),
+      duplicate: false,
+    };
+  };
+
   const handlePdfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (file.type !== 'application/pdf') {
-      showNotification('Selecione um arquivo PDF válido.', 'error');
+    const files: File[] = event.target.files ? Array.from(event.target.files) : [];
+    if (!files.length) return;
+    const pdfFiles = files.filter((file) => file.type === 'application/pdf');
+    if (!pdfFiles.length) {
+      showNotification('Selecione pelo menos um arquivo PDF válido.', 'error');
       return;
     }
 
     setIsProcessingPdf(true);
-    showNotification('Processando boleto PDF...', 'info');
+    showNotification(`Processando ${pdfFiles.length} boleto(s)...`, 'info');
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      // Usar a biblioteca importada nativamente
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      
-      let fullText = '';
-      
-      // Extract text from all pages
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(' ');
-        fullText += pageText + '\n';
+      const existingKeys = new Set(
+        transactions.map((tx) => boletoDuplicateKey(tx.fornecedor, tx.vencimento, tx.valor))
+      );
+      const batchKeys = new Set<string>();
+      const extractedRows: PdfImportDraft[] = [];
+
+      for (const file of pdfFiles) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = '';
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
+        }
+
+        const data = extractBoletoData(fullText, file.name);
+        const key = boletoDuplicateKey(data.fornecedor, data.vencimento, data.valor);
+        data.duplicate = existingKeys.has(key) || batchKeys.has(key);
+        batchKeys.add(key);
+        extractedRows.push(data);
       }
 
-      console.log('PDF Text extracted:', fullText);
+      if (!extractedRows.length) {
+        showNotification('Nenhum dado foi extraído dos PDFs.', 'error');
+        return;
+      }
 
-      // Extract data using regex patterns
-      const extractedData = extractBoletoData(fullText);
-      
-      setPdfExtractedData(extractedData);
+      setPdfExtractedRows(extractedRows);
       setShowPdfImportModal(true);
-      showNotification('Dados extraídos com sucesso!', 'success');
+      showNotification('Boletos lidos. Revise e confirme os lançamentos.', 'success');
     } catch (error) {
       console.error('Error processing PDF:', error);
       showNotification('Erro ao processar PDF. Tente novamente.', 'error');
@@ -2841,112 +2942,58 @@ export default function App() {
     }
   };
 
-  // Extract boleto data from text
-  const extractBoletoData = (text: string) => {
-    const normalizedText = text.toUpperCase().replace(/\s+/g, ' ');
-    
-    // Extract supplier name - look for common patterns
-    let fornecedor = 'Fornecedor não identificado';
-    
-    // Pattern: after "BENEFICIÁRIO" or "CEDENTE"
-    const beneficiarioPatterns = [
-      /BENEFICIÁRIO[:\s]+([A-Z\s]+?)(?:\s+CNPJ|\s+CPF|\s+AG|\d{2}\/\d{2}\/\d{4})/,
-      /CEDENTE[:\s]+([A-Z\s]+?)(?:\s+CNPJ|\s+CPF|\s+AG|\d{2}\/\d{2}\/\d{4})/,
-      /RAZÃO SOCIAL[:\s]+([A-Z\s]+?)(?:\s+CNPJ|\s+CPF)/,
-    ];
-    
-    for (const pattern of beneficiarioPatterns) {
-      const match = normalizedText.match(pattern);
-      if (match && match[1]) {
-        fornecedor = match[1].trim().replace(/\s+/g, ' ');
-        break;
-      }
-    }
-
-    // Extract due date - look for date patterns
-    let vencimento = '';
-    const datePatterns = [
-      /VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/,
-      /(\d{2}\/\d{2}\/\d{4})/g,
-    ];
-    
-    for (const pattern of datePatterns) {
-      const match = normalizedText.match(pattern);
-      if (match && match[1]) {
-        vencimento = match[1];
-        break;
-      }
-    }
-
-    // Extract value - look for R$ patterns
-    let valor = 0;
-    const valuePatterns = [
-      /VALOR\s+(?:DO\s+)?DOCUMENTO[:\s]+R?\$?\s*([\d.,]+)/,
-      /R\$\s*([\d.,]+)/,
-      /VALOR[:\s]+([\d.,]+)/,
-    ];
-    
-    for (const pattern of valuePatterns) {
-      const match = normalizedText.match(pattern);
-      if (match && match[1]) {
-        const valueStr = match[1]
-          .replace(/\./g, '')
-          .replace(',', '.');
-        const parsedValue = parseFloat(valueStr);
-        if (!isNaN(parsedValue) && parsedValue > 0) {
-          valor = parsedValue;
-          break;
-        }
-      }
-    }
-
-    return {
-      fornecedor,
-      vencimento,
-      valor,
-      rawText: text.substring(0, 500) // First 500 chars for reference
-    };
-  };
-
-  // Confirm PDF import and create transaction
-  const handleConfirmPdfImport = async (data: { fornecedor: string; vencimento: string; valor: number }) => {
+  const handleConfirmPdfImport = async () => {
     try {
-      const newTransaction = {
-        uid: 'guest',
-        fornecedor: data.fornecedor,
-        descricao: 'Importado de boleto PDF',
-        empresa: 'CN',
-        vencimento: data.vencimento,
-        pagamento: null,
-        valor: data.valor,
-        status: 'PENDENTE' as TransactionStatus,
-        banco: null,
-      };
+      const validRows = pdfExtractedRows.filter((row) => row.fornecedor && row.vencimento && row.valor > 0);
+      const nonDuplicateRows = validRows.filter((row) => !row.duplicate);
 
-      await api.createTransaction(newTransaction);
-      
-      // Sync supplier if new
-      const existingSupplier = suppliers.find(s => 
-        normalizeSupplierName(s.nome) === normalizeSupplierName(data.fornecedor)
-      );
-      if (!existingSupplier && data.fornecedor !== 'Fornecedor não identificado') {
-        await api.createSupplier({
+      if (!nonDuplicateRows.length) {
+        showNotification('Nenhum boleto novo para salvar.', 'info');
+        return;
+      }
+
+      const txList = nonDuplicateRows.map((row) => ({
+        uid: 'guest',
+        fornecedor: row.fornecedor,
+        descricao: `Importado de boleto PDF (${row.fileName})`,
+        empresa: 'CN',
+        vencimento: row.vencimento,
+        pagamento: null as any,
+        valor: row.valor,
+        status: 'PENDENTE' as TransactionStatus,
+        banco: null as any,
+      }));
+
+      if (txList.length === 1) {
+        await api.createTransaction(txList[0]);
+      } else {
+        await api.createTransactionsBatch(txList as any);
+      }
+
+      const supplierNames = new Set(suppliers.map((s) => normalizeSupplierName(s.nome)));
+      const newSuppliers = nonDuplicateRows
+        .filter((row) => row.fornecedor !== 'Fornecedor não identificado')
+        .filter((row) => !supplierNames.has(normalizeSupplierName(row.fornecedor)))
+        .map((row) => ({
           uid: 'guest',
-          nome: data.fornecedor,
+          nome: row.fornecedor,
           email: '',
           telefone: '',
-          cnpj: ''
-        });
-        fetchSuppliers();
+          cnpj: '',
+        }));
+
+      if (newSuppliers.length) {
+        await api.createSuppliersBatch(newSuppliers as any);
       }
 
       setShowPdfImportModal(false);
-      setPdfExtractedData(null);
-      fetchTransactions();
-      showNotification('Boleto importado com sucesso!', 'success');
+      setPdfExtractedRows([]);
+      await fetchTransactions();
+      await fetchSuppliers();
+      showNotification(`${nonDuplicateRows.length} boleto(s) importado(s) com sucesso!`, 'success');
     } catch (error) {
       console.error('Error creating transaction from PDF:', error);
-      showNotification('Erro ao salvar lançamento.', 'error');
+      showNotification('Erro ao salvar lançamentos de boleto.', 'error');
     }
   };
 
@@ -3522,6 +3569,25 @@ export default function App() {
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
+            {activeTab === 'lancamentos' && (
+              <>
+                <button 
+                  onClick={() => pdfInputRef.current?.click()}
+                  className="bg-primary/15 text-primary px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/25 transition-all border border-primary/25"
+                >
+                  {isProcessingPdf ? <Loader2 size={18} className="animate-spin" /> : <FileUp size={18} />}
+                  Importar Boletos PDF
+                </button>
+                <input
+                  type="file"
+                  ref={pdfInputRef}
+                  onChange={handlePdfUpload}
+                  accept="application/pdf"
+                  multiple
+                  className="hidden"
+                />
+              </>
+            )}
             <button 
               onClick={() => fileInputRef.current?.click()}
               className="bg-surface-variant/20 text-on-surface px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-surface-variant/40 transition-all border border-white/5"
@@ -3707,6 +3773,86 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {showPdfImportModal && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-surface border border-white/10 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+              <h3 className="text-lg md:text-xl font-bold font-headline flex items-center gap-2">
+                <FileUp className="text-primary" size={20} /> Automação de Boletos
+              </h3>
+              <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                {pdfExtractedRows.length} arquivo(s)
+              </span>
+            </div>
+
+            <div className="p-4 max-h-[60vh] overflow-auto">
+              <div className="space-y-3">
+                {pdfExtractedRows.map((row, index) => (
+                  <div key={`${row.fileName}-${index}`} className={cn("border rounded-xl p-3", row.duplicate ? "border-tertiary/40 bg-tertiary/5" : "border-white/10 bg-surface-variant/10")}>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                      <div className="md:col-span-3">
+                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Arquivo</p>
+                        <p className="text-xs text-on-surface-variant truncate">{row.fileName}</p>
+                      </div>
+                      <div className="md:col-span-3">
+                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Fornecedor</p>
+                        <input
+                          value={row.fornecedor}
+                          onChange={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, fornecedor: e.target.value } : item))}
+                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Vencimento</p>
+                        <input
+                          value={row.vencimento}
+                          onChange={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, vencimento: e.target.value } : item))}
+                          placeholder="DD/MM/AAAA"
+                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Valor</p>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={row.valor}
+                          onChange={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, valor: Number(e.target.value) } : item))}
+                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="md:col-span-2 flex md:justify-end items-end">
+                        <span className={cn("text-[10px] font-bold uppercase px-2 py-1 rounded border", row.duplicate ? "text-tertiary border-tertiary/40 bg-tertiary/10" : "text-primary border-primary/40 bg-primary/10")}>
+                          {row.duplicate ? 'Duplicado' : 'Novo'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-white/10 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowPdfImportModal(false);
+                  setPdfExtractedRows([]);
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-bold text-on-surface-variant hover:text-white hover:bg-white/5 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmPdfImport}
+                className="bg-primary text-background px-5 py-2 rounded-lg text-sm font-black uppercase tracking-widest hover:bg-primary-dark transition-all"
+              >
+                Confirmar Importação
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showNewTxModal && (
         <NewTxModal 
