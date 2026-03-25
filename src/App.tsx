@@ -46,6 +46,8 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const defaultBrandLogo = new URL('../Logo Cn/WhatsApp Image 2021-02-10 at 10.34.53.jpeg', import.meta.url).href;
+
 const toInputDate = (value?: string | null) => {
   if (!value) return '';
   const v = String(value).trim();
@@ -2085,6 +2087,7 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const currentBrandLogo = brandLogo || defaultBrandLogo;
 
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
@@ -2592,13 +2595,11 @@ export default function App() {
       <header className="bg-surface/80 backdrop-blur-md border-b border-white/5 flex justify-between items-center w-full px-4 md:px-8 py-5 fixed top-0 z-50">
         <div className="flex items-center gap-4 md:gap-8">
           <div className="flex items-center gap-3">
-            {brandLogo && (
-              <img
-                src={brandLogo}
-                alt="Logo Fluxo Caixa CN"
-                className="h-9 w-9 md:h-10 md:w-10 object-contain rounded-sm border border-white/10 bg-white/5 p-1"
-              />
-            )}
+            <img
+              src={currentBrandLogo}
+              alt="Logo Fluxo Caixa CN"
+              className="h-9 w-9 md:h-10 md:w-10 object-contain rounded-sm border border-white/10 bg-white/5 p-1"
+            />
             <h1 className="text-xl md:text-2xl font-black tracking-tighter premium-gradient-text font-headline">Fluxo Caixa CN</h1>
           </div>
 
@@ -2818,15 +2819,13 @@ export default function App() {
                           </button>
                         )}
                       </div>
-                      {brandLogo && (
-                        <div className="mt-4 flex justify-center">
-                          <img
-                            src={brandLogo}
-                            alt="Prévia da logo"
-                            className="h-20 w-20 object-contain rounded-sm border border-white/10 bg-white/5 p-2"
-                          />
-                        </div>
-                      )}
+                      <div className="mt-4 flex justify-center">
+                        <img
+                          src={currentBrandLogo}
+                          alt="Prévia da logo"
+                          className="h-20 w-20 object-contain rounded-sm border border-white/10 bg-white/5 p-2"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
