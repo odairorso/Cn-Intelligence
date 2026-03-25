@@ -2064,6 +2064,13 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
+  const [brandLogo, setBrandLogo] = useState<string>(() => {
+    try {
+      return localStorage.getItem('cn_brand_logo') || '';
+    } catch {
+      return '';
+    }
+  });
   const [user, setUser] = useState<any>(null);
   const [isAuthReady, setIsAuthReady] = useState(true);
 
@@ -2082,6 +2089,35 @@ export default function App() {
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showNotification('Selecione um arquivo de imagem válido.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      setBrandLogo(dataUrl);
+      try {
+        localStorage.setItem('cn_brand_logo', dataUrl);
+      } catch {
+      }
+      showNotification('Logo atualizada com sucesso!', 'success');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearLogo = () => {
+    setBrandLogo('');
+    try {
+      localStorage.removeItem('cn_brand_logo');
+    } catch {
+    }
+    showNotification('Logo removida.', 'info');
   };
 
   const fetchTransactions = async () => {
@@ -2555,7 +2591,16 @@ export default function App() {
       {/* Header */}
       <header className="bg-surface/80 backdrop-blur-md border-b border-white/5 flex justify-between items-center w-full px-4 md:px-8 py-5 fixed top-0 z-50">
         <div className="flex items-center gap-4 md:gap-8">
-          <h1 className="text-xl md:text-2xl font-black tracking-tighter premium-gradient-text font-headline">CN INTELLIGENCE</h1>
+          <div className="flex items-center gap-3">
+            {brandLogo && (
+              <img
+                src={brandLogo}
+                alt="Logo Fluxo Caixa CN"
+                className="h-9 w-9 md:h-10 md:w-10 object-contain rounded-sm border border-white/10 bg-white/5 p-1"
+              />
+            )}
+            <h1 className="text-xl md:text-2xl font-black tracking-tighter premium-gradient-text font-headline">Fluxo Caixa CN</h1>
+          </div>
 
           <nav className="hidden lg:flex gap-6">
             <button 
@@ -2748,7 +2793,44 @@ export default function App() {
                     Aqui você poderá gerenciar usuários, permissões e integrações bancárias em futuras atualizações.
                   </p>
                 </div>
-                
+
+                <div className="pt-8 border-t border-white/5">
+                  <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Identidade Visual</h4>
+                  <div className="space-y-4 max-w-md mx-auto">
+                    <div className="glass-card p-4">
+                      <p className="text-[11px] text-on-surface-variant mb-3">Logo exibida no topo do sistema.</p>
+                      <div className="flex items-center justify-center gap-3">
+                        <label className="bg-primary/10 text-primary px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-primary/20 transition-all border border-primary/20 cursor-pointer">
+                          <Upload size={14} /> Subir Logo
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleLogoUpload}
+                          />
+                        </label>
+                        {brandLogo && (
+                          <button
+                            onClick={clearLogo}
+                            className="bg-tertiary/10 text-tertiary px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-tertiary/20 transition-all border border-tertiary/20"
+                          >
+                            <X size={14} /> Remover
+                          </button>
+                        )}
+                      </div>
+                      {brandLogo && (
+                        <div className="mt-4 flex justify-center">
+                          <img
+                            src={brandLogo}
+                            alt="Prévia da logo"
+                            className="h-20 w-20 object-contain rounded-sm border border-white/10 bg-white/5 p-2"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="pt-8 border-t border-white/5">
                   <h4 className="text-sm font-bold text-tertiary mb-4 uppercase tracking-widest">Limpeza de Dados</h4>
                   <div className="space-y-4 max-w-md mx-auto">
