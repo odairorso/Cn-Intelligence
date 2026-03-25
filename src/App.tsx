@@ -3363,27 +3363,33 @@ export default function App() {
 
   // --- Computed Stats ---
   const stats = useMemo(() => {
-    let total = 0;
+    let totalDespesas = 0;
+    let totalReceitas = 0;
     let pagos = 0;
     let pendentes = 0;
     let vencidos = 0;
     const empresasSet = new Set<string>();
     for (const tx of transactions) {
-      total += tx.valor;
+      if (isRevenueTransaction(tx)) {
+        totalReceitas += tx.valor;
+      } else {
+        totalDespesas += tx.valor;
+      }
+      
       if (tx.status === 'PAGO') pagos++;
       else if (tx.status === 'VENCIDO') vencidos++;
       else pendentes++;
       empresasSet.add(tx.empresa);
     }
     const kpis: KPI[] = [
-      { label: 'VALOR TOTAL', value: total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), color: '#10b981' },
-      { label: 'REGISTROS', value: transactions.length.toString(), description: 'Volume operacional', color: '#10b981' },
-      { label: 'EMPRESAS', value: empresasSet.size.toString(), description: 'Unidades ativas', color: '#10b981' },
+      { label: 'TOTAL DESPESAS', value: totalDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), color: '#ef4444' },
+      { label: 'TOTAL RECEITAS', value: totalReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), color: '#10b981' },
+      { label: 'EMPRESAS', value: empresasSet.size.toString(), description: 'Unidades ativas', color: '#3b82f6' },
       { label: 'PENDENTES', value: pendentes.toString(), description: 'Aguardando conciliação', color: '#f59e0b' },
       { label: 'PAGOS', value: pagos.toString(), description: 'Liquidados', color: '#10b981' },
       { label: 'VENCIDOS', value: vencidos.toString(), description: 'Ação imediata necessária', color: '#ef4444' },
     ];
-    return { total, pagos, pendentes, vencidos, kpis };
+    return { totalDespesas, totalReceitas, pagos, pendentes, vencidos, kpis };
   }, [transactions]);
 
   // Removida a tela de loading de isAuthReady para permitir a renderização direta
