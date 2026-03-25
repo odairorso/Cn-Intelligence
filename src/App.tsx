@@ -3074,15 +3074,24 @@ export default function App() {
           const str = String(val).replace(/[R$\s]/g, '').trim();
           if (str === '' || str.toUpperCase() === 'TOTAL') return 0;
           
-          // Trata formatos como 1.500,00 ou 1500,00 ou 1500.00
+          // Trata formatos brasileiros padrão como 72.705,39 ou 1.500,00 ou 1500,00
           if (str.includes(',') && str.includes('.')) {
-             // Ex: 1.500,00 -> remove ponto, troca virgula por ponto
-             return Number(str.replace(/\./g, '').replace(',', '.'));
+             // Conta quantos pontos e vírgulas tem e onde estão para descobrir o formato
+             const lastDot = str.lastIndexOf('.');
+             const lastComma = str.lastIndexOf(',');
+             
+             if (lastComma > lastDot) {
+               // Formato BR: 72.705,39 (vírgula como decimal)
+               return Number(str.replace(/\./g, '').replace(',', '.'));
+             } else {
+               // Formato US: 72,705.39 (ponto como decimal)
+               return Number(str.replace(/,/g, ''));
+             }
           } else if (str.includes(',')) {
-             // Ex: 1500,00
+             // Ex: 1500,00 -> vira 1500.00
              return Number(str.replace(',', '.'));
           } else if ((str.match(/\./g) || []).length > 1) {
-             // Ex: 1.500.000 -> remove todos os pontos
+             // Ex: 1.500.000 -> remove todos os pontos (não tem casas decimais)
              return Number(str.replace(/\./g, ''));
           }
           
@@ -3544,20 +3553,24 @@ export default function App() {
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
-            <button 
-              onClick={() => pdfInputRef.current?.click()}
-              className="bg-primary/20 text-primary px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/30 transition-all border border-primary/20"
-            >
-              {isProcessingPdf ? <Loader2 size={18} className="animate-spin" /> : <FileUp size={18} />} 
-              Ler Boleto PDF
-            </button>
-            <input 
-              type="file" 
-              ref={pdfInputRef} 
-              onChange={handlePdfUpload} 
-              accept="application/pdf" 
-              className="hidden" 
-            />
+            {activeTab === 'lancamentos' && (
+              <>
+                <button 
+                  onClick={() => pdfInputRef.current?.click()}
+                  className="bg-primary/20 text-primary px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/30 transition-all border border-primary/20"
+                >
+                  {isProcessingPdf ? <Loader2 size={18} className="animate-spin" /> : <FileUp size={18} />} 
+                  Ler Boleto PDF
+                </button>
+                <input 
+                  type="file" 
+                  ref={pdfInputRef} 
+                  onChange={handlePdfUpload} 
+                  accept="application/pdf" 
+                  className="hidden" 
+                />
+              </>
+            )}
 
             <button 
               onClick={() => fileInputRef.current?.click()}
