@@ -46,6 +46,44 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const normalizeSupplierName = (value: string) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+
+const levenshteinDistance = (a: string, b: string) => {
+  const m = a.length;
+  const n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const dp = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return dp[m][n];
+};
+
+const isSupplierMatch = (transactionSupplier: string, supplierName: string) => {
+  const tx = normalizeSupplierName(transactionSupplier);
+  const sp = normalizeSupplierName(supplierName);
+  if (!tx || !sp) return false;
+  if (tx === sp) return true;
+  if (tx.includes(sp) || sp.includes(tx)) return true;
+  if (tx.slice(0, 3) !== sp.slice(0, 3)) return false;
+  return levenshteinDistance(tx, sp) <= 2;
+};
+
 // --- Types ---
 type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'bancos' | 'configuracoes';
 
@@ -490,66 +528,120 @@ interface FornecedoresTabProps {
   onSelectSupplier: (s: Supplier) => void;
 }
 
-const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSupplierModal, syncSuppliers, onSelectSupplier }: FornecedoresTabProps) => (
-  <div className="space-y-6">
-    <div className="flex justify-between items-center">
-      <div className="flex items-center gap-4">
-        <h3 className="text-xl font-bold font-headline">Gestão de Fornecedores</h3>
+const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSupplierModal, syncSuppliers, onSelectSupplier }: FornecedoresTabProps) => {
+  const [searchSupplier, setSearchSupplier] = useState('');
+
+  const mergedSuppliers = useMemo(() => {
+    const byKey = new Map<string, Supplier>();
+
+    suppliers.forEach((s) => {
+      const key = normalizeSupplierName(s.nome);
+      if (!key) return;
+      byKey.set(key, s);
+    });
+
+    transactions.forEach((tx) => {
+      const key = normalizeSupplierName(tx.fornecedor);
+      if (!key || byKey.has(key)) return;
+      byKey.set(key, {
+        id: `virtual-${key}`,
+        uid: 'guest',
+        nome: tx.fornecedor,
+        cnpj: '',
+        email: '',
+        telefone: ''
+      });
+    });
+
+    return Array.from(byKey.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }, [suppliers, transactions]);
+
+  const filteredSuppliers = useMemo(() => {
+    const q = normalizeSupplierName(searchSupplier);
+    if (!q) return mergedSuppliers;
+    return mergedSuppliers.filter((s) => normalizeSupplierName(s.nome).includes(q));
+  }, [mergedSuppliers, searchSupplier]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold font-headline">Gestão de Fornecedores</h3>
+          <button 
+            onClick={syncSuppliers}
+            className="bg-white/5 text-on-surface-variant px-4 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-white/10 transition-colors"
+            title="Sincronizar fornecedores dos lançamentos"
+          >
+            <RefreshCw size={14} /> Sincronizar
+          </button>
+        </div>
         <button 
-          onClick={syncSuppliers}
-          className="bg-white/5 text-on-surface-variant px-4 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-white/10 transition-colors"
-          title="Sincronizar fornecedores dos lançamentos"
+          onClick={() => setShowNewSupplierModal(true)}
+          className="bg-primary text-background px-6 py-2.5 rounded-sm text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all"
         >
-          <RefreshCw size={14} /> Sincronizar
+          <UserPlus size={18} /> Novo Fornecedor
         </button>
       </div>
-      <button 
-        onClick={() => setShowNewSupplierModal(true)}
-        className="bg-primary text-background px-6 py-2.5 rounded-sm text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all"
-      >
-        <UserPlus size={18} /> Novo Fornecedor
-      </button>
-    </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {suppliers.map(s => (
-        <div key={s.id} className="glass-card p-6 flex flex-col gap-4 relative group cursor-pointer hover:border-primary/40" onClick={() => onSelectSupplier(s)}>
-          <button 
-            onClick={(e) => { e.stopPropagation(); deleteSupplier(s.id); }}
-            className="absolute top-4 right-4 p-2 text-tertiary opacity-0 group-hover:opacity-100 transition-opacity hover:bg-tertiary/10 rounded-sm"
-          >
-            <Trash2 size={16} />
-          </button>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-sm bg-primary/20 flex items-center justify-center text-primary font-bold text-xl border border-primary/10">
-              {s.nome.charAt(0)}
-            </div>
-            <div>
-              <h4 className="font-bold text-on-surface">{s.nome}</h4>
-              <p className="text-[10px] font-black text-on-surface-variant/60 tracking-wider mt-0.5">{s.cnpj || 'CNPJ NÃO INFORMADO'}</p>
-            </div>
-          </div>
-          <div className="space-y-2 text-sm mt-2">
-            <p className="flex items-center gap-2 text-on-surface-variant/80 text-xs font-medium">
-              <FileText size={14} className="opacity-40" /> {s.email || 'E-mail não informado'}
-            </p>
-            <p className="flex items-center gap-2 text-on-surface-variant/80 text-xs font-medium">
-              <HelpCircle size={14} className="opacity-40" /> {s.telefone || 'Telefone não informado'}
-            </p>
-          </div>
-          <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center">
-            <p className="text-[10px] font-black text-primary uppercase tracking-widest">
-              {transactions.filter(tx => tx.fornecedor === s.nome).length} Lançamentos
-            </p>
-            <button className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest hover:text-primary transition-colors">
-              Detalhes →
-            </button>
-          </div>
+      <div className="glass-card p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60" size={16} />
+          <input
+            value={searchSupplier}
+            onChange={(e) => setSearchSupplier(e.target.value)}
+            placeholder="Buscar fornecedor..."
+            className="w-full bg-surface-variant/20 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm outline-none focus:border-primary"
+          />
         </div>
-      ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredSuppliers.map(s => (
+          <div key={s.id || normalizeSupplierName(s.nome)} className="glass-card p-6 flex flex-col gap-4 relative group cursor-pointer hover:border-primary/40" onClick={() => onSelectSupplier(s)}>
+            {s.id && !String(s.id).startsWith('virtual-') && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); deleteSupplier(s.id); }}
+                className="absolute top-4 right-4 p-2 text-tertiary opacity-0 group-hover:opacity-100 transition-opacity hover:bg-tertiary/10 rounded-sm"
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-sm bg-primary/20 flex items-center justify-center text-primary font-bold text-xl border border-primary/10">
+                {s.nome.charAt(0)}
+              </div>
+              <div>
+                <h4 className="font-bold text-on-surface">{s.nome}</h4>
+                <p className="text-[10px] font-black text-on-surface-variant/60 tracking-wider mt-0.5">{s.cnpj || 'CNPJ NÃO INFORMADO'}</p>
+              </div>
+            </div>
+            <div className="space-y-2 text-sm mt-2">
+              <p className="flex items-center gap-2 text-on-surface-variant/80 text-xs font-medium">
+                <FileText size={14} className="opacity-40" /> {s.email || 'E-mail não informado'}
+              </p>
+              <p className="flex items-center gap-2 text-on-surface-variant/80 text-xs font-medium">
+                <HelpCircle size={14} className="opacity-40" /> {s.telefone || 'Telefone não informado'}
+              </p>
+            </div>
+            <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center">
+              <p className="text-[10px] font-black text-primary uppercase tracking-widest">
+                {transactions.filter(tx => isSupplierMatch(tx.fornecedor, s.nome)).length} Lançamentos
+              </p>
+              <button className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest hover:text-primary transition-colors">
+                Detalhes →
+              </button>
+            </div>
+          </div>
+        ))}
+        {filteredSuppliers.length === 0 && (
+          <div className="col-span-full text-center text-on-surface-variant py-12 italic">
+            Nenhum fornecedor encontrado para a busca.
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 
 interface RelatoriosTabProps {
@@ -1575,12 +1667,22 @@ const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxM
 };
 
 const SupplierDetailModal = ({ supplier, transactions, onClose }: { supplier: Supplier, transactions: Transaction[], onClose: () => void }) => {
+  const txDateToNumber = (value: string) => {
+    if (!value) return 0;
+    if (value.includes('/')) {
+      const [dd, mm, yyyy] = value.split('/');
+      return new Date(`${yyyy}-${mm}-${dd}`).getTime();
+    }
+    if (value.includes('-')) {
+      return new Date(value).getTime();
+    }
+    return 0;
+  };
+
   const supplierTransactions = useMemo(() => 
-    transactions.filter(t => t.fornecedor === supplier.nome)
+    transactions.filter(t => isSupplierMatch(t.fornecedor, supplier.nome))
     .sort((a, b) => {
-      const dateA = a.vencimento.split('/').reverse().join('');
-      const dateB = b.vencimento.split('/').reverse().join('');
-      return dateB.localeCompare(dateA);
+      return txDateToNumber(b.vencimento) - txDateToNumber(a.vencimento);
     }),
   [transactions, supplier]);
 
