@@ -8,10 +8,12 @@ export default async function handler(req, res) {
 
   if (req.method === 'PUT') {
     try {
-      const { nome, saldo, ativo } = req.body;
+      const { nome, agencia, conta, saldo, ativo } = req.body;
       const rows = await sql`
         UPDATE banks 
         SET nome = COALESCE(${nome}, nome),
+            agencia = COALESCE(${agencia}, agencia),
+            conta = COALESCE(${conta}, conta),
             saldo = COALESCE(${saldo}, saldo),
             ativo = COALESCE(${ativo}, ativo)
         WHERE id = ${id}

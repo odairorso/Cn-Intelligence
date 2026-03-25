@@ -19,10 +19,10 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const { uid, nome, saldo, ativo } = req.body;
+      const { uid, nome, agencia, conta, saldo, ativo } = req.body;
       const rows = await sql`
-        INSERT INTO banks (uid, nome, saldo, ativo)
-        VALUES (${uid || 'guest'}, ${nome}, ${saldo || 0}, ${ativo !== false})
+        INSERT INTO banks (uid, nome, agencia, conta, saldo, ativo)
+        VALUES (${uid || 'guest'}, ${nome}, ${agencia || null}, ${conta || null}, ${saldo || 0}, ${ativo !== false})
         RETURNING *`;
       return res.status(201).json(rows[0]);
     } catch (e) {

@@ -46,6 +46,8 @@ export interface Bank {
   id: string;
   uid: string;
   nome: string;
+  agencia?: string;
+  conta?: string;
   saldo: number;
   ativo: boolean;
 }
