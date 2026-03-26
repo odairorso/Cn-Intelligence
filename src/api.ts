@@ -13,6 +13,7 @@ export interface Transaction {
   observacao?: string;
   banco?: string;
   tipo?: string;
+  juros?: number;
 }
 
 export interface Supplier {

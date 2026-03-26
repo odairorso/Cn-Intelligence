@@ -31,6 +31,9 @@ export default async function handler(req, res) {
       // Add tipo column (RECEITA/DESPESA) to transactions if not exists
       await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS tipo VARCHAR(10) DEFAULT 'DESPESA'`;
 
+      // Add juros column to transactions if not exists
+      await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS juros NUMERIC DEFAULT 0`;
+
       // Create banks index if not exists
       await sql`CREATE INDEX IF NOT EXISTS idx_banks_uid ON banks(uid)`;
 
