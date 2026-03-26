@@ -368,49 +368,91 @@ app.post('/api/extract-boleto', async (req, res) => {
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-    // Server-side PDF text extraction using pdf-parse
+    // Server-side PDF text extraction using pdfjs-dist
     let extractedText = text || '';
     if (pdfBase64 && !extractedText) {
       try {
-        const pdfParse = (await import('pdf-parse')).default;
+        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
         const pdfBuffer = Buffer.from(pdfBase64, 'base64');
-        const pdfData = await pdfParse(pdfBuffer);
-        extractedText = pdfData.text || '';
-        console.log(`[boleto] PDF parse: ${extractedText.length} chars from ${fileName}`);
+        const uint8 = new Uint8Array(pdfBuffer);
+        const pdf = await pdfjsLib.default.getDocument({ data: uint8 }).promise;
+        let fullText = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          fullText += textContent.items.map(item => item.str).join(' ') + '\n';
+        }
+        extractedText = fullText.trim();
+        console.log(`[boleto] pdfjs-dist: ${extractedText.length} chars from ${fileName}`);
       } catch (parseErr) {
-        console.error('[boleto] pdf-parse failed:', parseErr.message);
+        console.error('[boleto] pdfjs-dist failed:', parseErr.message);
       }
     }
 
-    const prompt = `Você é um especialista em extrair dados de boletos bancários brasileiros.
+    const hasText = extractedText.length > 10;
+
+    // Build prompt based on whether we have extracted text
+    let prompt;
+    if (hasText) {
+      prompt = `Você é um especialista em extrair dados de boletos bancários brasileiros.
 Analise o texto abaixo extraído de um PDF de boleto bancário e extraia os campos solicitados.
 
-${extractedText ? `TEXTO DO PDF:\n${extractedText}` : 'Nenhum texto disponível.'}
+TEXTO DO PDF:
+${extractedText}
+
 Nome do arquivo: ${fileName || 'N/A'}
 
 Extraia os seguintes campos:
-1. fornecedor: Nome do beneficiário/empresa que emitiu o boleto. Procure por campos como "Beneficiário", "Cedente", "Razão Social". Se não encontrar, use o nome do arquivo.
-2. vencimento: Data de vencimento no formato DD/MM/AAAA. Procure por "Vencimento", "Vcto", "Data de Vencimento".
+1. fornecedor: Nome do beneficiário/empresa que emitiu o boleto. Procure por "Beneficiário", "Cedente", "Razão Social". Se não encontrar, use o nome do arquivo.
+2. vencimento: Data de vencimento no formato DD/MM/AAAA. Procure por "Vencimento", "Vcto".
 3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal). Procure por "Valor", "Valor do Documento", "Valor Cobrado", "Vlr Pagar".
 4. cnpj: CNPJ do beneficiário se disponível.
 5. descricao: Descrição do serviço ou referência do boleto.
 6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR). Se não identificar, deixe vazio.
 
 Responda APENAS com JSON válido:
-{
-  "fornecedor": "",
-  "vencimento": "",
-  "valor": 0,
-  "cnpj": "",
-  "descricao": "",
-  "empresa": ""
-}`;
+{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":""}`;
+    } else {
+      // No text extracted - PDF is likely scanned image
+      // Send PDF directly to Gemini as inline data for visual analysis
+      prompt = `Você é um especialista em extrair dados de boletos bancários brasileiros.
+Analise visualmente o PDF de boleto bancário anexo (pode ser uma imagem/scan) e extraia os campos abaixo.
 
-    console.log(`[boleto] Enviando para Gemini: ${extractedText.length} chars de texto, fileName: ${fileName}`);
+Nome do arquivo: ${fileName || 'N/A'}
+
+Extraia os seguintes campos:
+1. fornecedor: Nome do beneficiário/empresa que emitiu o boleto.
+2. vencimento: Data de vencimento no formato DD/MM/AAAA.
+3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal).
+4. cnpj: CNPJ do beneficiário se disponível.
+5. descricao: Descrição do serviço ou referência do boleto.
+6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR). Se não identificar, deixe vazio.
+
+Responda APENAS com JSON válido:
+{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":""}`;
+    }
+
+    console.log(`[boleto] Gemini: text=${extractedText.length} chars, hasText=${hasText}, file=${fileName}`);
+
+    let contents;
+    if (!hasText && pdfBase64) {
+      // Send PDF as inline data for Gemini to read visually
+      contents = [
+        { text: prompt },
+        {
+          inlineData: {
+            mimeType: 'application/pdf',
+            data: pdfBase64,
+          },
+        },
+      ];
+    } else {
+      contents = prompt;
+    }
 
     const response = await ai.models.generateContent({
       model: 'gemini-1.5-flash',
-      contents: prompt,
+      contents,
       config: {
         responseMimeType: 'application/json',
         temperature: 0.1,
@@ -418,7 +460,7 @@ Responda APENAS com JSON válido:
     });
 
     let rawText = response.text;
-    console.log(`[boleto] Gemini response: ${rawText?.slice(0, 500)}`);
+    console.log(`[boleto] Gemini response: ${rawText?.slice(0, 300)}`);
     if (rawText) {
       rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
     }
@@ -452,7 +494,6 @@ Responda APENAS com JSON válido:
   } catch (error) {
     console.error('[boleto] Error extracting boleto data:', error.message);
     console.error('[boleto] Stack:', error.stack);
-    // Fallback: return basic data from filename
     const { fileName } = req.body;
     let fornecedor = 'Fornecedor não identificado';
     if (fileName) {
