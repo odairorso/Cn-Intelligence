@@ -361,18 +361,19 @@ app.delete('/api/clean-suspicious', async (req, res) => {
 // Boleto PDF extraction with Gemini AI
 app.post('/api/extract-boleto', async (req, res) => {
   try {
-    const { text, fileName } = req.body;
-    if (!text && !fileName) {
-      return res.status(400).json({ error: 'text or fileName required' });
+    const { text, fileName, pdfBase64 } = req.body;
+    if (!text && !fileName && !pdfBase64) {
+      return res.status(400).json({ error: 'text, fileName or pdfBase64 required' });
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-    const prompt = `Você é um especialista em extrair dados de boletos bancários brasileiros.
-Analise o texto abaixo extraído de um PDF de boleto e também o nome do arquivo.
+    let contents;
+    const textInstruction = `Você é um especialista em extrair dados de boletos bancários brasileiros.
+Analise o PDF de boleto anexo (ou o texto extraído abaixo) e o nome do arquivo.
 Extraia os seguintes campos:
 
-1. fornecedor: Nome do beneficiário/empresa que emitiu o boleto. Se não encontrar no texto, use o nome do arquivo como referência.
+1. fornecedor: Nome do beneficiário/empresa que emitiu o boleto. Se não encontrar, use o nome do arquivo como referência.
 2. vencimento: Data de vencimento no formato DD/MM/AAAA
 3. valor: Valor do boleto (apenas número, usar ponto como decimal)
 4. cnpj: CNPJ do beneficiário se disponível
@@ -381,8 +382,7 @@ Extraia os seguintes campos:
 
 Nome do arquivo: ${fileName || 'N/A'}
 
-Texto extraído do PDF:
-${text || 'N/A'}
+${text ? `Texto extraído do PDF:\n${text}` : 'Nenhum texto extraído - analise o PDF anexo.'}
 
 Responda APENAS com JSON válido no formato:
 {
@@ -394,9 +394,23 @@ Responda APENAS com JSON válido no formato:
   "empresa": ""
 }`;
 
+    if (pdfBase64) {
+      contents = [
+        { text: textInstruction },
+        {
+          inlineData: {
+            mimeType: 'application/pdf',
+            data: pdfBase64,
+          },
+        },
+      ];
+    } else {
+      contents = textInstruction;
+    }
+
     const response = await ai.models.generateContent({
       model: 'gemini-1.5-flash',
-      contents: prompt,
+      contents,
       config: {
         responseMimeType: 'application/json',
         temperature: 0.1,

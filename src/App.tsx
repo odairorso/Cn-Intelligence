@@ -2946,12 +2946,12 @@ export default function App() {
     };
   };
 
-  const extractBoletoWithGemini = async (text: string, fileName: string): Promise<PdfImportDraft> => {
+  const extractBoletoWithGemini = async (text: string, fileName: string, pdfBase64?: string): Promise<PdfImportDraft> => {
     try {
       const response = await fetch('/api/extract-boleto', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, fileName }),
+        body: JSON.stringify({ text, fileName, pdfBase64 }),
       });
       if (!response.ok) throw new Error('API error');
       const data = await response.json();
@@ -2993,21 +2993,34 @@ export default function App() {
 
       for (const file of pdfFiles) {
         const arrayBuffer = await file.arrayBuffer();
-        let pdf: any;
-        try {
-          pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        } catch {
-          pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true } as any).promise;
+
+        // Convert PDF to base64 for Gemini direct reading
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
         }
+        const pdfBase64 = btoa(binary);
+
+        // Also try to extract text with PDF.js as fallback
         let fullText = '';
-
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
+        try {
+          let pdf: any;
+          try {
+            pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          } catch {
+            pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true } as any).promise;
+          }
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
+          }
+        } catch {
+          // PDF.js failed (likely scanned image), rely on Gemini direct reading
         }
 
-        const data = await extractBoletoWithGemini(fullText, file.name);
+        const data = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
         data.fornecedor = resolveSupplierName(data.fornecedor, fullText);
         const key = boletoDuplicateKey(data.fornecedor, data.vencimento, data.valor);
         data.duplicate = existingKeys.has(key) || batchKeys.has(key);
