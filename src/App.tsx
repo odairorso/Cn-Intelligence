@@ -2852,12 +2852,16 @@ export default function App() {
       if (direct) return direct.nome;
     }
 
-    const byText = suppliers
-      .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
-      .filter((x) => x.key.length >= 5 && normalizedSource.includes(x.key))
-      .sort((a, b) => b.key.length - a.key.length)[0];
+    // Only search text for supplier name if Gemini didn't find a specific one
+    if (!validDetected || validDetected === 'Fornecedor não identificado') {
+      const byText = suppliers
+        .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
+        .filter((x) => x.key.length >= 5 && normalizedSource.includes(x.key))
+        .sort((a, b) => b.key.length - a.key.length)[0];
 
-    if (byText) return byText.supplier.nome;
+      if (byText) return byText.supplier.nome;
+    }
+
     return validDetected || 'Fornecedor não identificado';
   };
 
