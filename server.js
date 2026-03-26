@@ -214,7 +214,8 @@ app.put('/api/transactions/:id', async (req, res) => {
       ...tx,
       vencimento: tx.vencimento ? new Date(tx.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
       pagamento: tx.pagamento ? new Date(tx.pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
-      valor: Number(tx.valor)
+      valor: Number(tx.valor),
+      juros: Number(tx.juros || 0),
     });
   } catch (error) {
     console.error('Error updating transaction:', error);

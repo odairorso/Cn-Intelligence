@@ -31,6 +31,7 @@ export default async function handler(req, res) {
         vencimento: tx.vencimento ? new Date(tx.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
         pagamento: tx.pagamento ? new Date(tx.pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
         valor: Number(tx.valor),
+        juros: Number(tx.juros || 0),
       });
     } catch (e) {
       console.error(e);
