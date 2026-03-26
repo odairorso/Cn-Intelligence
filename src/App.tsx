@@ -166,7 +166,10 @@ const isSupplierMatch = (transactionSupplier: string, supplierName: string) => {
   const sp = normalizeSupplierName(supplierName);
   if (!tx || !sp) return false;
   if (tx === sp) return true;
-  if (tx.includes(sp) || sp.includes(tx)) return true;
+  // Substring match only for names >= 5 chars to avoid false positives like TIM inside EMPRESTIMO
+  if (tx.length >= 5 && sp.length >= 5 && (tx.includes(sp) || sp.includes(tx))) return true;
+  if (tx.length >= 5 && sp.includes(tx)) return true;
+  if (sp.length >= 5 && tx.includes(sp)) return true;
   if (tx.slice(0, 3) !== sp.slice(0, 3)) return false;
   return levenshteinDistance(tx, sp) <= 2;
 };
