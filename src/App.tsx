@@ -2432,21 +2432,28 @@ const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxM
                 onChange={e => setFormData({...formData, valor: e.target.value})}
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Juros (R$)</label>
-              <input 
-                type="number" step="0.01"
-                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
-                value={formData.juros || ''}
-                placeholder="0,00"
-                onChange={e => setFormData({...formData, juros: Number(e.target.value) || 0})}
-              />
-              {formData.juros > 0 && (
-                <p className="text-[10px] text-tertiary mt-1 font-bold">
-                  Total: R$ {(Number(formData.valor) + Number(formData.juros)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-              )}
-            </div>
+            {formData.status === 'PAGO' && (
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor Pago (R$)</label>
+                <input 
+                  type="number" step="0.01"
+                  className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                  value={formData.valorPago || ''}
+                  placeholder={formData.valor}
+                  onChange={e => {
+                    const valorPago = Number(e.target.value) || 0;
+                    const valorOriginal = Number(formData.valor) || 0;
+                    const jurosCalculado = Math.max(0, valorPago - valorOriginal);
+                    setFormData({...formData, valorPago: valorPago, juros: jurosCalculado});
+                  }}
+                />
+                {formData.juros > 0 && (
+                  <p className="text-[10px] text-tertiary mt-1 font-bold">
+                    Juros: R$ {Number(formData.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           {formData.status === 'PAGO' && (
             <div>
