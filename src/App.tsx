@@ -874,7 +874,10 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, deleteTransaction, setShow
                   <td className="px-8 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
                   <td className="px-8 py-4 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold">{tx.banco || '-'}</td>
                   <td className={cn("px-8 py-4 font-bold", tx.valor < 0 ? "text-tertiary" : "text-primary")}>
-                    {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {(tx.valor + (tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {tx.juros > 0 && (
+                      <p className="text-[9px] text-tertiary font-normal">(inclui {tx.juros.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} juros)</p>
+                    )}
                   </td>
                   <td className="px-8 py-4">
                     <span className={cn(
