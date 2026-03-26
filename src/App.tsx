@@ -2367,15 +2367,16 @@ const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxM
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Empresa</label>
               <select 
-                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+                style={{ backgroundColor: '#161b2a' }}
                 value={formData.empresa}
                 onChange={e => setFormData({...formData, empresa: e.target.value})}
               >
-                <option>CN</option>
-                <option>FACEMS</option>
-                <option>LAB</option>
-                <option>CEI</option>
-                <option>UNOPAR</option>
+                <option className="bg-[#161b2a] text-on-surface">CN</option>
+                <option className="bg-[#161b2a] text-on-surface">FACEMS</option>
+                <option className="bg-[#161b2a] text-on-surface">LAB</option>
+                <option className="bg-[#161b2a] text-on-surface">CEI</option>
+                <option className="bg-[#161b2a] text-on-surface">UNOPAR</option>
               </select>
             </div>
             <div>
