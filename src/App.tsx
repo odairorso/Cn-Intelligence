@@ -863,7 +863,7 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, deleteTransaction, setShow
                 <th className="px-8 py-4">Conta</th>
                 <th className="px-8 py-4">Valor</th>
                 <th className="px-8 py-4">Status</th>
-                <th className="px-8 py-4 sticky right-0 bg-[#0f1115] z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)]">Ações</th>
+                <th className="px-8 py-4 sticky right-0 bg-surface z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)]">Ações</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-white/5">
@@ -892,7 +892,7 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, deleteTransaction, setShow
                       {tx.status}
                     </span>
                   </td>
-                  <td className="px-8 py-4 sticky right-0 bg-[#0f1115] z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] group-hover:bg-[#1a1c23] transition-colors">
+                  <td className="px-8 py-4 sticky right-0 bg-surface z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] group-hover:bg-surface-variant/20 transition-colors">
                     <div className="flex gap-2 justify-end">
                       {tx.status !== 'PAGO' && (
                         <button
@@ -3969,14 +3969,15 @@ export default function App() {
                         <select
                           value={row.empresa}
                           onChange={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, empresa: e.target.value } : item))}
-                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary text-on-surface"
+                          style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}
                         >
-                          <option value="">Selecione</option>
-                          <option value="CN">CN</option>
-                          <option value="FACEMS">FACEMS</option>
-                          <option value="LAB">LAB</option>
-                          <option value="CEI">CEI</option>
-                          <option value="UNOPAR">UNOPAR</option>
+                          <option value="" style={{ backgroundColor: '#1e1e2e' }}>Selecione</option>
+                          <option value="CN" style={{ backgroundColor: '#1e1e2e' }}>CN</option>
+                          <option value="FACEMS" style={{ backgroundColor: '#1e1e2e' }}>FACEMS</option>
+                          <option value="LAB" style={{ backgroundColor: '#1e1e2e' }}>LAB</option>
+                          <option value="CEI" style={{ backgroundColor: '#1e1e2e' }}>CEI</option>
+                          <option value="UNOPAR" style={{ backgroundColor: '#1e1e2e' }}>UNOPAR</option>
                         </select>
                       </div>
                       {row.cnpj && (
