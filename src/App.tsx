@@ -2953,20 +2953,31 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, fileName, pdfBase64 }),
       });
-      if (!response.ok) throw new Error('API error');
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
       const data = await response.json();
-      return {
-        fileName,
-        fornecedor: data.fornecedor || 'Fornecedor não identificado',
-        vencimento: data.vencimento || '',
-        valor: typeof data.valor === 'number' ? data.valor : 0,
-        descricao: data.descricao || '',
-        empresa: data.empresa || '',
-        cnpj: data.cnpj || '',
-        rawText: text.slice(0, 500),
-        duplicate: false,
-      };
-    } catch {
+      console.log('[boleto] Gemini response:', data);
+
+      const hasValidData = data.fornecedor && data.fornecedor !== 'Fornecedor não identificado' && (data.valor > 0 || data.vencimento);
+
+      if (hasValidData) {
+        return {
+          fileName,
+          fornecedor: data.fornecedor || 'Fornecedor não identificado',
+          vencimento: data.vencimento || '',
+          valor: typeof data.valor === 'number' ? data.valor : 0,
+          descricao: data.descricao || '',
+          empresa: data.empresa || '',
+          cnpj: data.cnpj || '',
+          rawText: text.slice(0, 500),
+          duplicate: false,
+        };
+      }
+
+      console.log('[boleto] Gemini returned empty data, using local fallback');
+      const fallback = extractBoletoData(text, fileName);
+      return { ...fallback, descricao: data.descricao || '', empresa: data.empresa || '', cnpj: data.cnpj || '' };
+    } catch (err) {
+      console.error('[boleto] API error, using local fallback:', err);
       const fallback = extractBoletoData(text, fileName);
       return { ...fallback, descricao: '', empresa: '', cnpj: '' };
     }
@@ -3016,8 +3027,9 @@ export default function App() {
             const textContent = await page.getTextContent();
             fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
           }
-        } catch {
-          // PDF.js failed (likely scanned image), rely on Gemini direct reading
+          console.log(`[boleto] PDF.js extracted ${fullText.length} chars from ${file.name}:`, fullText.slice(0, 200));
+        } catch (pdfErr) {
+          console.log(`[boleto] PDF.js failed for ${file.name}, relying on server-side extraction:`, pdfErr);
         }
 
         const data = await extractBoletoWithGemini(fullText, file.name, pdfBase64);

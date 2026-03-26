@@ -25,22 +25,35 @@ export default async function handler(req, res) {
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-    const textInstruction = `Você é um especialista em extrair dados de boletos bancários brasileiros.
-Analise o PDF de boleto anexo (ou o texto extraído abaixo) e o nome do arquivo.
-Extraia os seguintes campos:
+    // Try server-side PDF text extraction
+    let extractedText = text || '';
+    if (pdfBase64 && !extractedText) {
+      try {
+        const pdfParse = (await import('pdf-parse')).default;
+        const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+        const pdfData = await pdfParse(pdfBuffer);
+        extractedText = pdfData.text || '';
+        console.log(`[boleto] PDF parse: ${extractedText.length} chars from ${fileName}`);
+      } catch (parseErr) {
+        console.error('[boleto] pdf-parse failed:', parseErr.message);
+      }
+    }
 
-1. fornecedor: Nome do beneficiário/empresa que emitiu o boleto. Se não encontrar, use o nome do arquivo como referência.
-2. vencimento: Data de vencimento no formato DD/MM/AAAA
-3. valor: Valor do boleto (apenas número, usar ponto como decimal)
-4. cnpj: CNPJ do beneficiário se disponível
-5. descricao: Descrição do serviço/produto, ou o que o boleto se refere
-6. empresa: Qual empresa do grupo CN o boleto pertence (CN, FACEMS, LAB, CEI, UNOPAR). Se não identificar, deixe vazio.
+    const prompt = `Você é um especialista em extrair dados de boletos bancários brasileiros.
+Analise o texto abaixo extraído de um PDF de boleto bancário e extraia os campos solicitados.
 
+${extractedText ? `TEXTO DO PDF:\n${extractedText}` : 'Nenhum texto disponível.'}
 Nome do arquivo: ${fileName || 'N/A'}
 
-${text ? `Texto extraído do PDF:\n${text}` : 'Nenhum texto extraído - analise o PDF anexo.'}
+Extraia os seguintes campos:
+1. fornecedor: Nome do beneficiário/empresa que emitiu o boleto. Procure por campos como "Beneficiário", "Cedente", "Razão Social". Se não encontrar, use o nome do arquivo.
+2. vencimento: Data de vencimento no formato DD/MM/AAAA. Procure por "Vencimento", "Vcto", "Data de Vencimento".
+3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal). Procure por "Valor", "Valor do Documento", "Valor Cobrado", "Vlr Pagar".
+4. cnpj: CNPJ do beneficiário se disponível.
+5. descricao: Descrição do serviço ou referência do boleto.
+6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR). Se não identificar, deixe vazio.
 
-Responda APENAS com JSON válido no formato:
+Responda APENAS com JSON válido:
 {
   "fornecedor": "",
   "vencimento": "",
@@ -50,24 +63,9 @@ Responda APENAS com JSON válido no formato:
   "empresa": ""
 }`;
 
-    let contents;
-    if (pdfBase64) {
-      contents = [
-        { text: textInstruction },
-        {
-          inlineData: {
-            mimeType: 'application/pdf',
-            data: pdfBase64,
-          },
-        },
-      ];
-    } else {
-      contents = textInstruction;
-    }
-
     const response = await ai.models.generateContent({
       model: 'gemini-1.5-flash',
-      contents,
+      contents: prompt,
       config: {
         responseMimeType: 'application/json',
         temperature: 0.1,
@@ -99,7 +97,6 @@ Responda APENAS com JSON válido no formato:
     // Fallback: extract fornecedor from filename if AI didn't find it
     if (!extracted.fornecedor || extracted.fornecedor === '' || extracted.fornecedor.toLowerCase() === 'não identificado') {
       if (fileName) {
-        // Remove extension and common prefixes
         let name = fileName.replace(/\.pdf$/i, '').replace(/^(BOL|BOLETO|MAT)\s*/i, '').trim();
         extracted.fornecedor = name;
       }
@@ -107,8 +104,7 @@ Responda APENAS com JSON válido no formato:
 
     res.status(200).json(extracted);
   } catch (error) {
-    console.error('Error extracting boleto data:', error.message);
-    // Fallback: return basic data from filename
+    console.error('[boleto] Error extracting boleto data:', error.message);
     const { fileName } = req.body;
     let fornecedor = 'Fornecedor não identificado';
     if (fileName) {
