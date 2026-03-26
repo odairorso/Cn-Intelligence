@@ -185,7 +185,7 @@ app.post('/api/transactions', async (req, res) => {
 app.put('/api/transactions/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo } = req.body;
+    const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, juros } = req.body;
     
     const pDate = pagamento ? pagamento.split('/').reverse().join('-') : null;
     const vDate = vencimento ? vencimento.split('/').reverse().join('-') : null;
@@ -201,9 +201,10 @@ app.put('/api/transactions/:id', async (req, res) => {
         valor = $7,
         banco = $8,
         tipo = $9,
+        juros = $10,
         updated_at = NOW()
-      WHERE id = $10 RETURNING *`,
-      [status, pDate, fornecedor, descricao, empresa, vDate, valor, banco, tipo || 'DESPESA', id]
+      WHERE id = $11 RETURNING *`,
+      [status, pDate, fornecedor, descricao, empresa, vDate, valor, banco, tipo || 'DESPESA', juros || 0, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     

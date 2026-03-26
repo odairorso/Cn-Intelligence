@@ -2288,6 +2288,7 @@ const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxM
     valor: transaction.valor.toString(),
     banco: transaction.banco || '',
     tipo: transaction.tipo || 'DESPESA',
+    juros: transaction.juros || 0,
   });
 
   useEffect(() => {
@@ -2298,6 +2299,7 @@ const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxM
       valor: transaction.valor.toString(),
       banco: transaction.banco || '',
       tipo: transaction.tipo || 'DESPESA',
+      juros: transaction.juros || 0,
     });
   }, [transaction]);
 
@@ -2426,6 +2428,21 @@ const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxM
                 value={formData.valor}
                 onChange={e => setFormData({...formData, valor: e.target.value})}
               />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Juros (R$)</label>
+              <input 
+                type="number" step="0.01"
+                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                value={formData.juros || ''}
+                placeholder="0,00"
+                onChange={e => setFormData({...formData, juros: Number(e.target.value) || 0})}
+              />
+              {formData.juros > 0 && (
+                <p className="text-[10px] text-tertiary mt-1 font-bold">
+                  Total: R$ {(Number(formData.valor) + Number(formData.juros)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              )}
             </div>
           </div>
           {formData.status === 'PAGO' && (
