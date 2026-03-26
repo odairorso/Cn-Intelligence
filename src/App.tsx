@@ -119,24 +119,32 @@ const normalizeCompanyKey = (value: string) => {
 };
 
 const isRevenueTransaction = (tx: Pick<Transaction, 'fornecedor' | 'descricao'>) => {
-  const text = normalizeSupplierName(`${tx.fornecedor} ${tx.descricao}`);
+  const fornecedor = normalizeSupplierName(tx.fornecedor);
+  const descricao = normalizeSupplierName(tx.descricao);
   
-  // Receita Federal é imposto (despesa), nunca receita.
-  if (text.includes('RECEITA FEDERAL')) return false;
+  // Fornecedores conhecidos são sempre despesa, nunca receita
+  if (fornecedor.includes('RECEITA FEDERAL')) return false;
+  if (fornecedor.includes('ANHANGUERA')) return false;
+  if (fornecedor.includes('EDUBOT')) return false;
+  if (fornecedor.includes('EDITORADISTRIBUIDORA')) return false;
+  if (fornecedor.includes('ENERGISA')) return false;
+  if (fornecedor.includes('SANESUL')) return false;
+  if (fornecedor.includes('CLARO')) return false;
+  if (fornecedor.includes('VIVO')) return false;
+  if (fornecedor.includes('TIM')) return false;
 
+  // Palavras-chave na descrição que indicam receita
   return (
-    text.includes('REPASSE') ||
-    text.includes('MENSALIDADE') ||
-    text.includes('ENTRADA') ||
-    text.includes('CREDITO') ||
-    text.includes('EDUCBANK') ||
-    text.includes('KROTON') ||
-    text.includes('ANHANGUERA') ||
-    text.includes('ADIANTAMENTO') ||
-    text.includes('CHEQUE') ||
-    text.includes('PERMUTA') ||
-    text.includes('CARTAO CREDITO') ||
-    text.includes('REDE')
+    descricao.includes('REPASSE') ||
+    descricao.includes('MENSALIDADE') ||
+    descricao.includes('ENTRADA') ||
+    descricao.includes('CREDITO') ||
+    descricao.includes('EDUCBANK') ||
+    descricao.includes('KROTON') ||
+    descricao.includes('ADIANTAMENTO') ||
+    descricao.includes('CHEQUE') ||
+    descricao.includes('PERMUTA') ||
+    descricao.includes('REDE FEMENINA')
   );
 };
 
