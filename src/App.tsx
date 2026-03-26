@@ -29,7 +29,8 @@ import {
   RefreshCw,
   CreditCard,
   FileUp,
-  Loader2
+  Loader2,
+  Printer
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, 
@@ -1101,6 +1102,7 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
 
   const [selectedMonth, setSelectedMonth] = useState<string>('TODOS');
   const [selectedCompany, setSelectedCompany] = useState<string>('TODOS');
+  const [selectedTipo, setSelectedTipo] = useState<string>('TODOS');
 
   const companies = useMemo(() => {
     const map = new Map<string, string>();
@@ -1121,48 +1123,129 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
       const matchesYear = selectedYear === 'TODOS' || year === selectedYear;
       const matchesMonth = selectedMonth === 'TODOS' || month === selectedMonth;
       const matchesCompany = selectedCompany === 'TODOS' || normalizeCompanyKey(tx.empresa) === selectedCompany;
-      return matchesYear && matchesMonth && matchesCompany;
+      const txTipo = tx.tipo || (isRevenueTransaction(tx) ? 'RECEITA' : 'DESPESA');
+      const matchesTipo = selectedTipo === 'TODOS' || txTipo === selectedTipo;
+      return matchesYear && matchesMonth && matchesCompany && matchesTipo;
     });
-  }, [transactions, selectedYear, selectedMonth, selectedCompany]);
-
-  const monthlyData = useMemo(() => {
-    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    const data = Array.from({ length: 12 }, (_, i) => ({ name: months[i], value: 0 }));
-    for (const tx of filteredData) {
-      if (isRevenueTransaction(tx)) continue;
-      const parts = tx.vencimento.includes('/') ? tx.vencimento.split('/') : tx.vencimento.split('-');
-      const m = tx.vencimento.includes('/') ? parts[1] : parts[1];
-      const idx = parseInt(m, 10) - 1;
-      if (idx >= 0 && idx < 12) data[idx].value += tx.valor;
-    }
-    return data;
-  }, [filteredData]);
-
-  const companyData = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const tx of filteredData) {
-      if (isRevenueTransaction(tx)) continue;
-      const companyKey = normalizeCompanyKey(tx.empresa);
-      map.set(companyKey, (map.get(companyKey) || 0) + tx.valor);
-    }
-    return Array.from(map.entries())
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
-  }, [filteredData]);
+  }, [transactions, selectedYear, selectedMonth, selectedCompany, selectedTipo]);
 
   const periodTotals = useMemo(() => {
-    let receitas = 0;
-    let despesas = 0;
+    let total = 0;
+    let jurosTotal = 0;
     for (const tx of filteredData) {
-      if (isRevenueTransaction(tx)) receitas += tx.valor;
-      else despesas += tx.valor;
+      total += Number(tx.valor) + Number(tx.juros || 0);
+      jurosTotal += Number(tx.juros || 0);
     }
-    return { receitas, despesas, saldo: receitas - despesas };
+    return { total, jurosTotal, count: filteredData.length };
   }, [filteredData]);
+
+  const monthLabel = useMemo(() => {
+    const months: Record<string, string> = { '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril', '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto', '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro' };
+    return selectedMonth === 'TODOS' ? 'Todos os Meses' : months[selectedMonth] || selectedMonth;
+  }, [selectedMonth]);
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const tipoLabel = selectedTipo === 'TODOS' ? 'Fluxo de Caixa' : selectedTipo === 'RECEITA' ? 'Relatório de Receitas' : 'Relatório de Despesas';
+    const now = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    const rows = filteredData.map((tx, i) => {
+      const valorTotal = Number(tx.valor) + Number(tx.juros || 0);
+      return `<tr>
+        <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${i + 1}</td>
+        <td style="padding:6px 8px;border:1px solid #ccc">${tx.fornecedor}</td>
+        <td style="padding:6px 8px;border:1px solid #ccc">${tx.descricao || '-'}</td>
+        <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${tx.empresa || '-'}</td>
+        <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${tx.vencimento}</td>
+        <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${tx.pagamento || '-'}</td>
+        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right">${Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}</td>
+        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right;font-weight:bold">${valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+        <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${tx.status}</td>
+      </tr>`;
+    }).join('');
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>${tipoLabel} - ${monthLabel}/${selectedYear}</title>
+  <style>
+    @page { margin: 2cm 2.5cm; size: A4 landscape; }
+    body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; line-height: 1.5; }
+    h1 { text-align: center; font-size: 14pt; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; }
+    .subtitle { text-align: center; font-size: 11pt; margin-bottom: 6px; color: #333; }
+    .info { text-align: center; font-size: 10pt; margin-bottom: 20px; color: #666; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10pt; }
+    th { background: #f0f0f0; padding: 8px; border: 1px solid #ccc; text-align: left; font-weight: bold; text-transform: uppercase; font-size: 9pt; }
+    .total-row td { font-weight: bold; background: #f9f9f9; }
+    .footer { margin-top: 30px; font-size: 9pt; color: #666; text-align: center; }
+    .signature { margin-top: 60px; text-align: center; }
+    .signature-line { width: 300px; border-top: 1px solid #000; margin: 0 auto; padding-top: 4px; font-size: 10pt; }
+  </style>
+</head>
+<body>
+  <h1>${tipoLabel}</h1>
+  <p class="subtitle">Colégio Naviraí - Grupo CN</p>
+  <p class="info">Período: ${monthLabel} de ${selectedYear} | Empresa: ${selectedCompany === 'TODOS' ? 'Todas' : selectedCompany} | Emitido em: ${now}</p>
+  
+  <table>
+    <thead>
+      <tr>
+        <th style="width:30px;text-align:center">#</th>
+        <th>Fornecedor</th>
+        <th>Descrição</th>
+        <th style="text-align:center">Empresa</th>
+        <th style="text-align:center">Vencimento</th>
+        <th style="text-align:center">Pagamento</th>
+        <th style="text-align:right">Valor</th>
+        <th style="text-align:right">Juros</th>
+        <th style="text-align:right">Total</th>
+        <th style="text-align:center">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+      <tr class="total-row">
+        <td colspan="6" style="padding:8px;border:1px solid #ccc;text-align:right">TOTAL GERAL</td>
+        <td style="padding:8px;border:1px solid #ccc;text-align:right">${filteredData.reduce((a,tx) => a + Number(tx.valor), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+        <td style="padding:8px;border:1px solid #ccc;text-align:right">${periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}</td>
+        <td style="padding:8px;border:1px solid #ccc;text-align:right;font-weight:bold">${periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+        <td style="padding:8px;border:1px solid #ccc;text-align:center">${periodTotals.count} itens</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <p>Relatório gerado automaticamente pelo sistema Fluxo de Caixa CN</p>
+  </div>
+  <div class="signature">
+    <div class="signature-line">Responsável</div>
+  </div>
+</body>
+</html>`);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+  };
 
   return (
     <div className="space-y-8">
       <div className="glass-card p-6 flex flex-wrap gap-4 items-end">
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase">Tipo</label>
+          <select 
+            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+            style={{ backgroundColor: '#1e1e2e' }}
+            value={selectedTipo}
+            onChange={e => setSelectedTipo(e.target.value)}
+          >
+            <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
+            <option value="RECEITA" className="bg-surface text-on-surface">Receitas</option>
+            <option value="DESPESA" className="bg-surface text-on-surface">Despesas</option>
+          </select>
+        </div>
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-on-surface-variant uppercase">Ano</label>
           <select 
@@ -1208,69 +1291,28 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
           </select>
         </div>
         <div className="flex-grow"></div>
+        <button
+          onClick={handlePrint}
+          className="bg-primary text-background px-5 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-primary-dark transition-all whitespace-nowrap"
+        >
+          <Printer size={16} /> Imprimir / PDF
+        </button>
         <div className="text-right">
-          <p className="text-[10px] font-bold text-on-surface-variant uppercase">Despesas no Período</p>
-          <p className="text-xl font-bold text-primary">
-            {periodTotals.despesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          <p className="text-[10px] font-bold text-on-surface-variant uppercase">
+            {selectedTipo === 'RECEITA' ? 'Receitas' : selectedTipo === 'DESPESA' ? 'Despesas' : 'Total'} no Período
           </p>
-          <p className="text-[11px] text-on-surface-variant mt-1">Receitas: {periodTotals.receitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-          <p className={cn("text-[11px] font-semibold", periodTotals.saldo >= 0 ? "text-primary" : "text-tertiary")}>Saldo: {periodTotals.saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="glass-card p-8 min-h-[400px]">
-          <h4 className="text-lg font-bold font-headline mb-6">Despesas Mensais ({selectedYear})</h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-              <XAxis dataKey="name" stroke="#c6c6cd" fontSize={10} axisLine={false} tickLine={false} />
-              <YAxis 
-                stroke="#c6c6cd" 
-                fontSize={10} 
-                axisLine={false} 
-                tickLine={false}
-                tickFormatter={(value) => `R$ ${value >= 1000 ? (value/1000).toFixed(0) + 'k' : value}`}
-              />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#161b2a', border: 'none', borderRadius: '8px' }}
-                itemStyle={{ color: '#dee2f7' }}
-                formatter={(value: number) => [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Valor']}
-              />
-              <Area type="monotone" dataKey="value" stroke="#10b981" fill="#10b98120" strokeWidth={3} />
-
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="glass-card p-8 min-h-[400px]">
-          <h4 className="text-lg font-bold font-headline mb-6">Despesas por Empresa</h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={companyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-              <XAxis dataKey="name" stroke="#c6c6cd" fontSize={10} axisLine={false} tickLine={false} />
-              <YAxis 
-                stroke="#c6c6cd" 
-                fontSize={10} 
-                axisLine={false} 
-                tickLine={false}
-                tickFormatter={(value) => `R$ ${value >= 1000 ? (value/1000).toFixed(0) + 'k' : value}`}
-              />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#161b2a', border: 'none', borderRadius: '8px' }}
-                itemStyle={{ color: '#dee2f7' }}
-                formatter={(value: number) => [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Valor']}
-              />
-              <Bar dataKey="value" fill="#10b981" radius={[2, 2, 0, 0]} />
-
-            </BarChart>
-          </ResponsiveContainer>
+          <p className="text-xl font-bold text-primary">
+            {periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          </p>
+          <p className="text-[11px] text-on-surface-variant mt-1">{periodTotals.count} lançamentos</p>
         </div>
       </div>
 
       <div className="glass-card overflow-hidden">
         <div className="px-6 py-4 md:px-8 md:py-6 border-b border-white/5 flex justify-between items-center">
-          <h4 className="text-base md:text-lg font-bold font-headline">Lançamentos no Período</h4>
+          <h4 className="text-base md:text-lg font-bold font-headline">
+            {selectedTipo === 'RECEITA' ? 'Receitas' : selectedTipo === 'DESPESA' ? 'Despesas' : 'Lançamentos'} no Período
+          </h4>
           <span className="text-xs text-on-surface-variant font-bold uppercase tracking-widest">
             {filteredData.length} registros
           </span>
@@ -1288,12 +1330,12 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
                 <div className="flex justify-between items-start gap-2">
                   <span className="font-semibold text-sm flex-1 leading-tight">{tx.fornecedor}</span>
                   <span className="font-bold text-sm whitespace-nowrap">
-                    {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-on-surface-variant">
+                  <span>{tx.descricao}</span>
                   <span>Venc: {tx.vencimento}</span>
-                  {tx.pagamento && <span>Pago: {tx.pagamento}</span>}
                   <span className={cn(
                     "font-bold",
                     tx.status === 'PAGO' && "text-primary",
@@ -1311,30 +1353,38 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
           <table className="w-full text-left">
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
+                <th className="px-8 py-4">#</th>
                 <th className="px-8 py-4">Fornecedor</th>
                 <th className="px-8 py-4">Descrição</th>
+                <th className="px-8 py-4">Empresa</th>
                 <th className="px-8 py-4">Vencimento</th>
                 <th className="px-8 py-4">Pagamento</th>
-                <th className="px-8 py-4">Valor</th>
+                <th className="px-8 py-4 text-right">Valor</th>
+                <th className="px-8 py-4 text-right">Juros</th>
+                <th className="px-8 py-4 text-right">Total</th>
                 <th className="px-8 py-4">Status</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-white/5">
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-8 py-12 text-center text-on-surface-variant italic">
+                  <td colSpan={10} className="px-8 py-12 text-center text-on-surface-variant italic">
                     Nenhum lançamento encontrado para os filtros selecionados.
                   </td>
                 </tr>
               ) : (
-                filteredData.map((tx) => (
+                filteredData.map((tx, i) => (
                   <tr key={tx.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-8 py-4 text-on-surface-variant text-xs">{i + 1}</td>
                     <td className="px-8 py-4 font-semibold">{tx.fornecedor}</td>
                     <td className="px-8 py-4 text-on-surface-variant">{tx.descricao}</td>
+                    <td className="px-8 py-4">{tx.empresa}</td>
                     <td className="px-8 py-4">{tx.vencimento}</td>
                     <td className="px-8 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
-                    <td className="px-8 py-4 font-bold">
-                      {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    <td className="px-8 py-4 text-right">{Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    <td className="px-8 py-4 text-right text-tertiary text-xs">{Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}</td>
+                    <td className="px-8 py-4 text-right font-bold text-primary">
+                      {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </td>
                     <td className="px-8 py-4">
                       <span className={cn(
@@ -1350,6 +1400,17 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
                 ))
               )}
             </tbody>
+            {filteredData.length > 0 && (
+              <tfoot>
+                <tr className="border-t-2 border-white/20 font-bold">
+                  <td colSpan={6} className="px-8 py-4 text-right text-on-surface-variant uppercase text-xs tracking-widest">Total Geral</td>
+                  <td className="px-8 py-4 text-right">{filteredData.reduce((a,tx) => a + Number(tx.valor), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                  <td className="px-8 py-4 text-right text-tertiary">{periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}</td>
+                  <td className="px-8 py-4 text-right text-primary text-lg">{periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                  <td className="px-8 py-4 text-xs text-on-surface-variant">{periodTotals.count} itens</td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </div>
