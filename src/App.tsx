@@ -3006,45 +3006,51 @@ export default function App() {
       const existingKeys = new Set(
         transactions.map((tx) => boletoDuplicateKey(tx.fornecedor, tx.vencimento, tx.valor))
       );
-      const batchKeys = new Set<string>();
-      const extractedRows: PdfImportDraft[] = [];
 
-      for (const file of pdfFiles) {
-        const arrayBuffer = await file.arrayBuffer();
+      // Process all PDFs in parallel
+      const extractedRows: PdfImportDraft[] = await Promise.all(
+        pdfFiles.map(async (file) => {
+          const arrayBuffer = await file.arrayBuffer();
 
-        // Convert PDF to base64 for Gemini direct reading
-        const bytes = new Uint8Array(arrayBuffer);
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        const pdfBase64 = btoa(binary);
+          // Convert PDF to base64
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const pdfBase64 = btoa(binary);
 
-        // Also try to extract text with PDF.js as fallback
-        let fullText = '';
-        try {
-          let pdf: any;
+          // Extract text with PDF.js
+          let fullText = '';
           try {
-            pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-          } catch {
-            pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true } as any).promise;
+            let pdf: any;
+            try {
+              pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            } catch {
+              pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true } as any).promise;
+            }
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const textContent = await page.getTextContent();
+              fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
+            }
+            console.log(`[boleto] PDF.js extracted ${fullText.length} chars from ${file.name}:`, fullText.slice(0, 200));
+          } catch (pdfErr) {
+            console.log(`[boleto] PDF.js failed for ${file.name}, relying on server-side extraction:`, pdfErr);
           }
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
-          }
-          console.log(`[boleto] PDF.js extracted ${fullText.length} chars from ${file.name}:`, fullText.slice(0, 200));
-        } catch (pdfErr) {
-          console.log(`[boleto] PDF.js failed for ${file.name}, relying on server-side extraction:`, pdfErr);
-        }
 
-        const data = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
-        data.fornecedor = resolveSupplierName(data.fornecedor, fullText);
+          const data = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
+          data.fornecedor = resolveSupplierName(data.fornecedor, fullText);
+          return data;
+        })
+      );
+
+      // Mark duplicates after all PDFs processed
+      const batchKeys = new Set<string>();
+      for (const data of extractedRows) {
         const key = boletoDuplicateKey(data.fornecedor, data.vencimento, data.valor);
         data.duplicate = existingKeys.has(key) || batchKeys.has(key);
         batchKeys.add(key);
-        extractedRows.push(data);
       }
 
       if (!extractedRows.length) {

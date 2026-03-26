@@ -31,6 +31,12 @@ export default async function handler(req, res) {
       // Create banks index if not exists
       await sql`CREATE INDEX IF NOT EXISTS idx_banks_uid ON banks(uid)`;
 
+      // Index for fast duplicate detection
+      await sql`CREATE INDEX IF NOT EXISTS idx_transactions_duplicate ON transactions(fornecedor, vencimento, valor, empresa)`;
+
+      // Index for fast date queries
+      await sql`CREATE INDEX IF NOT EXISTS idx_transactions_vencimento ON transactions(vencimento)`;
+
       return res.json({ message: 'Tables created successfully' });
     } catch (e) {
       console.error(e);
