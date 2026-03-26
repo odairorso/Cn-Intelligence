@@ -1362,9 +1362,10 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
 
 interface ReceitasTabProps {
   transactions: Transaction[];
+  onNewRevenue: () => void;
 }
 
-const ReceitasTab = ({ transactions }: ReceitasTabProps) => {
+const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
   const revenueTransactions = useMemo(
     () => transactions.filter(tx => isRevenueTransaction(tx)),
     [transactions]
@@ -1488,7 +1489,12 @@ const ReceitasTab = ({ transactions }: ReceitasTabProps) => {
             {companies.map(c => <option key={c.value} value={c.value} className="bg-surface text-on-surface">{c.label}</option>)}
           </select>
         </div>
-        <div className="flex-grow"></div>
+        <button
+          onClick={onNewRevenue}
+          className="bg-primary text-background px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-primary-dark transition-all whitespace-nowrap"
+        >
+          <Plus size={16} /> Nova Receita
+        </button>
         <div className="text-right">
           <p className="text-[10px] font-bold text-on-surface-variant uppercase">Receitas no Período</p>
           <p className="text-xl font-bold text-primary">
@@ -3773,7 +3779,7 @@ export default function App() {
             )}
 
             {activeTab === 'relatorios' && <RelatoriosTab transactions={transactions} />}
-            {activeTab === 'receitas' && <ReceitasTab transactions={transactions} />}
+            {activeTab === 'receitas' && <ReceitasTab transactions={transactions} onNewRevenue={() => setShowNewTxModal(true)} />}
             {activeTab === 'bancos' && (
               <BancosTab 
                 banks={banks}
