@@ -118,32 +118,18 @@ const normalizeCompanyKey = (value: string) => {
   return normalized || 'GERAL';
 };
 
-const isRevenueTransaction = (tx: Pick<Transaction, 'fornecedor' | 'descricao'>) => {
-  const fornecedor = normalizeSupplierName(tx.fornecedor);
-  const descricao = normalizeSupplierName(tx.descricao);
-  
-  // Fornecedores conhecidos são sempre despesa, nunca receita
-  if (fornecedor.includes('RECEITA FEDERAL')) return false;
-  if (fornecedor.includes('ANHANGUERA')) return false;
-  if (fornecedor.includes('EDUBOT')) return false;
-  if (fornecedor.includes('EDITORADISTRIBUIDORA')) return false;
-  if (fornecedor.includes('ENERGISA')) return false;
-  if (fornecedor.includes('SANESUL')) return false;
-  if (fornecedor.includes('CLARO')) return false;
-  if (fornecedor.includes('VIVO')) return false;
-  if (fornecedor.includes('TIM')) return false;
+const isRevenueTransaction = (tx: { fornecedor?: string; descricao?: string; tipo?: string }) => {
+  // Se o campo tipo está definido, usar ele diretamente
+  if (tx.tipo === 'RECEITA') return true;
+  if (tx.tipo === 'DESPESA') return false;
 
-  // Palavras-chave na descrição que indicam receita
+  // Fallback: classificação automática pela descrição
+  const descricao = normalizeSupplierName(tx.descricao);
   return (
     descricao.includes('REPASSE') ||
     descricao.includes('MENSALIDADE') ||
-    descricao.includes('ENTRADA') ||
-    descricao.includes('CREDITO') ||
     descricao.includes('EDUCBANK') ||
     descricao.includes('KROTON') ||
-    descricao.includes('ADIANTAMENTO') ||
-    descricao.includes('CHEQUE') ||
-    descricao.includes('PERMUTA') ||
     descricao.includes('REDE FEMENINA')
   );
 };
@@ -2032,7 +2018,8 @@ const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxMod
     parcelas: '1',
     valorTipo: 'parcela' as 'parcela' | 'total',
     status: 'PENDENTE' as TransactionStatus,
-    banco: ''
+    banco: '',
+    tipo: 'DESPESA' as 'RECEITA' | 'DESPESA',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -2064,6 +2051,7 @@ const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxMod
           valor: Number(formData.valorTipo === 'total' ? (Number(formData.valor) / parcelas).toFixed(2) : formData.valor),
           status: formData.status,
           banco: formData.status === 'PAGO' ? formData.banco : null,
+          tipo: formData.tipo,
         };
       });
 
@@ -2143,6 +2131,20 @@ const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxMod
               </select>
 
             </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Tipo</label>
+              <select 
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+                style={{ backgroundColor: '#161b2a' }}
+                value={formData.tipo}
+                onChange={e => setFormData({...formData, tipo: e.target.value as 'RECEITA' | 'DESPESA'})}
+              >
+                <option value="DESPESA" className="bg-[#161b2a] text-on-surface">Despesa</option>
+                <option value="RECEITA" className="bg-[#161b2a] text-on-surface">Receita</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Status</label>
               <select 
