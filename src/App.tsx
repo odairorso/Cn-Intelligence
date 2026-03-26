@@ -2286,7 +2286,8 @@ const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxM
     vencimento: toInputDate(transaction.vencimento),
     pagamento: toInputDate(transaction.pagamento),
     valor: transaction.valor.toString(),
-    banco: transaction.banco || ''
+    banco: transaction.banco || '',
+    tipo: transaction.tipo || 'DESPESA',
   });
 
   useEffect(() => {
@@ -2295,7 +2296,8 @@ const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxM
       vencimento: toInputDate(transaction.vencimento),
       pagamento: toInputDate(transaction.pagamento),
       valor: transaction.valor.toString(),
-      banco: transaction.banco || ''
+      banco: transaction.banco || '',
+      tipo: transaction.tipo || 'DESPESA',
     });
   }, [transaction]);
 
@@ -2376,6 +2378,20 @@ const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxM
                 <option>UNOPAR</option>
               </select>
             </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Tipo</label>
+              <select 
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+                style={{ backgroundColor: '#161b2a' }}
+                value={formData.tipo || 'DESPESA'}
+                onChange={e => setFormData({...formData, tipo: e.target.value})}
+              >
+                <option value="DESPESA" className="bg-[#161b2a] text-on-surface">Despesa</option>
+                <option value="RECEITA" className="bg-[#161b2a] text-on-surface">Receita</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Status</label>
               <select 

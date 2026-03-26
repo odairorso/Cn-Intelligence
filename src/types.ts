@@ -25,6 +25,7 @@ export interface Transaction {
   valor: number;
   status: TransactionStatus;
   banco?: string;
+  tipo?: string;
 }
 
 
