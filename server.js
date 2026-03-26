@@ -133,16 +133,16 @@ app.post('/api/transactions/batch', async (req, res) => {
     await client.query('BEGIN');
     
     for (const tx of transactions) {
-      const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco } = tx;
+      const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo } = tx;
       
       const vDate = parseDateToPg(vencimento);
       const pDate = parseDateToPg(pagamento);
 
       try {
         await client.query(
-          `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [uid || 'guest', fornecedor, descricao || '-', empresa || 'Geral', vDate, pDate, valor, status || 'PENDENTE', banco || null]
+          `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [uid || 'guest', fornecedor, descricao || '-', empresa || 'Geral', vDate, pDate, valor, status || 'PENDENTE', banco || null, tipo || 'DESPESA']
         );
       } catch (insertError) {
         console.error(`Erro inserindo linha [Fornecedor: ${fornecedor}, Venc: ${vencimento}, Valor: ${valor}]:`, insertError.message);
@@ -163,7 +163,7 @@ app.post('/api/transactions/batch', async (req, res) => {
 });
 app.post('/api/transactions', async (req, res) => {
   try {
-    const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco } = req.body;
+    const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo } = req.body;
 
     
     // Convert DD/MM/YYYY back to YYYY-MM-DD
@@ -171,9 +171,9 @@ app.post('/api/transactions', async (req, res) => {
     const pDate = pagamento ? pagamento.split('/').reverse().join('-') : null;
 
     const result = await pool.query(
-      `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [uid || 'guest', fornecedor, descricao || '-', empresa || 'Geral', vDate, pDate, valor, status || 'PENDENTE', banco || null]
+      `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      [uid || 'guest', fornecedor, descricao || '-', empresa || 'Geral', vDate, pDate, valor, status || 'PENDENTE', banco || null, tipo || 'DESPESA']
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -185,7 +185,7 @@ app.post('/api/transactions', async (req, res) => {
 app.put('/api/transactions/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco } = req.body;
+    const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo } = req.body;
     
     const pDate = pagamento ? pagamento.split('/').reverse().join('-') : null;
     const vDate = vencimento ? vencimento.split('/').reverse().join('-') : null;
@@ -200,9 +200,10 @@ app.put('/api/transactions/:id', async (req, res) => {
         vencimento = $6::date,
         valor = $7,
         banco = $8,
+        tipo = $9,
         updated_at = NOW()
-      WHERE id = $9 RETURNING *`,
-      [status, pDate, fornecedor, descricao, empresa, vDate, valor, banco, id]
+      WHERE id = $10 RETURNING *`,
+      [status, pDate, fornecedor, descricao, empresa, vDate, valor, banco, tipo || 'DESPESA', id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     

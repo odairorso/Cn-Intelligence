@@ -8,7 +8,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'PUT') {
     try {
-      const { status, pagamento, vencimento, fornecedor, descricao, empresa, valor, banco } = req.body;
+      const { status, pagamento, vencimento, fornecedor, descricao, empresa, valor, banco, tipo } = req.body;
       const pDate = pagamento ? parseDateToPg(pagamento) : null;
       const vDate = vencimento ? parseDateToPg(vencimento) : null;
       const rows = await sql`
@@ -20,7 +20,8 @@ export default async function handler(req, res) {
           descricao  = COALESCE(${descricao}, descricao),
           empresa    = COALESCE(${empresa}, empresa),
           valor      = COALESCE(${valor !== undefined ? Number(valor) : null}, valor),
-          banco      = ${banco !== undefined ? banco : null}
+          banco      = ${banco !== undefined ? banco : null},
+          tipo       = COALESCE(${tipo}, tipo)
         WHERE id = ${id}
         RETURNING *`;
       const tx = rows[0];

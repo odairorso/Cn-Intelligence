@@ -12,6 +12,7 @@ export interface Transaction {
   status: string;
   observacao?: string;
   banco?: string;
+  tipo?: string;
 }
 
 export interface Supplier {
