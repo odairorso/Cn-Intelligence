@@ -390,7 +390,7 @@ app.post('/api/extract-boleto', async (req, res) => {
       }
     }
 
-    const hasText = extractedText.length > 10;
+    const hasText = extractedText.length > 50;
 
     // Build prompt based on whether we have extracted text
     let prompt;
@@ -404,7 +404,10 @@ ${extractedText}
 Nome do arquivo: ${fileName || 'N/A'}
 
 Extraia os seguintes campos:
-1. fornecedor: Nome do beneficiário/empresa que emitiu o boleto. Procure por "Beneficiário", "Cedente", "Razão Social". Se não encontrar, use o nome do arquivo.
+1. fornecedor: NOME DO BENEFICIÁRIO/CEDENTE que recebe o pagamento (NÃO é o banco!).
+   - Procure por "Beneficiário", "Cedente", "Razão Social", "Nome/Razão Social"
+   - NUNCA use o nome do banco como fornecedor (ex: Sicredi, Bradesco, Itaú, Banco do Brasil, Cora são BANCOS, não fornecedores)
+   - Se encontrar apenas o nome do banco, procure mais abaixo no boleto o nome real do beneficiário
 2. vencimento: Data de vencimento no formato DD/MM/AAAA. Procure por "Vencimento", "Vcto".
 3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal). Procure por "Valor", "Valor do Documento", "Valor Cobrado", "Vlr Pagar".
 4. cnpj: CNPJ do beneficiário se disponível.
@@ -417,12 +420,14 @@ Responda APENAS com JSON válido:
       // No text extracted - PDF is likely scanned image
       // Send PDF directly to Gemini as inline data for visual analysis
       prompt = `Você é um especialista em extrair dados de boletos bancários brasileiros.
-Analise visualmente o PDF de boleto bancário anexo (pode ser uma imagem/scan) e extraia os campos abaixo.
+Analise visualmente o PDF de boleto bancário anexo e extraia os campos abaixo.
 
 Nome do arquivo: ${fileName || 'N/A'}
 
 Extraia os seguintes campos:
-1. fornecedor: Nome do beneficiário/empresa que emitiu o boleto.
+1. fornecedor: NOME DO BENEFICIÁRIO/CEDENTE que recebe o pagamento (NÃO é o banco!).
+   - Procure por "Beneficiário", "Cedente", "Razão Social"
+   - NUNCA use o nome do banco como fornecedor (Sicredi, Bradesco, Itaú, Banco do Brasil, Cora são BANCOS)
 2. vencimento: Data de vencimento no formato DD/MM/AAAA.
 3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal).
 4. cnpj: CNPJ do beneficiário se disponível.
