@@ -180,4 +180,25 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch contas contabeis');
     return res.json();
   },
+  
+  async createContaContabil(data: { codigo: string; nome: string; tipo: 'RECEITA' | 'DESPESA' }): Promise<any> {
+    const res = await fetch(`${API_BASE}/contas-contabeis`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to create conta contábil');
+    return res.json();
+  },
+
+  async updateContaContabil(id: number, data: Partial<{ codigo: string; nome: string; tipo: 'RECEITA' | 'DESPESA'; ativo: boolean }>): Promise<any> {
+    const params = new URLSearchParams({ id: String(id) }).toString();
+    const res = await fetch(`${API_BASE}/contas-contabeis?${params}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update conta contábil');
+    return res.json();
+  },
 };

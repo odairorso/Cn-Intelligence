@@ -54,6 +54,13 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function matchesAccountType(acc: ContaContabil, tipo: 'RECEITA' | 'DESPESA') {
+  const t = String(acc.tipo || '').toUpperCase();
+  const desire = String(tipo || '').toUpperCase();
+  if (desire === 'DESPESA') return ['DESPESA', 'DEBITO', 'DÉBITO'].includes(t);
+  return ['RECEITA', 'CREDITO', 'CRÉDITO'].includes(t);
+}
+
 const defaultBrandLogo = new URL('../Logo Cn/WhatsApp Image 2021-02-10 at 10.34.53.jpeg', import.meta.url).href;
 
 const toInputDate = (value?: string | null) => {
@@ -2123,6 +2130,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           status: formData.status,
           banco: formData.status === 'PAGO' ? formData.banco : null,
           tipo: formData.tipo,
+          conta_contabil_id: formData.conta_contabil_id
         };
       });
 
@@ -2487,10 +2495,13 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                 onChange={e => setFormData({...formData, conta_contabil_id: Number(e.target.value) || undefined})}
               >
                 <option value="" className="bg-[#161b2a] text-on-surface">Selecione a conta</option>
-                {contasContabeis.filter(c => c.tipo === formData.tipo).map(c => (
+                {contasContabeis.filter(c => matchesAccountType(c, formData.tipo)).map(c => (
                   <option key={c.id} value={c.id} className="bg-[#161b2a] text-on-surface">{c.codigo} - {c.nome}</option>
                 ))}
               </select>
+              {contasContabeis.filter(c => matchesAccountType(c, formData.tipo)).length === 0 && (
+                <p className="text-[10px] text-on-surface-variant mt-1">Nenhuma conta encontrada para {formData.tipo}. Cadastre em Configurações.</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Status</label>
@@ -4281,6 +4292,123 @@ export default function App() {
                   </div>
                 </div>
 
+                <div className="pt-8 border-t border-white/5">
+                  <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Plano de Contas</h4>
+                  <div className="space-y-4 max-w-3xl mx-auto">
+                    <div className="glass-card p-4">
+                      <div className="grid grid-cols-12 gap-2">
+                        <div className="col-span-3">
+                          <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Código</p>
+                          <input
+                            value={newContaContabil.codigo}
+                            onChange={(e) => setNewContaContabil(prev => ({ ...prev, codigo: e.target.value }))}
+                            placeholder="Ex: 3.1"
+                            className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div className="col-span-6">
+                          <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Nome</p>
+                          <input
+                            value={newContaContabil.nome}
+                            onChange={(e) => setNewContaContabil(prev => ({ ...prev, nome: e.target.value }))}
+                            placeholder="Ex: Folha de Pagamento"
+                            className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Tipo</p>
+                          <select
+                            value={newContaContabil.tipo}
+                            onChange={(e) => setNewContaContabil(prev => ({ ...prev, tipo: e.target.value as 'DESPESA' | 'RECEITA' }))}
+                            className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                          >
+                            <option value="DESPESA">DESPESA</option>
+                            <option value="RECEITA">RECEITA</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex justify-end mt-3">
+                        <button
+                          onClick={async () => {
+                            try {
+                              if (!newContaContabil.codigo || !newContaContabil.nome) {
+                                showNotification('Preencha código e nome.', 'error');
+                                return;
+                              }
+                              await api.createContaContabil({
+                                codigo: newContaContabil.codigo,
+                                nome: newContaContabil.nome,
+                                tipo: newContaContabil.tipo as any,
+                              });
+                              setNewContaContabil({ codigo: '', nome: '', tipo: 'DESPESA' });
+                              await fetchContasContabeis();
+                              showNotification('Conta contábil cadastrada!', 'success');
+                            } catch (e) {
+                              showNotification('Erro ao cadastrar conta.', 'error');
+                            }
+                          }}
+                          className="bg-secondary/10 text-secondary px-4 py-2 rounded-lg text-xs font-bold border border-secondary/20 hover:bg-secondary/20 transition-all"
+                        >
+                          Cadastrar Conta
+                        </button>
+                      </div>
+                    </div>
+                    <div className="glass-card p-4">
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <p className="text-[11px] font-bold uppercase text-on-surface-variant mb-2">Despesas</p>
+                          <div className="space-y-1 max-h-64 overflow-auto pr-1">
+                            {contasContabeis.filter(c => matchesAccountType(c, 'DESPESA')).map((c) => (
+                              <div key={c.id} className="flex items-center justify-between border border-white/10 rounded-lg px-3 py-2">
+                                <span className="text-xs">{c.codigo} - {c.nome}</span>
+                                <label className="text-[10px] flex items-center gap-2">
+                                  <span className="text-on-surface-variant">{c.ativo ? 'Ativa' : 'Inativa'}</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={c.ativo}
+                                    onChange={async (e) => {
+                                      try {
+                                        await api.updateContaContabil(c.id, { ativo: e.target.checked });
+                                        await fetchContasContabeis();
+                                      } catch {
+                                        showNotification('Erro ao atualizar conta.', 'error');
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-bold uppercase text-on-surface-variant mb-2">Receitas</p>
+                          <div className="space-y-1 max-h-64 overflow-auto pr-1">
+                            {contasContabeis.filter(c => matchesAccountType(c, 'RECEITA')).map((c) => (
+                              <div key={c.id} className="flex items-center justify-between border border-white/10 rounded-lg px-3 py-2">
+                                <span className="text-xs">{c.codigo} - {c.nome}</span>
+                                <label className="text-[10px] flex items-center gap-2">
+                                  <span className="text-on-surface-variant">{c.ativo ? 'Ativa' : 'Inativa'}</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={c.ativo}
+                                    onChange={async (e) => {
+                                      try {
+                                        await api.updateContaContabil(c.id, { ativo: e.target.checked });
+                                        await fetchContasContabeis();
+                                      } catch {
+                                        showNotification('Erro ao atualizar conta.', 'error');
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div className="pt-8 border-t border-white/5">
                   <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Contas Contábeis</h4>
                   <div className="space-y-4 max-w-xl mx-auto">
