@@ -3065,7 +3065,7 @@ export default function App() {
       return;
     }
     try {
-      const res = await fetch('/api/contas-contabeis', {
+      const res = await fetch('/api?route=contas-contabeis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newContaContabil),
@@ -3442,7 +3442,7 @@ export default function App() {
 
   const extractBoletoWithGemini = async (text: string, fileName: string, pdfBase64?: string): Promise<PdfImportDraft> => {
     try {
-      const response = await fetch('/api/extract-boleto', {
+      const response = await fetch('/api?route=extract-boleto', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, fileName, pdfBase64 }),
