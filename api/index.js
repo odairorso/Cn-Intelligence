@@ -68,26 +68,32 @@ async function ensureContasTable() {
       ativo BOOLEAN DEFAULT true,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`;
-  const existing = await sql`SELECT COUNT(*)::int AS cnt FROM contas_contabeis`;
-  if (Number(existing[0].cnt) === 0) {
-    await sql`
-      INSERT INTO contas_contabeis (codigo, nome, tipo) VALUES
-      ('3.1', 'Folha de Pagamento', 'DESPESA'),
-      ('3.2', 'Aluguel', 'DESPESA'),
-      ('3.3', 'Água / Luz / Telefone', 'DESPESA'),
-      ('3.4', 'Material de Escritório', 'DESPESA'),
-      ('3.5', 'Segurança', 'DESPESA'),
-      ('3.6', 'Editoras', 'DESPESA'),
-      ('3.7', 'Impostos', 'DESPESA'),
-      ('3.8', 'Manutenção', 'DESPESA'),
-      ('3.9', 'Tarifas Bancárias', 'DESPESA'),
-      ('3.10', 'Juros / Multas', 'DESPESA'),
-      ('3.11', 'Outras Despesas', 'DESPESA'),
-      ('4.1', 'Mensalidades', 'RECEITA'),
-      ('4.2', 'Repasses', 'RECEITA'),
-      ('4.3', 'Matrículas', 'RECEITA'),
-      ('4.4', 'Permutas / Convênios', 'RECEITA'),
-      ('4.5', 'Outras Receitas', 'RECEITA')`;
+  
+  // Insere contas padrão apenas se não existirem (verifica por código)
+  const defaultAccounts = [
+    ['3.1', 'Folha de Pagamento', 'DESPESA'],
+    ['3.2', 'Aluguel', 'DESPESA'],
+    ['3.3', 'Água / Luz / Telefone', 'DESPESA'],
+    ['3.4', 'Material de Escritório', 'DESPESA'],
+    ['3.5', 'Segurança', 'DESPESA'],
+    ['3.6', 'Editoras', 'DESPESA'],
+    ['3.7', 'Impostos', 'DESPESA'],
+    ['3.8', 'Manutenção', 'DESPESA'],
+    ['3.9', 'Tarifas Bancárias', 'DESPESA'],
+    ['3.10', 'Juros / Multas', 'DESPESA'],
+    ['3.11', 'Outras Despesas', 'DESPESA'],
+    ['4.1', 'Mensalidades', 'RECEITA'],
+    ['4.2', 'Repasses', 'RECEITA'],
+    ['4.3', 'Matrículas', 'RECEITA'],
+    ['4.4', 'Permutas / Convênios', 'RECEITA'],
+    ['4.5', 'Outras Receitas', 'RECEITA'],
+  ];
+  
+  for (const [codigo, nome, tipo] of defaultAccounts) {
+    const exists = await sql`SELECT id FROM contas_contabeis WHERE codigo = ${codigo} LIMIT 1`;
+    if (exists.length === 0) {
+      await sql`INSERT INTO contas_contabeis (codigo, nome, tipo) VALUES (${codigo}, ${nome}, ${tipo})`;
+    }
   }
 }
 
@@ -682,26 +688,32 @@ async function handleSetupTables(req, res) {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       )`;
 
-    const existing = await sql`SELECT COUNT(*) as cnt FROM contas_contabeis`;
-    if (Number(existing[0].cnt) === 0) {
-      await sql`
-        INSERT INTO contas_contabeis (codigo, nome, tipo) VALUES
-        ('3.1', 'Folha de Pagamento', 'DESPESA'),
-        ('3.2', 'Aluguel', 'DESPESA'),
-        ('3.3', 'Água / Luz / Telefone', 'DESPESA'),
-        ('3.4', 'Material de Escritório', 'DESPESA'),
-        ('3.5', 'Segurança', 'DESPESA'),
-        ('3.6', 'Editoras', 'DESPESA'),
-        ('3.7', 'Impostos', 'DESPESA'),
-        ('3.8', 'Manutenção', 'DESPESA'),
-        ('3.9', 'Tarifas Bancárias', 'DESPESA'),
-        ('3.10', 'Juros / Multas', 'DESPESA'),
-        ('3.11', 'Outras Despesas', 'DESPESA'),
-        ('4.1', 'Mensalidades', 'RECEITA'),
-        ('4.2', 'Repasses', 'RECEITA'),
-        ('4.3', 'Matrículas', 'RECEITA'),
-        ('4.4', 'Permutas / Convênios', 'RECEITA'),
-        ('4.5', 'Outras Receitas', 'RECEITA')`;
+    // Insere contas padrão apenas se não existirem (verifica por código)
+    const defaultAccounts = [
+      ['3.1', 'Folha de Pagamento', 'DESPESA'],
+      ['3.2', 'Aluguel', 'DESPESA'],
+      ['3.3', 'Água / Luz / Telefone', 'DESPESA'],
+      ['3.4', 'Material de Escritório', 'DESPESA'],
+      ['3.5', 'Segurança', 'DESPESA'],
+      ['3.6', 'Editoras', 'DESPESA'],
+      ['3.7', 'Impostos', 'DESPESA'],
+      ['3.8', 'Manutenção', 'DESPESA'],
+      ['3.9', 'Tarifas Bancárias', 'DESPESA'],
+      ['3.10', 'Juros / Multas', 'DESPESA'],
+      ['3.11', 'Outras Despesas', 'DESPESA'],
+      ['4.1', 'Mensalidades', 'RECEITA'],
+      ['4.2', 'Repasses', 'RECEITA'],
+      ['4.3', 'Matrículas', 'RECEITA'],
+      ['4.4', 'Permutas / Convênios', 'RECEITA'],
+      ['4.5', 'Outras Receitas', 'RECEITA'],
+    ];
+    
+    for (const [codigo, nome, tipo] of defaultAccounts) {
+      const exists = await sql`SELECT id FROM contas_contabeis WHERE codigo = ${codigo} LIMIT 1`;
+      if (exists.length === 0) {
+        await sql`INSERT INTO contas_contabeis (codigo, nome, tipo) VALUES (${codigo}, ${nome}, ${tipo})`;
+        console.log(`[setup] Conta ${codigo} - ${nome} adicionada`);
+      }
     }
 
     await sql`CREATE INDEX IF NOT EXISTS idx_banks_uid ON banks(uid)`;
