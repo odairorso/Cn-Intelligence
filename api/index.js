@@ -658,7 +658,12 @@ Extraia os seguintes campos:
 4. cnpj: CNPJ do beneficiário se disponível.
 5. descricao: Descrição do serviço ou referência do boleto.
 6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR).
-7. numero_boleto: Número do documento/nosso número do boleto.
+7. numero_boleto: O NÚMERO QUE IDENTIFICA UNICAMENTE O BOLETO. Procure por:
+   - "Nosso número" ou "Nosso Numero"
+   - "Nro documento" ou "Nº documento" ou "Nr documento"
+   - "Número do documento" ou "Numero do documento"
+   - "Código de barras" (extraia apenas os números)
+   - Este campo é OBRIGATÓRIO e nunca deve ser vazio. Se não encontrar, procure na linha digitável (código de barras com 47-48 dígitos).
 
 Responda APENAS com JSON válido:
 {"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
@@ -675,7 +680,12 @@ Extraia os seguintes campos:
 4. cnpj: CNPJ do beneficiário se disponível.
 5. descricao: Descrição do serviço ou referência do boleto.
 6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR).
-7. numero_boleto: Número do documento/nosso número do boleto.
+7. numero_boleto: O NÚMERO QUE IDENTIFICA UNICAMENTE O BOLETO. Procure por:
+   - "Nosso número" ou "Nosso Numero"
+   - "Nro documento" ou "Nº documento" ou "Nr documento"
+   - "Número do documento" ou "Numero do documento"
+   - "Código de barras" (extraia apenas os números)
+   - Este campo é OBRIGATÓRIO e nunca deve ser vazio. Se não encontrar, procure na linha digitável (código de barras com 47-48 dígitos).
 
 Responda APENAS com JSON válido:
 {"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;

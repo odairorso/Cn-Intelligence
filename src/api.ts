@@ -202,6 +202,23 @@ export const api = {
     return res.json();
   },
 
+  async resetDatabase(): Promise<void> {
+    const res = await fetch(`${API_BASE}?route=reset`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to reset database');
+  },
+
+  async cleanDuplicates(): Promise<{ deleted: number }> {
+    const res = await fetch(`${API_BASE}?route=clean-duplicates`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to clean duplicates');
+    return res.json();
+  },
+
+  async cleanSuspicious(): Promise<{ deleted: number }> {
+    const res = await fetch(`${API_BASE}?route=clean-suspicious`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to clean suspicious data');
+    return res.json();
+  },
+
   async extractBoleto(text?: string, fileName?: string, pdfBase64?: string): Promise<any> {
     const res = await fetch(`${API_BASE}?route=extract-boleto`, {
       method: 'POST',
