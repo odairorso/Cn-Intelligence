@@ -69,7 +69,7 @@ async function ensureContasTable() {
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`;
   
-  // Insere contas padrão apenas se não existirem (verifica por código)
+  // Atualiza ou insere contas padrão (upsert por código)
   const defaultAccounts = [
     ['3.1', 'Folha de Pagamento', 'DESPESA'],
     ['3.2', 'Aluguel', 'DESPESA'],
@@ -93,6 +93,8 @@ async function ensureContasTable() {
     const exists = await sql`SELECT id FROM contas_contabeis WHERE codigo = ${codigo} LIMIT 1`;
     if (exists.length === 0) {
       await sql`INSERT INTO contas_contabeis (codigo, nome, tipo) VALUES (${codigo}, ${nome}, ${tipo})`;
+    } else {
+      await sql`UPDATE contas_contabeis SET nome = ${nome}, tipo = ${tipo}, ativo = true WHERE codigo = ${codigo}`;
     }
   }
 }
@@ -688,7 +690,7 @@ async function handleSetupTables(req, res) {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       )`;
 
-    // Insere contas padrão apenas se não existirem (verifica por código)
+    // Atualiza ou insere contas padrão (upsert por código)
     const defaultAccounts = [
       ['3.1', 'Folha de Pagamento', 'DESPESA'],
       ['3.2', 'Aluguel', 'DESPESA'],
@@ -712,7 +714,11 @@ async function handleSetupTables(req, res) {
       const exists = await sql`SELECT id FROM contas_contabeis WHERE codigo = ${codigo} LIMIT 1`;
       if (exists.length === 0) {
         await sql`INSERT INTO contas_contabeis (codigo, nome, tipo) VALUES (${codigo}, ${nome}, ${tipo})`;
-        console.log(`[setup] Conta ${codigo} - ${nome} adicionada`);
+        console.log(`[setup] Conta ${codigo} - ${nome} inserida`);
+      } else {
+        // Atualiza nome se diferente
+        await sql`UPDATE contas_contabeis SET nome = ${nome}, tipo = ${tipo}, ativo = true WHERE codigo = ${codigo}`;
+        console.log(`[setup] Conta ${codigo} - ${nome} atualizada`);
       }
     }
 
