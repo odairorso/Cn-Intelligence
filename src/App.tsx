@@ -30,7 +30,8 @@ import {
   CreditCard,
   FileUp,
   Loader2,
-  Printer
+  Printer,
+  Merge
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, 
@@ -210,6 +211,7 @@ type PdfImportDraft = {
   numero_boleto: string;
   rawText: string;
   duplicate: boolean;
+  conta_contabil_id?: number;
 };
 
 // --- Components ---
@@ -1053,6 +1055,20 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
             title="Sincronizar fornecedores dos lançamentos"
           >
             <RefreshCw size={14} /> Sincronizar
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                await api.mergeSuppliersAuto();
+                window.location.reload();
+              } catch (e) {
+                console.error('Auto merge error', e);
+              }
+            }}
+            className="bg-primary/10 text-primary px-4 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-primary/20 transition-colors"
+            title="Unificar variações automaticamente"
+          >
+            <Merge size={14} /> Unificar Auto
           </button>
         </div>
         <button 
@@ -2582,8 +2598,14 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               <select 
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }}
-                value={formData.conta_contabil_id || ''}
-                onChange={e => setFormData({...formData, conta_contabil_id: Number(e.target.value) || undefined})}
+                value={formData.conta_contabil_id !== undefined ? formData.conta_contabil_id : ''}
+                onChange={e => {
+                  const v = e.target.value;
+                  setFormData({
+                    ...formData,
+                    conta_contabil_id: v === '' ? undefined : Number(v)
+                  });
+                }}
               >
                 <option value="" className="bg-[#161b2a] text-on-surface">Selecione a conta</option>
                 {contasContabeis.filter(c => matchesAccountType(c, formData.tipo)).map(c => (
@@ -3557,6 +3579,7 @@ export default function App() {
         status: 'PENDENTE' as TransactionStatus,
         banco: null as any,
         numero_boleto: row.numero_boleto,
+        conta_contabil_id: row.conta_contabil_id,
       }));
 
       if (txList.length === 1) {
@@ -4761,6 +4784,22 @@ export default function App() {
                           <option value="" style={{ backgroundColor: '#1e1e2e' }}>Selecione</option>
                           {companyOptions.map((company) => (
                             <option key={company} value={company} style={{ backgroundColor: '#1e1e2e' }}>{company}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="md:col-span-3">
+                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Conta Contábil</p>
+                        <select
+                          value={row.conta_contabil_id || ''}
+                          onChange={(e) => updatePdfRow(index, { conta_contabil_id: e.target.value ? Number(e.target.value) : undefined })}
+                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary text-on-surface"
+                          style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}
+                        >
+                          <option value="" style={{ backgroundColor: '#1e1e2e' }}>Selecione a conta</option>
+                          {contasContabeis.map((conta) => (
+                            <option key={conta.id} value={conta.id} style={{ backgroundColor: '#1e1e2e' }}>
+                              {conta.codigo} - {conta.nome}
+                            </option>
                           ))}
                         </select>
                       </div>
