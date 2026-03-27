@@ -134,16 +134,16 @@ app.post('/api/transactions/batch', async (req, res) => {
     await client.query('BEGIN');
     
     for (const tx of transactions) {
-      const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo } = tx;
+      const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = tx;
       
       const vDate = parseDateToPg(vencimento);
       const pDate = parseDateToPg(pagamento);
 
       try {
         await client.query(
-          `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [uid || 'guest', fornecedor, descricao || '-', empresa || 'Geral', vDate, pDate, valor, status || 'PENDENTE', banco || null, tipo || 'DESPESA']
+          `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          [uid || 'guest', fornecedor, descricao || '-', empresa || 'Geral', vDate, pDate, valor, status || 'PENDENTE', banco || null, tipo || 'DESPESA', numero_boleto || null, conta_contabil_id || null]
         );
       } catch (insertError) {
         console.error(`Erro inserindo linha [Fornecedor: ${fornecedor}, Venc: ${vencimento}, Valor: ${valor}]:`, insertError.message);
@@ -164,7 +164,7 @@ app.post('/api/transactions/batch', async (req, res) => {
 });
 app.post('/api/transactions', async (req, res) => {
   try {
-    const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo } = req.body;
+    const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = req.body;
 
     
     // Convert DD/MM/YYYY back to YYYY-MM-DD
@@ -172,9 +172,9 @@ app.post('/api/transactions', async (req, res) => {
     const pDate = pagamento ? pagamento.split('/').reverse().join('-') : null;
 
     const result = await pool.query(
-      `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-      [uid || 'guest', fornecedor, descricao || '-', empresa || 'Geral', vDate, pDate, valor, status || 'PENDENTE', banco || null, tipo || 'DESPESA']
+      `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+      [uid || 'guest', fornecedor, descricao || '-', empresa || 'Geral', vDate, pDate, valor, status || 'PENDENTE', banco || null, tipo || 'DESPESA', numero_boleto || null, conta_contabil_id || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -186,7 +186,7 @@ app.post('/api/transactions', async (req, res) => {
 app.put('/api/transactions/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, juros } = req.body;
+    const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, juros, numero_boleto, conta_contabil_id } = req.body;
     
     const pDate = pagamento ? pagamento.split('/').reverse().join('-') : null;
     const vDate = vencimento ? vencimento.split('/').reverse().join('-') : null;
@@ -203,9 +203,11 @@ app.put('/api/transactions/:id', async (req, res) => {
         banco = $8,
         tipo = $9,
         juros = $10,
+        numero_boleto = $11,
+        conta_contabil_id = $12,
         updated_at = NOW()
-      WHERE id = $11 RETURNING *`,
-      [status, pDate, fornecedor, descricao, empresa, vDate, valor, banco, tipo || 'DESPESA', juros || 0, id]
+      WHERE id = $13 RETURNING *`,
+      [status, pDate, fornecedor, descricao, empresa, vDate, valor, banco, tipo || 'DESPESA', juros || 0, numero_boleto || null, conta_contabil_id || null, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     
@@ -230,6 +232,17 @@ app.delete('/api/transactions/:id', async (req, res) => {
     res.status(204).send();
   } catch (error) {
     console.error('Error deleting transaction:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Contas Contábeis API
+app.get('/api/contas-contabeis', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM contas_contabeis WHERE ativo = true ORDER BY codigo ASC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching contas contabeis:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -408,37 +421,34 @@ Nome do arquivo: ${fileName || 'N/A'}
 
 Extraia os seguintes campos:
 1. fornecedor: NOME DO BENEFICIÁRIO/CEDENTE que recebe o pagamento (NÃO é o banco!).
-   - Procure por "Beneficiário", "Cedente", "Razão Social", "Nome/Razão Social"
-   - NUNCA use o nome do banco como fornecedor (ex: Sicredi, Bradesco, Itaú, Banco do Brasil, Cora são BANCOS, não fornecedores)
-   - Se encontrar apenas o nome do banco, procure mais abaixo no boleto o nome real do beneficiário
-2. vencimento: Data de vencimento no formato DD/MM/AAAA. Procure por "Vencimento", "Vcto".
-3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal). Procure por "Valor", "Valor do Documento", "Valor Cobrado", "Vlr Pagar".
+   - Procure por "Beneficiário", "Cedente", "Razão Social"
+   - NUNCA use o nome do banco como fornecedor (Sicredi, Bradesco, Itaú, Cora são BANCOS)
+2. vencimento: Data de vencimento no formato DD/MM/AAAA.
+3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal).
 4. cnpj: CNPJ do beneficiário se disponível.
 5. descricao: Descrição do serviço ou referência do boleto.
 6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR). Se não identificar, deixe vazio.
+7. numero_boleto: Número do documento/nosso número do boleto. Procure por "Nro documento", "Nr documento", "Nosso número", "Nro doc". Este número identifica unicamente o boleto.
 
 Responda APENAS com JSON válido:
-{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":""}`;
+{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
     } else {
-      // No text extracted - PDF is likely scanned image
-      // Send PDF directly to Gemini as inline data for visual analysis
       prompt = `Você é um especialista em extrair dados de boletos bancários brasileiros.
 Analise visualmente o PDF de boleto bancário anexo e extraia os campos abaixo.
 
 Nome do arquivo: ${fileName || 'N/A'}
 
 Extraia os seguintes campos:
-1. fornecedor: NOME DO BENEFICIÁRIO/CEDENTE que recebe o pagamento (NÃO é o banco!).
-   - Procure por "Beneficiário", "Cedente", "Razão Social"
-   - NUNCA use o nome do banco como fornecedor (Sicredi, Bradesco, Itaú, Banco do Brasil, Cora são BANCOS)
+1. fornecedor: NOME DO BENEFICIÁRIO/CEDENTE (NÃO é o banco! Sicredi, Bradesco, Cora são BANCOS)
 2. vencimento: Data de vencimento no formato DD/MM/AAAA.
 3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal).
 4. cnpj: CNPJ do beneficiário se disponível.
 5. descricao: Descrição do serviço ou referência do boleto.
-6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR). Se não identificar, deixe vazio.
+6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR).
+7. numero_boleto: Número do documento/nosso número do boleto.
 
 Responda APENAS com JSON válido:
-{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":""}`;
+{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
     }
 
     console.log(`[boleto] Gemini: text=${extractedText.length} chars, hasText=${hasText}, file=${fileName}`);
