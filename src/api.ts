@@ -211,4 +211,12 @@ export const api = {
     if (!res.ok) throw new Error('Failed to merge suppliers');
     return res.json();
   },
+
+  async mergeSuppliersAuto(): Promise<{ updated: number; removed: number }> {
+    const res = await fetch(`${API_BASE}/suppliers/merge-auto`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to auto-merge suppliers');
+    return res.json();
+  },
 };
