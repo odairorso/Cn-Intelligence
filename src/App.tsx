@@ -3054,13 +3054,40 @@ export default function App() {
 
   // --- Handlers ---
 
+  const normalizeBoletoNumber = (value?: string) =>
+    String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
   const boletoDuplicateKey = (fornecedor: string, vencimento: string, valor: number, numeroBoleto?: string) => {
-    // Se tem número do boleto, usa ele como chave principal
-    if (numeroBoleto && numeroBoleto.trim()) {
-      return `BOLETO:${numeroBoleto.trim()}`;
+    const normalizedNumber = normalizeBoletoNumber(numeroBoleto);
+    if (normalizedNumber) {
+      return `BOLETO:${normalizedNumber}`;
     }
-    // Se não tem número do boleto, retorna null para não bloquear duplicatas falsas
     return null;
+  };
+
+  const getExistingBoletoKeys = () =>
+    new Set(
+      transactions
+        .map((tx) => boletoDuplicateKey(tx.fornecedor, tx.vencimento, tx.valor, tx.numero_boleto))
+        .filter((key): key is string => Boolean(key))
+    );
+
+  const applyDuplicateFlags = (rows: PdfImportDraft[]) => {
+    const existingKeys = getExistingBoletoKeys();
+    const batchKeys = new Set<string>();
+    return rows.map((row) => {
+      const numero_boleto = normalizeBoletoNumber(row.numero_boleto);
+      const key = boletoDuplicateKey(row.fornecedor, row.vencimento, row.valor, numero_boleto);
+      const duplicate = Boolean(key && (existingKeys.has(key) || batchKeys.has(key)));
+      if (key) batchKeys.add(key);
+      return { ...row, numero_boleto, duplicate };
+    });
+  };
+
+  const updatePdfRow = (index: number, patch: Partial<PdfImportDraft>) => {
+    setPdfExtractedRows((prev) =>
+      applyDuplicateFlags(prev.map((item, i) => (i === index ? { ...item, ...patch } : item)))
+    );
   };
 
   const parseLinhaDigitavel = (text: string) => {
@@ -3265,10 +3292,6 @@ export default function App() {
     showNotification(`Processando ${pdfFiles.length} boleto(s) com IA...`, 'info');
 
     try {
-      const existingKeys = new Set(
-        transactions.map((tx) => boletoDuplicateKey(tx.fornecedor, tx.vencimento, tx.valor, tx.numero_boleto)).filter(k => k !== null)
-      );
-
       // Process all PDFs in parallel
       const extractedRows: PdfImportDraft[] = await Promise.all(
         pdfFiles.map(async (file) => {
@@ -3307,21 +3330,12 @@ export default function App() {
         })
       );
 
-      // Mark duplicates after all PDFs processed
-      const batchKeys = new Set<string>();
-      for (const data of extractedRows) {
-        const key = boletoDuplicateKey(data.fornecedor, data.vencimento, data.valor, data.numero_boleto);
-        // Only mark as duplicate if key is not null (meaning numero_boleto exists)
-        data.duplicate = key !== null && (existingKeys.has(key) || batchKeys.has(key));
-        if (key) batchKeys.add(key);
-      }
-
       if (!extractedRows.length) {
         showNotification('Nenhum dado foi extraído dos PDFs.', 'error');
         return;
       }
 
-      setPdfExtractedRows(extractedRows);
+      setPdfExtractedRows(applyDuplicateFlags(extractedRows));
       setShowPdfImportModal(true);
       showNotification('Boletos lidos pela IA. Revise e confirme os lançamentos.', 'success');
     } catch (error) {
@@ -3335,11 +3349,22 @@ export default function App() {
 
   const handleConfirmPdfImport = async () => {
     try {
-      const validRows = pdfExtractedRows.filter((row) => row.fornecedor && row.vencimento && row.valor > 0);
-      const nonDuplicateRows = validRows.filter((row) => !row.duplicate);
+      const validRows = pdfExtractedRows
+        .filter((row) => row.fornecedor && row.vencimento && row.valor > 0)
+        .map((row) => ({ ...row, numero_boleto: normalizeBoletoNumber(row.numero_boleto) }));
+
+      const withoutNumberCount = validRows.filter((row) => !row.numero_boleto).length;
+      if (withoutNumberCount > 0) {
+        showNotification('Preencha o número do boleto para bloquear duplicidade.', 'error');
+        return;
+      }
+
+      const recheckedRows = applyDuplicateFlags(validRows as PdfImportDraft[]);
+      const nonDuplicateRows = recheckedRows.filter((row) => !row.duplicate);
+      const blockedCount = recheckedRows.length - nonDuplicateRows.length;
 
       if (!nonDuplicateRows.length) {
-        showNotification('Nenhum boleto novo para salvar.', 'info');
+        showNotification('Todos os boletos já foram lançados e foram bloqueados.', 'info');
         return;
       }
 
@@ -3358,6 +3383,7 @@ export default function App() {
         valor: row.valor,
         status: 'PENDENTE' as TransactionStatus,
         banco: null as any,
+        numero_boleto: row.numero_boleto,
       }));
 
       if (txList.length === 1) {
@@ -3385,7 +3411,7 @@ export default function App() {
       setPdfExtractedRows([]);
       await fetchTransactions();
       await fetchSuppliers();
-      showNotification(`${nonDuplicateRows.length} boleto(s) importado(s) com sucesso!`, 'success');
+      showNotification(`${nonDuplicateRows.length} boleto(s) importado(s). ${blockedCount} bloqueado(s) por duplicidade.`, 'success');
     } catch (error) {
       console.error('Error creating transaction from PDF:', error);
       showNotification('Erro ao salvar lançamentos de boleto.', 'error');
@@ -4304,8 +4330,8 @@ export default function App() {
                         <input
                           list="supplier-suggestions"
                           value={row.fornecedor}
-                          onChange={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, fornecedor: e.target.value } : item))}
-                          onBlur={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, fornecedor: resolveSupplierName(e.target.value, item.rawText) } : item))}
+                          onChange={(e) => updatePdfRow(index, { fornecedor: e.target.value })}
+                          onBlur={(e) => updatePdfRow(index, { fornecedor: resolveSupplierName(e.target.value, row.rawText) })}
                           className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
@@ -4313,7 +4339,7 @@ export default function App() {
                         <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Vencimento</p>
                         <input
                           value={row.vencimento}
-                          onChange={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, vencimento: e.target.value } : item))}
+                          onChange={(e) => updatePdfRow(index, { vencimento: e.target.value })}
                           placeholder="DD/MM/AAAA"
                           className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
@@ -4324,13 +4350,20 @@ export default function App() {
                           type="number"
                           step="0.01"
                           value={row.valor}
-                          onChange={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, valor: Number(e.target.value) } : item))}
+                          onChange={(e) => updatePdfRow(index, { valor: Number(e.target.value) })}
                           className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
                       <div className="md:col-span-2 flex md:justify-end items-end">
-                        <span className={cn("text-[10px] font-bold uppercase px-2 py-1 rounded border", row.duplicate ? "text-tertiary border-tertiary/40 bg-tertiary/10" : "text-primary border-primary/40 bg-primary/10")}>
-                          {row.duplicate ? 'Duplicado' : 'Novo'}
+                        <span className={cn(
+                          "text-[10px] font-bold uppercase px-2 py-1 rounded border",
+                          !row.numero_boleto
+                            ? "text-secondary border-secondary/40 bg-secondary/10"
+                            : row.duplicate
+                              ? "text-tertiary border-tertiary/40 bg-tertiary/10"
+                              : "text-primary border-primary/40 bg-primary/10"
+                        )}>
+                          {!row.numero_boleto ? 'Sem número' : row.duplicate ? 'Duplicado' : 'Novo'}
                         </span>
                       </div>
                     </div>
@@ -4339,8 +4372,17 @@ export default function App() {
                         <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Descrição</p>
                         <input
                           value={row.descricao}
-                          onChange={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, descricao: e.target.value } : item))}
+                          onChange={(e) => updatePdfRow(index, { descricao: e.target.value })}
                           placeholder="Descrição do boleto"
+                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="md:col-span-4">
+                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Número do Boleto</p>
+                        <input
+                          value={row.numero_boleto || ''}
+                          onChange={(e) => updatePdfRow(index, { numero_boleto: e.target.value })}
+                          placeholder="Nosso número / Nro documento"
                           className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
@@ -4348,7 +4390,7 @@ export default function App() {
                         <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Empresa</p>
                         <select
                           value={row.empresa}
-                          onChange={(e) => setPdfExtractedRows(prev => prev.map((item, i) => i === index ? { ...item, empresa: e.target.value } : item))}
+                          onChange={(e) => updatePdfRow(index, { empresa: e.target.value })}
                           className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary text-on-surface"
                           style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}
                         >
@@ -4359,7 +4401,7 @@ export default function App() {
                         </select>
                       </div>
                       {row.cnpj && (
-                        <div className="md:col-span-4 flex items-end">
+                        <div className="md:col-span-5 flex items-end">
                           <p className="text-xs text-on-surface-variant">CNPJ: {row.cnpj}</p>
                         </div>
                       )}
