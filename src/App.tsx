@@ -1,4 +1,4 @@
-import React, { Component, useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -13,8 +13,6 @@ import {
   Upload,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
-  Filter,
   Download,
   Plus,
   Trash2,
@@ -24,7 +22,6 @@ import {
   PieChart as PieChartIcon,
   UserPlus,
   FileSpreadsheet,
-  Menu,
   X,
   Edit,
   RefreshCw,
@@ -37,7 +34,7 @@ import {
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, 
   BarChart, Bar, XAxis, YAxis, Tooltip, 
-  AreaChart, Area, Legend, CartesianGrid
+  AreaChart, Area, CartesianGrid
 } from 'recharts';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -45,181 +42,22 @@ import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
 import { motion, AnimatePresence } from 'motion/react';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 
-import { Transaction, KPI, ChartData, Supplier, TransactionStatus, Bank, ContaContabil } from './types';
+import { Transaction, KPI, Supplier, TransactionStatus, Bank, ContaContabil } from './types';
 import { api } from './api';
 import { OFXImportTab } from './OFXImport';
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-function matchesAccountType(acc: ContaContabil, tipo: 'RECEITA' | 'DESPESA') {
-  const t = String(acc.tipo || '').toUpperCase();
-  const desire = String(tipo || '').toUpperCase();
-  if (desire === 'DESPESA') return ['DESPESA', 'DEBITO', 'DÉBITO'].includes(t);
-  return ['RECEITA', 'CREDITO', 'CRÉDITO'].includes(t);
-}
+import { useAppData } from './hooks/useAppData';
+import {
+  cn, toInputDate, toDisplayDate, dateSortKey,
+  normalizeSupplierName, normalizeCompanyKey,
+  isSupplierMatch, isRevenueTransaction, matchesAccountType, formatBRL,
+} from './lib/utils';
+import { DEFAULT_COMPANIES, DEFAULT_ACCOUNTS, PAGE_SIZE, MONTH_LABELS } from './lib/constants';
 
 const defaultBrandLogo = new URL('../Logo Cn/WhatsApp Image 2021-02-10 at 10.34.53.jpeg', import.meta.url).href;
 
-const toInputDate = (value?: string | null) => {
-  if (!value) return '';
-  const v = String(value).trim();
-  if (v.includes('/')) {
-    const [dd, mm, yyyy] = v.split('/');
-    if (dd && mm && yyyy) return `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
-  }
-  if (v.match(/^\d{4}-\d{2}-\d{2}/)) return v.slice(0, 10);
-  if (v.includes('T')) return v.slice(0, 10);
-  const parsed = new Date(v);
-  if (!Number.isNaN(parsed.getTime())) {
-    const yyyy = parsed.getUTCFullYear();
-    const mm = String(parsed.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(parsed.getUTCDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }
-  return '';
-};
-
-const toDisplayDate = (value?: string | null) => {
-  if (!value) return '';
-  const v = String(value).trim();
-  if (v.includes('/')) return v;
-  if (v.match(/^\d{4}-\d{2}-\d{2}/)) {
-    const [yyyy, mm, dd] = v.slice(0, 10).split('-');
-    return `${dd}/${mm}/${yyyy}`;
-  }
-  if (v.includes('T')) {
-    const d = new Date(v);
-    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
-  }
-  const parsed = new Date(v);
-  if (!Number.isNaN(parsed.getTime())) return parsed.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
-  return v;
-};
-
-const dateSortKey = (value?: string | null) => {
-  if (!value) return 0;
-  const v = String(value).trim();
-  if (v.includes('/')) {
-    const [dd, mm, yyyy] = v.split('/');
-    return new Date(`${yyyy}-${mm}-${dd}`).getTime();
-  }
-  return new Date(v).getTime() || 0;
-};
-
-// Cache for normalized names to avoid re-computing
-const normalizeCache = new Map<string, string>();
-
-const normalizeSupplierName = (value: string): string => {
-  const cacheKey = String(value || '');
-  if (normalizeCache.has(cacheKey)) {
-    return normalizeCache.get(cacheKey)!;
-  }
-  
-  const normalized = String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  
-  // Limit cache size to prevent memory leak
-  if (normalizeCache.size > 10000) {
-    normalizeCache.clear();
-  }
-  
-  normalizeCache.set(cacheKey, normalized);
-  return normalized;
-};
-
-const normalizeCompanyKey = (value: string) => {
-  const normalized = String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .replace(/[^A-Z0-9 ]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return normalized || 'GERAL';
-};
-
-const isRevenueTransaction = (tx: { fornecedor?: string; descricao?: string; tipo?: string }) => {
-  // Se o campo tipo está definido, usar ele diretamente
-  if (tx.tipo === 'RECEITA') return true;
-  if (tx.tipo === 'DESPESA') return false;
-
-  // Fallback: classificação automática pela descrição
-  const descricao = normalizeSupplierName(tx.descricao);
-  return (
-    descricao.includes('REPASSE') ||
-    descricao.includes('MENSALIDADE') ||
-    descricao.includes('EDUCBANK') ||
-    descricao.includes('KROTON') ||
-    descricao.includes('REDE FEMENINA')
-  );
-};
-
-// Fast supplier matching - optimized version (no Levenshtein O(n²))
-const matchCache = new Map<string, boolean>();
-
-const isSupplierMatch = (transactionSupplier: string, supplierName: string): boolean => {
-  const cacheKey = `${transactionSupplier}|${supplierName}`;
-  if (matchCache.has(cacheKey)) {
-    return matchCache.get(cacheKey)!;
-  }
-  
-  const tx = normalizeSupplierName(transactionSupplier);
-  const sp = normalizeSupplierName(supplierName);
-  
-  let result = false;
-  
-  if (!tx || !sp) {
-    result = false;
-  } else if (tx === sp) {
-    result = true;
-  } else if (tx.length >= 5 && sp.length >= 5) {
-    // Simple prefix match (first 5 chars) - much faster than Levenshtein
-    result = tx.substring(0, 5) === sp.substring(0, 5);
-  }
-  
-  // Limit cache size
-  if (matchCache.size > 50000) {
-    matchCache.clear();
-  }
-  
-  matchCache.set(cacheKey, result);
-  return result;
-};
-
 // --- Types ---
 type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'receitas' | 'bancos' | 'extrato' | 'configuracoes';
-
-const DEFAULT_COMPANIES = ['CN', 'CEI', 'UNOPAR', 'FACEMS', 'ELAINE', 'POLO DE ITAQUIRAI'];
-
-const DEFAULT_ACCOUNTS: Array<ContaContabil> = [
-  { id: 0, codigo: '3.1', nome: 'Folha de Pagamento', tipo: 'DESPESA', ativo: true } as any,
-  { id: 0, codigo: '3.2', nome: 'Aluguel', tipo: 'DESPESA', ativo: true } as any,
-  { id: 0, codigo: '3.3', nome: 'Água / Luz / Telefone', tipo: 'DESPESA', ativo: true } as any,
-  { id: 0, codigo: '3.4', nome: 'Material de Escritório', tipo: 'DESPESA', ativo: true } as any,
-  { id: 0, codigo: '3.5', nome: 'Segurança', tipo: 'DESPESA', ativo: true } as any,
-  { id: 0, codigo: '3.6', nome: 'Editoras', tipo: 'DESPESA', ativo: true } as any,
-  { id: 0, codigo: '3.7', nome: 'Impostos', tipo: 'DESPESA', ativo: true } as any,
-  { id: 0, codigo: '3.8', nome: 'Manutenção', tipo: 'DESPESA', ativo: true } as any,
-  { id: 0, codigo: '3.9', nome: 'Tarifas Bancárias', tipo: 'DESPESA', ativo: true } as any,
-  { id: 0, codigo: '3.10', nome: 'Juros / Multas', tipo: 'DESPESA', ativo: true } as any,
-  { id: 0, codigo: '3.11', nome: 'Outras Despesas', tipo: 'DESPESA', ativo: true } as any,
-  { id: 0, codigo: '4.1', nome: 'Mensalidades', tipo: 'RECEITA', ativo: true } as any,
-  { id: 0, codigo: '4.2', nome: 'Repasses', tipo: 'RECEITA', ativo: true } as any,
-  { id: 0, codigo: '4.3', nome: 'Matrículas', tipo: 'RECEITA', ativo: true } as any,
-  { id: 0, codigo: '4.4', nome: 'Permutas / Convênios', tipo: 'RECEITA', ativo: true } as any,
-  { id: 0, codigo: '4.5', nome: 'Aplicação Bancária', tipo: 'RECEITA', ativo: true } as any,
-  { id: 0, codigo: '4.6', nome: 'Outras Receitas', tipo: 'RECEITA', ativo: true } as any,
-];
 
 type PdfImportDraft = {
   fileName: string;
@@ -706,8 +544,6 @@ interface LancamentosTabProps {
   setShowNewTxModal: (show: boolean) => void;
   setEditingTx: (tx: Transaction) => void;
 }
-
-const PAGE_SIZE = 50;
 
 const LancamentosTab = ({ transactions, onMarkAsPaid, deleteTransaction, setShowNewTxModal, setEditingTx }: LancamentosTabProps) => {
   const [filter, setFilter] = useState('');
@@ -3136,39 +2972,25 @@ const NewSupplierModal = ({ setShowNewSupplierModal, onSuccess }: NewSupplierMod
 // --- Main App ---
 
 export default function App() {
+  const {
+    transactions, suppliers, banks, contasContabeis, companyOptions, notification,
+    fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis,
+    showNotification,
+    markAsPaid, updateTransaction, deleteTransaction,
+    deleteSupplier, syncSuppliers,
+    deleteBank,
+    addCompanyOption, removeCompanyOption, updateCompanyOption,
+    setCompanyOptions,
+  } = useAppData();
+
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [banks, setBanks] = useState<Bank[]>([]);
-  const [contasContabeis, setContasContabeis] = useState<ContaContabil[]>([]);
-  const [companyOptions, setCompanyOptions] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem('cn_company_options');
-      if (!raw) return DEFAULT_COMPANIES;
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return DEFAULT_COMPANIES;
-      const normalized = Array.from(new Set(parsed
-        .map((item: any) => String(item || '').trim().toUpperCase())
-        .filter(Boolean)));
-      return normalized.length ? normalized : DEFAULT_COMPANIES;
-    } catch {
-      return DEFAULT_COMPANIES;
-    }
-  });
   const [newCompanyName, setNewCompanyName] = useState('');
   const [editingCompany, setEditingCompany] = useState<string | null>(null);
   const [editingCompanyName, setEditingCompanyName] = useState('');
   const [newContaContabil, setNewContaContabil] = useState({ codigo: '', nome: '', tipo: 'DESPESA' });
-  const [searchContaContabil, setSearchContaContabil] = useState('');
   const [brandLogo, setBrandLogo] = useState<string>(() => {
-    try {
-      return localStorage.getItem('cn_brand_logo') || '';
-    } catch {
-      return '';
-    }
+    try { return localStorage.getItem('cn_brand_logo') || ''; } catch { return ''; }
   });
-  const [user, setUser] = useState<any>(null);
-  const [isAuthReady, setIsAuthReady] = useState(true);
 
   const [showNewTxModal, setShowNewTxModal] = useState(false);
   const [newTxInitialTipo, setNewTxInitialTipo] = useState<'DESPESA' | 'RECEITA'>('DESPESA');
@@ -3185,77 +3007,7 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const currentBrandLogo = brandLogo || defaultBrandLogo;
-
-  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
-  };
-
-  const normalizeCompanyName = (name: string) => String(name || '').trim().toUpperCase();
-
-  const addCompanyOption = (name: string) => {
-    const normalized = normalizeCompanyName(name);
-    if (!normalized) {
-      showNotification('Informe um nome de empresa válido.', 'error');
-      return;
-    }
-    if (companyOptions.includes(normalized)) {
-      showNotification('Essa empresa já existe.', 'info');
-      return;
-    }
-    setCompanyOptions((prev) => [...prev, normalized]);
-    setNewCompanyName('');
-    showNotification(`Empresa ${normalized} adicionada.`, 'success');
-  };
-
-  const removeCompanyOption = (name: string) => {
-    const normalized = normalizeCompanyName(name);
-    if (!companyOptions.includes(normalized)) return;
-    const next = companyOptions.filter((item) => item !== normalized);
-    if (!next.length) {
-      showNotification('Mantenha pelo menos uma empresa na lista.', 'error');
-      return;
-    }
-    setCompanyOptions(next);
-    if (editingCompany === normalized) {
-      setEditingCompany(null);
-      setEditingCompanyName('');
-    }
-    showNotification(`Empresa ${normalized} removida.`, 'info');
-  };
-
-  const addContaContabil = async () => {
-    if (!newContaContabil.codigo || !newContaContabil.nome) {
-      showNotification('Informe o código e o nome da conta.', 'error');
-      return;
-    }
-    try {
-      const res = await fetch('/api?route=contas-contabeis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newContaContabil),
-      });
-      if (!res.ok) throw new Error('Erro ao adicionar');
-      showNotification('Conta contábil adicionada!', 'success');
-      setNewContaContabil({ codigo: '', nome: '', tipo: 'DESPESA' });
-      fetchContasContabeis();
-    } catch (e) {
-      showNotification('Erro ao adicionar conta contábil.', 'error');
-    }
-  };
-
-  const deleteContaContabil = async (id: number) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta conta?')) return;
-    try {
-      await fetch(`/api/contas-contabeis?id=${id}`, { method: 'DELETE' });
-      showNotification('Conta contábil excluída!', 'success');
-      fetchContasContabeis();
-    } catch (e) {
-      showNotification('Erro ao excluir conta contábil.', 'error');
-    }
-  };
 
   const startEditCompany = (name: string) => {
     setEditingCompany(name);
@@ -3263,19 +3015,11 @@ export default function App() {
   };
 
   const saveEditCompany = (originalName: string) => {
-    const normalized = normalizeCompanyName(editingCompanyName);
-    if (!normalized) {
-      showNotification('Informe um nome de empresa válido.', 'error');
-      return;
+    const ok = updateCompanyOption(originalName, editingCompanyName);
+    if (ok) {
+      setEditingCompany(null);
+      setEditingCompanyName('');
     }
-    if (normalized !== originalName && companyOptions.includes(normalized)) {
-      showNotification('Já existe uma empresa com esse nome.', 'error');
-      return;
-    }
-    setCompanyOptions((prev) => prev.map((item) => item === originalName ? normalized : item));
-    setEditingCompany(null);
-    setEditingCompanyName('');
-    showNotification('Empresa atualizada com sucesso.', 'success');
   };
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -3289,10 +3033,7 @@ export default function App() {
     reader.onload = () => {
       const dataUrl = String(reader.result || '');
       setBrandLogo(dataUrl);
-      try {
-        localStorage.setItem('cn_brand_logo', dataUrl);
-      } catch {
-      }
+      try { localStorage.setItem('cn_brand_logo', dataUrl); } catch { /* ignore */ }
       showNotification('Logo atualizada com sucesso!', 'success');
     };
     reader.readAsDataURL(file);
@@ -3306,108 +3047,6 @@ export default function App() {
     }
     showNotification('Logo removida.', 'info');
   };
-
-  const fetchTransactions = async () => {
-    try {
-      const data = await api.getTransactions('guest');
-      const normalized = data.map((tx: any) => ({
-        ...tx,
-        vencimento: toDisplayDate(tx.vencimento),
-        pagamento: tx.pagamento ? toDisplayDate(tx.pagamento) : undefined,
-      }));
-      setTransactions(normalized.sort((a: any, b: any) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento)));
-    } catch (error) {
-      console.error('Failed to fetch transactions:', error);
-    }
-  };
-
-  const fetchSuppliers = async () => {
-    try {
-      const data = await api.getSuppliers('guest');
-      setSuppliers(data);
-    } catch (error) {
-      console.error('Failed to fetch suppliers:', error);
-    }
-  };
-
-  const fetchBanks = async () => {
-    try {
-      const data = await api.getBanks('guest');
-      setBanks(data);
-    } catch (error) {
-      console.error('Failed to fetch banks:', error);
-    }
-  };
-
-  const fetchContasContabeis = async () => {
-    try {
-      let data = await api.getContasContabeis();
-      if (!Array.isArray(data) || data.length === 0) {
-        try {
-          await api.setupTables();
-          data = await api.getContasContabeis();
-        } catch {
-        }
-      }
-      if (Array.isArray(data) && data.length > 0) {
-        setContasContabeis(data);
-      } else {
-        setContasContabeis(DEFAULT_ACCOUNTS);
-        showNotification('Usando plano de contas padrão local (API indisponível).', 'info');
-      }
-    } catch (error) {
-      console.error('Failed to fetch contas contabeis:', error);
-      setContasContabeis(DEFAULT_ACCOUNTS);
-      showNotification('API indisponível. Carregamos plano de contas padrão local.', 'info');
-    }
-  };
-
-  useEffect(() => {
-    api.setupTables().catch(console.error).finally(() => {
-      fetchTransactions();
-      fetchSuppliers();
-      fetchBanks();
-      fetchContasContabeis();
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!suppliers || suppliers.length === 0) return;
-    const key = 'cn_auto_merge_suppliers_last';
-    try {
-      const last = Number(localStorage.getItem(key) || 0);
-      const SIX_HOURS = 6 * 60 * 60 * 1000;
-      if (Date.now() - last < SIX_HOURS) return;
-    } catch {}
-    (async () => {
-      try {
-        await api.mergeSuppliersAuto();
-        await fetchSuppliers();
-        await fetchTransactions();
-        try { localStorage.setItem('cn_auto_merge_suppliers_last', String(Date.now())); } catch {}
-      } catch (e) {
-        console.error('Auto-merge suppliers failed:', e);
-      }
-    })();
-  }, [suppliers.length]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('cn_company_options', JSON.stringify(companyOptions));
-    } catch {
-    }
-  }, [companyOptions]);
-
-  useEffect(() => {
-    const sanitized = Array.from(new Set(companyOptions.map((item) => normalizeCompanyName(item)).filter(Boolean)));
-    if (!sanitized.length) {
-      setCompanyOptions(DEFAULT_COMPANIES);
-      return;
-    }
-    if (sanitized.length !== companyOptions.length || sanitized.some((item, i) => item !== companyOptions[i])) {
-      setCompanyOptions(sanitized);
-    }
-  }, [companyOptions]);
 
   // --- Handlers ---
 
@@ -3425,10 +3064,7 @@ export default function App() {
 
   const boletoDuplicateKey = (fornecedor: string, vencimento: string, valor: number, numeroBoleto?: string, descricao?: string, empresa?: string) => {
     const normalizedNumber = normalizeBoletoNumber(numeroBoleto);
-    if (normalizedNumber) {
-      return `BOLETO:${normalizedNumber}`;
-    }
-    // Include descricao and empresa to avoid false positives for same supplier/date/value but different descriptions
+    if (normalizedNumber) return `BOLETO:${normalizedNumber}`;
     const desc = normalizeSupplierName(descricao || '');
     const emp = normalizeSupplierName(empresa || '');
     return `BASE:${normalizeSupplierName(fornecedor)}|${vencimento}|${Number(valor || 0).toFixed(2)}|${desc}|${emp}`;
@@ -3477,11 +3113,8 @@ export default function App() {
         if (normalized) return normalized;
       }
     }
-    // Fallback: extract 47-48 digit barcode (linha digitável)
     const barcodeMatch = source.match(/\b([0-9]{47,48})\b/);
-    if (barcodeMatch?.[1]) {
-      return barcodeMatch[1];
-    }
+    if (barcodeMatch?.[1]) return barcodeMatch[1];
     return '';
   };
 
@@ -3497,18 +3130,13 @@ export default function App() {
     const dd = String(dueDate.getUTCDate()).padStart(2, '0');
     const mm = String(dueDate.getUTCMonth() + 1).padStart(2, '0');
     const yyyy = String(dueDate.getUTCFullYear());
-    return {
-      vencimento: `${dd}/${mm}/${yyyy}`,
-      valor: Number.isFinite(valor) ? valor : 0,
-    };
+    return { vencimento: `${dd}/${mm}/${yyyy}`, valor: Number.isFinite(valor) ? valor : 0 };
   };
 
   const shouldRejectSupplierName = (name: string) => {
     const value = String(name || '').trim().toUpperCase();
     if (!value) return true;
-    if (value.includes('DATA DO DOCUMENTO')) return true;
-    if (value.includes('VENCIMENTO')) return true;
-    if (value.includes('NOSSO NUMERO')) return true;
+    if (value.includes('DATA DO DOCUMENTO') || value.includes('VENCIMENTO') || value.includes('NOSSO NUMERO')) return true;
     const onlyNumericLike = value.replace(/[^0-9]/g, '').length >= Math.max(8, value.length - 2);
     if (onlyNumericLike) return true;
     if ((value.match(/[A-Z]/g) || []).length < 3) return true;
@@ -3534,13 +3162,11 @@ export default function App() {
       if (direct) return direct.nome;
     }
 
-    // Only search text for supplier name if Gemini didn't find a specific one
     if (!validDetected || validDetected === 'Fornecedor não identificado') {
       const byText = suppliers
         .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
         .filter((x) => x.key.length >= 5 && normalizedSource.includes(x.key))
         .sort((a, b) => b.key.length - a.key.length)[0];
-
       if (byText) return byText.supplier.nome;
     }
 
@@ -3566,10 +3192,7 @@ export default function App() {
       const match = normalizedText.match(pattern);
       if (match?.[1]) {
         const candidate = match[1].trim().replace(/\s+/g, ' ');
-        if (!shouldRejectSupplierName(candidate)) {
-          fornecedor = candidate;
-          break;
-        }
+        if (!shouldRejectSupplierName(candidate)) { fornecedor = candidate; break; }
       }
     }
 
@@ -3578,9 +3201,7 @@ export default function App() {
         .map((s) => ({ supplier: s, score: normalizedText.includes(normalizeSupplierName(s.nome)) ? normalizeSupplierName(s.nome).length : 0 }))
         .filter((x) => x.score > 0)
         .sort((a, b) => b.score - a.score)[0];
-      if (bestSupplier) {
-        fornecedor = bestSupplier.supplier.nome;
-      }
+      if (bestSupplier) fornecedor = bestSupplier.supplier.nome;
     }
 
     const datePatterns = [
@@ -3588,13 +3209,9 @@ export default function App() {
       /DATA DE VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/,
       /\b(\d{2}\/\d{2}\/\d{4})\b/,
     ];
-
     for (const pattern of datePatterns) {
       const match = normalizedText.match(pattern);
-      if (match?.[1]) {
-        vencimento = match[1];
-        break;
-      }
+      if (match?.[1]) { vencimento = match[1]; break; }
     }
 
     const valuePatterns = [
@@ -3604,15 +3221,11 @@ export default function App() {
       /VLR\s+PAGAR[:\s]+R?\$?\s*([\d.,]+)/,
       /R\$\s*([\d]{1,3}(?:\.[\d]{3})*,[\d]{2})/,
     ];
-
     for (const pattern of valuePatterns) {
       const match = normalizedText.match(pattern);
       if (match?.[1]) {
         const parsed = Number(match[1].replace(/\./g, '').replace(',', '.'));
-        if (!Number.isNaN(parsed) && parsed > 0) {
-          valor = parsed;
-          break;
-        }
+        if (!Number.isNaN(parsed) && parsed > 0) { valor = parsed; break; }
       }
     }
 
@@ -3641,7 +3254,7 @@ export default function App() {
 
   const extractBoletoWithGemini = async (text: string, fileName: string, pdfBase64?: string): Promise<PdfImportDraft> => {
     try {
-      const response = await fetch('/api?route=extract-boleto', {
+      const response = await fetch('/api/extract-boleto', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, fileName, pdfBase64 }),
@@ -4099,18 +3712,6 @@ export default function App() {
     reader.readAsArrayBuffer(file);
   };
 
-  const markAsPaid = async (id: string, banco: string) => {
-    const today = new Date().toLocaleDateString('pt-BR');
-    setTransactions(prev => prev.map(tx =>
-      tx.id === id ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: today, banco } : tx
-    ));
-    showNotification('Lançamento marcado como pago!', 'success');
-    api.updateTransaction(id, { status: 'PAGO', pagamento: today, banco }).catch(err => {
-      console.error('Failed to mark as paid:', err);
-      fetchTransactions();
-    });
-  };
-
   const handleMarkAsPaidClick = (tx: Transaction) => {
     if (banks.filter(b => b.ativo).length > 0) {
       setShowPayModal({ id: tx.id, valor: tx.valor });
@@ -4119,93 +3720,11 @@ export default function App() {
     }
   };
 
-  const updateTransaction = async (updatedTx: Transaction) => {
-    const { id, ...data } = updatedTx;
-    if (!id) return;
-    try {
-      const saved = await api.updateTransaction(id, data);
-      const normalizedSaved = {
-        ...saved,
-        vencimento: toDisplayDate(saved.vencimento),
-        pagamento: saved.pagamento ? toDisplayDate(saved.pagamento) : undefined,
-      } as Transaction;
-      setTransactions(prev =>
-        prev
-          .map(tx => tx.id === id ? { ...tx, ...normalizedSaved } as Transaction : tx)
-          .sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento))
-      );
-      showNotification('Lançamento atualizado!', 'success');
-    } catch (err) {
-      console.error('Failed to update transaction:', err);
-      showNotification('Erro ao atualizar lançamento.', 'error');
-      fetchTransactions();
-    }
-  };
-
-  const syncSuppliers = async () => {
-    const transactionSuppliers = new Set<string>(transactions.map(tx => tx.fornecedor));
-    const existingNames = new Set<string>(suppliers.map(s => s.nome));
-    let count = 0;
-
-    for (const nome of transactionSuppliers) {
-      if (!existingNames.has(nome) && nome !== 'Desconhecido') {
-        await api.createSupplier({
-          uid: 'guest',
-          nome: nome,
-          email: '',
-          telefone: '',
-          cnpj: ''
-        });
-        count++;
-      }
-    }
-
-    if (count > 0) {
-      showNotification(`${count} novos fornecedores sincronizados!`, 'success');
-      fetchSuppliers();
-    } else {
-      showNotification('Todos os fornecedores já estão cadastrados.', 'info');
-    }
-  };
-
-  const deleteTransaction = async (id: string) => {
-    // Optimistic update — sem re-fetch
-    setTransactions(prev => prev.filter(tx => tx.id !== id));
-    showNotification('Lançamento excluído.', 'info');
-    api.deleteTransaction(id).catch(err => {
-      console.error('Failed to delete transaction:', err);
-      fetchTransactions(); // rollback se falhar
-    });
-  };
-
-  const deleteSupplier = async (id: string) => {
-    try {
-      await api.deleteSupplier(id);
-      showNotification('Fornecedor excluído.', 'info');
-      fetchSuppliers();
-    } catch (error) {
-      console.error('Failed to delete supplier:', error);
-    }
-  };
-
-  const deleteBank = async (id: string) => {
-    try {
-      await api.deleteBank(id);
-      showNotification('Banco excluído.', 'info');
-      fetchBanks();
-    } catch (error) {
-      console.error('Failed to delete bank:', error);
-    }
-  };
-
   const resetSystem = async () => {
     if (!window.confirm('ATENÇÃO: Isso apagará TODOS os seus lançamentos e fornecedores da nuvem. Deseja continuar?')) return;
-    
     try {
       showNotification('Iniciando limpeza de dados...', 'info');
-      
       await api.resetDatabase();
-      
       showNotification('Sistema resetado com sucesso!', 'success');
       fetchTransactions();
       fetchSuppliers();
