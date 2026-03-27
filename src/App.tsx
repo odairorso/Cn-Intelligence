@@ -209,6 +209,7 @@ type PdfImportDraft = {
   empresa: string;
   cnpj: string;
   numero_boleto: string;
+  tipo?: 'RECEITA' | 'DESPESA';
   rawText: string;
   duplicate: boolean;
   conta_contabil_id?: number;
@@ -3236,18 +3237,21 @@ export default function App() {
     return raw.replace(/[^A-Z0-9]/g, '');
   };
 
-  const boletoDuplicateKey = (fornecedor: string, vencimento: string, valor: number, numeroBoleto?: string) => {
+  const boletoDuplicateKey = (fornecedor: string, vencimento: string, valor: number, numeroBoleto?: string, descricao?: string, empresa?: string) => {
     const normalizedNumber = normalizeBoletoNumber(numeroBoleto);
     if (normalizedNumber) {
       return `BOLETO:${normalizedNumber}`;
     }
-    return `BASE:${normalizeSupplierName(fornecedor)}|${vencimento}|${Number(valor || 0).toFixed(2)}`;
+    // Include descricao and empresa to avoid false positives for same supplier/date/value but different descriptions
+    const desc = normalizeSupplierName(descricao || '');
+    const emp = normalizeSupplierName(empresa || '');
+    return `BASE:${normalizeSupplierName(fornecedor)}|${vencimento}|${Number(valor || 0).toFixed(2)}|${desc}|${emp}`;
   };
 
   const getExistingBoletoKeys = () =>
     new Set(
       transactions
-        .map((tx) => boletoDuplicateKey(tx.fornecedor, tx.vencimento, tx.valor, tx.numero_boleto))
+        .map((tx) => boletoDuplicateKey(tx.fornecedor, tx.vencimento, tx.valor, tx.numero_boleto, tx.descricao, tx.empresa))
         .filter((key): key is string => Boolean(key))
     );
 
@@ -3256,7 +3260,7 @@ export default function App() {
     const batchKeys = new Set<string>();
     return rows.map((row) => {
       const numero_boleto = normalizeBoletoNumber(row.numero_boleto);
-      const key = boletoDuplicateKey(row.fornecedor, row.vencimento, row.valor, numero_boleto);
+      const key = boletoDuplicateKey(row.fornecedor, row.vencimento, row.valor, numero_boleto, row.descricao, row.empresa);
       const duplicate = existingKeys.has(key) || batchKeys.has(key);
       batchKeys.add(key);
       return { ...row, numero_boleto, duplicate };
@@ -3435,6 +3439,7 @@ export default function App() {
       empresa: '',
       cnpj: '',
       numero_boleto: numeroBoleto,
+      tipo: 'DESPESA',
       rawText: text.slice(0, 500),
       duplicate: false,
     };
@@ -3465,6 +3470,7 @@ export default function App() {
           empresa: data.empresa || '',
           cnpj: data.cnpj || '',
           numero_boleto: normalizeBoletoNumber(data.numero_boleto || '') || fallbackNumero || inferredFromDescricao,
+          tipo: 'DESPESA',
           rawText: text.slice(0, 500),
           duplicate: false,
         };
@@ -3472,11 +3478,11 @@ export default function App() {
 
       console.log('[boleto] Gemini returned empty data, using local fallback');
       const fallback = extractBoletoData(text, fileName);
-      return { ...fallback, descricao: data.descricao || '', empresa: data.empresa || '', cnpj: data.cnpj || '', numero_boleto: data.numero_boleto || '' };
+      return { ...fallback, descricao: data.descricao || '', empresa: data.empresa || '', cnpj: data.cnpj || '', numero_boleto: data.numero_boleto || '', tipo: 'DESPESA' };
     } catch (err) {
       console.error('[boleto] API error, using local fallback:', err);
       const fallback = extractBoletoData(text, fileName);
-      return { ...fallback, descricao: '', empresa: '', cnpj: '', numero_boleto: '' };
+      return { ...fallback, descricao: '', empresa: '', cnpj: '', numero_boleto: '', tipo: 'DESPESA' };
     }
   };
 
@@ -3566,6 +3572,7 @@ export default function App() {
       const canonicalRows = nonDuplicateRows.map((row) => ({
         ...row,
         fornecedor: resolveSupplierName(row.fornecedor, row.rawText),
+        tipo: row.tipo || 'DESPESA',
       }));
 
       const txList = canonicalRows.map((row) => ({
@@ -3580,6 +3587,7 @@ export default function App() {
         banco: null as any,
         numero_boleto: row.numero_boleto,
         conta_contabil_id: row.conta_contabil_id,
+        tipo: row.tipo || 'DESPESA',
       }));
 
       if (txList.length === 1) {

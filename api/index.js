@@ -93,6 +93,8 @@ async function handleTransactions(req, res) {
             WHERE upper(coalesce(fornecedor, '')) = upper(${fornecedor})
               AND vencimento = ${vDate}
               AND abs(valor - ${valor}) < 0.0001
+              AND upper(coalesce(descricao, '')) = upper(${descricao || ''})
+              AND upper(coalesce(empresa, '')) = upper(${empresa || ''})
             LIMIT 1`;
       if (duplicateRows.length) {
         return res.status(409).json({ error: 'Boleto já lançado', duplicate: true });
@@ -130,9 +132,12 @@ async function handleTransactionsBatch(req, res) {
       const vDate = parseDateToPg(vencimento) || new Date().toISOString().split('T')[0];
       const pDate = parseDateToPg(pagamento);
       const normalizedNumber = normalizeBoletoNumber(numero_boleto);
+      // Include descricao and empresa in duplicate key to avoid false positives
+      const descKey = String(descricao || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const empKey = String(empresa || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       const localKey = normalizedNumber
         ? `BOLETO:${normalizedNumber}`
-        : `BASE:${String(fornecedor || '').toUpperCase()}|${vDate}|${Number(valor || 0).toFixed(2)}`;
+        : `BASE:${String(fornecedor || '').toUpperCase()}|${vDate}|${Number(valor || 0).toFixed(2)}|${descKey}|${empKey}`;
       if (seenKeys.has(localKey)) {
         blocked++;
         continue;
@@ -147,6 +152,8 @@ async function handleTransactionsBatch(req, res) {
             WHERE upper(coalesce(fornecedor, '')) = upper(${fornecedor})
               AND vencimento = ${vDate}
               AND abs(valor - ${valor}) < 0.0001
+              AND upper(coalesce(descricao, '')) = upper(${descricao || ''})
+              AND upper(coalesce(empresa, '')) = upper(${empresa || ''})
             LIMIT 1`;
       if (duplicateRows.length) {
         blocked++;
