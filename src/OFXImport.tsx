@@ -164,6 +164,11 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
   const [step, setStep]           = useState<'upload' | 'review' | 'done'>('upload');
   const [importCount, setImportCount] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [activeSearchIdx, setActiveSearchIdx] = useState(-1);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const normalizeSupplierName = (v: string) =>
+    String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
   // ── Detect duplicates ──────────────────────────────────────────────────
   const isDuplicate = useCallback(
@@ -536,13 +541,43 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
                         {/* Fornecedor */}
                         <div className="md:col-span-3">
                           <p className="text-[9px] font-bold uppercase text-on-surface-variant/50 mb-1">Fornecedor / Sacado</p>
-                          <input
-                            value={row.fornecedor}
-                            onChange={(e) => updateRow(idx, { fornecedor: e.target.value })}
-                            list="ofx-supplier-suggestions"
-                            className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-primary"
-                            disabled={row.duplicate}
-                          />
+                          <div className="relative">
+                            <input
+                              value={row.fornecedor}
+                              onChange={(e) => {
+                                updateRow(idx, { fornecedor: e.target.value });
+                                setActiveSearchIdx(idx);
+                                setSearchTerm(e.target.value);
+                              }}
+                              onFocus={() => { setActiveSearchIdx(idx); setSearchTerm(row.fornecedor); }}
+                              placeholder="Digite para buscar fornecedor..."
+                              className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-primary"
+                              disabled={row.duplicate}
+                            />
+                            {activeSearchIdx === idx && searchTerm && (
+                              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#1e1e2e] border border-white/10 rounded-lg shadow-2xl max-h-40 overflow-y-auto">
+                                {suppliers
+                                  .filter(s => normalizeSupplierName(s.nome).includes(normalizeSupplierName(searchTerm)))
+                                  .slice(0, 8)
+                                  .map(s => (
+                                    <button
+                                      key={s.id || s.nome}
+                                      className="w-full text-left px-3 py-2 text-xs hover:bg-primary/20 hover:text-primary transition-colors truncate"
+                                      onClick={() => {
+                                        updateRow(idx, { fornecedor: s.nome });
+                                        setActiveSearchIdx(-1);
+                                        setSearchTerm('');
+                                      }}
+                                    >
+                                      {s.nome}
+                                    </button>
+                                  ))}
+                                {suppliers.filter(s => normalizeSupplierName(s.nome).includes(normalizeSupplierName(searchTerm))).length === 0 && (
+                                  <p className="px-3 py-2 text-xs text-on-surface-variant italic">Nenhum fornecedor encontrado</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         {/* Descrição */}
