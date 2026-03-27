@@ -27,6 +27,7 @@ export interface Transaction {
   banco?: string;
   tipo?: string;
   juros?: number;
+  numero_boleto?: string;
   conta_contabil_id?: number;
 }
 
