@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"C:\\\\Users\\\\Financeiro\\\\Documents\\\\Colheitadeira\\\\Agroharvest Ompio de Oliveira\" fetch origin)",
+      "Bash(git -C \"C:\\\\Users\\\\Financeiro\\\\Documents\\\\Colheitadeira\\\\Agroharvest Ompio de Oliveira\" log --oneline origin/main..HEAD)",
+      "Bash(node -e \":*)",
+      "Bash(npx tsx:*)"
+    ]
+  }
+}
