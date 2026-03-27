@@ -173,7 +173,7 @@ const isSupplierMatch = (transactionSupplier: string, supplierName: string) => {
 // --- Types ---
 type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'receitas' | 'bancos' | 'extrato' | 'configuracoes';
 
-const DEFAULT_COMPANIES = ['CN', 'FACEMS', 'LAB', 'CEI', 'UNOPAR'];
+const DEFAULT_COMPANIES = ['CN', 'CEI', 'UNOPAR', 'FACEMS', 'ELAINE', 'POLO DE ITAQUIRAI'];
 
 type PdfImportDraft = {
   fileName: string;
@@ -2845,14 +2845,13 @@ export default function App() {
       if (!Array.isArray(parsed)) return DEFAULT_COMPANIES;
       const normalized = parsed
         .map((item: any) => String(item || '').trim().toUpperCase())
-        .filter(Boolean);
+        .filter((item: string) => DEFAULT_COMPANIES.includes(item));
       const merged = Array.from(new Set([...DEFAULT_COMPANIES, ...normalized]));
-      return merged.length ? merged : DEFAULT_COMPANIES;
+      return DEFAULT_COMPANIES.filter((company) => merged.includes(company));
     } catch {
       return DEFAULT_COMPANIES;
     }
   });
-  const [newCompanyName, setNewCompanyName] = useState('');
   const [brandLogo, setBrandLogo] = useState<string>(() => {
     try {
       return localStorage.getItem('cn_brand_logo') || '';
@@ -2883,33 +2882,6 @@ export default function App() {
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
-  };
-
-  const normalizeCompanyName = (name: string) => String(name || '').trim().toUpperCase();
-
-  const addCompanyOption = (name: string) => {
-    const normalized = normalizeCompanyName(name);
-    if (!normalized) {
-      showNotification('Informe um nome de empresa válido.', 'error');
-      return;
-    }
-    if (companyOptions.includes(normalized)) {
-      showNotification('Essa empresa já está cadastrada.', 'info');
-      return;
-    }
-    setCompanyOptions((prev) => [...prev, normalized]);
-    setNewCompanyName('');
-    showNotification(`Empresa ${normalized} cadastrada com sucesso!`, 'success');
-  };
-
-  const removeCompanyOption = (name: string) => {
-    const normalized = normalizeCompanyName(name);
-    if (DEFAULT_COMPANIES.includes(normalized)) {
-      showNotification('Empresas padrão não podem ser removidas.', 'info');
-      return;
-    }
-    setCompanyOptions((prev) => prev.filter((item) => item !== normalized));
-    showNotification(`Empresa ${normalized} removida.`, 'info');
   };
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2999,15 +2971,12 @@ export default function App() {
   }, [companyOptions]);
 
   useEffect(() => {
-    const fromTransactions = transactions
-      .map((tx) => String(tx.empresa || '').trim().toUpperCase())
-      .filter(Boolean);
-    if (!fromTransactions.length) return;
-    const merged = Array.from(new Set([...companyOptions, ...fromTransactions]));
-    if (merged.length !== companyOptions.length) {
-      setCompanyOptions(merged);
+    const sanitized = companyOptions.filter((item) => DEFAULT_COMPANIES.includes(item));
+    const ordered = DEFAULT_COMPANIES.filter((item) => sanitized.includes(item));
+    if (ordered.length !== companyOptions.length || ordered.some((item, i) => item !== companyOptions[i])) {
+      setCompanyOptions(ordered);
     }
-  }, [transactions, companyOptions]);
+  }, [companyOptions]);
 
   // --- Handlers ---
 
@@ -3223,7 +3192,7 @@ export default function App() {
 
     try {
       const existingKeys = new Set(
-        transactions.map((tx) => boletoDuplicateKey(tx.fornecedor, tx.vencimento, tx.valor))
+        transactions.map((tx) => boletoDuplicateKey(tx.fornecedor, tx.vencimento, tx.valor, tx.numero_boleto))
       );
 
       // Process all PDFs in parallel
@@ -4088,34 +4057,11 @@ export default function App() {
                   <h4 className="text-sm font-bold text-secondary mb-4 uppercase tracking-widest">Empresas</h4>
                   <div className="space-y-4 max-w-xl mx-auto">
                     <div className="glass-card p-4">
-                      <p className="text-[11px] text-on-surface-variant mb-3">Cadastre empresas para aparecerem no campo Empresa dos lançamentos e boletos.</p>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newCompanyName}
-                          onChange={(e) => setNewCompanyName(e.target.value)}
-                          placeholder="Ex: COLÉGIO EXEMPLO"
-                          className="flex-1 bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
-                        />
-                        <button
-                          onClick={() => addCompanyOption(newCompanyName)}
-                          className="bg-secondary/20 text-secondary px-4 py-2 rounded-lg text-xs font-bold border border-secondary/30 hover:bg-secondary/30 transition-all"
-                        >
-                          Cadastrar
-                        </button>
-                      </div>
+                      <p className="text-[11px] text-on-surface-variant mb-3">Lista fixa solicitada: somente as empresas abaixo ficam disponíveis no sistema.</p>
                       <div className="mt-4 flex flex-wrap gap-2">
                         {companyOptions.map((company) => (
                           <span key={company} className="inline-flex items-center gap-2 bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-1.5 text-xs font-bold">
                             {company}
-                            {!DEFAULT_COMPANIES.includes(company) && (
-                              <button
-                                onClick={() => removeCompanyOption(company)}
-                                className="text-tertiary hover:text-tertiary/80"
-                              >
-                                <X size={12} />
-                              </button>
-                            )}
                           </span>
                         ))}
                       </div>
