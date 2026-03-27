@@ -1,17 +1,18 @@
 import type { Transaction, Supplier, Bank, ContaContabil } from './types';
 
+// O backend no Vercel usa api/index.js com roteamento por ?route=
 const API_BASE = '/api';
 
 export const api = {
   // ─── Transactions ──────────────────────────────────────────────────────────
   async getTransactions(_uid: string): Promise<Transaction[]> {
-    const res = await fetch(`${API_BASE}/transactions`);
+    const res = await fetch(`${API_BASE}?route=transactions`);
     if (!res.ok) throw new Error('Failed to fetch transactions');
     return res.json();
   },
 
   async createTransaction(data: Omit<Transaction, 'id'>): Promise<Transaction> {
-    const res = await fetch(`${API_BASE}/transactions`, {
+    const res = await fetch(`${API_BASE}?route=transactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -21,7 +22,7 @@ export const api = {
   },
 
   async createTransactionsBatch(data: Omit<Transaction, 'id'>[]): Promise<void> {
-    const res = await fetch(`${API_BASE}/transactions/batch`, {
+    const res = await fetch(`${API_BASE}?route=transactions-batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -30,7 +31,7 @@ export const api = {
   },
 
   async updateTransaction(id: string, data: Partial<Transaction>): Promise<Transaction> {
-    const res = await fetch(`${API_BASE}/transactions/${id}`, {
+    const res = await fetch(`${API_BASE}?route=transactions&id=${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -40,19 +41,19 @@ export const api = {
   },
 
   async deleteTransaction(id: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/transactions/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE}?route=transactions&id=${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete transaction');
   },
 
   // ─── Suppliers ─────────────────────────────────────────────────────────────
   async getSuppliers(_uid: string): Promise<Supplier[]> {
-    const res = await fetch(`${API_BASE}/suppliers`);
+    const res = await fetch(`${API_BASE}?route=suppliers`);
     if (!res.ok) throw new Error('Failed to fetch suppliers');
     return res.json();
   },
 
   async createSupplier(data: Omit<Supplier, 'id'>): Promise<Supplier> {
-    const res = await fetch(`${API_BASE}/suppliers`, {
+    const res = await fetch(`${API_BASE}?route=suppliers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -62,7 +63,7 @@ export const api = {
   },
 
   async createSuppliersBatch(data: Omit<Supplier, 'id'>[]): Promise<void> {
-    const res = await fetch(`${API_BASE}/suppliers/batch`, {
+    const res = await fetch(`${API_BASE}?route=suppliers-batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -71,12 +72,12 @@ export const api = {
   },
 
   async deleteSupplier(id: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/suppliers/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE}?route=suppliers&id=${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete supplier');
   },
 
   async mergeSuppliers(target: string, aliases: string[]): Promise<{ updated: number; removed: number }> {
-    const res = await fetch(`${API_BASE}/suppliers/merge`, {
+    const res = await fetch(`${API_BASE}?route=suppliers-merge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ target, aliases }),
@@ -86,20 +87,20 @@ export const api = {
   },
 
   async mergeSuppliersAuto(): Promise<{ updated: number; removed: number }> {
-    const res = await fetch(`${API_BASE}/suppliers/merge-auto`, { method: 'POST' });
+    const res = await fetch(`${API_BASE}?route=suppliers-merge-auto`, { method: 'POST' });
     if (!res.ok) throw new Error('Failed to auto-merge suppliers');
     return res.json();
   },
 
   // ─── Banks ─────────────────────────────────────────────────────────────────
   async getBanks(_uid: string): Promise<Bank[]> {
-    const res = await fetch(`${API_BASE}/banks`);
+    const res = await fetch(`${API_BASE}?route=banks`);
     if (!res.ok) throw new Error('Failed to fetch banks');
     return res.json();
   },
 
   async createBank(data: Omit<Bank, 'id'>): Promise<Bank> {
-    const res = await fetch(`${API_BASE}/banks`, {
+    const res = await fetch(`${API_BASE}?route=banks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -109,7 +110,7 @@ export const api = {
   },
 
   async updateBank(id: string, data: Partial<Bank>): Promise<Bank> {
-    const res = await fetch(`${API_BASE}/banks/${id}`, {
+    const res = await fetch(`${API_BASE}?route=banks&id=${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -119,19 +120,19 @@ export const api = {
   },
 
   async deleteBank(id: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/banks/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE}?route=banks&id=${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete bank');
   },
 
   // ─── Contas Contábeis ──────────────────────────────────────────────────────
   async getContasContabeis(): Promise<ContaContabil[]> {
-    const res = await fetch(`${API_BASE}/contas-contabeis`);
+    const res = await fetch(`${API_BASE}?route=contas-contabeis`);
     if (!res.ok) throw new Error('Failed to fetch contas contabeis');
     return res.json();
   },
 
   async createContaContabil(data: { codigo: string; nome: string; tipo: 'RECEITA' | 'DESPESA' }): Promise<ContaContabil> {
-    const res = await fetch(`${API_BASE}/contas-contabeis`, {
+    const res = await fetch(`${API_BASE}?route=contas-contabeis`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -141,7 +142,7 @@ export const api = {
   },
 
   async updateContaContabil(id: number, data: Partial<ContaContabil>): Promise<ContaContabil> {
-    const res = await fetch(`${API_BASE}/contas-contabeis/${id}`, {
+    const res = await fetch(`${API_BASE}?route=contas-contabeis&id=${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -152,29 +153,29 @@ export const api = {
 
   // ─── Utilities ─────────────────────────────────────────────────────────────
   async setupTables(): Promise<void> {
-    const res = await fetch(`${API_BASE}/setup-tables`, { method: 'POST' });
+    const res = await fetch(`${API_BASE}?route=setup-tables`, { method: 'POST' });
     if (!res.ok) throw new Error('Failed to setup tables');
   },
 
   async resetDatabase(): Promise<void> {
-    const res = await fetch(`${API_BASE}/reset`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE}?route=reset`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to reset database');
   },
 
   async cleanDuplicates(): Promise<{ deleted: number }> {
-    const res = await fetch(`${API_BASE}/clean-duplicates`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE}?route=clean-duplicates`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to clean duplicates');
     return res.json();
   },
 
   async cleanSuspicious(): Promise<{ deleted: number }> {
-    const res = await fetch(`${API_BASE}/clean-suspicious`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE}?route=clean-suspicious`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to clean suspicious data');
     return res.json();
   },
 
   async extractBoleto(text?: string, fileName?: string, pdfBase64?: string): Promise<Record<string, unknown>> {
-    const res = await fetch(`${API_BASE}/extract-boleto`, {
+    const res = await fetch(`${API_BASE}?route=extract-boleto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, fileName, pdfBase64 }),
