@@ -3059,8 +3059,8 @@ export default function App() {
     if (numeroBoleto && numeroBoleto.trim()) {
       return `BOLETO:${numeroBoleto.trim()}`;
     }
-    // Fallback: fornecedor + vencimento + valor
-    return `${normalizeSupplierName(fornecedor)}|${vencimento}|${Number(valor || 0).toFixed(2)}`;
+    // Se não tem número do boleto, retorna null para não bloquear duplicatas falsas
+    return null;
   };
 
   const parseLinhaDigitavel = (text: string) => {
@@ -3266,7 +3266,7 @@ export default function App() {
 
     try {
       const existingKeys = new Set(
-        transactions.map((tx) => boletoDuplicateKey(tx.fornecedor, tx.vencimento, tx.valor, tx.numero_boleto))
+        transactions.map((tx) => boletoDuplicateKey(tx.fornecedor, tx.vencimento, tx.valor, tx.numero_boleto)).filter(k => k !== null)
       );
 
       // Process all PDFs in parallel
@@ -3311,8 +3311,9 @@ export default function App() {
       const batchKeys = new Set<string>();
       for (const data of extractedRows) {
         const key = boletoDuplicateKey(data.fornecedor, data.vencimento, data.valor, data.numero_boleto);
-        data.duplicate = existingKeys.has(key) || batchKeys.has(key);
-        batchKeys.add(key);
+        // Only mark as duplicate if key is not null (meaning numero_boleto exists)
+        data.duplicate = key !== null && (existingKeys.has(key) || batchKeys.has(key));
+        if (key) batchKeys.add(key);
       }
 
       if (!extractedRows.length) {
