@@ -2246,9 +2246,10 @@ interface NewTxModalProps {
   companyOptions: string[];
   setShowNewTxModal: (show: boolean) => void;
   onSuccess: () => void;
+  initialTipo?: 'DESPESA' | 'RECEITA';
 }
 
-const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShowNewTxModal, onSuccess }: NewTxModalProps) => {
+const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShowNewTxModal, onSuccess, initialTipo = 'DESPESA' }: NewTxModalProps) => {
   const [formData, setFormData] = useState({
     fornecedor: suppliers[0]?.nome || '',
     descricao: '',
@@ -2260,7 +2261,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
     valorTipo: 'parcela' as 'parcela' | 'total',
     status: 'PENDENTE' as TransactionStatus,
     banco: '',
-    tipo: 'DESPESA' as 'RECEITA' | 'DESPESA',
+    tipo: initialTipo as 'RECEITA' | 'DESPESA',
     conta_contabil_id: undefined as number | undefined,
   });
   const [searchConta, setSearchConta] = useState('');
@@ -3169,6 +3170,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(true);
 
   const [showNewTxModal, setShowNewTxModal] = useState(false);
+  const [newTxInitialTipo, setNewTxInitialTipo] = useState<'DESPESA' | 'RECEITA'>('DESPESA');
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
   const [showNewBankModal, setShowNewBankModal] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
@@ -4486,7 +4488,7 @@ export default function App() {
             )}
 
             {activeTab === 'relatorios' && <RelatoriosTab transactions={transactions} />}
-            {activeTab === 'receitas' && <ReceitasTab transactions={transactions} onNewRevenue={() => setShowNewTxModal(true)} />}
+            {activeTab === 'receitas' && <ReceitasTab transactions={transactions} onNewRevenue={() => { setNewTxInitialTipo('RECEITA'); setShowNewTxModal(true); }} />}
             {activeTab === 'bancos' && (
               <BancosTab 
                 banks={banks}
@@ -5101,6 +5103,7 @@ export default function App() {
             fetchTransactions();
             showNotification('Lançamento salvo com sucesso!', 'success');
           }}
+          initialTipo={newTxInitialTipo}
         />
       )}
 
