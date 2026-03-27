@@ -217,7 +217,8 @@ const DEFAULT_ACCOUNTS: Array<ContaContabil> = [
   { id: 0, codigo: '4.2', nome: 'Repasses', tipo: 'RECEITA', ativo: true } as any,
   { id: 0, codigo: '4.3', nome: 'Matrículas', tipo: 'RECEITA', ativo: true } as any,
   { id: 0, codigo: '4.4', nome: 'Permutas / Convênios', tipo: 'RECEITA', ativo: true } as any,
-  { id: 0, codigo: '4.5', nome: 'Outras Receitas', tipo: 'RECEITA', ativo: true } as any,
+  { id: 0, codigo: '4.5', nome: 'Aplicação Bancária', tipo: 'RECEITA', ativo: true } as any,
+  { id: 0, codigo: '4.6', nome: 'Outras Receitas', tipo: 'RECEITA', ativo: true } as any,
 ];
 
 type PdfImportDraft = {

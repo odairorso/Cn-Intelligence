@@ -86,7 +86,8 @@ async function ensureContasTable() {
     ['4.2', 'Repasses', 'RECEITA'],
     ['4.3', 'Matrículas', 'RECEITA'],
     ['4.4', 'Permutas / Convênios', 'RECEITA'],
-    ['4.5', 'Outras Receitas', 'RECEITA'],
+    ['4.5', 'Aplicação Bancária', 'RECEITA'],
+    ['4.6', 'Outras Receitas', 'RECEITA'],
   ];
   
   for (const [codigo, nome, tipo] of defaultAccounts) {
@@ -707,7 +708,8 @@ async function handleSetupTables(req, res) {
       ['4.2', 'Repasses', 'RECEITA'],
       ['4.3', 'Matrículas', 'RECEITA'],
       ['4.4', 'Permutas / Convênios', 'RECEITA'],
-      ['4.5', 'Outras Receitas', 'RECEITA'],
+      ['4.5', 'Aplicação Bancária', 'RECEITA'],
+      ['4.6', 'Outras Receitas', 'RECEITA'],
     ];
     
     for (const [codigo, nome, tipo] of defaultAccounts) {
