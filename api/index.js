@@ -95,10 +95,13 @@ async function ensureContasTable() {
 async function handleTransactions(req, res) {
   if (req.method === 'GET') {
     try {
-      const { uid } = req.query;
+      const { uid, limit } = req.query;
+      // Limit results for better performance (default 2000, max 5000)
+      const maxResults = Math.min(Number(limit) || 2000, 5000);
+      
       const rows = uid
-        ? await sql`SELECT * FROM transactions WHERE uid = ${uid} ORDER BY vencimento DESC`
-        : await sql`SELECT * FROM transactions ORDER BY vencimento DESC`;
+        ? await sql`SELECT * FROM transactions WHERE uid = ${uid} ORDER BY vencimento DESC LIMIT ${maxResults}`
+        : await sql`SELECT * FROM transactions ORDER BY vencimento DESC LIMIT ${maxResults}`;
 
       const formatted = rows.map(tx => ({
         ...tx,
@@ -394,6 +397,10 @@ async function handleSuppliersMergeAuto(req, res) {
     let totalRemoved = 0;
     let groupsProcessed = 0;
 
+    // Collect all updates and deletes to do in batches
+    const updates = [];
+    const deletes = [];
+
     for (const [key, items] of groups.entries()) {
       if (items.length <= 1) continue; // Skip uniques
       
@@ -417,32 +424,42 @@ async function handleSuppliersMergeAuto(req, res) {
 
       console.log(`[merge-auto] Canonical: "${canonical}", Aliases: ${aliases.join(', ')}`);
 
-      // Update all transactions with aliases to use canonical name
-      for (const alias of aliases) {
-        const normalizedAlias = normSupplier(alias);
-        const updateResult = await sql`
-          UPDATE transactions 
-          SET fornecedor = ${canonical} 
-          WHERE upper(regexp_replace(coalesce(fornecedor, ''), '[^A-Za-z0-9]+', ' ', 'g')) = ${normalizedAlias}
-             OR fornecedor = ${alias}
-        `;
-        console.log(`[merge-auto] Updated transactions: "${alias}" -> "${canonical}" (${updateResult.length} rows)`);
-        totalUpdated += updateResult.length;
-      }
+      // Collect aliases for batch update
+      aliases.forEach(alias => {
+        updates.push({ alias, canonical });
+      });
 
-      // Delete duplicate suppliers (keep the canonical one)
-      for (const alias of aliases) {
-        const normalizedAlias = normSupplier(alias);
-        const deleteResult = await sql`
-          DELETE FROM suppliers 
-          WHERE (upper(regexp_replace(coalesce(nome, ''), '[^A-Za-z0-9]+', ' ', 'g')) = ${normalizedAlias}
-                 OR nome = ${alias})
-          AND nome != ${canonical}
-          RETURNING id
-        `;
-        console.log(`[merge-auto] Deleted supplier: "${alias}" (${deleteResult.length} rows)`);
-        totalRemoved += deleteResult.length;
-      }
+      // Collect aliases for batch delete
+      aliases.forEach(alias => {
+        deletes.push({ alias, canonical });
+      });
+    }
+
+    // Execute batch updates
+    for (const { alias, canonical } of updates) {
+      const normalizedAlias = normSupplier(alias);
+      const updateResult = await sql`
+        UPDATE transactions 
+        SET fornecedor = ${canonical} 
+        WHERE upper(regexp_replace(coalesce(fornecedor, ''), '[^A-Za-z0-9]+', ' ', 'g')) = ${normalizedAlias}
+           OR fornecedor = ${alias}
+      `;
+      console.log(`[merge-auto] Updated transactions: "${alias}" -> "${canonical}" (${updateResult.length} rows)`);
+      totalUpdated += updateResult.length;
+    }
+
+    // Execute batch deletes
+    for (const { alias, canonical } of deletes) {
+      const normalizedAlias = normSupplier(alias);
+      const deleteResult = await sql`
+        DELETE FROM suppliers 
+        WHERE (upper(regexp_replace(coalesce(nome, ''), '[^A-Za-z0-9]+', ' ', 'g')) = ${normalizedAlias}
+               OR nome = ${alias})
+        AND nome != ${canonical}
+        RETURNING id
+      `;
+      console.log(`[merge-auto] Deleted supplier: "${alias}" (${deleteResult.length} rows)`);
+      totalRemoved += deleteResult.length;
     }
 
     console.log(`[merge-auto] Completed: ${groupsProcessed} groups, ${totalUpdated} transactions updated, ${totalRemoved} suppliers removed`);
@@ -687,7 +704,10 @@ async function handleSetupTables(req, res) {
 
     await sql`CREATE INDEX IF NOT EXISTS idx_banks_uid ON banks(uid)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_transactions_duplicate ON transactions(fornecedor, vencimento, valor, empresa)`;
-    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_vencimento ON transactions(vencimento)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_vencimento ON transactions(vencimento DESC)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_uid ON transactions(uid)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_fornecedor ON transactions(fornecedor)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status)`;
 
     // Unique normalized boleto number (prevents duplicados definitivos)
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_boleto_unique
