@@ -173,13 +173,25 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
   // ── Detect duplicates ──────────────────────────────────────────────────
   const isDuplicate = useCallback(
     (row: OFXTransaction) => {
-      return transactions.some(
-        (tx) =>
-          tx.descricao?.includes(row.fitid) ||
-          (tx.valor === Math.abs(row.trnamt) &&
-            tx.vencimento === row.dtposted &&
-            tx.fornecedor.toUpperCase() === row.fornecedor.toUpperCase())
-      );
+      const rowValue = Math.abs(row.trnamt);
+      const rowNormName = normalizeSupplierName(row.fornecedor);
+
+      return transactions.some((tx) => {
+        // Match by FITID in description
+        if (tx.descricao?.includes(row.fitid)) return true;
+
+        // Match by value + date + supplier name (fuzzy)
+        const txValue = Number(tx.valor) + Number(tx.juros || 0);
+        if (Math.abs(txValue - rowValue) < 0.01 && tx.vencimento === row.dtposted) {
+          const txNormName = normalizeSupplierName(tx.fornecedor);
+          // Exact normalized match
+          if (txNormName === rowNormName) return true;
+          // One contains the other
+          if (txNormName.length >= 5 && rowNormName.includes(txNormName)) return true;
+          if (rowNormName.length >= 5 && txNormName.includes(rowNormName)) return true;
+        }
+        return false;
+      });
     },
     [transactions]
   );
