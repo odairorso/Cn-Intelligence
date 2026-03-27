@@ -110,49 +110,31 @@ const dateSortKey = (value?: string | null) => {
   return new Date(v).getTime() || 0;
 };
 
-const normalizeSupplierName = (value: string) =>
-  String(value || '')
+// Cache for normalized names to avoid re-computing
+const normalizeCache = new Map<string, string>();
+
+const normalizeSupplierName = (value: string): string => {
+  const cacheKey = String(value || '');
+  if (normalizeCache.has(cacheKey)) {
+    return normalizeCache.get(cacheKey)!;
+  }
+  
+  const normalized = String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
-    // Common variations
-    .replace(/\bCELULARS?\b/g, 'CELULAR')
-    .replace(/\bEXTINTORES?\b/g, 'EXTINTOR')
-    .replace(/\bPAPELARIA(S)?\b/g, 'PAPELARIA')
-    .replace(/\bLIVRARIA(S)?\b/g, 'LIVRARIA')
-    .replace(/\bEDITORAS?\b/g, 'EDITORA')
-    .replace(/\bDISTRIBUIDORAS?\b/g, 'DISTRIBUIDORA')
-    .replace(/\bSERVICOS?\b/g, 'SERVICO')
-    .replace(/\bMANUTENCAO(S)?\b/g, 'MANUTENCAO')
-    .replace(/\bSEGURANCA(S)?\b/g, 'SEGURANCA')
-    .replace(/\bLIMPEZA(S)?\b/g, 'LIMPEZA')
-    .replace(/\bALIMENTACAO(S)?\b/g, 'ALIMENTACAO')
-    .replace(/\bTRANSPORTE(S)?\b/g, 'TRANSPORTE')
-    .replace(/\bCOMUNICACAO(S)?\b/g, 'COMUNICACAO')
-    .replace(/\bELETRICOS?\b/g, 'ELETRICO')
-    .replace(/\bELETRONICOS?\b/g, 'ELETRONICO')
-    .replace(/\bGRAFICAS?\b/g, 'GRAFICA')
-    .replace(/\bINFORMATICAS?\b/g, 'INFORMATICA')
-    .replace(/\bCONSTRUCAO(S)?\b/g, 'CONSTRUCAO')
-    .replace(/\bESCRITORIO(S)?\b/g, 'ESCRITORIO')
-    .replace(/\bPOSTOS?\b/g, 'POSTO')
-    .replace(/\bSUPERMERCADOS?\b/g, 'SUPERMERCADO')
-    .replace(/\bRESTAURANTES?\b/g, 'RESTAURANTE')
-    .replace(/\bFARMACIAS?\b/g, 'FARMACIA')
-    .replace(/\bCLINICAS?\b/g, 'CLINICA')
-    .replace(/\bHOSPITAIS?\b/g, 'HOSPITAL')
-    .replace(/\bLABORATORIOS?\b/g, 'LABORATORIO')
-    .replace(/\bEMPRESAS?\b/g, 'EMPRESA')
-    .replace(/\bCOMERCIOS?\b/g, 'COMERCIO')
-    .replace(/\bINDUSTRIAS?\b/g, 'INDUSTRIA')
-    .replace(/\bSOLUCOES?\b/g, 'SOLUCOES')
-    .replace(/\bSISTEMAS?\b/g, 'SISTEMA')
-    .replace(/\bPROJETOS?\b/g, 'PROJETO')
-    .replace(/\bGRUPO\w*\b/g, 'GRUPO')
     .trim();
+  
+  // Limit cache size to prevent memory leak
+  if (normalizeCache.size > 10000) {
+    normalizeCache.clear();
+  }
+  
+  normalizeCache.set(cacheKey, normalized);
+  return normalized;
+};
 
 const normalizeCompanyKey = (value: string) => {
   const normalized = String(value || '')
@@ -181,38 +163,36 @@ const isRevenueTransaction = (tx: { fornecedor?: string; descricao?: string; tip
   );
 };
 
-const levenshteinDistance = (a: string, b: string) => {
-  const m = a.length;
-  const n = b.length;
-  if (!m) return n;
-  if (!n) return m;
-  const dp = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + cost
-      );
-    }
-  }
-  return dp[m][n];
-};
+// Fast supplier matching - optimized version (no Levenshtein O(n²))
+const matchCache = new Map<string, boolean>();
 
-const isSupplierMatch = (transactionSupplier: string, supplierName: string) => {
+const isSupplierMatch = (transactionSupplier: string, supplierName: string): boolean => {
+  const cacheKey = `${transactionSupplier}|${supplierName}`;
+  if (matchCache.has(cacheKey)) {
+    return matchCache.get(cacheKey)!;
+  }
+  
   const tx = normalizeSupplierName(transactionSupplier);
   const sp = normalizeSupplierName(supplierName);
-  if (!tx || !sp) return false;
-  if (tx === sp) return true;
-  // Substring match only for names >= 5 chars to avoid false positives like TIM inside EMPRESTIMO
-  if (tx.length >= 5 && sp.length >= 5 && (tx.includes(sp) || sp.includes(tx))) return true;
-  if (tx.length >= 5 && sp.includes(tx)) return true;
-  if (sp.length >= 5 && tx.includes(sp)) return true;
-  if (tx.slice(0, 3) !== sp.slice(0, 3)) return false;
-  return levenshteinDistance(tx, sp) <= 2;
+  
+  let result = false;
+  
+  if (!tx || !sp) {
+    result = false;
+  } else if (tx === sp) {
+    result = true;
+  } else if (tx.length >= 5 && sp.length >= 5) {
+    // Simple prefix match (first 5 chars) - much faster than Levenshtein
+    result = tx.substring(0, 5) === sp.substring(0, 5);
+  }
+  
+  // Limit cache size
+  if (matchCache.size > 50000) {
+    matchCache.clear();
+  }
+  
+  matchCache.set(cacheKey, result);
+  return result;
 };
 
 // --- Types ---
@@ -1035,6 +1015,24 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
   const [mergeTarget, setMergeTarget] = useState<string>('');
   const [mergeAliases, setMergeAliases] = useState<string[]>([]);
 
+  // Pre-calculate transaction count per supplier (optimized O(n) instead of O(n*m))
+  const supplierTransactionCount = useMemo(() => {
+    const countMap = new Map<string, number>();
+    transactions.forEach(tx => {
+      const key = normalizeSupplierName(tx.fornecedor);
+      if (key) {
+        countMap.set(key, (countMap.get(key) || 0) + 1);
+      }
+    });
+    return countMap;
+  }, [transactions]);
+
+  // Fast lookup for transaction count
+  const getTransactionCount = (supplierName: string): number => {
+    const key = normalizeSupplierName(supplierName);
+    return supplierTransactionCount.get(key) || 0;
+  };
+
   const mergedSuppliers = useMemo(() => {
     const byKey = new Map<string, Supplier>();
 
@@ -1233,7 +1231,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
             </div>
             <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center">
               <p className="text-[10px] font-black text-primary uppercase tracking-widest">
-                {transactions.filter(tx => isSupplierMatch(tx.fornecedor, s.nome)).length} Lançamentos
+                {getTransactionCount(s.nome)} Lançamentos
               </p>
               <button className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest hover:text-primary transition-colors">
                 Detalhes →
