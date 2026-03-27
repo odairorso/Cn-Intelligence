@@ -47,9 +47,10 @@ Extraia os seguintes campos:
 4. cnpj: CNPJ do beneficiário se disponível.
 5. descricao: Descrição do serviço ou referência do boleto.
 6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR). Se não identificar, deixe vazio.
+7. numero_boleto: Número do documento/nosso número do boleto. Procure por "Nro documento", "Nr documento", "Nosso número", "Nro doc". Este número identifica unicamente o boleto.
 
 Responda APENAS com JSON válido:
-{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":""}`;
+{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
     } else {
       prompt = `Você é um especialista em extrair dados de boletos bancários brasileiros.
 Analise visualmente o PDF de boleto bancário anexo e extraia os campos abaixo.
@@ -65,9 +66,10 @@ Extraia os seguintes campos:
 4. cnpj: CNPJ do beneficiário se disponível.
 5. descricao: Descrição do serviço ou referência do boleto.
 6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR). Se não identificar, deixe vazio.
+7. numero_boleto: Número do documento/nosso número do boleto.
 
 Responda APENAS com JSON válido:
-{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":""}`;
+{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
     }
 
     let contents;
@@ -139,6 +141,7 @@ Responda APENAS com JSON válido:
       cnpj: '',
       descricao: fileName || '',
       empresa: '',
+      numero_boleto: '',
     });
   }
 }

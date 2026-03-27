@@ -12,13 +12,13 @@ export default async function handler(req, res) {
 
   try {
     for (const tx of transactions) {
-      const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco } = tx;
+      const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = tx;
       const vDate = parseDateToPg(vencimento) || new Date().toISOString().split('T')[0];
       const pDate = parseDateToPg(pagamento);
       await sql`
-        INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco)
+        INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id)
         VALUES (${uid || 'guest'}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'},
-                ${vDate}, ${pDate}, ${valor}, ${status || 'PENDENTE'}, ${banco || null})`;
+                ${vDate}, ${pDate}, ${valor}, ${status || 'PENDENTE'}, ${banco || null}, ${tipo || 'DESPESA'}, ${numero_boleto || null}, ${conta_contabil_id || null})`;
     }
     return res.status(201).json({ message: 'Batch created successfully', count: transactions.length });
   } catch (e) {

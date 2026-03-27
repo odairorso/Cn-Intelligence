@@ -27,13 +27,13 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo } = req.body;
+      const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = req.body;
       const vDate = parseDateToPg(vencimento);
       const pDate = parseDateToPg(pagamento);
       const rows = await sql`
-        INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo)
+        INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id)
         VALUES (${uid || 'guest'}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'},
-                ${vDate}, ${pDate}, ${valor}, ${status || 'PENDENTE'}, ${banco || null}, ${tipo || 'DESPESA'})
+                ${vDate}, ${pDate}, ${valor}, ${status || 'PENDENTE'}, ${banco || null}, ${tipo || 'DESPESA'}, ${numero_boleto || null}, ${conta_contabil_id || null})
         RETURNING *`;
       return res.status(201).json(rows[0]);
     } catch (e) {
