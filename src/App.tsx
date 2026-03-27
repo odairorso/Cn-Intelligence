@@ -3529,7 +3529,8 @@ export default function App() {
             } catch {
               pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true } as any).promise;
             }
-            for (let i = 1; i <= pdf.numPages; i++) {
+            const maxPages = Math.min(2, pdf.numPages || 0);
+            for (let i = 1; i <= maxPages; i++) {
               const page = await pdf.getPage(i);
               const textContent = await page.getTextContent();
               fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
