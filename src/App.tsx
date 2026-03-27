@@ -48,6 +48,7 @@ import { twMerge } from 'tailwind-merge';
 
 import { Transaction, KPI, ChartData, Supplier, TransactionStatus, Bank } from './types';
 import { api } from './api';
+import { OFXImportTab } from './OFXImport';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -170,7 +171,7 @@ const isSupplierMatch = (transactionSupplier: string, supplierName: string) => {
 };
 
 // --- Types ---
-type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'receitas' | 'bancos' | 'configuracoes';
+type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'receitas' | 'bancos' | 'extrato' | 'configuracoes';
 
 type PdfImportDraft = {
   fileName: string;
@@ -3655,19 +3656,33 @@ export default function App() {
     let pendentes = 0;
     let vencidos = 0;
     const empresasSet = new Set<string>();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     for (const tx of transactions) {
       total += tx.valor;
-      if (tx.status === 'PAGO') pagos++;
-      else if (tx.status === 'VENCIDO') vencidos++;
-      else pendentes++;
+      if (tx.status === 'PAGO') {
+        pagos++;
+      } else if (tx.status === 'VENCIDO') {
+        vencidos++;
+      } else {
+        // Auto-detect: PENDENTE with past vencimento = VENCIDO
+        const parts = tx.vencimento?.split('/');
+        if (parts?.length === 3) {
+          const vDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+          if (vDate < today) vencidos++;
+          else pendentes++;
+        } else {
+          pendentes++;
+        }
+      }
       empresasSet.add(tx.empresa);
     }
     const kpis: KPI[] = [
-      { label: 'VALOR TOTAL', value: total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), color: '#10b981' },
-      { label: 'REGISTROS', value: transactions.length.toString(), description: 'Volume operacional', color: '#10b981' },
-      { label: 'EMPRESAS', value: empresasSet.size.toString(), description: 'Unidades ativas', color: '#10b981' },
+      { label: 'VALOR TOTAL', value: total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), color: '#3b82f6' },
+      { label: 'REGISTROS', value: transactions.length.toString(), description: 'Volume operacional', color: '#3b82f6' },
+      { label: 'EMPRESAS', value: empresasSet.size.toString(), description: 'Unidades ativas', color: '#3b82f6' },
       { label: 'PENDENTES', value: pendentes.toString(), description: 'Aguardando conciliação', color: '#f59e0b' },
-      { label: 'PAGOS', value: pagos.toString(), description: 'Liquidados', color: '#10b981' },
+      { label: 'PAGOS', value: pagos.toString(), description: 'Liquidados', color: '#3b82f6' },
       { label: 'VENCIDOS', value: vencidos.toString(), description: 'Ação imediata necessária', color: '#ef4444' },
     ];
     return { total, pagos, pendentes, vencidos, kpis };
@@ -3724,6 +3739,12 @@ export default function App() {
               className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'bancos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
               Bancos
+            </button>
+            <button 
+              onClick={() => setActiveTab('extrato')}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'extrato' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+            >
+              Extrato OFX
             </button>
             <button 
               onClick={() => setActiveTab('configuracoes')}
@@ -3785,6 +3806,13 @@ export default function App() {
           <span className="text-[9px] font-black uppercase tracking-tighter">Bancos</span>
         </button>
         <button 
+          onClick={() => setActiveTab('extrato')}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'extrato' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
+        >
+          <Download size={22} strokeWidth={activeTab === 'extrato' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">OFX</span>
+        </button>
+        <button 
           onClick={() => setActiveTab('configuracoes')}
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'configuracoes' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
@@ -3805,6 +3833,7 @@ export default function App() {
               {activeTab === 'relatorios' && '📈 Relatórios Financeiros'}
               {activeTab === 'receitas' && '💸 Receitas'}
               {activeTab === 'bancos' && '🏦 Bancos'}
+              {activeTab === 'extrato' && '📄 Importar Extrato OFX'}
               {activeTab === 'configuracoes' && '⚙️ Configurações'}
             </h2>
             <div className="flex flex-wrap gap-3">
@@ -3902,6 +3931,15 @@ export default function App() {
                 setShowNewBankModal={setShowNewBankModal}
                 setEditingBank={setEditingBank}
                 deleteBank={deleteBank}
+              />
+            )}
+            {activeTab === 'extrato' && (
+              <OFXImportTab
+                transactions={transactions}
+                suppliers={suppliers}
+                banks={banks}
+                onSuccess={() => { fetchTransactions(); }}
+                showNotification={showNotification}
               />
             )}
             {activeTab === 'configuracoes' && (
