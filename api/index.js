@@ -615,6 +615,11 @@ async function handleSetupTables(req, res) {
     await sql`CREATE INDEX IF NOT EXISTS idx_transactions_duplicate ON transactions(fornecedor, vencimento, valor, empresa)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_transactions_vencimento ON transactions(vencimento)`;
 
+    // Unique normalized boleto number (prevents duplicados definitivos)
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_boleto_unique
+              ON transactions ((regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g')))
+              WHERE numero_boleto IS NOT NULL AND numero_boleto <> ''`;
+
     return res.json({ message: 'Tables created successfully' });
   } catch (e) {
     console.error(e);
