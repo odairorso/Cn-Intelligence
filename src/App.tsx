@@ -2869,6 +2869,7 @@ export default function App() {
   const [newCompanyName, setNewCompanyName] = useState('');
   const [editingCompany, setEditingCompany] = useState<string | null>(null);
   const [editingCompanyName, setEditingCompanyName] = useState('');
+  const [newContaContabil, setNewContaContabil] = useState({ codigo: '', nome: '', tipo: 'DESPESA' });
   const [brandLogo, setBrandLogo] = useState<string>(() => {
     try {
       return localStorage.getItem('cn_brand_logo') || '';
@@ -2932,6 +2933,37 @@ export default function App() {
       setEditingCompanyName('');
     }
     showNotification(`Empresa ${normalized} removida.`, 'info');
+  };
+
+  const addContaContabil = async () => {
+    if (!newContaContabil.codigo || !newContaContabil.nome) {
+      showNotification('Informe o código e o nome da conta.', 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/contas-contabeis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newContaContabil),
+      });
+      if (!res.ok) throw new Error('Erro ao adicionar');
+      showNotification('Conta contábil adicionada!', 'success');
+      setNewContaContabil({ codigo: '', nome: '', tipo: 'DESPESA' });
+      fetchContasContabeis();
+    } catch (e) {
+      showNotification('Erro ao adicionar conta contábil.', 'error');
+    }
+  };
+
+  const deleteContaContabil = async (id: number) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta conta?')) return;
+    try {
+      await fetch(`/api/contas-contabeis?id=${id}`, { method: 'DELETE' });
+      showNotification('Conta contábil excluída!', 'success');
+      fetchContasContabeis();
+    } catch (e) {
+      showNotification('Erro ao excluir conta contábil.', 'error');
+    }
   };
 
   const startEditCompany = (name: string) => {
@@ -4219,6 +4251,66 @@ export default function App() {
                             )}
                           </span>
                         ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-white/5">
+                  <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Contas Contábeis</h4>
+                  <div className="space-y-4 max-w-xl mx-auto">
+                    <div className="glass-card p-4">
+                      <p className="text-[11px] text-on-surface-variant mb-3">Gerencie as contas contábeis usadas na classificação de lançamentos.</p>
+                      <div className="flex gap-2 mb-4">
+                        <input
+                          type="text"
+                          value={newContaContabil.codigo}
+                          onChange={(e) => setNewContaContabil({ ...newContaContabil, codigo: e.target.value })}
+                          placeholder="Código (ex: 3.10)"
+                          className="w-24 bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                        />
+                        <input
+                          type="text"
+                          value={newContaContabil.nome}
+                          onChange={(e) => setNewContaContabil({ ...newContaContabil, nome: e.target.value })}
+                          placeholder="Nome da conta"
+                          className="flex-1 bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                        />
+                        <select
+                          value={newContaContabil.tipo}
+                          onChange={(e) => setNewContaContabil({ ...newContaContabil, tipo: e.target.value })}
+                          className="bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                        >
+                          <option value="DESPESA">Despesa</option>
+                          <option value="RECEITA">Receita</option>
+                        </select>
+                        <button
+                          onClick={addContaContabil}
+                          className="bg-primary/20 text-primary px-4 py-2 rounded-lg text-xs font-bold border border-primary/30 hover:bg-primary/30 transition-all"
+                        >
+                          Adicionar
+                        </button>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto space-y-2">
+                        {contasContabeis.map((conta) => (
+                          <div key={conta.id} className="flex items-center justify-between bg-surface-variant/10 border border-white/5 rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-3">
+                              <span className={`text-xs font-bold px-2 py-1 rounded ${conta.tipo === 'RECEITA' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                {conta.codigo}
+                              </span>
+                              <span className="text-sm">{conta.nome}</span>
+                            </div>
+                            <button
+                              onClick={() => deleteContaContabil(conta.id)}
+                              className="text-tertiary hover:text-tertiary/80"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                        {contasContabeis.length === 0 && (
+                          <p className="text-center text-xs text-on-surface-variant py-4">Nenhuma conta contábil cadastrada.</p>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -34,6 +34,46 @@ export default async function handler(req, res) {
       // Add juros column to transactions if not exists
       await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS juros NUMERIC DEFAULT 0`;
 
+      // Add numero_boleto column if not exists
+      await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS numero_boleto VARCHAR(255)`;
+
+      // Add conta_contabil_id column if not exists
+      await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS conta_contabil_id INTEGER REFERENCES contas_contabeis(id)`;
+
+      // Create contas_contabeis table if not exists
+      await sql`
+        CREATE TABLE IF NOT EXISTS contas_contabeis (
+          id SERIAL PRIMARY KEY,
+          codigo VARCHAR(20) NOT NULL,
+          nome VARCHAR(255) NOT NULL,
+          tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('RECEITA', 'DESPESA')),
+          ativo BOOLEAN DEFAULT true,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+      `;
+
+      // Insert default contas contábeis if empty
+      const existing = await sql`SELECT COUNT(*) as cnt FROM contas_contabeis`;
+      if (Number(existing[0].cnt) === 0) {
+        await sql`
+          INSERT INTO contas_contabeis (codigo, nome, tipo) VALUES
+          ('3.1', 'Folha de Pagamento', 'DESPESA'),
+          ('3.2', 'Aluguel', 'DESPESA'),
+          ('3.3', 'Água / Luz / Telefone', 'DESPESA'),
+          ('3.4', 'Material de Escritório', 'DESPESA'),
+          ('3.5', 'Segurança', 'DESPESA'),
+          ('3.6', 'Editoras', 'DESPESA'),
+          ('3.7', 'Impostos', 'DESPESA'),
+          ('3.8', 'Manutenção', 'DESPESA'),
+          ('3.9', 'Outras Despesas', 'DESPESA'),
+          ('4.1', 'Mensalidades', 'RECEITA'),
+          ('4.2', 'Repasses', 'RECEITA'),
+          ('4.3', 'Matrículas', 'RECEITA'),
+          ('4.4', 'Permutas / Convênios', 'RECEITA'),
+          ('4.5', 'Outras Receitas', 'RECEITA')
+        `;
+      }
+
       // Create banks index if not exists
       await sql`CREATE INDEX IF NOT EXISTS idx_banks_uid ON banks(uid)`;
 
