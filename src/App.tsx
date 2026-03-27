@@ -182,6 +182,23 @@ type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'receit
 
 const DEFAULT_COMPANIES = ['CN', 'CEI', 'UNOPAR', 'FACEMS', 'ELAINE', 'POLO DE ITAQUIRAI'];
 
+const DEFAULT_ACCOUNTS: Array<ContaContabil> = [
+  { id: 0, codigo: '3.1', nome: 'Folha de Pagamento', tipo: 'DESPESA', ativo: true } as any,
+  { id: 0, codigo: '3.2', nome: 'Aluguel', tipo: 'DESPESA', ativo: true } as any,
+  { id: 0, codigo: '3.3', nome: 'Água / Luz / Telefone', tipo: 'DESPESA', ativo: true } as any,
+  { id: 0, codigo: '3.4', nome: 'Material de Escritório', tipo: 'DESPESA', ativo: true } as any,
+  { id: 0, codigo: '3.5', nome: 'Segurança', tipo: 'DESPESA', ativo: true } as any,
+  { id: 0, codigo: '3.6', nome: 'Editoras', tipo: 'DESPESA', ativo: true } as any,
+  { id: 0, codigo: '3.7', nome: 'Impostos', tipo: 'DESPESA', ativo: true } as any,
+  { id: 0, codigo: '3.8', nome: 'Manutenção', tipo: 'DESPESA', ativo: true } as any,
+  { id: 0, codigo: '3.9', nome: 'Outras Despesas', tipo: 'DESPESA', ativo: true } as any,
+  { id: 0, codigo: '4.1', nome: 'Mensalidades', tipo: 'RECEITA', ativo: true } as any,
+  { id: 0, codigo: '4.2', nome: 'Repasses', tipo: 'RECEITA', ativo: true } as any,
+  { id: 0, codigo: '4.3', nome: 'Matrículas', tipo: 'RECEITA', ativo: true } as any,
+  { id: 0, codigo: '4.4', nome: 'Permutas / Convênios', tipo: 'RECEITA', ativo: true } as any,
+  { id: 0, codigo: '4.5', nome: 'Outras Receitas', tipo: 'RECEITA', ativo: true } as any,
+];
+
 type PdfImportDraft = {
   fileName: string;
   fornecedor: string;
@@ -3069,9 +3086,16 @@ export default function App() {
         } catch {
         }
       }
-      setContasContabeis(Array.isArray(data) ? data : []);
+      if (Array.isArray(data) && data.length > 0) {
+        setContasContabeis(data);
+      } else {
+        setContasContabeis(DEFAULT_ACCOUNTS);
+        showNotification('Usando plano de contas padrão local (API indisponível).', 'info');
+      }
     } catch (error) {
       console.error('Failed to fetch contas contabeis:', error);
+      setContasContabeis(DEFAULT_ACCOUNTS);
+      showNotification('API indisponível. Carregamos plano de contas padrão local.', 'info');
     }
   };
 
