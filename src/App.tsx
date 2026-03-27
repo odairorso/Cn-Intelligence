@@ -3279,7 +3279,10 @@ export default function App() {
       /NOSSO\s*N[ÚU]MERO[:\s-]*([A-Z0-9./-]{6,40})/,
       /N[ROº°]*\s*DOCUMENTO[:\s-]*([A-Z0-9./-]{6,40})/,
       /NUMERO\s*DO\s*DOCUMENTO[:\s-]*([A-Z0-9./-]{6,40})/,
-      /NR\s*DOC[:\s-]*([A-Z0-9./-]{6,40})/,
+      /NR\.?\s*DOC[:\s-]*([A-Z0-9./-]{6,40})/,
+      /N[º°]?\s*DOC[:\s-]*([A-Z0-9./-]{6,40})/,
+      /DOCUMENTO[:\s-]*([0-9]{6,20})/,
+      /COD(?:IGO)?\s*(?:DE)?\s*BARRAS[:\s-]*([0-9]{47,48})/,
     ];
     for (const pattern of patterns) {
       const match = source.match(pattern);
@@ -3287,6 +3290,11 @@ export default function App() {
         const normalized = normalizeBoletoNumber(match[1]);
         if (normalized) return normalized;
       }
+    }
+    // Fallback: extract 47-48 digit barcode (linha digitável)
+    const barcodeMatch = source.match(/\b([0-9]{47,48})\b/);
+    if (barcodeMatch?.[1]) {
+      return barcodeMatch[1];
     }
     return '';
   };
@@ -4781,6 +4789,18 @@ export default function App() {
                           className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
+                      <div className="md:col-span-2">
+                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Tipo</p>
+                        <select
+                          value={row.tipo || 'DESPESA'}
+                          onChange={(e) => updatePdfRow(index, { tipo: e.target.value as 'RECEITA' | 'DESPESA', conta_contabil_id: undefined })}
+                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary text-on-surface"
+                          style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}
+                        >
+                          <option value="DESPESA" style={{ backgroundColor: '#1e1e2e' }}>Despesa</option>
+                          <option value="RECEITA" style={{ backgroundColor: '#1e1e2e' }}>Receita</option>
+                        </select>
+                      </div>
                       <div className="md:col-span-3">
                         <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Empresa</p>
                         <select
@@ -4804,7 +4824,9 @@ export default function App() {
                           style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}
                         >
                           <option value="" style={{ backgroundColor: '#1e1e2e' }}>Selecione a conta</option>
-                          {contasContabeis.map((conta) => (
+                          {contasContabeis
+                            .filter((conta) => matchesAccountType(conta, (row.tipo || 'DESPESA') as 'RECEITA' | 'DESPESA'))
+                            .map((conta) => (
                             <option key={conta.id} value={conta.id} style={{ backgroundColor: '#1e1e2e' }}>
                               {conta.codigo} - {conta.nome}
                             </option>
