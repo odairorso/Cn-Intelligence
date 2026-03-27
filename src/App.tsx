@@ -13,6 +13,7 @@ import {
   Upload,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Filter,
   Download,
   Plus,
@@ -2262,6 +2263,8 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
     tipo: 'DESPESA' as 'RECEITA' | 'DESPESA',
     conta_contabil_id: undefined as number | undefined,
   });
+  const [searchConta, setSearchConta] = useState('');
+  const [showContaDropdown, setShowContaDropdown] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2386,17 +2389,71 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           </div>
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta Contábil</label>
-            <select 
-              className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
-              style={{ backgroundColor: '#161b2a' }}
-              value={formData.conta_contabil_id || ''}
-              onChange={e => setFormData({...formData, conta_contabil_id: Number(e.target.value) || undefined})}
-            >
-              <option value="" className="bg-[#161b2a] text-on-surface">Selecione a conta</option>
-              {contasContabeis.filter(c => c.tipo === formData.tipo).map(c => (
-                <option key={c.id} value={c.id} className="bg-[#161b2a] text-on-surface">{c.codigo} - {c.nome}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <div 
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm cursor-pointer flex justify-between items-center"
+                style={{ backgroundColor: '#161b2a' }}
+                onClick={() => setShowContaDropdown(!showContaDropdown)}
+              >
+                <span className={formData.conta_contabil_id ? 'text-on-surface' : 'text-on-surface-variant'}>
+                  {formData.conta_contabil_id 
+                    ? contasContabeis.find(c => c.id === formData.conta_contabil_id)?.codigo + ' - ' + contasContabeis.find(c => c.id === formData.conta_contabil_id)?.nome
+                    : 'Selecione a conta'}
+                </span>
+                <ChevronDown size={14} className="text-on-surface-variant" />
+              </div>
+              {showContaDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-[#161b2a] border border-white/10 rounded-lg shadow-xl max-h-60 overflow-hidden">
+                  <div className="p-2 border-b border-white/10">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant/60" size={14} />
+                      <input
+                        type="text"
+                        placeholder="Buscar conta..."
+                        value={searchConta}
+                        onChange={(e) => setSearchConta(e.target.value)}
+                        className="w-full bg-surface-variant/20 border border-white/10 rounded pl-8 pr-3 py-1.5 text-sm outline-none focus:border-primary"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-44 overflow-y-auto">
+                    <div 
+                      className="px-3 py-2 text-sm text-on-surface-variant hover:bg-white/5 cursor-pointer"
+                      onClick={() => {
+                        setFormData({...formData, conta_contabil_id: undefined});
+                        setShowContaDropdown(false);
+                        setSearchConta('');
+                      }}
+                    >
+                      Selecione a conta
+                    </div>
+                    {contasContabeis
+                      .filter(c => c.tipo === formData.tipo)
+                      .filter(c => {
+                        const q = searchConta.toLowerCase();
+                        if (!q) return true;
+                        return c.codigo.toLowerCase().includes(q) || c.nome.toLowerCase().includes(q);
+                      })
+                      .map(c => (
+                        <div 
+                          key={c.id}
+                          className="px-3 py-2 text-sm hover:bg-white/5 cursor-pointer flex items-center gap-2"
+                          style={{ backgroundColor: formData.conta_contabil_id === c.id ? 'rgba(59, 130, 246, 0.2)' : 'transparent' }}
+                          onClick={() => {
+                            setFormData({...formData, conta_contabil_id: c.id});
+                            setShowContaDropdown(false);
+                            setSearchConta('');
+                          }}
+                        >
+                          <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">{c.codigo}</span>
+                          <span>{c.nome}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -2546,6 +2603,8 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
     tipo: transaction.tipo || 'DESPESA',
     juros: transaction.juros || 0,
   });
+  const [searchConta, setSearchConta] = useState('');
+  const [showContaDropdown, setShowContaDropdown] = useState(false);
 
   useEffect(() => {
     setFormData({
@@ -2651,23 +2710,71 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta Contábil</label>
-              <select 
-                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
-                style={{ backgroundColor: '#161b2a' }}
-                value={formData.conta_contabil_id !== undefined ? formData.conta_contabil_id : ''}
-                onChange={e => {
-                  const v = e.target.value;
-                  setFormData({
-                    ...formData,
-                    conta_contabil_id: v === '' ? undefined : Number(v)
-                  });
-                }}
-              >
-                <option value="" className="bg-[#161b2a] text-on-surface">Selecione a conta</option>
-                {contasContabeis.filter(c => matchesAccountType(c, formData.tipo)).map(c => (
-                  <option key={c.id} value={c.id} className="bg-[#161b2a] text-on-surface">{c.codigo} - {c.nome}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <div 
+                  className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm cursor-pointer flex justify-between items-center"
+                  style={{ backgroundColor: '#161b2a' }}
+                  onClick={() => setShowContaDropdown(!showContaDropdown)}
+                >
+                  <span className={formData.conta_contabil_id !== undefined ? 'text-on-surface' : 'text-on-surface-variant'}>
+                    {formData.conta_contabil_id !== undefined 
+                      ? contasContabeis.find(c => c.id === formData.conta_contabil_id)?.codigo + ' - ' + contasContabeis.find(c => c.id === formData.conta_contabil_id)?.nome
+                      : 'Selecione a conta'}
+                  </span>
+                  <ChevronDown size={14} className="text-on-surface-variant" />
+                </div>
+                {showContaDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-[#161b2a] border border-white/10 rounded-lg shadow-xl max-h-60 overflow-hidden">
+                    <div className="p-2 border-b border-white/10">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant/60" size={14} />
+                        <input
+                          type="text"
+                          placeholder="Buscar conta..."
+                          value={searchConta}
+                          onChange={(e) => setSearchConta(e.target.value)}
+                          className="w-full bg-surface-variant/20 border border-white/10 rounded pl-8 pr-3 py-1.5 text-sm outline-none focus:border-primary"
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                    <div className="max-h-44 overflow-y-auto">
+                      <div 
+                        className="px-3 py-2 text-sm text-on-surface-variant hover:bg-white/5 cursor-pointer"
+                        onClick={() => {
+                          setFormData({...formData, conta_contabil_id: undefined});
+                          setShowContaDropdown(false);
+                          setSearchConta('');
+                        }}
+                      >
+                        Selecione a conta
+                      </div>
+                      {contasContabeis
+                        .filter(c => matchesAccountType(c, formData.tipo))
+                        .filter(c => {
+                          const q = searchConta.toLowerCase();
+                          if (!q) return true;
+                          return c.codigo.toLowerCase().includes(q) || c.nome.toLowerCase().includes(q);
+                        })
+                        .map(c => (
+                          <div 
+                            key={c.id}
+                            className="px-3 py-2 text-sm hover:bg-white/5 cursor-pointer flex items-center gap-2"
+                            style={{ backgroundColor: formData.conta_contabil_id === c.id ? 'rgba(59, 130, 246, 0.2)' : 'transparent' }}
+                            onClick={() => {
+                              setFormData({...formData, conta_contabil_id: c.id});
+                              setShowContaDropdown(false);
+                              setSearchConta('');
+                            }}
+                          >
+                            <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">{c.codigo}</span>
+                            <span>{c.nome}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               {contasContabeis.filter(c => matchesAccountType(c, formData.tipo)).length === 0 && (
                 <p className="text-[10px] text-on-surface-variant mt-1">Nenhuma conta encontrada para {formData.tipo}. Cadastre em Configurações.</p>
               )}
