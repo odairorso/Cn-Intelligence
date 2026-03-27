@@ -3061,8 +3061,15 @@ export default function App() {
 
   const fetchContasContabeis = async () => {
     try {
-      const data = await api.getContasContabeis();
-      setContasContabeis(data);
+      let data = await api.getContasContabeis();
+      if (!Array.isArray(data) || data.length === 0) {
+        try {
+          await api.setupTables();
+          data = await api.getContasContabeis();
+        } catch {
+        }
+      }
+      setContasContabeis(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch contas contabeis:', error);
     }
@@ -4350,6 +4357,20 @@ export default function App() {
                           className="bg-secondary/10 text-secondary px-4 py-2 rounded-lg text-xs font-bold border border-secondary/20 hover:bg-secondary/20 transition-all"
                         >
                           Cadastrar Conta
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await api.setupTables();
+                              await fetchContasContabeis();
+                              showNotification('Plano de contas padrão carregado.', 'success');
+                            } catch {
+                              showNotification('Erro ao carregar plano padrão.', 'error');
+                            }
+                          }}
+                          className="ml-3 bg-primary/10 text-primary px-4 py-2 rounded-lg text-xs font-bold border border-primary/20 hover:bg-primary/20 transition-all"
+                        >
+                          Carregar Padrão
                         </button>
                       </div>
                     </div>
