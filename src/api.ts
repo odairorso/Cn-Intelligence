@@ -201,4 +201,14 @@ export const api = {
     if (!res.ok) throw new Error('Failed to update conta contábil');
     return res.json();
   },
+
+  async mergeSuppliers(target: string, aliases: string[]): Promise<{ updated: number; removed: number }> {
+    const res = await fetch(`${API_BASE}/suppliers/merge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target, aliases }),
+    });
+    if (!res.ok) throw new Error('Failed to merge suppliers');
+    return res.json();
+  },
 };

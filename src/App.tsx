@@ -992,6 +992,8 @@ interface FornecedoresTabProps {
 
 const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSupplierModal, syncSuppliers, onSelectSupplier }: FornecedoresTabProps) => {
   const [searchSupplier, setSearchSupplier] = useState('');
+  const [mergeTarget, setMergeTarget] = useState<string>('');
+  const [mergeAliases, setMergeAliases] = useState<string[]>([]);
 
   const mergedSuppliers = useMemo(() => {
     const byKey = new Map<string, Supplier>();
@@ -1023,6 +1025,22 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
     if (!q) return mergedSuppliers;
     return mergedSuppliers.filter((s) => normalizeSupplierName(s.nome).includes(q));
   }, [mergedSuppliers, searchSupplier]);
+
+  const duplicateGroups = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    suppliers.forEach((s) => {
+      const key = normalizeSupplierName(s.nome);
+      if (!key) return;
+      if (!map.has(key)) map.set(key, new Set());
+      map.get(key)!.add(s.nome);
+    });
+    const out: Array<{ key: string; names: string[] }> = [];
+    map.forEach((set, key) => {
+      const arr = Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      if (arr.length > 1) out.push({ key, names: arr });
+    });
+    return out.sort((a, b) => a.names[0].localeCompare(b.names[0], 'pt-BR'));
+  }, [suppliers]);
 
   return (
     <div className="space-y-6">
@@ -1056,6 +1074,62 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
           />
         </div>
       </div>
+
+      {duplicateGroups.length > 0 && (
+        <div className="glass-card p-4">
+          <h4 className="text-sm font-bold text-on-surface mb-3">Unificar Fornecedores Duplicados</h4>
+          <div className="space-y-3">
+            {duplicateGroups.map((g, idx) => (
+              <div key={g.key} className="flex flex-wrap items-center gap-2 border border-white/10 rounded-lg p-3">
+                <select
+                  value={mergeTarget && g.names.includes(mergeTarget) ? mergeTarget : g.names[0]}
+                  onChange={(e) => setMergeTarget(e.target.value)}
+                  className="bg-surface-variant/20 border border-white/10 rounded px-2 py-1 text-xs"
+                >
+                  {g.names.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase">← manter</span>
+                <div className="flex flex-wrap gap-2">
+                  {g.names.map((n) => (
+                    <label key={n} className="inline-flex items-center gap-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={mergeAliases.includes(n)}
+                        onChange={(e) => {
+                          setMergeAliases((prev) => e.target.checked ? Array.from(new Set([...prev, n])) : prev.filter((x) => x !== n));
+                        }}
+                      />
+                      <span className="px-2 py-1 rounded bg-surface-variant/20 border border-white/10">{n}</span>
+                    </label>
+                  ))}
+                </div>
+                <button
+                  onClick={async () => {
+                    const target = mergeTarget && g.names.includes(mergeTarget) ? mergeTarget : g.names[0];
+                    const toMerge = mergeAliases.filter((n) => n !== target && g.names.includes(n));
+                    if (toMerge.length === 0) return;
+                    try {
+                      await api.mergeSuppliers(target, toMerge);
+                      setMergeAliases([]);
+                      setMergeTarget('');
+                      await syncSuppliers();
+                    } catch {
+                    }
+                  }}
+                  className="ml-auto bg-primary/10 text-primary px-3 py-1.5 rounded text-xs font-bold border border-primary/20 hover:bg-primary/20"
+                >
+                  Unificar Selecionados
+                </button>
+              </div>
+            ))}
+            {duplicateGroups.length === 0 && (
+              <p className="text-xs text-on-surface-variant">Sem duplicados detectados.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredSuppliers.map(s => (
