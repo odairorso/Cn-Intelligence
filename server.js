@@ -529,6 +529,155 @@ Responda APENAS com JSON válido:
   }
 });
 
+// ─── Contas Contábeis - POST / PUT ────────────────────────────────────────────
+app.post('/api/contas-contabeis', async (req, res) => {
+  try {
+    const { codigo, nome, tipo } = req.body;
+    if (!codigo || !nome || !tipo) return res.status(400).json({ error: 'codigo, nome e tipo são obrigatórios' });
+    const result = await pool.query(
+      `INSERT INTO contas_contabeis (codigo, nome, tipo) VALUES ($1, $2, $3) RETURNING *`,
+      [codigo, nome, tipo]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating conta contabil:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.put('/api/contas-contabeis/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { codigo, nome, tipo, ativo } = req.body;
+    const result = await pool.query(
+      `UPDATE contas_contabeis SET
+        codigo = COALESCE($1, codigo),
+        nome   = COALESCE($2, nome),
+        tipo   = COALESCE($3, tipo),
+        ativo  = COALESCE($4, ativo)
+      WHERE id = $5 RETURNING *`,
+      [codigo, nome, tipo, ativo, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating conta contabil:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── Suppliers merge ──────────────────────────────────────────────────────────
+app.post('/api/suppliers/merge', async (req, res) => {
+  try {
+    const { target, aliases } = req.body;
+    if (!target || !Array.isArray(aliases)) return res.status(400).json({ error: 'target e aliases são obrigatórios' });
+    const client = await pool.connect();
+    let updated = 0;
+    let removed = 0;
+    try {
+      await client.query('BEGIN');
+      for (const alias of aliases) {
+        const upd = await client.query(
+          `UPDATE transactions SET fornecedor = $1 WHERE fornecedor = $2`,
+          [target, alias]
+        );
+        updated += upd.rowCount || 0;
+        const del = await client.query(`DELETE FROM suppliers WHERE nome = $1`, [alias]);
+        removed += del.rowCount || 0;
+      }
+      await client.query('COMMIT');
+      res.json({ updated, removed });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error merging suppliers:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/suppliers/merge-auto', async (req, res) => {
+  try {
+    // Agrupa fornecedores com mesmo nome normalizado e mantém o mais antigo
+    const result = await pool.query(`SELECT id, nome FROM suppliers ORDER BY created_at ASC`);
+    const rows = result.rows;
+    const normalize = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+    const groups = new Map();
+    for (const row of rows) {
+      const key = normalize(row.nome);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(row);
+    }
+    let updated = 0;
+    let removed = 0;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const [, group] of groups) {
+        if (group.length <= 1) continue;
+        const [keep, ...dupes] = group;
+        for (const dupe of dupes) {
+          const upd = await client.query(`UPDATE transactions SET fornecedor = $1 WHERE fornecedor = $2`, [keep.nome, dupe.nome]);
+          updated += upd.rowCount || 0;
+          const del = await client.query(`DELETE FROM suppliers WHERE id = $1`, [dupe.id]);
+          removed += del.rowCount || 0;
+        }
+      }
+      await client.query('COMMIT');
+      res.json({ updated, removed });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error auto-merging suppliers:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── Setup tables ─────────────────────────────────────────────────────────────
+app.post('/api/setup-tables', async (req, res) => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contas_contabeis (
+        id SERIAL PRIMARY KEY,
+        codigo VARCHAR(20) NOT NULL,
+        nome VARCHAR(255) NOT NULL,
+        tipo VARCHAR(20) NOT NULL DEFAULT 'DESPESA',
+        ativo BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+    // Seed default accounts if empty
+    const count = await pool.query('SELECT COUNT(*) FROM contas_contabeis');
+    if (parseInt(count.rows[0].count) === 0) {
+      const defaults = [
+        ['3.1','Folha de Pagamento','DESPESA'],['3.2','Aluguel','DESPESA'],
+        ['3.3','Água / Luz / Telefone','DESPESA'],['3.4','Material de Escritório','DESPESA'],
+        ['3.5','Segurança','DESPESA'],['3.6','Editoras','DESPESA'],
+        ['3.7','Impostos','DESPESA'],['3.8','Manutenção','DESPESA'],
+        ['3.9','Tarifas Bancárias','DESPESA'],['3.10','Juros / Multas','DESPESA'],
+        ['3.11','Outras Despesas','DESPESA'],['4.1','Mensalidades','RECEITA'],
+        ['4.2','Repasses','RECEITA'],['4.3','Matrículas','RECEITA'],
+        ['4.4','Permutas / Convênios','RECEITA'],['4.5','Aplicação Bancária','RECEITA'],
+        ['4.6','Outras Receitas','RECEITA'],
+      ];
+      for (const [codigo, nome, tipo] of defaults) {
+        await pool.query(`INSERT INTO contas_contabeis (codigo, nome, tipo) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [codigo, nome, tipo]);
+      }
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error setting up tables:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Backend server running on port ${PORT}`);
