@@ -2359,12 +2359,13 @@ interface EditTxModalProps {
   transaction: Transaction;
   suppliers: Supplier[];
   banks: Bank[];
+  contasContabeis: ContaContabil[];
   companyOptions: string[];
   onClose: () => void;
   onSave: (tx: Transaction) => void;
 }
 
-const EditTxModal = ({ transaction, suppliers, banks, companyOptions, onClose, onSave }: EditTxModalProps) => {
+const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOptions, onClose, onSave }: EditTxModalProps) => {
   const [formData, setFormData] = useState({
     ...transaction,
     vencimento: toInputDate(transaction.vencimento),
@@ -2477,6 +2478,20 @@ const EditTxModal = ({ transaction, suppliers, banks, companyOptions, onClose, o
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta Contábil</label>
+              <select 
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+                style={{ backgroundColor: '#161b2a' }}
+                value={formData.conta_contabil_id || ''}
+                onChange={e => setFormData({...formData, conta_contabil_id: Number(e.target.value) || undefined})}
+              >
+                <option value="" className="bg-[#161b2a] text-on-surface">Selecione a conta</option>
+                {contasContabeis.filter(c => c.tipo === formData.tipo).map(c => (
+                  <option key={c.id} value={c.id} className="bg-[#161b2a] text-on-surface">{c.codigo} - {c.nome}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Status</label>
               <select 
@@ -2843,15 +2858,17 @@ export default function App() {
       if (!raw) return DEFAULT_COMPANIES;
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return DEFAULT_COMPANIES;
-      const normalized = parsed
+      const normalized = Array.from(new Set(parsed
         .map((item: any) => String(item || '').trim().toUpperCase())
-        .filter((item: string) => DEFAULT_COMPANIES.includes(item));
-      const merged = Array.from(new Set([...DEFAULT_COMPANIES, ...normalized]));
-      return DEFAULT_COMPANIES.filter((company) => merged.includes(company));
+        .filter(Boolean)));
+      return normalized.length ? normalized : DEFAULT_COMPANIES;
     } catch {
       return DEFAULT_COMPANIES;
     }
   });
+  const [newCompanyName, setNewCompanyName] = useState('');
+  const [editingCompany, setEditingCompany] = useState<string | null>(null);
+  const [editingCompanyName, setEditingCompanyName] = useState('');
   const [brandLogo, setBrandLogo] = useState<string>(() => {
     try {
       return localStorage.getItem('cn_brand_logo') || '';
@@ -2882,6 +2899,60 @@ export default function App() {
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
+  };
+
+  const normalizeCompanyName = (name: string) => String(name || '').trim().toUpperCase();
+
+  const addCompanyOption = (name: string) => {
+    const normalized = normalizeCompanyName(name);
+    if (!normalized) {
+      showNotification('Informe um nome de empresa válido.', 'error');
+      return;
+    }
+    if (companyOptions.includes(normalized)) {
+      showNotification('Essa empresa já existe.', 'info');
+      return;
+    }
+    setCompanyOptions((prev) => [...prev, normalized]);
+    setNewCompanyName('');
+    showNotification(`Empresa ${normalized} adicionada.`, 'success');
+  };
+
+  const removeCompanyOption = (name: string) => {
+    const normalized = normalizeCompanyName(name);
+    if (!companyOptions.includes(normalized)) return;
+    const next = companyOptions.filter((item) => item !== normalized);
+    if (!next.length) {
+      showNotification('Mantenha pelo menos uma empresa na lista.', 'error');
+      return;
+    }
+    setCompanyOptions(next);
+    if (editingCompany === normalized) {
+      setEditingCompany(null);
+      setEditingCompanyName('');
+    }
+    showNotification(`Empresa ${normalized} removida.`, 'info');
+  };
+
+  const startEditCompany = (name: string) => {
+    setEditingCompany(name);
+    setEditingCompanyName(name);
+  };
+
+  const saveEditCompany = (originalName: string) => {
+    const normalized = normalizeCompanyName(editingCompanyName);
+    if (!normalized) {
+      showNotification('Informe um nome de empresa válido.', 'error');
+      return;
+    }
+    if (normalized !== originalName && companyOptions.includes(normalized)) {
+      showNotification('Já existe uma empresa com esse nome.', 'error');
+      return;
+    }
+    setCompanyOptions((prev) => prev.map((item) => item === originalName ? normalized : item));
+    setEditingCompany(null);
+    setEditingCompanyName('');
+    showNotification('Empresa atualizada com sucesso.', 'success');
   };
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2971,10 +3042,13 @@ export default function App() {
   }, [companyOptions]);
 
   useEffect(() => {
-    const sanitized = companyOptions.filter((item) => DEFAULT_COMPANIES.includes(item));
-    const ordered = DEFAULT_COMPANIES.filter((item) => sanitized.includes(item));
-    if (ordered.length !== companyOptions.length || ordered.some((item, i) => item !== companyOptions[i])) {
-      setCompanyOptions(ordered);
+    const sanitized = Array.from(new Set(companyOptions.map((item) => normalizeCompanyName(item)).filter(Boolean)));
+    if (!sanitized.length) {
+      setCompanyOptions(DEFAULT_COMPANIES);
+      return;
+    }
+    if (sanitized.length !== companyOptions.length || sanitized.some((item, i) => item !== companyOptions[i])) {
+      setCompanyOptions(sanitized);
     }
   }, [companyOptions]);
 
@@ -4057,11 +4131,65 @@ export default function App() {
                   <h4 className="text-sm font-bold text-secondary mb-4 uppercase tracking-widest">Empresas</h4>
                   <div className="space-y-4 max-w-xl mx-auto">
                     <div className="glass-card p-4">
-                      <p className="text-[11px] text-on-surface-variant mb-3">Lista fixa solicitada: somente as empresas abaixo ficam disponíveis no sistema.</p>
+                      <p className="text-[11px] text-on-surface-variant mb-3">Gerencie a lista de empresas usada nos lançamentos e na automação de boletos.</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newCompanyName}
+                          onChange={(e) => setNewCompanyName(e.target.value)}
+                          placeholder="Ex: POLO NOVO"
+                          className="flex-1 bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                        />
+                        <button
+                          onClick={() => addCompanyOption(newCompanyName)}
+                          className="bg-secondary/20 text-secondary px-4 py-2 rounded-lg text-xs font-bold border border-secondary/30 hover:bg-secondary/30 transition-all"
+                        >
+                          Adicionar
+                        </button>
+                      </div>
                       <div className="mt-4 flex flex-wrap gap-2">
                         {companyOptions.map((company) => (
-                          <span key={company} className="inline-flex items-center gap-2 bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-1.5 text-xs font-bold">
-                            {company}
+                          <span key={company} className="inline-flex items-center gap-2 bg-surface-variant/20 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold">
+                            {editingCompany === company ? (
+                              <>
+                                <input
+                                  value={editingCompanyName}
+                                  onChange={(e) => setEditingCompanyName(e.target.value)}
+                                  className="bg-transparent border border-white/10 rounded px-2 py-1 text-xs outline-none focus:border-primary w-36"
+                                />
+                                <button
+                                  onClick={() => saveEditCompany(company)}
+                                  className="text-primary hover:text-primary/80"
+                                >
+                                  Salvar
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingCompany(null);
+                                    setEditingCompanyName('');
+                                  }}
+                                  className="text-on-surface-variant hover:text-on-surface"
+                                >
+                                  Cancelar
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <span>{company}</span>
+                                <button
+                                  onClick={() => startEditCompany(company)}
+                                  className="text-secondary hover:text-secondary/80"
+                                >
+                                  <Edit size={12} />
+                                </button>
+                                <button
+                                  onClick={() => removeCompanyOption(company)}
+                                  className="text-tertiary hover:text-tertiary/80"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </>
+                            )}
                           </span>
                         ))}
                       </div>
@@ -4330,6 +4458,7 @@ export default function App() {
           transaction={editingTx}
           suppliers={suppliers}
           banks={banks}
+          contasContabeis={contasContabeis}
           companyOptions={companyOptions}
           onClose={() => setEditingTx(null)}
           onSave={updateTransaction}
