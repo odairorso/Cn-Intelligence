@@ -46,7 +46,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-import { Transaction, KPI, ChartData, Supplier, TransactionStatus, Bank } from './types';
+import { Transaction, KPI, ChartData, Supplier, TransactionStatus, Bank, ContaContabil } from './types';
 import { api } from './api';
 import { OFXImportTab } from './OFXImport';
 
@@ -173,6 +173,8 @@ const isSupplierMatch = (transactionSupplier: string, supplierName: string) => {
 // --- Types ---
 type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'receitas' | 'bancos' | 'extrato' | 'configuracoes';
 
+const DEFAULT_COMPANIES = ['CN', 'FACEMS', 'LAB', 'CEI', 'UNOPAR'];
+
 type PdfImportDraft = {
   fileName: string;
   fornecedor: string;
@@ -181,6 +183,7 @@ type PdfImportDraft = {
   descricao: string;
   empresa: string;
   cnpj: string;
+  numero_boleto: string;
   rawText: string;
   duplicate: boolean;
 };
@@ -2068,15 +2071,17 @@ const SelectBankModal = ({ transactionId, valor, banks, onClose, onConfirm }: Se
 interface NewTxModalProps {
   suppliers: Supplier[];
   banks: Bank[];
+  contasContabeis: ContaContabil[];
+  companyOptions: string[];
   setShowNewTxModal: (show: boolean) => void;
   onSuccess: () => void;
 }
 
-const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxModalProps) => {
+const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShowNewTxModal, onSuccess }: NewTxModalProps) => {
   const [formData, setFormData] = useState({
     fornecedor: suppliers[0]?.nome || '',
     descricao: '',
-    empresa: 'CN',
+    empresa: companyOptions[0] || 'CN',
     vencimento: new Date().toISOString().split('T')[0],
     pagamento: '',
     valor: '',
@@ -2085,6 +2090,7 @@ const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxMod
     status: 'PENDENTE' as TransactionStatus,
     banco: '',
     tipo: 'DESPESA' as 'RECEITA' | 'DESPESA',
+    conta_contabil_id: undefined as number | undefined,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -2188,11 +2194,9 @@ const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxMod
                 value={formData.empresa}
                 onChange={e => setFormData({...formData, empresa: e.target.value})}
               >
-                <option className="bg-[#161b2a]">CN</option>
-                <option className="bg-[#161b2a]">FACEMS</option>
-                <option className="bg-[#161b2a]">LAB</option>
-                <option className="bg-[#161b2a]">CEI</option>
-                <option className="bg-[#161b2a]">UNOPAR</option>
+                {companyOptions.map((company) => (
+                  <option key={company} value={company} className="bg-[#161b2a]">{company}</option>
+                ))}
               </select>
 
             </div>
@@ -2208,6 +2212,20 @@ const NewTxModal = ({ suppliers, banks, setShowNewTxModal, onSuccess }: NewTxMod
                 <option value="RECEITA" className="bg-[#161b2a] text-on-surface">Receita</option>
               </select>
             </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta Contábil</label>
+            <select 
+              className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
+              style={{ backgroundColor: '#161b2a' }}
+              value={formData.conta_contabil_id || ''}
+              onChange={e => setFormData({...formData, conta_contabil_id: Number(e.target.value) || undefined})}
+            >
+              <option value="" className="bg-[#161b2a] text-on-surface">Selecione a conta</option>
+              {contasContabeis.filter(c => c.tipo === formData.tipo).map(c => (
+                <option key={c.id} value={c.id} className="bg-[#161b2a] text-on-surface">{c.codigo} - {c.nome}</option>
+              ))}
+            </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -2341,11 +2359,12 @@ interface EditTxModalProps {
   transaction: Transaction;
   suppliers: Supplier[];
   banks: Bank[];
+  companyOptions: string[];
   onClose: () => void;
   onSave: (tx: Transaction) => void;
 }
 
-const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxModalProps) => {
+const EditTxModal = ({ transaction, suppliers, banks, companyOptions, onClose, onSave }: EditTxModalProps) => {
   const [formData, setFormData] = useState({
     ...transaction,
     vencimento: toInputDate(transaction.vencimento),
@@ -2439,11 +2458,9 @@ const EditTxModal = ({ transaction, suppliers, banks, onClose, onSave }: EditTxM
                 value={formData.empresa}
                 onChange={e => setFormData({...formData, empresa: e.target.value})}
               >
-                <option className="bg-[#161b2a] text-on-surface">CN</option>
-                <option className="bg-[#161b2a] text-on-surface">FACEMS</option>
-                <option className="bg-[#161b2a] text-on-surface">LAB</option>
-                <option className="bg-[#161b2a] text-on-surface">CEI</option>
-                <option className="bg-[#161b2a] text-on-surface">UNOPAR</option>
+                {companyOptions.map((company) => (
+                  <option key={company} value={company} className="bg-[#161b2a] text-on-surface">{company}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -2819,6 +2836,23 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
+  const [contasContabeis, setContasContabeis] = useState<ContaContabil[]>([]);
+  const [companyOptions, setCompanyOptions] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('cn_company_options');
+      if (!raw) return DEFAULT_COMPANIES;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return DEFAULT_COMPANIES;
+      const normalized = parsed
+        .map((item: any) => String(item || '').trim().toUpperCase())
+        .filter(Boolean);
+      const merged = Array.from(new Set([...DEFAULT_COMPANIES, ...normalized]));
+      return merged.length ? merged : DEFAULT_COMPANIES;
+    } catch {
+      return DEFAULT_COMPANIES;
+    }
+  });
+  const [newCompanyName, setNewCompanyName] = useState('');
   const [brandLogo, setBrandLogo] = useState<string>(() => {
     try {
       return localStorage.getItem('cn_brand_logo') || '';
@@ -2849,6 +2883,33 @@ export default function App() {
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
+  };
+
+  const normalizeCompanyName = (name: string) => String(name || '').trim().toUpperCase();
+
+  const addCompanyOption = (name: string) => {
+    const normalized = normalizeCompanyName(name);
+    if (!normalized) {
+      showNotification('Informe um nome de empresa válido.', 'error');
+      return;
+    }
+    if (companyOptions.includes(normalized)) {
+      showNotification('Essa empresa já está cadastrada.', 'info');
+      return;
+    }
+    setCompanyOptions((prev) => [...prev, normalized]);
+    setNewCompanyName('');
+    showNotification(`Empresa ${normalized} cadastrada com sucesso!`, 'success');
+  };
+
+  const removeCompanyOption = (name: string) => {
+    const normalized = normalizeCompanyName(name);
+    if (DEFAULT_COMPANIES.includes(normalized)) {
+      showNotification('Empresas padrão não podem ser removidas.', 'info');
+      return;
+    }
+    setCompanyOptions((prev) => prev.filter((item) => item !== normalized));
+    showNotification(`Empresa ${normalized} removida.`, 'info');
   };
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2912,18 +2973,52 @@ export default function App() {
     }
   };
 
+  const fetchContasContabeis = async () => {
+    try {
+      const data = await api.getContasContabeis();
+      setContasContabeis(data);
+    } catch (error) {
+      console.error('Failed to fetch contas contabeis:', error);
+    }
+  };
+
   useEffect(() => {
     api.setupTables().catch(console.error).finally(() => {
       fetchTransactions();
       fetchSuppliers();
       fetchBanks();
+      fetchContasContabeis();
     });
   }, []);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('cn_company_options', JSON.stringify(companyOptions));
+    } catch {
+    }
+  }, [companyOptions]);
+
+  useEffect(() => {
+    const fromTransactions = transactions
+      .map((tx) => String(tx.empresa || '').trim().toUpperCase())
+      .filter(Boolean);
+    if (!fromTransactions.length) return;
+    const merged = Array.from(new Set([...companyOptions, ...fromTransactions]));
+    if (merged.length !== companyOptions.length) {
+      setCompanyOptions(merged);
+    }
+  }, [transactions, companyOptions]);
+
   // --- Handlers ---
 
-  const boletoDuplicateKey = (fornecedor: string, vencimento: string, valor: number) =>
-    `${normalizeSupplierName(fornecedor)}|${vencimento}|${Number(valor || 0).toFixed(2)}`;
+  const boletoDuplicateKey = (fornecedor: string, vencimento: string, valor: number, numeroBoleto?: string) => {
+    // Se tem número do boleto, usa ele como chave principal
+    if (numeroBoleto && numeroBoleto.trim()) {
+      return `BOLETO:${numeroBoleto.trim()}`;
+    }
+    // Fallback: fornecedor + vencimento + valor
+    return `${normalizeSupplierName(fornecedor)}|${vencimento}|${Number(valor || 0).toFixed(2)}`;
+  };
 
   const parseLinhaDigitavel = (text: string) => {
     const digits = (text.match(/\d/g) || []).join('');
@@ -3070,6 +3165,7 @@ export default function App() {
       descricao: '',
       empresa: '',
       cnpj: '',
+      numero_boleto: '',
       rawText: text.slice(0, 500),
       duplicate: false,
     };
@@ -3097,6 +3193,7 @@ export default function App() {
           descricao: data.descricao || '',
           empresa: data.empresa || '',
           cnpj: data.cnpj || '',
+          numero_boleto: data.numero_boleto || '',
           rawText: text.slice(0, 500),
           duplicate: false,
         };
@@ -3104,11 +3201,11 @@ export default function App() {
 
       console.log('[boleto] Gemini returned empty data, using local fallback');
       const fallback = extractBoletoData(text, fileName);
-      return { ...fallback, descricao: data.descricao || '', empresa: data.empresa || '', cnpj: data.cnpj || '' };
+      return { ...fallback, descricao: data.descricao || '', empresa: data.empresa || '', cnpj: data.cnpj || '', numero_boleto: data.numero_boleto || '' };
     } catch (err) {
       console.error('[boleto] API error, using local fallback:', err);
       const fallback = extractBoletoData(text, fileName);
-      return { ...fallback, descricao: '', empresa: '', cnpj: '' };
+      return { ...fallback, descricao: '', empresa: '', cnpj: '', numero_boleto: '' };
     }
   };
 
@@ -3170,7 +3267,7 @@ export default function App() {
       // Mark duplicates after all PDFs processed
       const batchKeys = new Set<string>();
       for (const data of extractedRows) {
-        const key = boletoDuplicateKey(data.fornecedor, data.vencimento, data.valor);
+        const key = boletoDuplicateKey(data.fornecedor, data.vencimento, data.valor, data.numero_boleto);
         data.duplicate = existingKeys.has(key) || batchKeys.has(key);
         batchKeys.add(key);
       }
@@ -3988,6 +4085,45 @@ export default function App() {
                 </div>
 
                 <div className="pt-8 border-t border-white/5">
+                  <h4 className="text-sm font-bold text-secondary mb-4 uppercase tracking-widest">Empresas</h4>
+                  <div className="space-y-4 max-w-xl mx-auto">
+                    <div className="glass-card p-4">
+                      <p className="text-[11px] text-on-surface-variant mb-3">Cadastre empresas para aparecerem no campo Empresa dos lançamentos e boletos.</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newCompanyName}
+                          onChange={(e) => setNewCompanyName(e.target.value)}
+                          placeholder="Ex: COLÉGIO EXEMPLO"
+                          className="flex-1 bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                        />
+                        <button
+                          onClick={() => addCompanyOption(newCompanyName)}
+                          className="bg-secondary/20 text-secondary px-4 py-2 rounded-lg text-xs font-bold border border-secondary/30 hover:bg-secondary/30 transition-all"
+                        >
+                          Cadastrar
+                        </button>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {companyOptions.map((company) => (
+                          <span key={company} className="inline-flex items-center gap-2 bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-1.5 text-xs font-bold">
+                            {company}
+                            {!DEFAULT_COMPANIES.includes(company) && (
+                              <button
+                                onClick={() => removeCompanyOption(company)}
+                                className="text-tertiary hover:text-tertiary/80"
+                              >
+                                <X size={12} />
+                              </button>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-white/5">
                   <h4 className="text-sm font-bold text-tertiary mb-4 uppercase tracking-widest">Limpeza de Dados</h4>
                   <div className="space-y-4 max-w-md mx-auto">
                     <div className="glass-card p-4 flex items-center justify-between">
@@ -4142,11 +4278,9 @@ export default function App() {
                           style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}
                         >
                           <option value="" style={{ backgroundColor: '#1e1e2e' }}>Selecione</option>
-                          <option value="CN" style={{ backgroundColor: '#1e1e2e' }}>CN</option>
-                          <option value="FACEMS" style={{ backgroundColor: '#1e1e2e' }}>FACEMS</option>
-                          <option value="LAB" style={{ backgroundColor: '#1e1e2e' }}>LAB</option>
-                          <option value="CEI" style={{ backgroundColor: '#1e1e2e' }}>CEI</option>
-                          <option value="UNOPAR" style={{ backgroundColor: '#1e1e2e' }}>UNOPAR</option>
+                          {companyOptions.map((company) => (
+                            <option key={company} value={company} style={{ backgroundColor: '#1e1e2e' }}>{company}</option>
+                          ))}
                         </select>
                       </div>
                       {row.cnpj && (
@@ -4190,6 +4324,8 @@ export default function App() {
         <NewTxModal 
           suppliers={suppliers}
           banks={banks}
+          contasContabeis={contasContabeis}
+          companyOptions={companyOptions}
           setShowNewTxModal={setShowNewTxModal} 
           onSuccess={() => {
             fetchTransactions();
@@ -4248,6 +4384,7 @@ export default function App() {
           transaction={editingTx}
           suppliers={suppliers}
           banks={banks}
+          companyOptions={companyOptions}
           onClose={() => setEditingTx(null)}
           onSave={updateTransaction}
         />
