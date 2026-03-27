@@ -3050,6 +3050,7 @@ export default function App() {
   const [editingCompany, setEditingCompany] = useState<string | null>(null);
   const [editingCompanyName, setEditingCompanyName] = useState('');
   const [newContaContabil, setNewContaContabil] = useState({ codigo: '', nome: '', tipo: 'DESPESA' });
+  const [searchContaContabil, setSearchContaContabil] = useState('');
   const [brandLogo, setBrandLogo] = useState<string>(() => {
     try {
       return localStorage.getItem('cn_brand_logo') || '';
@@ -4648,6 +4649,23 @@ export default function App() {
                   <div className="space-y-4 max-w-xl mx-auto">
                     <div className="glass-card p-4">
                       <p className="text-[11px] text-on-surface-variant mb-3">Gerencie as contas contábeis usadas na classificação de lançamentos.</p>
+                      
+                      {/* Botão Carregar Padrão */}
+                      <button
+                        onClick={async () => {
+                          try {
+                            await api.setupTables();
+                            await fetchContasContabeis();
+                            showNotification('Contas padrão carregadas!', 'success');
+                          } catch (error) {
+                            showNotification('Erro ao carregar contas padrão.', 'error');
+                          }
+                        }}
+                        className="w-full mb-4 bg-primary/10 text-primary px-4 py-2 rounded-lg text-xs font-bold border border-primary/20 hover:bg-primary/20 transition-all"
+                      >
+                        Carregar Padrão (atualiza contas antigas)
+                      </button>
+                      
                       <div className="flex gap-2 mb-4">
                         <input
                           type="text"
@@ -4678,8 +4696,27 @@ export default function App() {
                           Adicionar
                         </button>
                       </div>
+                      
+                      {/* Caixa de Busca */}
+                      <div className="relative mb-3">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60" size={14} />
+                        <input
+                          type="text"
+                          placeholder="Buscar conta..."
+                          value={searchContaContabil || ''}
+                          onChange={(e) => setSearchContaContabil(e.target.value)}
+                          className="w-full bg-surface-variant/20 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm outline-none focus:border-primary"
+                        />
+                      </div>
+                      
                       <div className="max-h-60 overflow-y-auto space-y-2">
-                        {contasContabeis.map((conta) => (
+                        {contasContabeis
+                          .filter(c => {
+                            const q = (searchContaContabil || '').toLowerCase();
+                            if (!q) return true;
+                            return c.codigo.toLowerCase().includes(q) || c.nome.toLowerCase().includes(q);
+                          })
+                          .map((conta) => (
                           <div key={conta.id} className="flex items-center justify-between bg-surface-variant/10 border border-white/5 rounded-lg px-3 py-2">
                             <div className="flex items-center gap-3">
                               <span className={`text-xs font-bold px-2 py-1 rounded ${conta.tipo === 'RECEITA' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
