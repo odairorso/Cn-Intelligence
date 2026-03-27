@@ -95,13 +95,11 @@ async function ensureContasTable() {
 async function handleTransactions(req, res) {
   if (req.method === 'GET') {
     try {
-      const { uid, limit } = req.query;
-      // Limit results for better performance (default 2000, max 5000)
-      const maxResults = Math.min(Number(limit) || 2000, 5000);
-      
+      const { uid } = req.query;
+      // Carrega todas as transações
       const rows = uid
-        ? await sql`SELECT * FROM transactions WHERE uid = ${uid} ORDER BY vencimento DESC LIMIT ${maxResults}`
-        : await sql`SELECT * FROM transactions ORDER BY vencimento DESC LIMIT ${maxResults}`;
+        ? await sql`SELECT * FROM transactions WHERE uid = ${uid} ORDER BY vencimento DESC`
+        : await sql`SELECT * FROM transactions ORDER BY vencimento DESC`;
 
       const formatted = rows.map(tx => ({
         ...tx,
