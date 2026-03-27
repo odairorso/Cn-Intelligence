@@ -27,6 +27,7 @@ export interface Transaction {
   banco?: string;
   tipo?: string;
   juros?: number;
+  conta_contabil_id?: number;
 }
 
 
@@ -51,5 +52,13 @@ export interface Bank {
   agencia?: string;
   conta?: string;
   saldo: number;
+  ativo: boolean;
+}
+
+export interface ContaContabil {
+  id: number;
+  codigo: string;
+  nome: string;
+  tipo: string;
   ativo: boolean;
 }

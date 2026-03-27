@@ -14,6 +14,7 @@ export interface Transaction {
   banco?: string;
   tipo?: string;
   juros?: number;
+  conta_contabil_id?: number;
 }
 
 export interface Supplier {
@@ -171,5 +172,11 @@ export const api = {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error('Failed to delete bank');
+  },
+
+  async getContasContabeis(): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/contas-contabeis`);
+    if (!res.ok) throw new Error('Failed to fetch contas contabeis');
+    return res.json();
   },
 };
