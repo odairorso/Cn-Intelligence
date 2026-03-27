@@ -3086,15 +3086,24 @@ export default function App() {
 
   // --- Handlers ---
 
-  const normalizeBoletoNumber = (value?: string) =>
-    String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const normalizeBoletoNumber = (value?: string) => {
+    const raw = String(value || '').toUpperCase();
+    if (!raw) return '';
+    const tokens = raw
+      .split(/[\s:;|,]+/)
+      .map((token) => token.replace(/[^A-Z0-9]/g, ''))
+      .filter(Boolean);
+    const bestToken = tokens.find((token) => /\d{4,}/.test(token) && token.length >= 6 && token.length <= 30);
+    if (bestToken) return bestToken;
+    return raw.replace(/[^A-Z0-9]/g, '');
+  };
 
   const boletoDuplicateKey = (fornecedor: string, vencimento: string, valor: number, numeroBoleto?: string) => {
     const normalizedNumber = normalizeBoletoNumber(numeroBoleto);
     if (normalizedNumber) {
       return `BOLETO:${normalizedNumber}`;
     }
-    return null;
+    return `BASE:${normalizeSupplierName(fornecedor)}|${vencimento}|${Number(valor || 0).toFixed(2)}`;
   };
 
   const getExistingBoletoKeys = () =>
@@ -3110,8 +3119,8 @@ export default function App() {
     return rows.map((row) => {
       const numero_boleto = normalizeBoletoNumber(row.numero_boleto);
       const key = boletoDuplicateKey(row.fornecedor, row.vencimento, row.valor, numero_boleto);
-      const duplicate = Boolean(key && (existingKeys.has(key) || batchKeys.has(key)));
-      if (key) batchKeys.add(key);
+      const duplicate = existingKeys.has(key) || batchKeys.has(key);
+      batchKeys.add(key);
       return { ...row, numero_boleto, duplicate };
     });
   };
@@ -3120,6 +3129,24 @@ export default function App() {
     setPdfExtractedRows((prev) =>
       applyDuplicateFlags(prev.map((item, i) => (i === index ? { ...item, ...patch } : item)))
     );
+  };
+
+  const extractLocalBoletoNumber = (text: string) => {
+    const source = String(text || '').toUpperCase();
+    const patterns = [
+      /NOSSO\s*N[ÚU]MERO[:\s-]*([A-Z0-9./-]{6,40})/,
+      /N[ROº°]*\s*DOCUMENTO[:\s-]*([A-Z0-9./-]{6,40})/,
+      /NUMERO\s*DO\s*DOCUMENTO[:\s-]*([A-Z0-9./-]{6,40})/,
+      /NR\s*DOC[:\s-]*([A-Z0-9./-]{6,40})/,
+    ];
+    for (const pattern of patterns) {
+      const match = source.match(pattern);
+      if (match?.[1]) {
+        const normalized = normalizeBoletoNumber(match[1]);
+        if (normalized) return normalized;
+      }
+    }
+    return '';
   };
 
   const parseLinhaDigitavel = (text: string) => {
@@ -3259,6 +3286,8 @@ export default function App() {
       if (!valor && linhaInfo.valor > 0) valor = linhaInfo.valor;
     }
 
+    const numeroBoleto = extractLocalBoletoNumber(normalizedText);
+
     return {
       fileName,
       fornecedor,
@@ -3267,7 +3296,7 @@ export default function App() {
       descricao: '',
       empresa: '',
       cnpj: '',
-      numero_boleto: '',
+      numero_boleto: numeroBoleto,
       rawText: text.slice(0, 500),
       duplicate: false,
     };
@@ -3287,6 +3316,8 @@ export default function App() {
       const hasValidData = data.fornecedor && data.fornecedor !== 'Fornecedor não identificado' && (data.valor > 0 || data.vencimento);
 
       if (hasValidData) {
+        const fallbackNumero = extractLocalBoletoNumber(text);
+        const inferredFromDescricao = normalizeBoletoNumber(data.descricao || '');
         return {
           fileName,
           fornecedor: data.fornecedor || 'Fornecedor não identificado',
@@ -3295,7 +3326,7 @@ export default function App() {
           descricao: data.descricao || '',
           empresa: data.empresa || '',
           cnpj: data.cnpj || '',
-          numero_boleto: data.numero_boleto || '',
+          numero_boleto: normalizeBoletoNumber(data.numero_boleto || '') || fallbackNumero || inferredFromDescricao,
           rawText: text.slice(0, 500),
           duplicate: false,
         };
@@ -3384,12 +3415,6 @@ export default function App() {
       const validRows = pdfExtractedRows
         .filter((row) => row.fornecedor && row.vencimento && row.valor > 0)
         .map((row) => ({ ...row, numero_boleto: normalizeBoletoNumber(row.numero_boleto) }));
-
-      const withoutNumberCount = validRows.filter((row) => !row.numero_boleto).length;
-      if (withoutNumberCount > 0) {
-        showNotification('Preencha o número do boleto para bloquear duplicidade.', 'error');
-        return;
-      }
 
       const recheckedRows = applyDuplicateFlags(validRows as PdfImportDraft[]);
       const nonDuplicateRows = recheckedRows.filter((row) => !row.duplicate);
