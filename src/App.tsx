@@ -3206,6 +3206,26 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!suppliers || suppliers.length === 0) return;
+    const key = 'cn_auto_merge_suppliers_last';
+    try {
+      const last = Number(localStorage.getItem(key) || 0);
+      const SIX_HOURS = 6 * 60 * 60 * 1000;
+      if (Date.now() - last < SIX_HOURS) return;
+    } catch {}
+    (async () => {
+      try {
+        await api.mergeSuppliersAuto();
+        await fetchSuppliers();
+        await fetchTransactions();
+        try { localStorage.setItem('cn_auto_merge_suppliers_last', String(Date.now())); } catch {}
+      } catch (e) {
+        console.error('Auto-merge suppliers failed:', e);
+      }
+    })();
+  }, [suppliers.length]);
+
+  useEffect(() => {
     try {
       localStorage.setItem('cn_company_options', JSON.stringify(companyOptions));
     } catch {
