@@ -366,9 +366,14 @@ async function handleSuppliersMergeAuto(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const suppliers = await sql`SELECT id, nome FROM suppliers`;
-    const txs = await sql`SELECT fornecedor FROM transactions`;
+    console.log('[merge-auto] Starting auto merge process...');
+    
+    const suppliers = await sql`SELECT id, nome FROM suppliers ORDER BY nome`;
+    const txs = await sql`SELECT id, fornecedor FROM transactions`;
+    
+    console.log(`[merge-auto] Found ${suppliers.length} suppliers and ${txs.length} transactions`);
 
+    // Count frequency of each fornecedor in transactions
     const freqByName = new Map();
     txs.forEach((t) => {
       const name = String(t.fornecedor || '').trim();
@@ -376,20 +381,27 @@ async function handleSuppliersMergeAuto(req, res) {
       freqByName.set(name, (freqByName.get(name) || 0) + 1);
     });
 
-    const groups = new Map();
+    // Group suppliers by normalized name
+    const groups = new Map(); // normalized -> [{id, nome}]
     suppliers.forEach((s) => {
       const key = normSupplier(s.nome);
       if (!key) return;
-      if (!groups.has(key)) groups.set(key, new Set());
-      groups.get(key).add(s.nome);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push({ id: s.id, nome: s.nome });
     });
 
     let totalUpdated = 0;
     let totalRemoved = 0;
+    let groupsProcessed = 0;
 
-    for (const [key, set] of groups.entries()) {
-      const names = Array.from(set.values());
-      if (names.length <= 1) continue;
+    for (const [key, items] of groups.entries()) {
+      if (items.length <= 1) continue; // Skip uniques
+      
+      groupsProcessed++;
+      const names = items.map(i => i.nome);
+      console.log(`[merge-auto] Group "${key}": ${names.length} variants: ${names.join(' | ')}`);
+      
+      // Choose canonical name (most frequent in transactions, fallback to longest)
       let canonical = names[0];
       let bestScore = -1;
       names.forEach((n) => {
@@ -403,22 +415,47 @@ async function handleSuppliersMergeAuto(req, res) {
       const aliases = names.filter((n) => n !== canonical);
       if (aliases.length === 0) continue;
 
-      for (const alias of aliases) {
-        await sql`UPDATE transactions SET fornecedor = ${canonical} WHERE upper(regexp_replace(fornecedor, '[^A-Za-z0-9]+', ' ', 'g')) = ${normSupplier(alias)}`;
-      }
-      const cnt = await sql`SELECT COUNT(*)::int AS c FROM transactions WHERE fornecedor = ${canonical}`;
-      totalUpdated += Number(cnt[0].c) || 0;
+      console.log(`[merge-auto] Canonical: "${canonical}", Aliases: ${aliases.join(', ')}`);
 
+      // Update all transactions with aliases to use canonical name
       for (const alias of aliases) {
-        const rows = await sql`DELETE FROM suppliers WHERE upper(regexp_replace(nome, '[^A-Za-z0-9]+', ' ', 'g')) = ${normSupplier(alias)} AND upper(regexp_replace(nome, '[^A-Za-z0-9]+', ' ', 'g')) <> ${normSupplier(canonical)} RETURNING id`;
-        totalRemoved += rows.length;
+        const normalizedAlias = normSupplier(alias);
+        const updateResult = await sql`
+          UPDATE transactions 
+          SET fornecedor = ${canonical} 
+          WHERE upper(regexp_replace(coalesce(fornecedor, ''), '[^A-Za-z0-9]+', ' ', 'g')) = ${normalizedAlias}
+             OR fornecedor = ${alias}
+        `;
+        console.log(`[merge-auto] Updated transactions: "${alias}" -> "${canonical}" (${updateResult.length} rows)`);
+        totalUpdated += updateResult.length;
+      }
+
+      // Delete duplicate suppliers (keep the canonical one)
+      for (const alias of aliases) {
+        const normalizedAlias = normSupplier(alias);
+        const deleteResult = await sql`
+          DELETE FROM suppliers 
+          WHERE (upper(regexp_replace(coalesce(nome, ''), '[^A-Za-z0-9]+', ' ', 'g')) = ${normalizedAlias}
+                 OR nome = ${alias})
+          AND nome != ${canonical}
+          RETURNING id
+        `;
+        console.log(`[merge-auto] Deleted supplier: "${alias}" (${deleteResult.length} rows)`);
+        totalRemoved += deleteResult.length;
       }
     }
 
-    return res.json({ updated: totalUpdated, removed: totalRemoved });
+    console.log(`[merge-auto] Completed: ${groupsProcessed} groups, ${totalUpdated} transactions updated, ${totalRemoved} suppliers removed`);
+    
+    return res.json({ 
+      updated: totalUpdated, 
+      removed: totalRemoved, 
+      groupsProcessed,
+      message: `${groupsProcessed} grupos unificados, ${totalUpdated} transações atualizadas, ${totalRemoved} fornecedores removidos`
+    });
   } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: e.message });
+    console.error('[merge-auto] Error:', e);
+    return res.status(500).json({ error: e.message, stack: e.stack });
   }
 }
 
