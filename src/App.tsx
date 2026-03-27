@@ -1038,15 +1038,25 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
   const mergedSuppliers = useMemo(() => {
     const byKey = new Map<string, Supplier>();
 
+    // Add real suppliers first
     suppliers.forEach((s) => {
       const key = normalizeSupplierName(s.nome);
       if (!key) return;
       byKey.set(key, s);
     });
 
-    transactions.forEach((tx) => {
+    // Only add virtual suppliers from transactions if not already in suppliers
+    // Limit to first 500 unique to avoid performance issues with large datasets
+    let virtualCount = 0;
+    const seenVirtual = new Set<string>();
+    
+    for (const tx of transactions) {
+      if (virtualCount >= 500) break; // Limit virtual suppliers
+      
       const key = normalizeSupplierName(tx.fornecedor);
-      if (!key || byKey.has(key)) return;
+      if (!key || byKey.has(key) || seenVirtual.has(key)) continue;
+      
+      seenVirtual.add(key);
       byKey.set(key, {
         id: `virtual-${key}`,
         uid: 'guest',
@@ -1055,7 +1065,8 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
         email: '',
         telefone: ''
       });
-    });
+      virtualCount++;
+    }
 
     return Array.from(byKey.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }, [suppliers, transactions]);
@@ -1068,17 +1079,24 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
 
   const duplicateGroups = useMemo(() => {
     const map = new Map<string, Set<string>>();
+    
+    // Only process suppliers, not virtual ones
     suppliers.forEach((s) => {
+      if (s.id?.startsWith('virtual-')) return; // Skip virtual suppliers
+      
       const key = normalizeSupplierName(s.nome);
       if (!key) return;
       if (!map.has(key)) map.set(key, new Set());
       map.get(key)!.add(s.nome);
     });
+    
     const out: Array<{ key: string; names: string[] }> = [];
     map.forEach((set, key) => {
+      if (set.size <= 1) return; // Skip singles
       const arr = Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-      if (arr.length > 1) out.push({ key, names: arr });
+      out.push({ key, names: arr });
     });
+    
     return out.sort((a, b) => a.names[0].localeCompare(b.names[0], 'pt-BR'));
   }, [suppliers]);
 
