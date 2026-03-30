@@ -53,6 +53,8 @@ import {
   isSupplierMatch, isRevenueTransaction, matchesAccountType, formatBRL,
 } from './lib/utils';
 import { DEFAULT_COMPANIES, DEFAULT_ACCOUNTS, PAGE_SIZE, MONTH_LABELS } from './lib/constants';
+import { AnimatedNumber } from './components/AnimatedNumber';
+import { GlobalSearch } from './components/GlobalSearch';
 
 const defaultBrandLogo = new URL('../Logo Cn/WhatsApp Image 2021-02-10 at 10.34.53.jpeg', import.meta.url).href;
 
@@ -117,11 +119,355 @@ interface DashboardTabProps {
 }
 
 const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) => {
+  const [empresaFilter, setEmpresaFilter] = useState('TODOS');
+
+  // Lista de empresas únicas
+  const empresas = useMemo(() => {
+    const s = new Set(transactions.map(tx => tx.empresa).filter(Boolean));
+    return ['TODOS', ...Array.from(s).sort()];
+  }, [transactions]);
+
+  // Transações filtradas por empresa
+  const filteredTx = useMemo(() =>
+    empresaFilter === 'TODOS' ? transactions : transactions.filter(tx => tx.empresa === empresaFilter),
+    [transactions, empresaFilter]
+  );
+
   const statusChartData = [
     { name: 'Pagos', value: stats.pagos, color: '#10b981' },
     { name: 'Pendentes', value: stats.pendentes, color: '#f59e0b' },
     { name: 'Vencidos', value: stats.vencidos, color: '#ef4444' },
   ];
+
+  // Gráfico receitas vs despesas por mês
+  const monthlyFlux = useMemo(() => {
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const currentYear = new Date().getFullYear();
+    return months.map((month, idx) => {
+      const monthTx = filteredTx.filter(tx => {
+        const parts = tx.vencimento.split('/');
+        return parts.length === 3 && parseInt(parts[1]) === idx + 1 && parts[2] === String(currentYear);
+      });
+      const receitas = monthTx.filter(tx => tx.tipo === 'RECEITA').reduce((a, tx) => a + tx.valor, 0);
+      const despesas = monthTx.filter(tx => tx.tipo !== 'RECEITA').reduce((a, tx) => a + tx.valor, 0);
+      const saldo = receitas - despesas;
+      return { name: month, receitas, despesas, saldo };
+    });
+  }, [filteredTx]);
+
+  // Top 5 fornecedores por valor
+  const topSuppliers = useMemo(() => {
+    const supplierMap = new Map<string, number>();
+    filteredTx.forEach(tx => {
+      const current = supplierMap.get(tx.fornecedor) || 0;
+      supplierMap.set(tx.fornecedor, current + tx.valor);
+    });
+    return Array.from(supplierMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, value]) => ({ name, value }));
+  }, [filteredTx]);
+
+  // Stats filtrados
+  const filteredStats = useMemo(() => {
+    let total = 0, pagos = 0, pendentes = 0, vencidos = 0;
+    const today = new Date(); today.setHours(0,0,0,0);
+    for (const tx of filteredTx) {
+      total += tx.valor;
+      if (tx.status === 'PAGO') pagos++;
+      else if (tx.status === 'VENCIDO') vencidos++;
+      else {
+        const parts = tx.vencimento?.split('/');
+        if (parts?.length === 3) {
+          const vDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+          if (vDate < today) vencidos++; else pendentes++;
+        } else pendentes++;
+      }
+    }
+    return { total, pagos, pendentes, vencidos };
+  }, [filteredTx]);
+
+  const totalTx = filteredTx.length || 1;
+  const pagosPercent = Math.round((filteredStats.pagos / totalTx) * 100);
+  const pendentesPercent = Math.round((filteredStats.pendentes / totalTx) * 100);
+  const vencidosPercent = Math.round((filteredStats.vencidos / totalTx) * 100);
+
+  // Índice de saúde financeira
+  const healthScore = pagosPercent;
+  const healthColor = healthScore >= 80 ? '#10b981' : healthScore >= 60 ? '#f59e0b' : '#ef4444';
+  const healthLabel = healthScore >= 80 ? 'Saudável' : healthScore >= 60 ? 'Atenção' : 'Crítico';
+
+  return (
+    <div className="space-y-6">
+
+      {/* Filtro por empresa */}
+      <div className="flex flex-wrap items-center gap-2">
+        {empresas.map(emp => (
+          <button
+            key={emp}
+            onClick={() => setEmpresaFilter(emp)}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+              empresaFilter === emp
+                ? "bg-primary text-background border-primary"
+                : "bg-white/5 text-on-surface-variant border-white/10 hover:border-primary/40 hover:text-on-surface"
+            )}
+          >
+            {emp}
+          </button>
+        ))}
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        {[
+          { label: 'VALOR TOTAL', value: filteredStats.total, format: 'currency' as const, color: '#3b82f6' },
+          { label: 'REGISTROS', value: filteredTx.length, format: 'number' as const, color: '#3b82f6', desc: 'Volume operacional' },
+          { label: 'PENDENTES', value: filteredStats.pendentes, format: 'number' as const, color: '#f59e0b', desc: 'Aguardando' },
+          { label: 'PAGOS', value: filteredStats.pagos, format: 'number' as const, color: '#10b981', desc: 'Liquidados' },
+          { label: 'VENCIDOS', value: filteredStats.vencidos, format: 'number' as const, color: '#ef4444', desc: 'Ação necessária' },
+          { label: 'SAÚDE', value: healthScore, format: 'number' as const, color: healthColor, desc: healthLabel, suffix: '%' },
+        ].map((kpi, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.07 }}
+            className="relative overflow-hidden glass-card p-5 group hover:border-primary/40 transition-all duration-300"
+          >
+            <div className="absolute top-0 right-0 w-16 h-16 rounded-bl-full" style={{ background: `radial-gradient(circle, ${kpi.color}18, transparent)` }} />
+            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/60 mb-2">{kpi.label}</p>
+            <h3 className="text-lg xl:text-2xl font-black font-headline text-on-surface group-hover:text-primary transition-colors leading-tight">
+              <AnimatedNumber value={kpi.value} format={kpi.format} duration={900} />
+              {kpi.suffix}
+            </h3>
+            {kpi.desc && <p className="text-[9px] text-on-surface-variant/50 mt-1 font-medium">{kpi.desc}</p>}
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Cards de Status */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[
+          { label: 'Pagos', value: filteredStats.pagos, percent: pagosPercent, color: 'primary', icon: <CheckCircle size={20} className="text-primary" />, delay: 0.2 },
+          { label: 'Pendentes', value: filteredStats.pendentes, percent: pendentesPercent, color: 'secondary', icon: <Calendar size={20} className="text-secondary" />, delay: 0.3 },
+          { label: 'Vencidos', value: filteredStats.vencidos, percent: vencidosPercent, color: 'tertiary', icon: <TrendingUp size={20} className="text-tertiary" />, delay: 0.4 },
+        ].map((item, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: item.delay }}
+            className={`glass-card p-6 border-l-4 border-${item.color}`}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg bg-${item.color}/20 flex items-center justify-center`}>{item.icon}</div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/60">{item.label}</p>
+                  <p className={`text-2xl font-black text-${item.color}`}>
+                    <AnimatedNumber value={item.value} duration={900} />
+                  </p>
+                </div>
+              </div>
+              <span className={`text-3xl font-black text-${item.color}/20`}>{item.percent}%</span>
+            </div>
+            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${item.percent}%` }}
+                transition={{ delay: item.delay + 0.3, duration: 0.8 }}
+                className={`h-full bg-gradient-to-r from-${item.color} to-${item.color}/60 rounded-full`}
+              />
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Gráficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Receitas vs Despesas */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h4 className="text-lg font-bold font-headline">Receitas vs Despesas</h4>
+              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Fluxo mensal {new Date().getFullYear()}</p>
+            </div>
+            <div className="flex items-center gap-4 text-[10px]">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#10b981]" /> Receitas</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-tertiary" /> Despesas</span>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={monthlyFlux} barGap={2}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
+              <XAxis dataKey="name" stroke="#c6c6cd" fontSize={10} axisLine={false} tickLine={false} />
+              <YAxis stroke="#c6c6cd" fontSize={10} axisLine={false} tickLine={false}
+                tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#1a1f2e', border: '1px solid #ffffff15', borderRadius: '12px' }}
+                itemStyle={{ color: '#dee2f7', fontSize: '12px' }}
+                formatter={(v: number) => [v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), '']}
+              />
+              <Bar dataKey="receitas" fill="#10b981" radius={[3,3,0,0]} />
+              <Bar dataKey="despesas" fill="#ef4444" radius={[3,3,0,0]} opacity={0.8} />
+            </BarChart>
+          </ResponsiveContainer>
+        </motion.div>
+
+        {/* Status Donut */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="glass-card p-6">
+          <div className="mb-6">
+            <h4 className="text-lg font-bold font-headline">Status dos Lançamentos</h4>
+            <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Distribuição atual</p>
+          </div>
+          <div className="flex items-center justify-center relative">
+            {filteredTx.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[260px] text-on-surface-variant opacity-20">
+                <PieChartIcon size={64} /><p className="text-xs uppercase tracking-widest mt-4">Sem dados</p>
+              </div>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie data={statusChartData} cx="50%" cy="50%" innerRadius={70} outerRadius={95} paddingAngle={4} dataKey="value" cornerRadius={6}>
+                      {statusChartData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1a1f2e', border: '1px solid #ffffff15', borderRadius: '12px' }}
+                      itemStyle={{ color: '#dee2f7' }}
+                      formatter={(v: number) => [`${v} lançamentos`, '']}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-4xl font-black" style={{ color: healthColor }}>{pagosPercent}%</span>
+                  <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-widest">{healthLabel}</span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex justify-center gap-6 mt-4">
+            {statusChartData.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
+                <span className="text-xs font-medium text-on-surface-variant">{item.name}: {item.value}</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Top Fornecedores + Últimos Lançamentos */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }} className="glass-card p-6">
+          <div className="mb-6">
+            <h4 className="text-lg font-bold font-headline">Top Fornecedores</h4>
+            <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Por volume financeiro</p>
+          </div>
+          {topSuppliers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-on-surface-variant opacity-40">
+              <Building2 size={32} className="mb-3" /><p className="text-xs">Nenhum fornecedor</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {topSuppliers.map((supplier, idx) => {
+                const maxValue = topSuppliers[0]?.value || 1;
+                const percent = Math.round((supplier.value / maxValue) * 100);
+                return (
+                  <div key={idx} className="group">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <span className="w-6 h-6 rounded bg-primary/20 flex items-center justify-center text-[10px] font-black text-primary">{idx + 1}</span>
+                        <span className="text-sm font-semibold truncate max-w-[140px]">{supplier.name}</span>
+                      </div>
+                      <span className="text-xs font-bold text-primary">{formatBRL(supplier.value)}</span>
+                    </div>
+                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percent}%` }}
+                        transition={{ delay: 0.8 + idx * 0.1, duration: 0.6 }}
+                        className="h-full bg-gradient-to-r from-primary to-primary/40 rounded-full"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }} className="glass-card p-6 lg:col-span-2">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h4 className="text-lg font-bold font-headline">Últimos Lançamentos</h4>
+              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Atividade recente</p>
+            </div>
+            <span className="text-[10px] font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">{filteredTx.length} total</span>
+          </div>
+          {filteredTx.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-on-surface-variant opacity-40">
+              <FileText size={48} className="mb-4" />
+              <p className="text-sm font-medium">Nenhum lançamento encontrado</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredTx.slice(0, 6).map((tx, idx) => (
+                <motion.div
+                  key={tx.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.9 + idx * 0.05 }}
+                  className="flex items-center justify-between p-4 bg-white/[0.03] rounded-xl border border-white/5 hover:bg-white/[0.06] hover:border-primary/20 transition-all group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center",
+                      tx.status === 'PAGO' && "bg-primary/20",
+                      tx.status === 'PENDENTE' && "bg-secondary/20",
+                      tx.status === 'VENCIDO' && "bg-tertiary/20"
+                    )}>
+                      {tx.status === 'PAGO' && <CheckCircle size={18} className="text-primary" />}
+                      {tx.status === 'PENDENTE' && <Calendar size={18} className="text-secondary" />}
+                      {tx.status === 'VENCIDO' && <TrendingUp size={18} className="text-tertiary" />}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-on-surface group-hover:text-white transition-colors">{tx.fornecedor}</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50">{tx.vencimento}</span>
+                        <span className="w-1 h-1 rounded-full bg-white/20" />
+                        <span className="text-[10px] font-bold text-primary/60 uppercase">{tx.empresa}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <span className={cn("text-sm font-black", tx.valor < 0 ? "text-tertiary" : "text-primary")}>
+                        {formatBRL(tx.valor)}
+                      </span>
+                      <div className="mt-0.5">
+                        <span className={cn("text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest",
+                          tx.status === 'PAGO' && "bg-primary/20 text-primary",
+                          tx.status === 'PENDENTE' && "bg-secondary/20 text-secondary",
+                          tx.status === 'VENCIDO' && "bg-tertiary/20 text-tertiary"
+                        )}>{tx.status}</span>
+                      </div>
+                    </div>
+                    {tx.status !== 'PAGO' && (
+                      <button onClick={() => onMarkAsPaid(tx)} className="p-2 bg-primary/10 text-primary rounded-lg opacity-0 group-hover:opacity-100 hover:bg-primary/20 transition-all">
+                        <CheckCircle size={16} />
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      </div>
+    </div>
+  );
+};
 
   // Dados para gráfico de evolução mensal
   const monthlyEvolution = useMemo(() => {
@@ -3823,9 +4169,14 @@ export default function App() {
             </button>
             <button 
               onClick={() => setActiveTab('lancamentos')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'lancamentos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+              className={cn("relative transition-all duration-200 font-medium text-sm", activeTab === 'lancamentos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
               Lançamentos
+              {stats.vencidos > 0 && (
+                <span className="absolute -top-2 -right-3 bg-tertiary text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
+                  {stats.vencidos}
+                </span>
+              )}
             </button>
             <button 
               onClick={() => setActiveTab('fornecedores')}
@@ -3866,6 +4217,12 @@ export default function App() {
           </nav>
         </div>
         <div className="flex items-center gap-2 md:gap-4">
+          <GlobalSearch
+            transactions={transactions}
+            suppliers={suppliers}
+            banks={banks}
+            onNavigate={setActiveTab}
+          />
           <button className="p-2 text-on-surface-variant hover:bg-white/5 rounded-full transition-colors hidden sm:block">
             <Bell size={20} />
           </button>
