@@ -408,51 +408,65 @@ app.post('/api/extract-boleto', async (req, res) => {
 
     const hasText = extractedText.length > 50;
 
-    // Build prompt based on whether we have extracted text
+    // Prompt ultra-detalhado para máxima extração
+    const promptBase = `Você é um especialista em boletos bancários brasileiros com 20 anos de experiência.
+Sua tarefa é extrair dados de boletos com MÁXIMA PRECISÃO.
+
+REGRAS CRÍTICAS:
+- fornecedor = quem RECEBE o dinheiro (beneficiário/cedente), NUNCA o banco emissor
+- Bancos emissores (IGNORAR como fornecedor): Sicredi, Bradesco, Itaú, Santander, Caixa, BB, Cora, Inter, Nubank, C6, BTG, Safra, BV, Banrisul, Unicred, Ailos, Cresol
+- valor = número decimal com PONTO como separador decimal (ex: 632.86, não 63286)
+- Se o valor aparecer como "632,86" retorne 632.86
+- Se o valor aparecer como "2.092,71" retorne 2092.71
+- Se o valor aparecer como "2,092.71" retorne 2092.71
+
+CAMPOS A EXTRAIR:
+
+1. fornecedor: Nome da empresa/pessoa que emitiu o boleto
+   Procure por (nesta ordem): "Beneficiário", "Cedente", "Sacador/Avalista", "Razão Social", "Favorecido"
+   Exemplos válidos: HAPVIDA, SANESUL, ENERGISA, VSC CONTABILIDADE, PREFEITURA MUNICIPAL
+   
+2. vencimento: Data de vencimento no formato DD/MM/AAAA
+   Procure por: "Vencimento", "Data de Vencimento", "Venc."
+   
+3. valor: Valor TOTAL do boleto em reais (número com ponto decimal)
+   Procure por (nesta ordem): "(=) Valor do Documento", "Valor do Documento", "Valor Cobrado", "Valor Total", "Valor a Pagar"
+   ATENÇÃO: retorne APENAS o número, ex: 632.86
+   
+4. cnpj: CNPJ do beneficiário (formato: XX.XXX.XXX/XXXX-XX ou apenas dígitos)
+
+5. descricao: Descrição do serviço. Se não houver, use o tipo de cobrança ou referência.
+   Exemplos: "Plano de Saúde", "Conta de Água", "Honorários Contábeis", "Mensalidade"
+   
+6. empresa: Qual empresa do Grupo CN é o PAGADOR (quem paga o boleto)
+   Opções: CN, FACEMS, LAB, CEI, UNOPAR, ELAINE
+   Procure por: "Pagador", "Sacado" — se aparecer "COLEGIO NAVIRAI" = CN, "FACEMS" = FACEMS
+   Se não identificar, deixe vazio.
+   
+7. numero_boleto: Número único do boleto (para evitar duplicatas)
+   Procure por (nesta ordem de prioridade):
+   a) "Nosso Número" ou "Nosso Numero" — campo mais confiável
+   b) "Número do Documento" ou "Numero do Documento" ou "Nro Documento" ou "Nr Documento"  
+   c) "Nro Doc" ou "Nr Doc" ou "Nº Doc"
+   d) Linha digitável (47-48 dígitos)
+   Retorne APENAS os dígitos/alfanuméricos, sem pontos, traços ou espaços.
+
+Responda APENAS com JSON válido, sem markdown, sem explicações:
+{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
+
     let prompt;
     if (hasText) {
-      prompt = `Você é um especialista em extrair dados de boletos bancários brasileiros.
-Analise o texto abaixo extraído de um PDF de boleto bancário e extraia os campos solicitados.
+      prompt = `${promptBase}
 
-TEXTO DO PDF:
+TEXTO EXTRAÍDO DO PDF:
 ${extractedText}
 
-Nome do arquivo: ${fileName || 'N/A'}
-
-Extraia os seguintes campos:
-1. fornecedor: NOME DO BENEFICIÁRIO/CEDENTE que recebe o pagamento (NÃO é o banco!).
-   - Procure por "Beneficiário", "Cedente", "Razão Social"
-   - NUNCA use o nome do banco como fornecedor (Sicredi, Bradesco, Itaú, Cora são BANCOS)
-2. vencimento: Data de vencimento no formato DD/MM/AAAA.
-3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal).
-4. cnpj: CNPJ do beneficiário se disponível.
-5. descricao: Descrição do serviço ou referência do boleto.
-6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR). Se não identificar, deixe vazio.
-7. numero_boleto: Número que identifica unicamente o boleto. Procure EXATAMENTE por estes campos no texto (nesta ordem de prioridade):
-   - "Nosso Número" ou "Nosso Numero" — use o valor numérico após esse campo
-   - "Numero do Documento" ou "Número do Documento" ou "Nro documento" ou "Nr documento" ou "Nro doc"
-   - "Código de barras" — use os dígitos
-   Se encontrar, retorne APENAS os dígitos/alfanuméricos sem espaços ou pontos.
-
-Responda APENAS com JSON válido:
-{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
+Nome do arquivo: ${fileName || 'N/A'}`;
     } else {
-      prompt = `Você é um especialista em extrair dados de boletos bancários brasileiros.
-Analise visualmente o PDF de boleto bancário anexo e extraia os campos abaixo.
+      prompt = `${promptBase}
 
 Nome do arquivo: ${fileName || 'N/A'}
-
-Extraia os seguintes campos:
-1. fornecedor: NOME DO BENEFICIÁRIO/CEDENTE (NÃO é o banco! Sicredi, Bradesco, Cora são BANCOS)
-2. vencimento: Data de vencimento no formato DD/MM/AAAA.
-3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal). Ex: 632.86
-4. cnpj: CNPJ do beneficiário se disponível.
-5. descricao: Descrição do serviço ou referência do boleto.
-6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR).
-7. numero_boleto: Número que identifica unicamente o boleto. Procure por "Nosso Número", "Numero do Documento", "Nro documento".
-
-Responda APENAS com JSON válido:
-{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
+Analise visualmente o PDF anexo e extraia os dados.`;
     }
 
     console.log(`[boleto] Gemini: text=${extractedText.length} chars, hasText=${hasText}, file=${fileName}`);

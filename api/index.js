@@ -762,54 +762,44 @@ async function handleExtractBoleto(req, res) {
     const extractedText = text || '';
     const hasText = extractedText.length > 50;
 
+    const promptBase = `Você é um especialista em boletos bancários brasileiros com 20 anos de experiência.
+
+REGRAS CRÍTICAS:
+- fornecedor = quem RECEBE o dinheiro (beneficiário/cedente), NUNCA o banco emissor
+- Bancos emissores (IGNORAR como fornecedor): Sicredi, Bradesco, Itaú, Santander, Caixa, BB, Cora, Inter, Nubank, C6, BTG, Safra, BV, Banrisul, Unicred
+- valor = número decimal com PONTO como separador (ex: 632.86, não 63286)
+- Se valor aparecer como "632,86" retorne 632.86 — se "2.092,71" retorne 2092.71
+
+CAMPOS:
+1. fornecedor: Nome do beneficiário/cedente que emitiu o boleto
+   Procure por: "Beneficiário", "Cedente", "Sacador/Avalista", "Razão Social"
+2. vencimento: Data de vencimento no formato DD/MM/AAAA
+3. valor: Valor TOTAL em reais com ponto decimal (ex: 632.86)
+   Procure por: "(=) Valor do Documento", "Valor do Documento", "Valor Cobrado"
+4. cnpj: CNPJ do beneficiário
+5. descricao: Tipo de serviço (ex: "Plano de Saúde", "Conta de Água", "Honorários Contábeis", "Mensalidade")
+6. empresa: Empresa do Grupo CN que é o PAGADOR
+   - Se "COLEGIO NAVIRAI" ou "COLEGIO NAVIRA" aparecer como pagador/sacado → "CN"
+   - Se "FACEMS" aparecer como pagador → "FACEMS"
+   - Se "LABORATORIO" aparecer como pagador → "LAB"
+   - Se "CEI" aparecer como pagador → "CEI"
+   - Se "UNOPAR" aparecer como pagador → "UNOPAR"
+   - Se "ELAINE" aparecer como pagador → "ELAINE"
+   - Se não identificar, deixe vazio
+7. numero_boleto: Número único do boleto (nesta ordem de prioridade):
+   a) "Nosso Número" ou "Nosso Numero" — mais confiável
+   b) "Número do Documento" ou "Numero do Documento" ou "Nro Documento"
+   c) Linha digitável (47-48 dígitos)
+   Retorne APENAS dígitos/alfanuméricos sem pontos ou espaços.
+
+Responda APENAS com JSON válido:
+{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
+
     let prompt;
     if (hasText) {
-      prompt = `Você é um especialista em extrair dados de boletos bancários brasileiros.
-Analise o texto abaixo extraído de um PDF de boleto bancário e extraia os campos solicitados.
-
-TEXTO DO PDF:
-${extractedText}
-
-Nome do arquivo: ${fileName || 'N/A'}
-
-Extraia os seguintes campos:
-1. fornecedor: NOME DO BENEFICIÁRIO/CEDENTE que recebe o pagamento (NÃO é o banco!).
-2. vencimento: Data de vencimento no formato DD/MM/AAAA.
-3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal).
-4. cnpj: CNPJ do beneficiário se disponível.
-5. descricao: Descrição do serviço ou referência do boleto.
-6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR).
-7. numero_boleto: O NÚMERO QUE IDENTIFICA UNICAMENTE O BOLETO. Procure por:
-   - "Nosso número" ou "Nosso Numero"
-   - "Nro documento" ou "Nº documento" ou "Nr documento"
-   - "Número do documento" ou "Numero do documento"
-   - "Código de barras" (extraia apenas os números)
-   - Este campo é OBRIGATÓRIO e nunca deve ser vazio. Se não encontrar, procure na linha digitável (código de barras com 47-48 dígitos).
-
-Responda APENAS com JSON válido:
-{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
+      prompt = `${promptBase}\n\nTEXTO DO PDF:\n${extractedText}\n\nNome do arquivo: ${fileName || 'N/A'}`;
     } else {
-      prompt = `Você é um especialista em extrair dados de boletos bancários brasileiros.
-Analise visualmente o PDF de boleto bancário anexo e extraia os campos abaixo.
-
-Nome do arquivo: ${fileName || 'N/A'}
-
-Extraia os seguintes campos:
-1. fornecedor: NOME DO BENEFICIÁRIO/CEDENTE que recebe o pagamento (NÃO é o banco!).
-2. vencimento: Data de vencimento no formato DD/MM/AAAA.
-3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal).
-4. cnpj: CNPJ do beneficiário se disponível.
-5. descricao: Descrição do serviço ou referência do boleto.
-6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR).
-7. numero_boleto: O NÚMERO QUE IDENTIFICA UNICAMENTE O BOLETO. Procure por:
-   - "Nosso número" ou "Nosso Numero"
-   - "Nro documento" ou "Nº documento" ou "Nr documento"
-   - "Número do documento" ou "Numero do documento"
-   - "Código de barras" (extraia apenas os números)
-   - Este campo é OBRIGATÓRIO e nunca deve ser vazio. Se não encontrar, procure na linha digitável (código de barras com 47-48 dígitos).
-
-Responda APENAS com JSON válido:
-{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
+      prompt = `${promptBase}\n\nNome do arquivo: ${fileName || 'N/A'}\nAnalise visualmente o PDF anexo.`;
     }
 
     let contents;
@@ -853,8 +843,20 @@ Responda APENAS com JSON válido:
     }
 
     if (typeof extracted.valor === 'string') {
-      extracted.valor = parseFloat(extracted.valor.replace(/\./g, '').replace(',', '.'));
+      const raw = String(extracted.valor).trim().replace(/[R$\s]/g, '');
+      if (/^\d{1,3}(\.\d{3})+(,\d{2})$/.test(raw)) {
+        extracted.valor = parseFloat(raw.replace(/\./g, '').replace(',', '.'));
+      } else if (/^\d{1,3}(,\d{3})+(\.\d{2})$/.test(raw)) {
+        extracted.valor = parseFloat(raw.replace(/,/g, ''));
+      } else if (/^\d+\.\d{1,2}$/.test(raw)) {
+        extracted.valor = parseFloat(raw);
+      } else if (/^\d+,\d{1,2}$/.test(raw)) {
+        extracted.valor = parseFloat(raw.replace(',', '.'));
+      } else {
+        extracted.valor = parseFloat(raw.replace(/[^0-9.]/g, ''));
+      }
     }
+    if (!Number.isFinite(extracted.valor) || extracted.valor <= 0) extracted.valor = 0;
 
     if (!extracted.fornecedor || extracted.fornecedor === '' || extracted.fornecedor.toLowerCase() === 'não identificado') {
       if (fileName) {
