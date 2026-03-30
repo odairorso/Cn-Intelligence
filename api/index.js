@@ -1103,28 +1103,21 @@ Responda APENAS com JSON válido:
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             UNIQUE(cnpj), UNIQUE(nome_normalizado)
           )`;
+
+        // NUNCA sobrescreve padrão já confirmado pelo usuário (confirmacoes > 1)
+        // Só insere se não existir ainda
         if (cnpjClean.length >= 11) {
           await sql`
             INSERT INTO boleto_patterns (cnpj, nome_normalizado, fornecedor, descricao, empresa, tipo)
             VALUES (${cnpjClean}, ${nomeNorm}, ${extracted.fornecedor}, ${extracted.descricao||null}, ${extracted.empresa||null}, ${extracted.tipo||'DESPESA'})
-            ON CONFLICT (cnpj) DO UPDATE SET
-              fornecedor = EXCLUDED.fornecedor,
-              descricao = COALESCE(EXCLUDED.descricao, boleto_patterns.descricao),
-              empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
-              confirmacoes = boleto_patterns.confirmacoes + 1,
-              ultima_confirmacao = NOW()`;
+            ON CONFLICT (cnpj) DO NOTHING`;
         } else if (nomeNorm.length >= 5) {
           await sql`
             INSERT INTO boleto_patterns (nome_normalizado, fornecedor, descricao, empresa, tipo)
             VALUES (${nomeNorm}, ${extracted.fornecedor}, ${extracted.descricao||null}, ${extracted.empresa||null}, ${extracted.tipo||'DESPESA'})
-            ON CONFLICT (nome_normalizado) DO UPDATE SET
-              fornecedor = EXCLUDED.fornecedor,
-              descricao = COALESCE(EXCLUDED.descricao, boleto_patterns.descricao),
-              empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
-              confirmacoes = boleto_patterns.confirmacoes + 1,
-              ultima_confirmacao = NOW()`;
+            ON CONFLICT (nome_normalizado) DO NOTHING`;
         }
-        console.log(`[pattern] Auto-saved: ${extracted.fornecedor}`);
+        console.log(`[pattern] Auto-saved (first time only): ${extracted.fornecedor}`);
       } catch (e) {
         console.error('[pattern] Save error:', e.message);
       }
