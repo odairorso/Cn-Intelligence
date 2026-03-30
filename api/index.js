@@ -873,10 +873,14 @@ async function handleExtractBoleto(req, res) {
 
     // ── 1. Tenta extrair CNPJ e nome do beneficiário do texto antes do Gemini ──
     const srcUpper = extractedText.toUpperCase();
-    const cnpjMatch = srcUpper.match(/CNPJ[:\s]*(\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2})/);
-    const rawCnpj = cnpjMatch ? cleanCnpj(cnpjMatch[1]) : '';
 
-    // Tenta buscar padrão aprendido pelo CNPJ primeiro (mais rápido, sem Gemini)
+    // ATENÇÃO: no boleto existem 2 CNPJs — do beneficiário e do pagador
+    // O CNPJ do beneficiário aparece JUNTO ao nome do beneficiário
+    // Extrai todos os CNPJs e associa ao contexto
+    const cnpjMatches = [...srcUpper.matchAll(/(\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2})/g)];
+    const allCnpjs = cnpjMatches.map(m => cleanCnpj(m[1])).filter(c => c.length >= 11);
+
+    // Tenta identificar o beneficiário pelo campo explícito
     const benefPatterns = [
       /BENEFICI[AÁ]RIO[:\s]+([A-Z][A-Z0-9\s.&/,-]{3,60})(?:\s+CNPJ|\s+AG[EÊ]|\s+\d{2}\/)/,
       /CEDENTE[:\s]+([A-Z][A-Z0-9\s.&/,-]{3,60})(?:\s+CNPJ|\s+CPF)/,
@@ -887,6 +891,19 @@ async function handleExtractBoleto(req, res) {
       const m = srcUpper.match(p);
       if (m?.[1]) { rawBenefName = m[1].trim(); break; }
     }
+
+    // Tenta o CNPJ que aparece próximo ao nome do beneficiário
+    // Pega o CNPJ que NÃO é do pagador (pagador aparece depois de "Pagador" ou "Sacado")
+    const pagadorMatch = srcUpper.match(/PAGADOR[:\s]+([A-Z][A-Z0-9\s.&/,-]{3,60})/);
+    const pagadorNome = pagadorMatch?.[1]?.trim() || '';
+    // CNPJ do beneficiário = primeiro CNPJ que não está associado ao pagador
+    const rawCnpj = allCnpjs.find(c => {
+      // Verifica se esse CNPJ aparece próximo ao nome do pagador
+      const cnpjIdx = srcUpper.indexOf(c.slice(0,8)); // busca pelos primeiros 8 dígitos
+      const pagIdx = pagadorNome ? srcUpper.indexOf(pagadorNome.slice(0,10)) : -1;
+      if (pagIdx === -1) return true; // sem pagador identificado, usa o primeiro
+      return Math.abs(cnpjIdx - pagIdx) > 200; // CNPJ longe do pagador = beneficiário
+    }) || allCnpjs[0] || '';
 
     const pattern = await lookupPattern(rawCnpj, normName(rawBenefName));
 
