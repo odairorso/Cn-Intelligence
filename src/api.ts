@@ -183,4 +183,22 @@ export const api = {
     if (!res.ok) throw new Error('Failed to extract boleto data');
     return res.json();
   },
+
+  async saveBoletoPattern(data: {
+    cnpj?: string;
+    nome_beneficiario?: string;
+    fornecedor: string;
+    descricao?: string;
+    empresa?: string;
+    tipo?: string;
+    conta_contabil_id?: number;
+  }): Promise<void> {
+    try {
+      await fetch(`${API_BASE}?route=save-boleto-pattern`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    } catch { /* silencioso — não bloqueia o fluxo */ }
+  },
 };
