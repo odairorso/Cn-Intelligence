@@ -13,6 +13,13 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Helper para CORS
+const setCors = (res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+};
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
@@ -709,6 +716,233 @@ app.post('/api/setup-tables', async (req, res) => {
   } catch (error) {
     console.error('Error setting up tables:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── Roteador por query parameter (compatível com frontend) ───────────────────
+// Suporta /api?route=transactions, /api?route=transactions-batch, etc.
+app.get('/api', async (req, res) => {
+  setCors(res);
+  const { route, id, uid } = req.query;
+  
+  try {
+    switch (route) {
+      case 'transactions':
+        const result = await pool.query('SELECT * FROM transactions ORDER BY vencimento DESC');
+        const formatted = result.rows.map(tx => ({
+          ...tx,
+          vencimento: tx.vencimento ? new Date(tx.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
+          pagamento: tx.pagamento ? new Date(tx.pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
+          valor: Number(tx.valor),
+          juros: Number(tx.juros || 0),
+        }));
+        return res.json(formatted);
+        
+      case 'suppliers':
+        const suppliersResult = uid
+          ? await pool.query('SELECT * FROM suppliers WHERE uid = $1 ORDER BY nome ASC', [uid])
+          : await pool.query('SELECT * FROM suppliers ORDER BY nome ASC');
+        return res.json(suppliersResult.rows);
+        
+      case 'banks':
+        const banksResult = uid
+          ? await pool.query('SELECT * FROM banks WHERE uid = $1 AND ativo = true ORDER BY nome ASC', [uid])
+          : await pool.query('SELECT * FROM banks WHERE ativo = true ORDER BY nome ASC');
+        return res.json(banksResult.rows);
+        
+      case 'contas-contabeis':
+        const contasResult = await pool.query('SELECT * FROM contas_contabeis WHERE ativo = true ORDER BY codigo ASC');
+        return res.json(contasResult.rows);
+        
+      default:
+        return res.status(404).json({ error: 'Route not found' });
+    }
+  } catch (e) {
+    console.error('API error:', e);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api', async (req, res) => {
+  setCors(res);
+  const { route } = req.query;
+  
+  try {
+    switch (route) {
+      case 'transactions':
+        const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = req.body;
+        const vDate = parseDateToPg(vencimento);
+        const pDate = parseDateToPg(pagamento);
+        
+        const result = await pool.query(
+          `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+          [uid || 'guest', fornecedor, descricao || '-', empresa || 'Geral', vDate, pDate, valor, status || 'PENDENTE', banco || null, tipo || 'DESPESA', numero_boleto || null, conta_contabil_id || null]
+        );
+        return res.status(201).json(result.rows[0]);
+        
+      case 'transactions-batch':
+        const transactions = req.body;
+        if (!Array.isArray(transactions) || transactions.length === 0) {
+          return res.status(400).json({ error: 'Invalid batch data' });
+        }
+        
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          
+          for (const tx of transactions) {
+            const { uid: txUid, fornecedor: txForn, descricao: txDesc, empresa: txEmp, vencimento: txVenc, pagamento: txPag, valor: txVal, status: txStatus, banco: txBank, tipo: txTipo, numero_boleto: txNum, conta_contabil_id: txConta } = tx;
+            
+            const vDateBatch = parseDateToPg(txVenc);
+            const pDateBatch = parseDateToPg(txPag);
+            
+            await client.query(
+              `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+              [txUid || 'guest', txForn, txDesc || '-', txEmp || 'Geral', vDateBatch, pDateBatch, txVal, txStatus || 'PENDENTE', txBank || null, txTipo || 'DESPESA', txNum || null, txConta || null]
+            );
+          }
+          
+          await client.query('COMMIT');
+          return res.status(201).json({ message: 'Batch created successfully', count: transactions.length });
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
+        }
+        
+      case 'suppliers':
+        const { uid: supUid, nome, cnpj, email, telefone } = req.body;
+        const supResult = await pool.query(
+          `INSERT INTO suppliers (uid, nome, cnpj, email, telefone)
+           VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+          [supUid || 'guest', nome, cnpj || null, email || null, telefone || null]
+        );
+        return res.status(201).json(supResult.rows[0]);
+        
+      case 'banks':
+        const { uid: bankUid, nome: bankNome, agencia, conta, saldo } = req.body;
+        const bankResult = await pool.query(
+          `INSERT INTO banks (uid, nome, agencia, conta, saldo)
+           VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+          [bankUid || 'guest', bankNome, agencia || null, conta || null, saldo ?? 0]
+        );
+        return res.status(201).json(bankResult.rows[0]);
+        
+      case 'setup-tables':
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS contas_contabeis (
+            id SERIAL PRIMARY KEY,
+            codigo VARCHAR(20) NOT NULL,
+            nome VARCHAR(255) NOT NULL,
+            tipo VARCHAR(20) NOT NULL DEFAULT 'DESPESA',
+            ativo BOOLEAN NOT NULL DEFAULT true,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          )
+        `);
+        const count = await pool.query('SELECT COUNT(*) FROM contas_contabeis');
+        if (parseInt(count.rows[0].count) === 0) {
+          const defaults = [
+            ['3.1','Folha de Pagamento','DESPESA'],['3.2','Aluguel','DESPESA'],
+            ['3.3','Água / Luz / Telefone','DESPESA'],['3.4','Material de Escritório','DESPESA'],
+            ['3.5','Segurança','DESPESA'],['3.6','Editoras','DESPESA'],
+            ['3.7','Impostos','DESPESA'],['3.8','Manutenção','DESPESA'],
+            ['3.9','Tarifas Bancárias','DESPESA'],['3.10','Juros / Multas','DESPESA'],
+            ['3.11','Outras Despesas','DESPESA'],['4.1','Mensalidades','RECEITA'],
+            ['4.2','Repasses','RECEITA'],['4.3','Matrículas','RECEITA'],
+            ['4.4','Permutas / Convênios','RECEITA'],['4.5','Aplicação Bancária','RECEITA'],
+            ['4.6','Outras Receitas','RECEITA'],
+          ];
+          for (const [codigo, nome, tipo] of defaults) {
+            await pool.query(`INSERT INTO contas_contabeis (codigo, nome, tipo) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [codigo, nome, tipo]);
+          }
+        }
+        return res.json({ ok: true });
+        
+      default:
+        return res.status(404).json({ error: 'Route not found' });
+    }
+  } catch (e) {
+    console.error('API error:', e);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api', async (req, res) => {
+  setCors(res);
+  const { route, id } = req.query;
+  
+  try {
+    if (route === 'transactions' && id) {
+      const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, juros, numero_boleto, conta_contabil_id } = req.body;
+      
+      const pDate = pagamento ? parseDateToPg(pagamento) : null;
+      const vDate = vencimento ? parseDateToPg(vencimento) : null;
+      
+      const result = await pool.query(
+        `UPDATE transactions SET
+          status = $1,
+          pagamento = $2,
+          fornecedor = $3,
+          descricao = $4,
+          empresa = $5,
+          vencimento = $6,
+          valor = $7,
+          banco = $8,
+          tipo = $9,
+          juros = $10,
+          numero_boleto = $11,
+          conta_contabil_id = $12,
+          updated_at = NOW()
+        WHERE id = $13 RETURNING *`,
+        [status, pDate, fornecedor, descricao, empresa, vDate, valor, banco, tipo || 'DESPESA', juros || 0, numero_boleto || null, conta_contabil_id || null, id]
+      );
+      
+      if (result.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+      
+      const tx = result.rows[0];
+      return res.json({
+        ...tx,
+        vencimento: tx.vencimento ? new Date(tx.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
+        pagamento: tx.pagamento ? new Date(tx.pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
+        valor: Number(tx.valor),
+        juros: Number(tx.juros || 0),
+      });
+    }
+    
+    return res.status(404).json({ error: 'Route not found' });
+  } catch (e) {
+    console.error('API error:', e);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api', async (req, res) => {
+  setCors(res);
+  const { route, id } = req.query;
+  
+  try {
+    if (route === 'transactions' && id) {
+      await pool.query('DELETE FROM transactions WHERE id = $1', [id]);
+      return res.status(204).send();
+    }
+    
+    if (route === 'suppliers' && id) {
+      await pool.query('DELETE FROM suppliers WHERE id = $1', [id]);
+      return res.status(204).send();
+    }
+    
+    if (route === 'banks' && id) {
+      await pool.query('DELETE FROM banks WHERE id = $1', [id]);
+      return res.status(204).send();
+    }
+    
+    return res.status(404).json({ error: 'Route not found' });
+  } catch (e) {
+    console.error('API error:', e);
+    return res.status(500).json({ error: e.message });
   }
 });
 

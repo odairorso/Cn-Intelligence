@@ -3,8 +3,9 @@ import { GoogleGenAI } from '@google/genai';
 
 // --- Helpers ---
 const normalizeBoletoNumber = (value) => {
-  const raw = String(value || '').toUpperCase();
-  if (!raw) return '';
+  if (value === null || value === undefined || value === '') return '';
+  const raw = String(value).toUpperCase();
+  if (!raw || raw === 'UNDEFINED' || raw === 'NULL') return '';
   const tokens = raw
     .split(/[\s:;|,]+/)
     .map((token) => token.replace(/[^A-Z0-9]/g, ''))
@@ -168,29 +169,45 @@ async function handleTransactionsBatch(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const transactions = req.body;
+  console.log('[batch] Received:', JSON.stringify(transactions?.slice(0, 2), null, 2));
+  
   if (!Array.isArray(transactions) || transactions.length === 0) {
+    console.log('[batch] Invalid: not an array or empty');
     return res.status(400).json({ error: 'Invalid batch data' });
   }
 
   try {
     let created = 0;
     let blocked = 0;
+    let errors = [];
     const seenKeys = new Set();
-    for (const tx of transactions) {
+    
+    for (let i = 0; i < transactions.length; i++) {
+      const tx = transactions[i];
       const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = tx;
+      
+      // Validate required fields
+      if (!fornecedor || !vencimento || valor === undefined || valor === null) {
+        console.log(`[batch] Skipping row ${i}: missing required fields`, { fornecedor, vencimento, valor });
+        errors.push({ index: i, error: 'Missing required fields' });
+        continue;
+      }
+      
       const vDate = parseDateToPg(vencimento) || new Date().toISOString().split('T')[0];
       const pDate = parseDateToPg(pagamento);
       const normalizedNumber = normalizeBoletoNumber(numero_boleto);
-      // Include descricao and empresa in duplicate key to avoid false positives
+      
       const descKey = String(descricao || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       const empKey = String(empresa || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       const localKey = normalizedNumber
         ? `BOLETO:${normalizedNumber}`
         : `BASE:${String(fornecedor || '').toUpperCase()}|${vDate}|${Number(valor || 0).toFixed(2)}|${descKey}|${empKey}`;
+      
       if (seenKeys.has(localKey)) {
         blocked++;
         continue;
       }
+      
       const duplicateRows = normalizedNumber
         ? await sql`
             SELECT id FROM transactions
@@ -204,10 +221,12 @@ async function handleTransactionsBatch(req, res) {
               AND upper(coalesce(descricao, '')) = upper(${descricao || ''})
               AND upper(coalesce(empresa, '')) = upper(${empresa || ''})
             LIMIT 1`;
+      
       if (duplicateRows.length) {
         blocked++;
         continue;
       }
+      
       await sql`
         INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id)
         VALUES (${uid || 'guest'}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'},
@@ -215,10 +234,12 @@ async function handleTransactionsBatch(req, res) {
       created++;
       seenKeys.add(localKey);
     }
-    return res.status(201).json({ message: 'Batch processed', count: created, blocked });
+    
+    console.log(`[batch] Done: ${created} created, ${blocked} blocked, ${errors.length} errors`);
+    return res.status(201).json({ message: 'Batch processed', count: created, blocked, errors });
   } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: e.message });
+    console.error('[batch] Error:', e.message, e.stack);
+    return res.status(500).json({ error: e.message, details: e.stack });
   }
 }
 
