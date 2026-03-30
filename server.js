@@ -428,7 +428,11 @@ Extraia os seguintes campos:
 4. cnpj: CNPJ do beneficiário se disponível.
 5. descricao: Descrição do serviço ou referência do boleto.
 6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR). Se não identificar, deixe vazio.
-7. numero_boleto: Número do documento/nosso número do boleto. Procure por "Nro documento", "Nr documento", "Nosso número", "Nro doc". Este número identifica unicamente o boleto.
+7. numero_boleto: Número que identifica unicamente o boleto. Procure EXATAMENTE por estes campos no texto (nesta ordem de prioridade):
+   - "Nosso Número" ou "Nosso Numero" — use o valor numérico após esse campo
+   - "Numero do Documento" ou "Número do Documento" ou "Nro documento" ou "Nr documento" ou "Nro doc"
+   - "Código de barras" — use os dígitos
+   Se encontrar, retorne APENAS os dígitos/alfanuméricos sem espaços ou pontos.
 
 Responda APENAS com JSON válido:
 {"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
@@ -441,11 +445,11 @@ Nome do arquivo: ${fileName || 'N/A'}
 Extraia os seguintes campos:
 1. fornecedor: NOME DO BENEFICIÁRIO/CEDENTE (NÃO é o banco! Sicredi, Bradesco, Cora são BANCOS)
 2. vencimento: Data de vencimento no formato DD/MM/AAAA.
-3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal).
+3. valor: Valor do boleto em reais (apenas número, usar ponto como decimal). Ex: 632.86
 4. cnpj: CNPJ do beneficiário se disponível.
 5. descricao: Descrição do serviço ou referência do boleto.
 6. empresa: Qual empresa do grupo CN pertence (CN, FACEMS, LAB, CEI, UNOPAR).
-7. numero_boleto: Número do documento/nosso número do boleto.
+7. numero_boleto: Número que identifica unicamente o boleto. Procure por "Nosso Número", "Numero do Documento", "Nro documento".
 
 Responda APENAS com JSON válido:
 {"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
@@ -496,10 +500,26 @@ Responda APENAS com JSON válido:
       }
     }
 
-    // Ensure valor is a number
+    // Ensure valor is a number — detecta formato BR (1.234,56) e US (1,234.56)
     if (typeof extracted.valor === 'string') {
-      extracted.valor = parseFloat(extracted.valor.replace(/\./g, '').replace(',', '.'));
+      const raw = String(extracted.valor).trim().replace(/[R$\s]/g, '');
+      // Formato BR: 1.234,56 — vírgula é decimal
+      if (/^\d{1,3}(\.\d{3})*(,\d{1,2})?$/.test(raw)) {
+        extracted.valor = parseFloat(raw.replace(/\./g, '').replace(',', '.'));
+      // Formato US: 1,234.56 — ponto é decimal
+      } else if (/^\d{1,3}(,\d{3})*(\.\d{1,2})?$/.test(raw)) {
+        extracted.valor = parseFloat(raw.replace(/,/g, ''));
+      // Só ponto como decimal: 632.86
+      } else if (/^\d+\.\d{1,2}$/.test(raw)) {
+        extracted.valor = parseFloat(raw);
+      // Só vírgula como decimal: 632,86
+      } else if (/^\d+,\d{1,2}$/.test(raw)) {
+        extracted.valor = parseFloat(raw.replace(',', '.'));
+      } else {
+        extracted.valor = parseFloat(raw.replace(/[^0-9.]/g, ''));
+      }
     }
+    if (!Number.isFinite(extracted.valor) || extracted.valor <= 0) extracted.valor = 0;
 
     // Fallback: extract fornecedor from filename if AI didn't find it
     if (!extracted.fornecedor || extracted.fornecedor === '' || extracted.fornecedor.toLowerCase() === 'não identificado') {

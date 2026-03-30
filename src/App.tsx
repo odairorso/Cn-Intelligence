@@ -3077,13 +3077,15 @@ export default function App() {
   const extractLocalBoletoNumber = (text: string) => {
     const source = String(text || '').toUpperCase();
     const patterns = [
-      /NOSSO\s*N[ÚU]MERO[:\s-]*([A-Z0-9./-]{6,40})/,
-      /N[ROº°]*\s*DOCUMENTO[:\s-]*([A-Z0-9./-]{6,40})/,
-      /NUMERO\s*DO\s*DOCUMENTO[:\s-]*([A-Z0-9./-]{6,40})/,
-      /NR\.?\s*DOC[:\s-]*([A-Z0-9./-]{6,40})/,
-      /N[º°]?\s*DOC[:\s-]*([A-Z0-9./-]{6,40})/,
-      /DOCUMENTO[:\s-]*([0-9]{6,20})/,
-      /COD(?:IGO)?\s*(?:DE)?\s*BARRAS[:\s-]*([0-9]{47,48})/,
+      // Nosso Número (com ou sem acento, com ou sem espaço)
+      /NOSSO\s*N[UÚ]MERO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+      // Numero do Documento
+      /N[UÚ]MERO\s*DO\s*DOCUMENTO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+      /N[ROº°]*\s*DOCUMENTO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+      /NR\.?\s*DOC\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+      /N[º°]?\s*DOC\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+      /DOCUMENTO\s*[:\s-]*([0-9]{6,20})/,
+      /COD(?:IGO)?\s*(?:DE)?\s*BARRAS\s*[:\s-]*([0-9]{47,48})/,
     ];
     for (const pattern of patterns) {
       const match = source.match(pattern);
@@ -3198,12 +3200,29 @@ export default function App() {
       /VALOR\s+COBRADO[:\s]+R?\$?\s*([\d.,]+)/,
       /VALOR\s+TOTAL[:\s]+R?\$?\s*([\d.,]+)/,
       /VLR\s+PAGAR[:\s]+R?\$?\s*([\d.,]+)/,
-      /R\$\s*([\d]{1,3}(?:\.[\d]{3})*,[\d]{2})/,
+      /R\$\s*([\d]{1,3}(?:[.,][\d]{3})*[.,][\d]{2})/,
+      /\(=\)\s*Valor do Documento\s+([\d.,]+)/i,
     ];
     for (const pattern of valuePatterns) {
       const match = normalizedText.match(pattern);
       if (match?.[1]) {
-        const parsed = Number(match[1].replace(/\./g, '').replace(',', '.'));
+        const raw = match[1].trim();
+        let parsed = 0;
+        // Formato BR: 1.234,56
+        if (/^\d{1,3}(\.\d{3})+(,\d{2})$/.test(raw)) {
+          parsed = Number(raw.replace(/\./g, '').replace(',', '.'));
+        // Formato US: 1,234.56
+        } else if (/^\d{1,3}(,\d{3})+(\.\d{2})$/.test(raw)) {
+          parsed = Number(raw.replace(/,/g, ''));
+        // Só ponto decimal: 632.86
+        } else if (/^\d+\.\d{1,2}$/.test(raw)) {
+          parsed = Number(raw);
+        // Só vírgula decimal: 632,86
+        } else if (/^\d+,\d{1,2}$/.test(raw)) {
+          parsed = Number(raw.replace(',', '.'));
+        } else {
+          parsed = Number(raw.replace(/[^0-9.]/g, ''));
+        }
         if (!Number.isNaN(parsed) && parsed > 0) { valor = parsed; break; }
       }
     }
@@ -3247,15 +3266,17 @@ export default function App() {
       if (hasValidData) {
         const fallbackNumero = extractLocalBoletoNumber(text);
         const inferredFromDescricao = normalizeBoletoNumber(data.descricao || '');
+        const numero = normalizeBoletoNumber(data.numero_boleto || '') || fallbackNumero || inferredFromDescricao;
+        const descricao = data.descricao || (numero ? `Doc: ${numero}` : '');
         return {
           fileName,
           fornecedor: data.fornecedor || 'Fornecedor não identificado',
           vencimento: data.vencimento || '',
           valor: typeof data.valor === 'number' ? data.valor : 0,
-          descricao: data.descricao || '',
+          descricao,
           empresa: data.empresa || '',
           cnpj: data.cnpj || '',
-          numero_boleto: normalizeBoletoNumber(data.numero_boleto || '') || fallbackNumero || inferredFromDescricao,
+          numero_boleto: numero,
           tipo: 'DESPESA',
           rawText: text.slice(0, 500),
           duplicate: false,
