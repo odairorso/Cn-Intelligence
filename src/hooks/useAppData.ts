@@ -16,6 +16,7 @@ export function useAppData() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [contasContabeis, setContasContabeis] = useState<ContaContabil[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState<Notification | null>(null);
   const [companyOptions, setCompanyOptions] = useState<string[]>(() => {
     try {
@@ -95,14 +96,20 @@ export function useAppData() {
     }
   }, [showNotification]);
 
-  // ─── Initial load ─────────────────────────────────────────────────────────
+  // ─── Initial load — tudo em paralelo, sem esperar setupTables ───────────
   useEffect(() => {
-    api.setupTables().catch(console.error).finally(() => {
-      fetchTransactions();
-      fetchSuppliers();
-      fetchBanks();
-      fetchContasContabeis();
-    });
+    setIsLoading(true);
+
+    // Carrega tudo em paralelo — não bloqueia um pelo outro
+    Promise.all([
+      fetchTransactions(),
+      fetchSuppliers(),
+      fetchBanks(),
+      fetchContasContabeis(),
+    ]).finally(() => setIsLoading(false));
+
+    // setupTables roda em background sem bloquear o carregamento
+    api.setupTables().catch(console.error);
   }, [fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis]);
 
   // ─── Auto-merge suppliers (max 1x a cada 6h) ─────────────────────────────
@@ -249,7 +256,7 @@ export function useAppData() {
 
   return {
     // State
-    transactions, suppliers, banks, contasContabeis, companyOptions, notification,
+    transactions, suppliers, banks, contasContabeis, companyOptions, notification, isLoading,
     // Fetchers
     fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis,
     // Actions

@@ -2973,7 +2973,7 @@ const NewSupplierModal = ({ setShowNewSupplierModal, onSuccess }: NewSupplierMod
 
 export default function App() {
   const {
-    transactions, suppliers, banks, contasContabeis, companyOptions, notification,
+    transactions, suppliers, banks, contasContabeis, companyOptions, notification, isLoading,
     fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis,
     showNotification,
     markAsPaid, updateTransaction, deleteTransaction,
@@ -3773,7 +3773,33 @@ export default function App() {
     return { total, pagos, pendentes, vencidos, kpis };
   }, [transactions]);
 
-  // Removida a tela de loading de isAuthReady para permitir a renderização direta
+  // Skeleton de carregamento inicial
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-background">
+        <div className="flex items-center gap-3">
+          <img src={currentBrandLogo} alt="Logo" className="h-10 w-10 object-contain rounded-sm border border-white/10 bg-white/5 p-1" />
+          <h1 className="text-2xl font-black tracking-tighter premium-gradient-text font-headline">Fluxo Caixa CN</h1>
+        </div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-48 h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-full bg-primary rounded-full animate-[loading_1.2s_ease-in-out_infinite]" style={{ width: '60%', animation: 'pulse 1.2s ease-in-out infinite' }} />
+          </div>
+          <p className="text-xs text-on-surface-variant/50 uppercase tracking-widest font-bold">Carregando dados...</p>
+        </div>
+        {/* Skeleton cards */}
+        <div className="grid grid-cols-3 gap-4 w-full max-w-2xl px-8 mt-4">
+          {[1,2,3].map(i => (
+            <div key={i} className="glass-card p-5 animate-pulse">
+              <div className="h-2 bg-white/10 rounded w-2/3 mb-3" />
+              <div className="h-6 bg-white/10 rounded w-1/2" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
