@@ -13,6 +13,7 @@ import {
   Upload,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Download,
   Plus,
   Trash2,
@@ -121,17 +122,32 @@ interface DashboardTabProps {
 const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) => {
   const [empresaFilter, setEmpresaFilter] = useState('TODOS');
 
-  // Lista de empresas únicas
+  // Empresas normalizadas — agrupa CN/Cn/cn → CN, FACEMS/Facems → FACEMS etc.
   const empresas = useMemo(() => {
-    const s = new Set(transactions.map(tx => tx.empresa).filter(Boolean));
-    return ['TODOS', ...Array.from(s).sort()];
+    const map = new Map<string, string>(); // normalizado → label canônico
+    transactions.forEach(tx => {
+      if (!tx.empresa) return;
+      const key = tx.empresa.trim().toUpperCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      // Só adiciona se ainda não existe, ou se o valor atual é mais "limpo" (todo maiúsculo)
+      if (!map.has(key)) map.set(key, tx.empresa.trim().toUpperCase());
+    });
+    // Filtra entradas que claramente não são empresas (muito longas, contêm números, etc.)
+    const valid = Array.from(map.entries())
+      .filter(([key]) => key.length <= 30 && !/\d{3,}/.test(key) && !/[()[\]{}]/.test(key))
+      .map(([, label]) => label)
+      .sort();
+    return ['TODOS', ...valid];
   }, [transactions]);
 
-  // Transações filtradas por empresa
-  const filteredTx = useMemo(() =>
-    empresaFilter === 'TODOS' ? transactions : transactions.filter(tx => tx.empresa === empresaFilter),
-    [transactions, empresaFilter]
-  );
+  // Filtra usando a chave normalizada para pegar todas as variações
+  const filteredTx = useMemo(() => {
+    if (empresaFilter === 'TODOS') return transactions;
+    const key = empresaFilter.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return transactions.filter(tx =>
+      (tx.empresa || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === key
+    );
+  }, [transactions, empresaFilter]);
 
   const statusChartData = [
     { name: 'Pagos', value: stats.pagos, color: '#10b981' },
@@ -2920,6 +2936,7 @@ export default function App() {
   const [editingCompany, setEditingCompany] = useState<string | null>(null);
   const [editingCompanyName, setEditingCompanyName] = useState('');
   const [newContaContabil, setNewContaContabil] = useState({ codigo: '', nome: '', tipo: 'DESPESA' });
+  const [searchContaContabil, setSearchContaContabil] = useState('');
   const [brandLogo, setBrandLogo] = useState<string>(() => {
     try { return localStorage.getItem('cn_brand_logo') || ''; } catch { return ''; }
   });
@@ -2940,6 +2957,36 @@ export default function App() {
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const currentBrandLogo = brandLogo || defaultBrandLogo;
+
+  const addContaContabil = async () => {
+    if (!newContaContabil.codigo || !newContaContabil.nome) {
+      showNotification('Informe o código e o nome da conta.', 'error');
+      return;
+    }
+    try {
+      await api.createContaContabil({
+        codigo: newContaContabil.codigo,
+        nome: newContaContabil.nome,
+        tipo: newContaContabil.tipo as 'RECEITA' | 'DESPESA',
+      });
+      showNotification('Conta contábil adicionada!', 'success');
+      setNewContaContabil({ codigo: '', nome: '', tipo: 'DESPESA' });
+      fetchContasContabeis();
+    } catch {
+      showNotification('Erro ao adicionar conta contábil.', 'error');
+    }
+  };
+
+  const deleteContaContabil = async (id: number) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta conta?')) return;
+    try {
+      await api.updateContaContabil(id, { ativo: false });
+      showNotification('Conta contábil excluída!', 'success');
+      fetchContasContabeis();
+    } catch {
+      showNotification('Erro ao excluir conta contábil.', 'error');
+    }
+  };
 
   const startEditCompany = (name: string) => {
     setEditingCompany(name);
