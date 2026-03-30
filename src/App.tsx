@@ -3252,14 +3252,19 @@ export default function App() {
 
   const extractBoletoWithGemini = async (text: string, fileName: string, pdfBase64?: string): Promise<PdfImportDraft> => {
     try {
+      // Se tem texto suficiente, não manda o base64 — reduz payload em ~10x
+      const hasGoodText = text.trim().length > 100;
+      const payload = hasGoodText
+        ? { text, fileName }
+        : { text, fileName, pdfBase64 };
+
       const response = await fetch('/api?route=extract-boleto', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, fileName, pdfBase64 }),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error(`API error: ${response.status}`);
       const data = await response.json();
-      console.log('[boleto] Gemini response:', data);
 
       const hasValidData = data.fornecedor && data.fornecedor !== 'Fornecedor não identificado' && (data.valor > 0 || data.vencimento);
 
@@ -3303,23 +3308,14 @@ export default function App() {
     }
 
     setIsProcessingPdf(true);
-    showNotification(`Processando ${pdfFiles.length} boleto(s) com IA...`, 'info');
+    showNotification(`Processando ${pdfFiles.length} boleto(s)...`, 'info');
 
     try {
-      // Process all PDFs in parallel
       const extractedRows: PdfImportDraft[] = await Promise.all(
         pdfFiles.map(async (file) => {
           const arrayBuffer = await file.arrayBuffer();
 
-          // Convert PDF to base64
-          const bytes = new Uint8Array(arrayBuffer);
-          let binary = '';
-          for (let i = 0; i < bytes.byteLength; i++) {
-            binary += String.fromCharCode(bytes[i]);
-          }
-          const pdfBase64 = btoa(binary);
-
-          // Extract text with PDF.js
+          // Extrai texto com PDF.js primeiro
           let fullText = '';
           try {
             let pdf: any;
@@ -3334,9 +3330,24 @@ export default function App() {
               const textContent = await page.getTextContent();
               fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
             }
-            console.log(`[boleto] PDF.js extracted ${fullText.length} chars from ${file.name}:`, fullText.slice(0, 200));
           } catch (pdfErr) {
-            console.log(`[boleto] PDF.js failed for ${file.name}, relying on server-side extraction:`, pdfErr);
+            console.log(`[boleto] PDF.js failed for ${file.name}:`, pdfErr);
+          }
+
+          const hasGoodText = fullText.trim().length > 100;
+
+          // Só converte para base64 se o texto extraído for insuficiente
+          // Usa FileReader (mais rápido que loop byte a byte)
+          let pdfBase64 = '';
+          if (!hasGoodText) {
+            pdfBase64 = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const result = reader.result as string;
+                resolve(result.split(',')[1] || '');
+              };
+              reader.readAsDataURL(file);
+            });
           }
 
           const data = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
@@ -3352,7 +3363,7 @@ export default function App() {
 
       setPdfExtractedRows(applyDuplicateFlags(extractedRows));
       setShowPdfImportModal(true);
-      showNotification('Boletos lidos pela IA. Revise e confirme os lançamentos.', 'success');
+      showNotification('Boletos lidos. Revise e confirme.', 'success');
     } catch (error) {
       console.error('Error processing PDF:', error);
       showNotification('Erro ao processar PDF. Tente novamente.', 'error');
