@@ -764,6 +764,94 @@ async function handleSetupTables(req, res) {
   }
 }
 
+// Helper: normaliza nome para chave de busca
+const normName = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+
+// Helper: extrai CNPJ limpo
+const cleanCnpj = (s) => String(s || '').replace(/[^0-9]/g,'');
+
+// Consulta padrão aprendido pelo CNPJ ou nome normalizado
+async function lookupPattern(cnpj, nomeNormalizado) {
+  try {
+    if (cnpj && cnpj.length >= 11) {
+      const r = await sql`SELECT * FROM boleto_patterns WHERE cnpj = ${cnpj} LIMIT 1`;
+      if (r.length) return r[0];
+    }
+    if (nomeNormalizado && nomeNormalizado.length >= 5) {
+      // Busca por similaridade — nome contém ou é contido
+      const r = await sql`
+        SELECT * FROM boleto_patterns 
+        WHERE ${nomeNormalizado} LIKE '%' || nome_normalizado || '%'
+           OR nome_normalizado LIKE '%' || ${nomeNormalizado} || '%'
+        ORDER BY confirmacoes DESC LIMIT 1`;
+      if (r.length) return r[0];
+    }
+  } catch { /* tabela pode não existir ainda */ }
+  return null;
+}
+
+// POST /api?route=save-boleto-pattern — chamado quando usuário confirma importação
+async function handleSaveBoletoPattern(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const { cnpj, nome_beneficiario, fornecedor, descricao, empresa, tipo, conta_contabil_id } = req.body;
+    if (!fornecedor) return res.status(400).json({ error: 'fornecedor obrigatório' });
+
+    const cnpjClean = cleanCnpj(cnpj);
+    const nomeNorm = normName(nome_beneficiario || fornecedor);
+
+    // Garante que a tabela existe
+    await sql`
+      CREATE TABLE IF NOT EXISTS boleto_patterns (
+        id SERIAL PRIMARY KEY,
+        cnpj VARCHAR(20),
+        nome_normalizado VARCHAR(255),
+        fornecedor VARCHAR(255) NOT NULL,
+        descricao VARCHAR(255),
+        empresa VARCHAR(50),
+        tipo VARCHAR(10) DEFAULT 'DESPESA',
+        conta_contabil_id INTEGER,
+        confirmacoes INTEGER DEFAULT 1,
+        ultima_confirmacao TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(cnpj),
+        UNIQUE(nome_normalizado)
+      )`;
+
+    if (cnpjClean.length >= 11) {
+      await sql`
+        INSERT INTO boleto_patterns (cnpj, nome_normalizado, fornecedor, descricao, empresa, tipo, conta_contabil_id)
+        VALUES (${cnpjClean}, ${nomeNorm}, ${fornecedor}, ${descricao||null}, ${empresa||null}, ${tipo||'DESPESA'}, ${conta_contabil_id||null})
+        ON CONFLICT (cnpj) DO UPDATE SET
+          fornecedor = EXCLUDED.fornecedor,
+          descricao = COALESCE(EXCLUDED.descricao, boleto_patterns.descricao),
+          empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
+          tipo = EXCLUDED.tipo,
+          conta_contabil_id = COALESCE(EXCLUDED.conta_contabil_id, boleto_patterns.conta_contabil_id),
+          confirmacoes = boleto_patterns.confirmacoes + 1,
+          ultima_confirmacao = NOW()`;
+    } else {
+      await sql`
+        INSERT INTO boleto_patterns (nome_normalizado, fornecedor, descricao, empresa, tipo, conta_contabil_id)
+        VALUES (${nomeNorm}, ${fornecedor}, ${descricao||null}, ${empresa||null}, ${tipo||'DESPESA'}, ${conta_contabil_id||null})
+        ON CONFLICT (nome_normalizado) DO UPDATE SET
+          fornecedor = EXCLUDED.fornecedor,
+          descricao = COALESCE(EXCLUDED.descricao, boleto_patterns.descricao),
+          empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
+          tipo = EXCLUDED.tipo,
+          conta_contabil_id = COALESCE(EXCLUDED.conta_contabil_id, boleto_patterns.conta_contabil_id),
+          confirmacoes = boleto_patterns.confirmacoes + 1,
+          ultima_confirmacao = NOW()`;
+    }
+
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error('[pattern] Error saving pattern:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+}
+
 // POST /api?route=extract-boleto
 async function handleExtractBoleto(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -783,6 +871,99 @@ async function handleExtractBoleto(req, res) {
     const extractedText = text || '';
     const hasText = extractedText.length > 50;
 
+    // ── 1. Tenta extrair CNPJ e nome do beneficiário do texto antes do Gemini ──
+    const srcUpper = extractedText.toUpperCase();
+    const cnpjMatch = srcUpper.match(/CNPJ[:\s]*(\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2})/);
+    const rawCnpj = cnpjMatch ? cleanCnpj(cnpjMatch[1]) : '';
+
+    // Tenta buscar padrão aprendido pelo CNPJ primeiro (mais rápido, sem Gemini)
+    const benefPatterns = [
+      /BENEFICI[AÁ]RIO[:\s]+([A-Z][A-Z0-9\s.&/,-]{3,60})(?:\s+CNPJ|\s+AG[EÊ]|\s+\d{2}\/)/,
+      /CEDENTE[:\s]+([A-Z][A-Z0-9\s.&/,-]{3,60})(?:\s+CNPJ|\s+CPF)/,
+      /SACADOR[^:]*:[:\s]+([A-Z][A-Z0-9\s.&/,-]{3,60})(?:\s+-\s+CNPJ|\s+CNPJ)/,
+    ];
+    let rawBenefName = '';
+    for (const p of benefPatterns) {
+      const m = srcUpper.match(p);
+      if (m?.[1]) { rawBenefName = m[1].trim(); break; }
+    }
+
+    const pattern = await lookupPattern(rawCnpj, normName(rawBenefName));
+
+    if (pattern) {
+      // ✅ Padrão encontrado — retorna sem chamar o Gemini
+      console.log(`[boleto] Pattern hit: ${pattern.fornecedor} (${pattern.confirmacoes}x confirmado)`);
+
+      // Ainda precisa do Gemini só para vencimento, valor e numero_boleto
+      // Tenta extrair localmente primeiro
+      const dateMatch = srcUpper.match(/VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/);
+      const valorMatch = srcUpper.match(/\(=\)\s*VALOR[^0-9]*([\d.,]+)|VALOR\s*DO\s*DOCUMENTO[:\s]+([\d.,]+)/);
+      const nossoNumMatch = srcUpper.match(/NOSSO\s*N[UÚ]MERO[:\s-]*([A-Z0-9]{6,40})/);
+      const nroDocMatch = srcUpper.match(/N[UÚ]MERO\s*DO\s*DOCUMENTO[:\s-]*([A-Z0-9]{6,40})/);
+
+      const parseV = (s) => {
+        if (!s) return 0;
+        const r = s.trim();
+        if (/^\d{1,3}(\.\d{3})+(,\d{2})$/.test(r)) return parseFloat(r.replace(/\./g,'').replace(',','.'));
+        if (/^\d{1,3}(,\d{3})+(\.\d{2})$/.test(r)) return parseFloat(r.replace(/,/g,''));
+        if (/^\d+\.\d{1,2}$/.test(r)) return parseFloat(r);
+        if (/^\d+,\d{1,2}$/.test(r)) return parseFloat(r.replace(',','.'));
+        return 0;
+      };
+
+      const vencimento = dateMatch?.[1] || '';
+      const valor = parseV(valorMatch?.[1] || valorMatch?.[2] || '');
+      const numero_boleto = (nossoNumMatch?.[1] || nroDocMatch?.[1] || '').replace(/[^A-Z0-9]/g,'');
+
+      // Se não conseguiu extrair localmente, chama Gemini só para esses campos
+      if (!vencimento || !valor) {
+        // Chama Gemini com prompt mínimo só para data/valor
+        const miniPrompt = `Extraia do texto de boleto abaixo APENAS:
+- vencimento: data de vencimento no formato DD/MM/AAAA
+- valor: valor total em reais com ponto decimal (ex: 105.00)
+- numero_boleto: Nosso Número ou Número do Documento (só dígitos)
+
+TEXTO: ${extractedText.slice(0, 1000)}
+
+Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
+
+        const miniResp = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: miniPrompt,
+          config: { responseMimeType: 'application/json', temperature: 0 },
+        });
+        const mini = JSON.parse((miniResp.text || '{}').replace(/```json|```/gi,'').trim());
+
+        return res.json({
+          fornecedor: pattern.fornecedor,
+          vencimento: mini.vencimento || vencimento,
+          valor: mini.valor || valor,
+          cnpj: rawCnpj || '',
+          descricao: pattern.descricao || '',
+          empresa: pattern.empresa || '',
+          tipo: pattern.tipo || 'DESPESA',
+          conta_contabil_id: pattern.conta_contabil_id || null,
+          numero_boleto: mini.numero_boleto || numero_boleto,
+          _from_pattern: true,
+        });
+      }
+
+      return res.json({
+        fornecedor: pattern.fornecedor,
+        vencimento,
+        valor,
+        cnpj: rawCnpj || '',
+        descricao: pattern.descricao || '',
+        empresa: pattern.empresa || '',
+        tipo: pattern.tipo || 'DESPESA',
+        conta_contabil_id: pattern.conta_contabil_id || null,
+        numero_boleto,
+        _from_pattern: true,
+      });
+    }
+
+    // ── 2. Sem padrão — chama Gemini completo ────────────────────────────────
+
     const promptBase = `Você é um especialista em boletos bancários brasileiros com 20 anos de experiência.
 
 REGRAS CRÍTICAS:
@@ -792,15 +973,19 @@ REGRAS CRÍTICAS:
 - Se valor aparecer como "632,86" retorne 632.86 — se "2.092,71" retorne 2092.71
 
 CAMPOS:
-1. fornecedor: Nome do beneficiário/cedente que emitiu o boleto
+1. fornecedor: Nome do beneficiário/cedente que emitiu o boleto — quem VAI RECEBER o dinheiro
    Procure por: "Beneficiário", "Cedente", "Sacador/Avalista", "Razão Social"
+   ATENÇÃO: O campo "Pagador" ou "Sacado" é quem PAGA — NUNCA use como fornecedor
+   Se o beneficiário for uma pessoa física (ex: "Valmir Lopes de Souza"), use o nome dela
+   Exemplos corretos: HAPVIDA, SANESUL, ENERGISA, VSC CONTABILIDADE, Valmir Lopes de Souza
 2. vencimento: Data de vencimento no formato DD/MM/AAAA
 3. valor: Valor TOTAL em reais com ponto decimal (ex: 632.86)
    Procure por: "(=) Valor do Documento", "Valor do Documento", "Valor Cobrado"
 4. cnpj: CNPJ do beneficiário
 5. descricao: Tipo de serviço (ex: "Plano de Saúde", "Conta de Água", "Honorários Contábeis", "Mensalidade")
-6. empresa: Empresa do Grupo CN que é o PAGADOR
-   - Se "COLEGIO NAVIRAI" ou "COLEGIO NAVIRA" aparecer como pagador/sacado → "CN"
+6. empresa: Empresa do Grupo CN que é o PAGADOR (campo "Pagador" ou "Sacado" no boleto)
+   - Se "ANHANGUERA" ou "CENTRO EDUCACIONAL DE ITAQUIRAI" aparecer como pagador → "FACEMS"
+   - Se "COLEGIO NAVIRAI" ou "COLEGIO NAVIRA" aparecer como pagador → "CN"
    - Se "FACEMS" aparecer como pagador → "FACEMS"
    - Se "LABORATORIO" aparecer como pagador → "LAB"
    - Se "CEI" aparecer como pagador → "CEI"
@@ -886,6 +1071,48 @@ Responda APENAS com JSON válido:
       }
     }
 
+    // ── Salva padrão automaticamente para aprendizado futuro ─────────────────
+    if (extracted.fornecedor && extracted.fornecedor !== 'Fornecedor não identificado' && extracted.valor > 0) {
+      const cnpjClean = cleanCnpj(extracted.cnpj || rawCnpj || '');
+      const nomeNorm = normName(rawBenefName || extracted.fornecedor);
+      try {
+        await sql`
+          CREATE TABLE IF NOT EXISTS boleto_patterns (
+            id SERIAL PRIMARY KEY, cnpj VARCHAR(20), nome_normalizado VARCHAR(255),
+            fornecedor VARCHAR(255) NOT NULL, descricao VARCHAR(255), empresa VARCHAR(50),
+            tipo VARCHAR(10) DEFAULT 'DESPESA', conta_contabil_id INTEGER,
+            confirmacoes INTEGER DEFAULT 1,
+            ultima_confirmacao TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            UNIQUE(cnpj), UNIQUE(nome_normalizado)
+          )`;
+        if (cnpjClean.length >= 11) {
+          await sql`
+            INSERT INTO boleto_patterns (cnpj, nome_normalizado, fornecedor, descricao, empresa, tipo)
+            VALUES (${cnpjClean}, ${nomeNorm}, ${extracted.fornecedor}, ${extracted.descricao||null}, ${extracted.empresa||null}, ${extracted.tipo||'DESPESA'})
+            ON CONFLICT (cnpj) DO UPDATE SET
+              fornecedor = EXCLUDED.fornecedor,
+              descricao = COALESCE(EXCLUDED.descricao, boleto_patterns.descricao),
+              empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
+              confirmacoes = boleto_patterns.confirmacoes + 1,
+              ultima_confirmacao = NOW()`;
+        } else if (nomeNorm.length >= 5) {
+          await sql`
+            INSERT INTO boleto_patterns (nome_normalizado, fornecedor, descricao, empresa, tipo)
+            VALUES (${nomeNorm}, ${extracted.fornecedor}, ${extracted.descricao||null}, ${extracted.empresa||null}, ${extracted.tipo||'DESPESA'})
+            ON CONFLICT (nome_normalizado) DO UPDATE SET
+              fornecedor = EXCLUDED.fornecedor,
+              descricao = COALESCE(EXCLUDED.descricao, boleto_patterns.descricao),
+              empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
+              confirmacoes = boleto_patterns.confirmacoes + 1,
+              ultima_confirmacao = NOW()`;
+        }
+        console.log(`[pattern] Auto-saved: ${extracted.fornecedor}`);
+      } catch (e) {
+        console.error('[pattern] Save error:', e.message);
+      }
+    }
+
     res.status(200).json(extracted);
   } catch (error) {
     console.error('[boleto] Error extracting boleto data:', error.message);
@@ -935,6 +1162,8 @@ export default async function handler(req, res) {
       return handleContasContabeis(req, res);
     case 'setup-tables':
       return handleSetupTables(req, res);
+    case 'save-boleto-pattern':
+      return handleSaveBoletoPattern(req, res);
     case 'extract-boleto':
       return handleExtractBoleto(req, res);
     default:

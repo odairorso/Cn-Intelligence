@@ -3430,6 +3430,22 @@ export default function App() {
         await api.createSuppliersBatch(newSuppliers as any);
       }
 
+      // Salva padrões aprendidos para cada boleto confirmado
+      // Roda em background sem bloquear o fluxo
+      canonicalRows.forEach(row => {
+        if (row.fornecedor && row.fornecedor !== 'Fornecedor não identificado') {
+          api.saveBoletoPattern({
+            cnpj: row.cnpj,
+            nome_beneficiario: row.fornecedor,
+            fornecedor: row.fornecedor,
+            descricao: row.descricao,
+            empresa: row.empresa,
+            tipo: row.tipo || 'DESPESA',
+            conta_contabil_id: row.conta_contabil_id,
+          });
+        }
+      });
+
       setShowPdfImportModal(false);
       setPdfExtractedRows([]);
       await fetchTransactions();
