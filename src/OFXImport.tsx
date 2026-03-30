@@ -86,18 +86,34 @@ function getTagValue(content: string, tag: string): string {
 }
 
 function parseOFX(raw: string): OFXTransaction[] {
-  // Normaliza quebras de linha
-  const content = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  // Normaliza quebras de linha e remove cabeçalho SGML (linhas antes do primeiro <)
+  const content = raw
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
 
-  // Extrai bloco de transações (BANKTRANLIST ou INVTRANLIST)
-  const blockStart = content.toUpperCase().indexOf('<BANKTRANLIST>');
-  const blockEnd   = content.toUpperCase().indexOf('</BANKTRANLIST>');
-  const block = blockStart !== -1 && blockEnd !== -1
-    ? content.slice(blockStart, blockEnd)
-    : content;
+  const upper = content.toUpperCase();
 
-  // Divide por <STMTTRN>
-  const rawTxs = block.split(/<\/?STMTTRN>/i).filter((_, i) => i % 2 === 1);
+  // Tenta extrair bloco BANKTRANLIST (com ou sem fechamento)
+  let block = content;
+  const blockStart = upper.indexOf('<BANKTRANLIST>');
+  if (blockStart !== -1) {
+    const blockEnd = upper.indexOf('</BANKTRANLIST>');
+    block = blockEnd !== -1
+      ? content.slice(blockStart, blockEnd)
+      : content.slice(blockStart); // sem fechamento — pega até o fim
+  }
+
+  // Divide por <STMTTRN> — suporta SGML (sem fechamento) e XML (com </STMTTRN>)
+  // Estratégia: split em qualquer <STMTTRN> e pega o conteúdo até o próximo <STMTTRN> ou fim
+  const parts = block.split(/<STMTTRN>/i);
+  // parts[0] é o que vem antes do primeiro <STMTTRN>, ignorar
+  const rawTxs = parts.slice(1).map(p => {
+    // Remove tudo a partir de </STMTTRN> se existir
+    const closeIdx = p.toUpperCase().indexOf('</STMTTRN>');
+    return closeIdx !== -1 ? p.slice(0, closeIdx) : p;
+  });
+
+  if (rawTxs.length === 0) return [];
 
   return rawTxs.map((txRaw) => {
     const fitid   = getTagValue(txRaw, 'FITID')   || `ofx_${Math.random().toString(36).slice(2)}`;
@@ -106,7 +122,9 @@ function parseOFX(raw: string): OFXTransaction[] {
     const trntype = getTagValue(txRaw, 'TRNTYPE') || 'OTHER';
     const memo    = getTagValue(txRaw, 'MEMO')    || getTagValue(txRaw, 'NAME') || 'Sem descrição';
 
-    const trnamt   = parseFloat(amtRaw.replace(',', '.')) || 0;
+    // Limpa valor: remove espaços, troca vírgula por ponto
+    const amtClean = amtRaw.replace(/\s/g, '').replace(',', '.');
+    const trnamt   = parseFloat(amtClean) || 0;
     const dtposted = dtraw ? parseOFXDate(dtraw) : '';
 
     const isCredit = trnamt > 0 || trntype === 'CREDIT' || trntype === 'INT' || trntype === 'DIV';
