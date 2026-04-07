@@ -557,6 +557,16 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
   useEffect(() => { setPage(0); }, [filter, statusFilter, monthFilter, yearFilter, sortOrder]);
   // Clear selection when filters change
   useEffect(() => { setSelectedIds(new Set()); }, [filter, statusFilter, monthFilter, yearFilter, sortOrder, page]);
+  // Clear selection when transactions update (e.g. after batch pay)
+  useEffect(() => {
+    setSelectedIds(prev => {
+      if (prev.size === 0) return prev;
+      // Remove ids that are now PAGO
+      const paidIds = new Set(transactions.filter(tx => tx.status === 'PAGO').map(tx => tx.id));
+      const next = new Set([...prev].filter(id => !paidIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [transactions]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);

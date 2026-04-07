@@ -254,12 +254,25 @@ async function handleTransactionsBatchUpdate(req, res) {
 
   try {
     const today = new Date().toISOString().split('T')[0];
-    await sql`
-      UPDATE transactions
-      SET status = 'PAGO', pagamento = ${today}, banco = ${banco || null}
-      WHERE id = ANY(${ids}::int[]) AND status != 'PAGO'
-    `;
-    return res.json({ message: 'Batch updated', count: ids.length });
+    // Converter ids para inteiros e processar um a um para evitar problemas de cast
+    const numericIds = ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+    if (numericIds.length === 0) {
+      return res.status(400).json({ error: 'No valid numeric ids provided' });
+    }
+
+    let updated = 0;
+    for (const id of numericIds) {
+      const rows = await sql`
+        UPDATE transactions
+        SET status = 'PAGO', pagamento = ${today}, banco = ${banco || null}
+        WHERE id = ${id} AND status != 'PAGO'
+        RETURNING id
+      `;
+      updated += rows.length;
+    }
+
+    console.log(`[batch-update] Updated ${updated} of ${numericIds.length} transactions`);
+    return res.json({ message: 'Batch updated', count: updated });
   } catch (e) {
     console.error('[batch-update] Error:', e.message);
     return res.status(500).json({ error: e.message });
