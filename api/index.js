@@ -243,6 +243,29 @@ async function handleTransactionsBatch(req, res) {
   }
 }
 
+// PUT /api?route=transactions-batch-update
+async function handleTransactionsBatchUpdate(req, res) {
+  if (req.method !== 'PUT') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { ids, banco } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids must be a non-empty array' });
+  }
+
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    await sql`
+      UPDATE transactions
+      SET status = 'PAGO', pagamento = ${today}, banco = ${banco || null}
+      WHERE id = ANY(${ids}::int[]) AND status != 'PAGO'
+    `;
+    return res.json({ message: 'Batch updated', count: ids.length });
+  } catch (e) {
+    console.error('[batch-update] Error:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
 // PUT/DELETE /api?route=transactions&id=xxx
 async function handleTransactionById(req, res) {
   const { id } = req.query;
@@ -791,7 +814,43 @@ async function lookupPattern(cnpj, nomeNormalizado) {
   return null;
 }
 
+// GET /api?route=boleto-patterns — lista todos os padrões aprendidos
+async function handleBoletoPatterns(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS boleto_patterns (
+        id SERIAL PRIMARY KEY, cnpj VARCHAR(20), nome_normalizado VARCHAR(255),
+        fornecedor VARCHAR(255) NOT NULL, descricao VARCHAR(255), empresa VARCHAR(50),
+        tipo VARCHAR(10) DEFAULT 'DESPESA', conta_contabil_id INTEGER,
+        confirmacoes INTEGER DEFAULT 1,
+        ultima_confirmacao TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(cnpj), UNIQUE(nome_normalizado)
+      )`;
+    const rows = await sql`SELECT * FROM boleto_patterns ORDER BY confirmacoes DESC, fornecedor ASC`;
+    return res.json(rows);
+  } catch (e) {
+    console.error('[patterns] Error listing:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+// DELETE /api?route=boleto-patterns&id=xxx — deleta um padrão específico
+async function handleDeleteBoletoPattern(req, res) {
+  const { id } = req.query;
+  if (req.method !== 'DELETE' || !id) return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    await sql`DELETE FROM boleto_patterns WHERE id = ${id}`;
+    return res.status(204).end();
+  } catch (e) {
+    console.error('[patterns] Error deleting:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
 // POST /api?route=save-boleto-pattern — chamado quando usuário confirma importação
+// v2 — auto-save nunca sobrescreve padrão existente
 async function handleSaveBoletoPattern(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
@@ -999,7 +1058,7 @@ CAMPOS:
 3. valor: Valor TOTAL em reais com ponto decimal (ex: 632.86)
    Procure por: "(=) Valor do Documento", "Valor do Documento", "Valor Cobrado"
 4. cnpj: CNPJ do beneficiário
-5. descricao: Tipo de serviço (ex: "Plano de Saúde", "Conta de Água", "Honorários Contábeis", "Mensalidade")
+5. descricao: Tipo de serviço (ex: "Plano de Saúde", "Conta de Água", "Honorários Contábeis", "Mensalidade"). IMPORTANTE: Se houver o nome de um Pagador/Sacado (ex: nome de um aluno/cliente), inclua ele na descrição. Exemplo: "Mensalidade - Nome do Aluno/Cliente".
 6. empresa: Empresa do Grupo CN que é o PAGADOR (campo "Pagador" ou "Sacado" no boleto)
    - Se "ANHANGUERA" ou "CENTRO EDUCACIONAL DE ITAQUIRAI" aparecer como pagador → "FACEMS"
    - Se "COLEGIO NAVIRAI" ou "COLEGIO NAVIRA" aparecer como pagador → "CN"
@@ -1088,41 +1147,6 @@ Responda APENAS com JSON válido:
       }
     }
 
-    // ── Salva padrão automaticamente para aprendizado futuro ─────────────────
-    if (extracted.fornecedor && extracted.fornecedor !== 'Fornecedor não identificado' && extracted.valor > 0) {
-      const cnpjClean = cleanCnpj(extracted.cnpj || rawCnpj || '');
-      const nomeNorm = normName(rawBenefName || extracted.fornecedor);
-      try {
-        await sql`
-          CREATE TABLE IF NOT EXISTS boleto_patterns (
-            id SERIAL PRIMARY KEY, cnpj VARCHAR(20), nome_normalizado VARCHAR(255),
-            fornecedor VARCHAR(255) NOT NULL, descricao VARCHAR(255), empresa VARCHAR(50),
-            tipo VARCHAR(10) DEFAULT 'DESPESA', conta_contabil_id INTEGER,
-            confirmacoes INTEGER DEFAULT 1,
-            ultima_confirmacao TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            UNIQUE(cnpj), UNIQUE(nome_normalizado)
-          )`;
-
-        // NUNCA sobrescreve padrão já confirmado pelo usuário (confirmacoes > 1)
-        // Só insere se não existir ainda
-        if (cnpjClean.length >= 11) {
-          await sql`
-            INSERT INTO boleto_patterns (cnpj, nome_normalizado, fornecedor, descricao, empresa, tipo)
-            VALUES (${cnpjClean}, ${nomeNorm}, ${extracted.fornecedor}, ${extracted.descricao||null}, ${extracted.empresa||null}, ${extracted.tipo||'DESPESA'})
-            ON CONFLICT (cnpj) DO NOTHING`;
-        } else if (nomeNorm.length >= 5) {
-          await sql`
-            INSERT INTO boleto_patterns (nome_normalizado, fornecedor, descricao, empresa, tipo)
-            VALUES (${nomeNorm}, ${extracted.fornecedor}, ${extracted.descricao||null}, ${extracted.empresa||null}, ${extracted.tipo||'DESPESA'})
-            ON CONFLICT (nome_normalizado) DO NOTHING`;
-        }
-        console.log(`[pattern] Auto-saved (first time only): ${extracted.fornecedor}`);
-      } catch (e) {
-        console.error('[pattern] Save error:', e.message);
-      }
-    }
-
     res.status(200).json(extracted);
   } catch (error) {
     console.error('[boleto] Error extracting boleto data:', error.message);
@@ -1156,6 +1180,8 @@ export default async function handler(req, res) {
       return handleTransactions(req, res);
     case 'transactions-batch':
       return handleTransactionsBatch(req, res);
+    case 'transactions-batch-update':
+      return handleTransactionsBatchUpdate(req, res);
     case 'suppliers':
       if (id) return handleSupplierById(req, res);
       return handleSuppliers(req, res);
@@ -1174,6 +1200,9 @@ export default async function handler(req, res) {
       return handleSetupTables(req, res);
     case 'save-boleto-pattern':
       return handleSaveBoletoPattern(req, res);
+    case 'boleto-patterns':
+      if (id) return handleDeleteBoletoPattern(req, res);
+      return handleBoletoPatterns(req, res);
     case 'extract-boleto':
       return handleExtractBoleto(req, res);
     default:

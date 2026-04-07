@@ -488,18 +488,20 @@ const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) 
 interface LancamentosTabProps {
   transactions: Transaction[];
   onMarkAsPaid: (tx: Transaction) => void;
+  onMarkAsPaidBatch: (txs: Transaction[]) => void;
   deleteTransaction: (id: string) => void;
   setShowNewTxModal: (show: boolean) => void;
   setEditingTx: (tx: Transaction) => void;
 }
 
-const LancamentosTab = ({ transactions, onMarkAsPaid, deleteTransaction, setShowNewTxModal, setEditingTx }: LancamentosTabProps) => {
+const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteTransaction, setShowNewTxModal, setEditingTx }: LancamentosTabProps) => {
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [monthFilter, setMonthFilter] = useState('TODOS');
   const [yearFilter, setYearFilter] = useState('TODOS');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [page, setPage] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
   // Extrair meses e anos únicos para os filtros
   const availableYears = useMemo(() => {
@@ -553,9 +555,40 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, deleteTransaction, setShow
 
   // Reset page when filters change
   useEffect(() => { setPage(0); }, [filter, statusFilter, monthFilter, yearFilter, sortOrder]);
+  // Clear selection when filters change
+  useEffect(() => { setSelectedIds(new Set()); }, [filter, statusFilter, monthFilter, yearFilter, sortOrder, page]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const pendingOnPage = paginated.filter(tx => tx.status !== 'PAGO');
+  const allPagePendingSelected = pendingOnPage.length > 0 && pendingOnPage.every(tx => selectedIds.has(tx.id));
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allPagePendingSelected) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        pendingOnPage.forEach(tx => next.delete(tx.id));
+        return next;
+      });
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        pendingOnPage.forEach(tx => next.add(tx.id));
+        return next;
+      });
+    }
+  };
+
+  const selectedTxs = transactions.filter(tx => selectedIds.has(tx.id));
 
   return (
     <div className="space-y-6">
@@ -2921,14 +2954,15 @@ const NewSupplierModal = ({ setShowNewSupplierModal, onSuccess }: NewSupplierMod
 
 export default function App() {
   const {
-    transactions, suppliers, banks, contasContabeis, companyOptions, notification, isLoading,
-    fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis,
+    transactions, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, boletoPatterns,
+    fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns,
     showNotification,
     markAsPaid, updateTransaction, deleteTransaction,
     deleteSupplier, syncSuppliers,
     deleteBank,
     addCompanyOption, removeCompanyOption, updateCompanyOption,
     setCompanyOptions,
+    deleteBoletoPattern,
   } = useAppData();
 
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
@@ -3240,7 +3274,7 @@ export default function App() {
       fornecedor,
       vencimento,
       valor,
-      descricao: '',
+      descricao: fileName.replace(/\.pdf$/i, '').trim(),
       empresa: '',
       cnpj: '',
       numero_boleto: numeroBoleto,
@@ -3272,7 +3306,9 @@ export default function App() {
         const fallbackNumero = extractLocalBoletoNumber(text);
         const inferredFromDescricao = normalizeBoletoNumber(data.descricao || '');
         const numero = normalizeBoletoNumber(data.numero_boleto || '') || fallbackNumero || inferredFromDescricao;
-        const descricao = data.descricao || (numero ? `Doc: ${numero}` : '');
+        const nomeArquivo = fileName.replace(/\.pdf$/i, '').trim();
+        const baseDescricao = data.descricao && data.descricao !== '-' ? data.descricao : (numero ? `Doc: ${numero}` : '');
+        const descricao = baseDescricao ? `${nomeArquivo} - ${baseDescricao}` : nomeArquivo;
         return {
           fileName,
           fornecedor: data.fornecedor || 'Fornecedor não identificado',
@@ -3290,11 +3326,11 @@ export default function App() {
 
       console.log('[boleto] Gemini returned empty data, using local fallback');
       const fallback = extractBoletoData(text, fileName);
-      return { ...fallback, descricao: data.descricao || '', empresa: data.empresa || '', cnpj: data.cnpj || '', numero_boleto: data.numero_boleto || '', tipo: 'DESPESA' };
+      return { ...fallback, empresa: data.empresa || '', cnpj: data.cnpj || '', numero_boleto: data.numero_boleto || '', tipo: 'DESPESA' };
     } catch (err) {
       console.error('[boleto] API error, using local fallback:', err);
       const fallback = extractBoletoData(text, fileName);
-      return { ...fallback, descricao: '', empresa: '', cnpj: '', numero_boleto: '', tipo: 'DESPESA' };
+      return { ...fallback, empresa: '', cnpj: '', numero_boleto: '', tipo: 'DESPESA' };
     }
   };
 
@@ -4478,6 +4514,50 @@ export default function App() {
                       >
                         <Trash2 size={14} /> Limpar Suspeitos
                       </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-white/5">
+                  <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Padrões de Boletos</h4>
+                  <div className="space-y-4 max-w-2xl mx-auto">
+                    <div className="glass-card p-4">
+                      <p className="text-[11px] text-on-surface-variant mb-3">
+                        Gerencie os padrões aprendidos automaticamente ao importar boletos. Se um fornecedor estiver errado, delete o padrão para que o sistema peça para configurar novamente na próxima importação.
+                      </p>
+                      <button
+                        onClick={() => fetchBoletoPatterns()}
+                        className="bg-primary/10 text-primary px-4 py-2 rounded-lg text-xs font-bold border border-primary/20 hover:bg-primary/20 transition-all mb-3"
+                      >
+                        Atualizar Lista
+                      </button>
+                      <div className="max-h-60 overflow-y-auto space-y-2">
+                        {boletoPatterns.length === 0 ? (
+                          <p className="text-center text-xs text-on-surface-variant py-4">Nenhum padrão aprendido ainda.</p>
+                        ) : (
+                          boletoPatterns.map((pattern) => (
+                            <div key={pattern.id} className="flex items-center justify-between bg-surface-variant/10 border border-white/5 rounded-lg px-3 py-2">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold">{pattern.fornecedor}</span>
+                                <span className="text-[10px] text-on-surface-variant">
+                                  {pattern.nome_normalizado} • {pattern.confirmacoes}x confirmado
+                                  {pattern.empresa && ` • ${pattern.empresa}`}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Excluir padrão "${pattern.fornecedor}"?`)) {
+                                    deleteBoletoPattern(pattern.id);
+                                  }
+                                }}
+                                className="text-tertiary hover:text-tertiary/80"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
