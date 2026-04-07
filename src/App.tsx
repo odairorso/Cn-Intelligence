@@ -648,12 +648,22 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
           </button>
 
         </div>
-        <button 
-          onClick={() => setShowNewTxModal(true)}
-          className="bg-primary text-background px-6 py-2.5 rounded-sm text-sm font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all whitespace-nowrap shadow-lg shadow-primary/10"
-        >
-          <Plus size={18} strokeWidth={3} /> Novo Lançamento
-        </button>
+        <div className="flex gap-2">
+          {selectedIds.size > 0 && (
+            <button
+              onClick={() => onMarkAsPaidBatch(selectedTxs)}
+              className="bg-primary/20 border border-primary/40 text-primary px-5 py-2.5 rounded-sm text-sm font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary/30 transition-all whitespace-nowrap"
+            >
+              <Check size={18} strokeWidth={3} /> Receber {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+            </button>
+          )}
+          <button 
+            onClick={() => setShowNewTxModal(true)}
+            className="bg-primary text-background px-6 py-2.5 rounded-sm text-sm font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all whitespace-nowrap shadow-lg shadow-primary/10"
+          >
+            <Plus size={18} strokeWidth={3} /> Novo Lançamento
+          </button>
+        </div>
 
       </div>
 
@@ -672,6 +682,14 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
               tx.status === 'VENCIDO' && "border-tertiary/60"
             )}>
               <div className="flex justify-between items-start gap-2 mb-2">
+                {tx.status !== 'PAGO' && (
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(tx.id)}
+                    onChange={() => toggleSelect(tx.id)}
+                    className="mt-1 accent-primary cursor-pointer"
+                  />
+                )}
                 <span className="font-semibold text-sm leading-tight flex-1">{tx.fornecedor}</span>
                 <span className={cn("font-bold text-sm whitespace-nowrap", tx.valor < 0 ? "text-tertiary" : "text-primary")}>
                   {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -719,6 +737,15 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
           <table className="w-full text-left">
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
+                <th className="px-4 py-4 w-10">
+                  <input
+                    type="checkbox"
+                    checked={allPagePendingSelected}
+                    onChange={toggleSelectAll}
+                    className="accent-primary cursor-pointer"
+                    title="Selecionar todos pendentes desta página"
+                  />
+                </th>
                 <th className="px-8 py-4">Fornecedor</th>
                 <th className="px-8 py-4">Descrição</th>
                 <th className="px-8 py-4">Empresa</th>
@@ -732,7 +759,17 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
             </thead>
             <tbody className="text-sm divide-y divide-white/5">
               {paginated.map((tx) => (
-                <tr key={tx.id} className="hover:bg-white/5 transition-colors">
+                <tr key={tx.id} className={cn("hover:bg-white/5 transition-colors", selectedIds.has(tx.id) && "bg-primary/5")}>
+                  <td className="px-4 py-4">
+                    {tx.status !== 'PAGO' && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(tx.id)}
+                        onChange={() => toggleSelect(tx.id)}
+                        className="accent-primary cursor-pointer"
+                      />
+                    )}
+                  </td>
                   <td className="px-8 py-4 font-semibold">{tx.fornecedor}</td>
                   <td className="px-8 py-4 text-on-surface-variant">{tx.descricao}</td>
                   <td className="px-8 py-4">
@@ -2957,7 +2994,7 @@ export default function App() {
     transactions, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, boletoPatterns,
     fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns,
     showNotification,
-    markAsPaid, updateTransaction, deleteTransaction,
+    markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
     deleteSupplier, syncSuppliers,
     deleteBank,
     addCompanyOption, removeCompanyOption, updateCompanyOption,
@@ -2983,6 +3020,7 @@ export default function App() {
   const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [showPayModal, setShowPayModal] = useState<{ id: string; valor: number } | null>(null);
+  const [showPayBatchModal, setShowPayBatchModal] = useState<Transaction[] | null>(null);
   const [showPdfImportModal, setShowPdfImportModal] = useState(false);
   const [pdfExtractedRows, setPdfExtractedRows] = useState<PdfImportDraft[]>([]);
   const [isProcessingPdf, setIsProcessingPdf] = useState(false);
@@ -3783,6 +3821,15 @@ export default function App() {
     }
   };
 
+  const handleMarkAsPaidBatchClick = (txs: Transaction[]) => {
+    if (txs.length === 0) return;
+    if (banks.filter(b => b.ativo).length > 0) {
+      setShowPayBatchModal(txs);
+    } else {
+      markAsPaidBatch(txs.map(t => t.id), '');
+    }
+  };
+
   const resetSystem = async () => {
     if (!window.confirm('ATENÇÃO: Isso apagará TODOS os seus lançamentos e fornecedores da nuvem. Deseja continuar?')) return;
     try {
@@ -4090,7 +4137,8 @@ export default function App() {
             {activeTab === 'lancamentos' && (
               <LancamentosTab 
                 transactions={transactions} 
-                onMarkAsPaid={handleMarkAsPaidClick} 
+                onMarkAsPaid={handleMarkAsPaidClick}
+                onMarkAsPaidBatch={handleMarkAsPaidBatchClick}
                 deleteTransaction={deleteTransaction} 
                 setShowNewTxModal={setShowNewTxModal} 
                 setEditingTx={setEditingTx}
@@ -4811,6 +4859,19 @@ export default function App() {
           onConfirm={(banco) => {
             markAsPaid(showPayModal.id, banco);
             setShowPayModal(null);
+          }}
+        />
+      )}
+
+      {showPayBatchModal && (
+        <SelectBankModal
+          transactionId="batch"
+          valor={showPayBatchModal.reduce((sum, tx) => sum + tx.valor, 0)}
+          banks={banks}
+          onClose={() => setShowPayBatchModal(null)}
+          onConfirm={(banco) => {
+            markAsPaidBatch(showPayBatchModal.map(t => t.id), banco);
+            setShowPayBatchModal(null);
           }}
         />
       )}
