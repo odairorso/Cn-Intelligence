@@ -872,6 +872,10 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
   const [searchSupplier, setSearchSupplier] = useState('');
   const [mergeTarget, setMergeTarget] = useState<string>('');
   const [mergeAliases, setMergeAliases] = useState<string[]>([]);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [manualMergeTarget, setManualMergeTarget] = useState('');
+  const [manualMergeAlias, setManualMergeAlias] = useState('');
+  const [merging, setMerging] = useState(false);
 
   // Pre-calculate transaction count per supplier (optimized O(n) instead of O(n*m))
   const supplierTransactionCount = useMemo(() => {
@@ -981,6 +985,13 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
             title="Unificar variações automaticamente"
           >
             <Merge size={14} /> Unificar Auto
+          </button>
+          <button
+            onClick={() => { setManualMergeTarget(''); setManualMergeAlias(''); setShowMergeModal(true); }}
+            className="bg-secondary/10 text-secondary px-4 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-secondary/20 transition-colors"
+            title="Unificar dois fornecedores manualmente"
+          >
+            <Merge size={14} /> Unificar Manual
           </button>
         </div>
         <button 
@@ -1103,6 +1114,86 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
           </div>
         )}
       </div>
+
+      {/* Modal de Unificação Manual */}
+      {showMergeModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="glass-card p-8 w-full max-w-md border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+          >
+            <h3 className="text-xl font-bold font-headline mb-2">Unificar Fornecedores</h3>
+            <p className="text-sm text-on-surface-variant mb-6">
+              Todos os lançamentos do fornecedor <span className="text-tertiary font-bold">a remover</span> serão migrados para o <span className="text-primary font-bold">nome final</span>.
+            </p>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Nome final (manter)</label>
+                <select
+                  value={manualMergeTarget}
+                  onChange={e => setManualMergeTarget(e.target.value)}
+                  className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-primary"
+                >
+                  <option value="">Selecione o fornecedor...</option>
+                  {[...new Set([...suppliers.map(s => s.nome), ...transactions.map(t => t.fornecedor)])].sort().map(n => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor a remover (alias)</label>
+                <select
+                  value={manualMergeAlias}
+                  onChange={e => setManualMergeAlias(e.target.value)}
+                  className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-primary"
+                >
+                  <option value="">Selecione o fornecedor...</option>
+                  {[...new Set([...suppliers.map(s => s.nome), ...transactions.map(t => t.fornecedor)])].sort().filter(n => n !== manualMergeTarget).map(n => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {manualMergeTarget && manualMergeAlias && (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-6 text-xs text-on-surface-variant">
+                Todos os lançamentos de <span className="font-bold text-tertiary">"{manualMergeAlias}"</span> passarão a se chamar <span className="font-bold text-primary">"{manualMergeTarget}"</span>.
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowMergeModal(false)}
+                className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={!manualMergeTarget || !manualMergeAlias || merging}
+                onClick={async () => {
+                  if (!manualMergeTarget || !manualMergeAlias) return;
+                  setMerging(true);
+                  try {
+                    await api.mergeSuppliers(manualMergeTarget, [manualMergeAlias]);
+                    setShowMergeModal(false);
+                    await syncSuppliers();
+                    window.location.reload();
+                  } catch (e) {
+                    console.error(e);
+                  } finally {
+                    setMerging(false);
+                  }
+                }}
+                className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {merging ? 'Unificando...' : 'Confirmar'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
