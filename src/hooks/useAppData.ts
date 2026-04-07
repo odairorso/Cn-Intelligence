@@ -18,6 +18,16 @@ export function useAppData() {
   const [contasContabeis, setContasContabeis] = useState<ContaContabil[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState<Notification | null>(null);
+  const [boletoPatterns, setBoletoPatterns] = useState<Array<{
+    id: number;
+    cnpj: string;
+    nome_normalizado: string;
+    fornecedor: string;
+    descricao: string;
+    empresa: string;
+    tipo: string;
+    confirmacoes: number;
+  }>>([]);
   const [companyOptions, setCompanyOptions] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem('cn_company_options');
@@ -96,6 +106,27 @@ export function useAppData() {
     }
   }, [showNotification]);
 
+  // ─── Boleto Patterns ─────────────────────────────────────────────────────
+  const fetchBoletoPatterns = useCallback(async () => {
+    try {
+      const data = await api.getBoletoPatterns();
+      setBoletoPatterns(data);
+    } catch (error) {
+      console.error('Failed to fetch boleto patterns:', error);
+    }
+  }, []);
+
+  const deleteBoletoPattern = useCallback(async (id: number) => {
+    try {
+      await api.deleteBoletoPattern(id);
+      showNotification('Padrão de boleto excluído.', 'info');
+      fetchBoletoPatterns();
+    } catch (error) {
+      console.error('Failed to delete boleto pattern:', error);
+      showNotification('Erro ao excluir padrão.', 'error');
+    }
+  }, [showNotification, fetchBoletoPatterns]);
+
   // ─── Initial load — tudo em paralelo, sem esperar setupTables ───────────
   useEffect(() => {
     setIsLoading(true);
@@ -106,11 +137,12 @@ export function useAppData() {
       fetchSuppliers(),
       fetchBanks(),
       fetchContasContabeis(),
+      fetchBoletoPatterns(),
     ]).finally(() => setIsLoading(false));
 
     // setupTables roda em background sem bloquear o carregamento
     api.setupTables().catch(console.error);
-  }, [fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis]);
+  }, [fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns]);
 
   // ─── Auto-merge suppliers (max 1x a cada 6h) ─────────────────────────────
   useEffect(() => {
@@ -148,6 +180,18 @@ export function useAppData() {
     showNotification('Lançamento marcado como pago!', 'success');
     api.updateTransaction(id, { status: 'PAGO', pagamento: today, banco }).catch(err => {
       console.error('Failed to mark as paid:', err);
+      fetchTransactions();
+    });
+  }, [showNotification, fetchTransactions]);
+
+  const markAsPaidBatch = useCallback(async (ids: string[], banco: string) => {
+    const today = new Date().toLocaleDateString('pt-BR');
+    setTransactions(prev =>
+      prev.map(tx => ids.includes(tx.id) ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: today, banco } : tx)
+    );
+    showNotification(`${ids.length} lançamento(s) marcado(s) como pago!`, 'success');
+    api.updateTransactionsBatch(ids, banco).catch(err => {
+      console.error('Failed to mark batch as paid:', err);
       fetchTransactions();
     });
   }, [showNotification, fetchTransactions]);
@@ -224,6 +268,23 @@ export function useAppData() {
     }
   }, [showNotification, fetchBanks]);
 
+  // ─── Initial load — tudo em paralelo, sem esperar setupTables ───────────
+  useEffect(() => {
+    setIsLoading(true);
+
+    // Carrega tudo em paralelo — não bloqueia um pelo outro
+    Promise.all([
+      fetchTransactions(),
+      fetchSuppliers(),
+      fetchBanks(),
+      fetchContasContabeis(),
+      fetchBoletoPatterns(),
+    ]).finally(() => setIsLoading(false));
+
+    // setupTables roda em background sem bloquear o carregamento
+    api.setupTables().catch(console.error);
+  }, [fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns]);
+
   // ─── Company options ──────────────────────────────────────────────────────
   const normalizeCompanyName = (name: string) => String(name || '').trim().toUpperCase();
 
@@ -256,15 +317,16 @@ export function useAppData() {
 
   return {
     // State
-    transactions, suppliers, banks, contasContabeis, companyOptions, notification, isLoading,
+    transactions, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, boletoPatterns,
     // Fetchers
-    fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis,
+    fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns,
     // Actions
     showNotification,
-    markAsPaid, updateTransaction, deleteTransaction,
+    markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
     deleteSupplier, syncSuppliers,
     deleteBank,
     addCompanyOption, removeCompanyOption, updateCompanyOption,
     setCompanyOptions,
+    deleteBoletoPattern,
   };
 }

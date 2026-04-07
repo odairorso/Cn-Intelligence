@@ -30,6 +30,15 @@ export const api = {
     if (!res.ok) throw new Error('Failed to create transactions batch');
   },
 
+  async updateTransactionsBatch(ids: string[], banco: string): Promise<void> {
+    const res = await fetch(`${API_BASE}?route=transactions-batch-update`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, banco }),
+    });
+    if (!res.ok) throw new Error('Failed to update transactions batch');
+  },
+
   async updateTransaction(id: string, data: Partial<Transaction>): Promise<Transaction> {
     const res = await fetch(`${API_BASE}?route=transactions&id=${id}`, {
       method: 'PUT',
@@ -200,5 +209,25 @@ export const api = {
         body: JSON.stringify(data),
       });
     } catch { /* silencioso — não bloqueia o fluxo */ }
+  },
+
+  async getBoletoPatterns(): Promise<Array<{
+    id: number;
+    cnpj: string;
+    nome_normalizado: string;
+    fornecedor: string;
+    descricao: string;
+    empresa: string;
+    tipo: string;
+    confirmacoes: number;
+  }>> {
+    const res = await fetch(`${API_BASE}?route=boleto-patterns`);
+    if (!res.ok) throw new Error('Failed to fetch patterns');
+    return res.json();
+  },
+
+  async deleteBoletoPattern(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE}?route=boleto-patterns&id=${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete pattern');
   },
 };
