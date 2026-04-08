@@ -886,11 +886,10 @@ async function handleSaveBoletoPattern(req, res) {
 
     if (cnpjClean.length >= 11) {
       await sql`
-        INSERT INTO boleto_patterns (cnpj, nome_normalizado, fornecedor, descricao, empresa, tipo, conta_contabil_id)
-        VALUES (${cnpjClean}, ${nomeNorm}, ${fornecedor}, ${descricao||null}, ${empresa||null}, ${tipo||'DESPESA'}, ${conta_contabil_id||null})
+        INSERT INTO boleto_patterns (cnpj, nome_normalizado, fornecedor, empresa, tipo, conta_contabil_id)
+        VALUES (${cnpjClean}, ${nomeNorm}, ${fornecedor}, ${empresa||null}, ${tipo||'DESPESA'}, ${conta_contabil_id||null})
         ON CONFLICT (cnpj) DO UPDATE SET
           fornecedor = EXCLUDED.fornecedor,
-          descricao = COALESCE(EXCLUDED.descricao, boleto_patterns.descricao),
           empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
           tipo = EXCLUDED.tipo,
           conta_contabil_id = COALESCE(EXCLUDED.conta_contabil_id, boleto_patterns.conta_contabil_id),
@@ -898,11 +897,10 @@ async function handleSaveBoletoPattern(req, res) {
           ultima_confirmacao = NOW()`;
     } else {
       await sql`
-        INSERT INTO boleto_patterns (nome_normalizado, fornecedor, descricao, empresa, tipo, conta_contabil_id)
-        VALUES (${nomeNorm}, ${fornecedor}, ${descricao||null}, ${empresa||null}, ${tipo||'DESPESA'}, ${conta_contabil_id||null})
+        INSERT INTO boleto_patterns (nome_normalizado, fornecedor, empresa, tipo, conta_contabil_id)
+        VALUES (${nomeNorm}, ${fornecedor}, ${empresa||null}, ${tipo||'DESPESA'}, ${conta_contabil_id||null})
         ON CONFLICT (nome_normalizado) DO UPDATE SET
           fornecedor = EXCLUDED.fornecedor,
-          descricao = COALESCE(EXCLUDED.descricao, boleto_patterns.descricao),
           empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
           tipo = EXCLUDED.tipo,
           conta_contabil_id = COALESCE(EXCLUDED.conta_contabil_id, boleto_patterns.conta_contabil_id),
