@@ -4772,7 +4772,12 @@ export default function App() {
                           list="supplier-suggestions"
                           value={row.fornecedor}
                           onChange={(e) => updatePdfRow(index, { fornecedor: e.target.value })}
-                          onBlur={(e) => updatePdfRow(index, { fornecedor: resolveSupplierName(e.target.value, row.rawText) })}
+                          onBlur={(e) => {
+                            const current = e.target.value;
+                            if (!current || current === 'Fornecedor não identificado') {
+                              updatePdfRow(index, { fornecedor: resolveSupplierName(current, row.rawText) });
+                            }
+                          }}
                           className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
