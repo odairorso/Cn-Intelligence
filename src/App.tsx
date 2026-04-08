@@ -2354,7 +2354,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
               >
                 <span className={formData.conta_contabil_id ? 'text-on-surface' : 'text-on-surface-variant'}>
                   {formData.conta_contabil_id 
-                    ? contasContabeis.find(c => c.id === formData.conta_contabil_id)?.codigo + ' - ' + contasContabeis.find(c => c.id === formData.conta_contabil_id)?.nome
+                    ? contasContabeis.find(c => c.id === formData.conta_contabil_id)?.nome
                     : 'Selecione a conta'}
                 </span>
                 <ChevronDown size={14} className="text-on-surface-variant" />
@@ -2675,7 +2675,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                 >
                   <span className={formData.conta_contabil_id !== undefined ? 'text-on-surface' : 'text-on-surface-variant'}>
                     {formData.conta_contabil_id !== undefined 
-                      ? contasContabeis.find(c => c.id === formData.conta_contabil_id)?.codigo + ' - ' + contasContabeis.find(c => c.id === formData.conta_contabil_id)?.nome
+                      ? contasContabeis.find(c => c.id === formData.conta_contabil_id)?.nome
                       : 'Selecione a conta'}
                   </span>
                   <ChevronDown size={14} className="text-on-surface-variant" />
@@ -4476,7 +4476,7 @@ export default function App() {
                           <div className="space-y-1 max-h-64 overflow-auto pr-1">
                             {contasContabeis.filter(c => matchesAccountType(c, 'DESPESA')).map((c) => (
                               <div key={c.id} className="flex items-center justify-between border border-white/10 rounded-lg px-3 py-2">
-                                <span className="text-xs">{c.codigo} - {c.nome}</span>
+                                <span className="text-xs">{c.nome}</span>
                                 <label className="text-[10px] flex items-center gap-2">
                                   <span className="text-on-surface-variant">{c.ativo ? 'Ativa' : 'Inativa'}</span>
                                   <input
@@ -4501,7 +4501,7 @@ export default function App() {
                           <div className="space-y-1 max-h-64 overflow-auto pr-1">
                             {contasContabeis.filter(c => matchesAccountType(c, 'RECEITA')).map((c) => (
                               <div key={c.id} className="flex items-center justify-between border border-white/10 rounded-lg px-3 py-2">
-                                <span className="text-xs">{c.codigo} - {c.nome}</span>
+                                <span className="text-xs">{c.nome}</span>
                                 <label className="text-[10px] flex items-center gap-2">
                                   <span className="text-on-surface-variant">{c.ativo ? 'Ativa' : 'Inativa'}</span>
                                   <input
@@ -4866,7 +4866,7 @@ export default function App() {
                             .filter((conta) => matchesAccountType(conta, (row.tipo || 'DESPESA') as 'RECEITA' | 'DESPESA'))
                             .map((conta) => (
                             <option key={conta.id} value={conta.id} style={{ backgroundColor: '#1e1e2e' }}>
-                              {conta.codigo} - {conta.nome}
+                              {conta.nome}
                             </option>
                           ))}
                         </select>
