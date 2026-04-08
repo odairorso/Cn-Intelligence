@@ -997,6 +997,10 @@ async function handleExtractBoleto(req, res) {
       const valor = parseV(valorMatch?.[1] || valorMatch?.[2] || '');
       const numero_boleto = (nossoNumMatch?.[1] || nroDocMatch?.[1] || '').replace(/[^A-Z0-9]/g,'');
 
+      // Extrai nome do Pagador do texto para usar como descrição
+      const pagadorRawMatch = srcUpper.match(/PAGADOR[:\s]+([A-Z][A-Z0-9\s.'-]{3,60})(?:\s+\d{3}[.\s]\d{3}|\s+CPF|\s+CNPJ|\n|$)/);
+      const pagadorDescricao = pagadorRawMatch?.[1]?.trim() || '';
+
       // Se não conseguiu extrair localmente, chama Gemini só para esses campos
       if (!vencimento || !valor) {
         // Chama Gemini com prompt mínimo só para data/valor
@@ -1021,7 +1025,7 @@ Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
           vencimento: mini.vencimento || vencimento,
           valor: mini.valor || valor,
           cnpj: rawCnpj || '',
-          descricao: pattern.descricao || '',
+          descricao: pagadorDescricao || pattern.descricao || '',
           empresa: pattern.empresa || '',
           tipo: pattern.tipo || 'DESPESA',
           conta_contabil_id: pattern.conta_contabil_id || null,
@@ -1035,7 +1039,7 @@ Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
         vencimento,
         valor,
         cnpj: rawCnpj || '',
-        descricao: pattern.descricao || '',
+        descricao: pagadorDescricao || pattern.descricao || '',
         empresa: pattern.empresa || '',
         tipo: pattern.tipo || 'DESPESA',
         conta_contabil_id: pattern.conta_contabil_id || null,
@@ -1064,7 +1068,7 @@ CAMPOS:
 3. valor: Valor TOTAL em reais com ponto decimal (ex: 632.86)
    Procure por: "(=) Valor do Documento", "Valor do Documento", "Valor Cobrado"
 4. cnpj: CNPJ do beneficiário
-5. descricao: Tipo de serviço (ex: "Plano de Saúde", "Conta de Água", "Honorários Contábeis", "Mensalidade"). IMPORTANTE: Se houver o nome de um Pagador/Sacado (ex: nome de um aluno/cliente), inclua ele na descrição. Exemplo: "Mensalidade - Nome do Aluno/Cliente".
+5. descricao: APENAS o nome completo do Pagador/Sacado (a pessoa ou empresa que está PAGANDO o boleto). Procure pelo campo "Pagador" ou "Sacado" no boleto. Exemplo: "ELAINE APARECIDA DA SILVA", "JAQUELINE DE AQUINO MAFRA". NÃO inclua o nome do arquivo, NÃO inclua tipo de serviço, NÃO inclua nada além do nome do pagador.
 6. empresa: Empresa do Grupo CN que é o PAGADOR (campo "Pagador" ou "Sacado" no boleto)
    - Se "ANHANGUERA" ou "CENTRO EDUCACIONAL DE ITAQUIRAI" aparecer como pagador → "FACEMS"
    - Se "COLEGIO NAVIRAI" ou "COLEGIO NAVIRA" aparecer como pagador → "CN"
