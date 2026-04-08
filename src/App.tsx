@@ -3408,12 +3408,17 @@ export default function App() {
 
     const numeroBoleto = extractLocalBoletoNumber(normalizedText);
 
+    // Extrair nome do Pagador/Sacado para usar como descrição
+    const pagadorMatch = normalizedText.match(/PAGADOR[:\s]+([A-Z][A-Z0-9\s.'-]{3,60})(?:\s+\d{3}\.|\s+CPF|\s+CNPJ|$)/);
+    const sacadoMatch = normalizedText.match(/SACADO[:\s]+([A-Z][A-Z0-9\s.'-]{3,60})(?:\s+\d{3}\.|\s+CPF|\s+CNPJ|$)/);
+    const pagadorNome = (pagadorMatch?.[1] || sacadoMatch?.[1] || '').trim();
+
     return {
       fileName,
       fornecedor,
       vencimento,
       valor,
-      descricao: fileName.replace(/\.pdf$/i, '').trim(),
+      descricao: pagadorNome || '',
       empresa: '',
       cnpj: '',
       numero_boleto: numeroBoleto,
@@ -3445,9 +3450,7 @@ export default function App() {
         const fallbackNumero = extractLocalBoletoNumber(text);
         const inferredFromDescricao = normalizeBoletoNumber(data.descricao || '');
         const numero = normalizeBoletoNumber(data.numero_boleto || '') || fallbackNumero || inferredFromDescricao;
-        const nomeArquivo = fileName.replace(/\.pdf$/i, '').trim();
-        const baseDescricao = data.descricao && data.descricao !== '-' ? data.descricao : (numero ? `Doc: ${numero}` : '');
-        const descricao = baseDescricao ? `${nomeArquivo} - ${baseDescricao}` : nomeArquivo;
+        const descricao = (data.descricao && data.descricao !== '-') ? data.descricao : '';
         return {
           fileName,
           fornecedor: data.fornecedor || 'Fornecedor não identificado',
