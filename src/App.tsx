@@ -3408,10 +3408,10 @@ export default function App() {
 
     const numeroBoleto = extractLocalBoletoNumber(normalizedText);
 
-    // Extrair nome do Pagador/Sacado para usar como descrição
-    const pagadorMatch = normalizedText.match(/PAGADOR[:\s]+([A-Z][A-Z0-9\s.'-]{3,60})(?:\s+\d{3}\.|\s+CPF|\s+CNPJ|$)/);
-    const sacadoMatch = normalizedText.match(/SACADO[:\s]+([A-Z][A-Z0-9\s.'-]{3,60})(?:\s+\d{3}\.|\s+CPF|\s+CNPJ|$)/);
-    const pagadorNome = (pagadorMatch?.[1] || sacadoMatch?.[1] || '').trim();
+    // Extrair nome do Pagador/Sacado para usar como descrição (aceita acentos)
+    const pagadorMatch = normalizedText.match(/PAGADOR\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
+    const sacadoMatch = normalizedText.match(/SACADO\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
+    const pagadorNome = ((pagadorMatch?.[1] || sacadoMatch?.[1] || '')).trim().replace(/\s+/g, ' ');
 
     return {
       fileName,
