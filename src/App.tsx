@@ -3334,12 +3334,14 @@ export default function App() {
     let valor = 0;
 
     const fornecedorPatterns = [
-      /BENEFICIÁRIO[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/,
-      /CEDENTE[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/,
-      /VENDEDOR[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/,
-      /EMISSOR[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/,
-      /RAZÃO SOCIAL[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/,
-      /SACADO[:\s]+([A-Z0-9\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/,
+      /BENEFICI[AÁ]RIO[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
+      /CEDENTE[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
+      /VENDEDOR[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/i,
+      /EMISSOR[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/i,
+      /RAZ[AÃ]O SOCIAL[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/i,
+      /SACADO[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
+      // Nome seguido diretamente de CNPJ sem label (ex: "Empresa Ltda  18.717.282/0001-08")
+      /([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,60})\s+\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/i,
     ];
 
     for (const pattern of fornecedorPatterns) {
@@ -4766,20 +4768,32 @@ export default function App() {
                           {row.fileName.length > 55 ? `boleto_${index + 1}.pdf` : row.fileName}
                         </p>
                       </div>
-                      <div className="md:col-span-3">
+                      <div className="md:col-span-3 relative">
                         <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Fornecedor</p>
                         <input
-                          list="supplier-suggestions"
                           value={row.fornecedor}
                           onChange={(e) => updatePdfRow(index, { fornecedor: e.target.value })}
-                          onBlur={(e) => {
-                            const current = e.target.value;
-                            if (!current || current === 'Fornecedor não identificado') {
-                              updatePdfRow(index, { fornecedor: resolveSupplierName(current, row.rawText) });
-                            }
-                          }}
+                          placeholder="Digite o fornecedor..."
                           className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
+                        {/* Sugestões de fornecedores */}
+                        {row.fornecedor && row.fornecedor.length > 1 && (
+                          <div className="absolute z-50 w-full mt-1 bg-[#161b2a] border border-white/10 rounded-lg shadow-xl max-h-40 overflow-y-auto">
+                            {suppliers
+                              .filter(s => s.nome.toLowerCase().includes(row.fornecedor.toLowerCase()))
+                              .slice(0, 6)
+                              .map(s => (
+                                <div
+                                  key={s.id || s.nome}
+                                  className="px-3 py-2 text-sm hover:bg-white/10 cursor-pointer"
+                                  onMouseDown={(e) => { e.preventDefault(); updatePdfRow(index, { fornecedor: s.nome }); }}
+                                >
+                                  {s.nome}
+                                </div>
+                              ))
+                            }
+                          </div>
+                        )}
                       </div>
                       <div className="md:col-span-2">
                         <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Vencimento</p>
