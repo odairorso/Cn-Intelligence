@@ -957,7 +957,7 @@ async function handleExtractBoleto(req, res) {
 
     // Tenta o CNPJ que aparece próximo ao nome do beneficiário
     // Pega o CNPJ que NÃO é do pagador (pagador aparece depois de "Pagador" ou "Sacado")
-    const pagadorMatch = srcUpper.match(/PAGADOR[:\s]+([A-Z][A-Z0-9\s.&/,-]{3,60})/);
+    const pagadorMatch = srcUpper.match(/PAGADOR[:\s]+([\w\u00C0-\u017E\s.&/,-]{3,60})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ)/i);
     const pagadorNome = pagadorMatch?.[1]?.trim() || '';
     // CNPJ do beneficiário = primeiro CNPJ que não está associado ao pagador
     const rawCnpj = allCnpjs.find(c => {
@@ -995,9 +995,9 @@ async function handleExtractBoleto(req, res) {
       const valor = parseV(valorMatch?.[1] || valorMatch?.[2] || '');
       const numero_boleto = (nossoNumMatch?.[1] || nroDocMatch?.[1] || '').replace(/[^A-Z0-9]/g,'');
 
-      // Extrai nome do Pagador do texto para usar como descrição
-      const pagadorRawMatch = srcUpper.match(/PAGADOR[:\s]+([A-Z][A-Z0-9\s.'-]{3,60})(?:\s+\d{3}[.\s]\d{3}|\s+CPF|\s+CNPJ|\n|$)/);
-      const pagadorDescricao = pagadorRawMatch?.[1]?.trim() || '';
+      // Extrai nome do Pagador do texto para usar como descrição (aceita acentos e caracteres especiais)
+      const pagadorRawMatch = srcUpper.match(/PAGADOR\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
+      const pagadorDescricao = (pagadorRawMatch?.[1] || '').trim().replace(/\s+/g, ' ');
 
       // Se não conseguiu extrair localmente, chama Gemini só para esses campos
       if (!vencimento || !valor) {
