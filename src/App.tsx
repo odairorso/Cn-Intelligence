@@ -3470,7 +3470,12 @@ export default function App() {
 
       console.log('[boleto] Gemini returned empty data, using local fallback');
       const fallback = extractBoletoData(text, fileName);
-      return { ...fallback, empresa: data.empresa || '', cnpj: data.cnpj || '', numero_boleto: data.numero_boleto || '', tipo: 'DESPESA' };
+      // Se nem o fallback local extraiu dados, usa o nome do arquivo como fornecedor
+      if (fallback.fornecedor === 'Fornecedor não identificado') {
+        const nameFromFile = fileName.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ').trim();
+        fallback.fornecedor = nameFromFile || 'Fornecedor não identificado';
+      }
+      return { ...fallback, empresa: data.empresa || '', cnpj: data.cnpj || '', numero_boleto: data.numero_boleto || fallback.numero_boleto || '', tipo: 'DESPESA' };
     } catch (err) {
       console.error('[boleto] API error, using local fallback:', err);
       const fallback = extractBoletoData(text, fileName);
