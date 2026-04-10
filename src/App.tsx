@@ -4773,27 +4773,10 @@ export default function App() {
                         <input
                           value={row.fornecedor}
                           onChange={(e) => updatePdfRow(index, { fornecedor: e.target.value })}
+                          onFocus={(e) => e.target.select()}
                           placeholder="Digite o fornecedor..."
                           className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
-                        {/* Sugestões de fornecedores */}
-                        {row.fornecedor && row.fornecedor.length > 1 && (
-                          <div className="absolute z-50 w-full mt-1 bg-[#161b2a] border border-white/10 rounded-lg shadow-xl max-h-40 overflow-y-auto">
-                            {suppliers
-                              .filter(s => s.nome.toLowerCase().includes(row.fornecedor.toLowerCase()))
-                              .slice(0, 6)
-                              .map(s => (
-                                <div
-                                  key={s.id || s.nome}
-                                  className="px-3 py-2 text-sm hover:bg-white/10 cursor-pointer"
-                                  onMouseDown={(e) => { e.preventDefault(); updatePdfRow(index, { fornecedor: s.nome }); }}
-                                >
-                                  {s.nome}
-                                </div>
-                              ))
-                            }
-                          </div>
-                        )}
                       </div>
                       <div className="md:col-span-2">
                         <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Vencimento</p>
