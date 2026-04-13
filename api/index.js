@@ -1201,6 +1201,7 @@ Responda APENAS com JSON válido:
       }
     }
     if (!Number.isFinite(extracted.valor) || extracted.valor <= 0) extracted.valor = 0;
+    if (extracted.valor > 500000) extracted.valor = 0;
 
     if (!extracted.fornecedor || extracted.fornecedor === '' || extracted.fornecedor.toLowerCase() === 'não identificado') {
       if (fileName) {
