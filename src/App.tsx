@@ -3259,6 +3259,11 @@ export default function App() {
       /N[º°]?\s*DOC\s*[:\s-]*([A-Z0-9./-]{6,40})/,
       /DOCUMENTO\s*[:\s-]*([0-9]{6,20})/,
       /COD(?:IGO)?\s*(?:DE)?\s*BARRAS\s*[:\s-]*([0-9]{47,48})/,
+      /C.{0,6}DIGO\s*(?:DE)?\s*BARRAS\s*[:\s-]*([0-9]{47,48})/,
+      /UTILIZE\s+O\s+C.{0,6}DIGO\s*[:\s-]*([A-Z0-9]{6,25})/,
+      /MATR.{0,6}CULA\s*[:\s-]*([0-9]{6,14}(?:[-/][0-9A-Z]{1,6}){1,8})/,
+      /NOTA\s+FISCAL\s+N[ROº°]*\s*[:\s-]*([0-9.]{6,25})/,
+      /([0-9]{11})\s+CADASTRE\s+SUA\s+FATURA/,
     ];
     for (const pattern of patterns) {
       const match = source.match(pattern);
@@ -3266,6 +3271,17 @@ export default function App() {
         const normalized = normalizeBoletoNumber(match[1]);
         if (normalized) return normalized;
       }
+    }
+    const labeledBlockPatterns = [
+      /LINHA\s*DIGIT[AÁ]VEL[^0-9]*([0-9\s.]{40,160})/,
+      /C.{0,6}DIGO\s*DE\s*BARRAS[^0-9]*([0-9\s.]{40,160})/,
+    ];
+    for (const p of labeledBlockPatterns) {
+      const m = source.match(p);
+      const digits = (m?.[1]?.match(/\d/g) || []).join('');
+      if (digits.length === 47 || digits.length === 48) return digits;
+      if (digits.length > 48) return digits.slice(0, 48);
+      if (digits.length > 47) return digits.slice(0, 47);
     }
     const barcodeMatch = source.match(/\b([0-9]{47,48})\b/);
     if (barcodeMatch?.[1]) return barcodeMatch[1];
@@ -3294,6 +3310,7 @@ export default function App() {
     if (value.includes('AGENCIA') || value.includes('CÓDIGO') || value.includes('CODIGO') || value.includes('BENEFICI')) return true;
     if (value.includes('LOCAL DE PAGAMENTO') || value.includes('PAGAVEL') || value.includes('INSTRUCOES')) return true;
     if (value.includes('ESPECIE') || value.includes('CARTEIRA') || value.includes('USO DO BANCO')) return true;
+    if (value.includes('AVENIDA') || value.includes(' AV ') || value.includes('AV.') || value.includes('RUA') || value.includes('CEP')) return true;
     const onlyNumericLike = value.replace(/[^0-9]/g, '').length >= Math.max(8, value.length - 2);
     if (onlyNumericLike) return true;
     if ((value.match(/[A-Z]/g) || []).length < 3) return true;
@@ -3305,6 +3322,15 @@ export default function App() {
     const validDetected = shouldRejectSupplierName(cleanDetected) ? '' : cleanDetected;
     const normalizedDetected = normalizeSupplierName(validDetected);
     const normalizedSource = normalizeSupplierName(sourceText);
+
+    if (normalizedDetected.includes('ENERGISA') || normalizedSource.includes('ENERGISA')) {
+      const energisaMatch = suppliers
+        .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
+        .filter((x) => x.key.includes('ENERGISA'))
+        .sort((a, b) => b.key.length - a.key.length)[0];
+      if (energisaMatch) return energisaMatch.supplier.nome;
+      return 'ENERGISA';
+    }
 
     if (normalizedDetected.includes('EDITORA') || normalizedSource.includes('EDITORA')) {
       const editoraMatch = suppliers

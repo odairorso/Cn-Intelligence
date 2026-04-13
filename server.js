@@ -46,6 +46,65 @@ const parseDateToPg = (val) => {
   return null;
 };
 
+const normalizeBoletoNumber = (value) => {
+  if (value === null || value === undefined || value === '') return '';
+  const raw = String(value).toUpperCase();
+  if (!raw || raw === 'UNDEFINED' || raw === 'NULL') return '';
+  const tokens = raw
+    .split(/[\s:;|,]+/)
+    .map((token) => token.replace(/[^A-Z0-9]/g, ''))
+    .filter(Boolean);
+  const bestToken = tokens.find((token) => /\d{4,}/.test(token) && token.length >= 6 && token.length <= 30);
+  if (bestToken) return bestToken;
+  return raw.replace(/[^A-Z0-9]/g, '');
+};
+
+const extractLocalBoletoNumber = (text) => {
+  const source = String(text || '').toUpperCase();
+  const patterns = [
+    /NOSSO\s*N[UÚ]MERO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+    /N[UÚ]MERO\s*DO\s*DOCUMENTO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+    /N[ROº°]*\s*DOCUMENTO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+    /NR\.?\s*DOC\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+    /N[º°]?\s*DOC\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+    /DOCUMENTO\s*[:\s-]*([0-9]{6,20})/,
+    /COD(?:IGO)?\s*(?:DE)?\s*BARRAS\s*[:\s-]*([0-9]{47,48})/,
+    /C.{0,6}DIGO\s*(?:DE)?\s*BARRAS\s*[:\s-]*([0-9]{47,48})/,
+    /UTILIZE\s+O\s+C.{0,6}DIGO\s*[:\s-]*([A-Z0-9]{6,25})/,
+    /MATR.{0,6}CULA\s*[:\s-]*([0-9]{6,14}(?:[-/][0-9A-Z]{1,6}){1,8})/,
+    /NOTA\s+FISCAL\s+N[ROº°]*\s*[:\s-]*([0-9.]{6,25})/,
+    /([0-9]{11})\s+CADASTRE\s+SUA\s+FATURA/,
+  ];
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    if (match?.[1]) {
+      const normalized = normalizeBoletoNumber(match[1]);
+      if (normalized) return normalized;
+    }
+  }
+  const labeledBlockPatterns = [
+    /LINHA\s*DIGIT[AÁ]VEL[^0-9]*([0-9\s.]{40,160})/,
+    /C.{0,6}DIGO\s*DE\s*BARRAS[^0-9]*([0-9\s.]{40,160})/,
+  ];
+  for (const p of labeledBlockPatterns) {
+    const m = source.match(p);
+    const digits = (m?.[1]?.match(/\d/g) || []).join('');
+    if (digits.length === 47 || digits.length === 48) return digits;
+    if (digits.length > 48) return digits.slice(0, 48);
+    if (digits.length > 47) return digits.slice(0, 47);
+  }
+  const barcodeMatch = source.match(/\b([0-9]{47,48})\b/);
+  if (barcodeMatch?.[1]) return barcodeMatch[1];
+  return '';
+};
+
+const isAddressLike = (value) => {
+  const v = String(value || '').toUpperCase();
+  if (!v) return false;
+  if (v.includes(' AV ') || v.includes('AV.') || v.includes('AVENIDA') || v.includes('RUA') || v.includes('CEP')) return true;
+  return false;
+};
+
 // Banks API
 app.get('/api/banks', async (req, res) => {
   try {
@@ -421,6 +480,7 @@ Sua tarefa é extrair dados de boletos com MÁXIMA PRECISÃO.
 
 REGRAS CRÍTICAS:
 - fornecedor = quem RECEBE o dinheiro (beneficiário/cedente), NUNCA o banco emissor
+- NUNCA use um endereço como fornecedor (ex: "AV.", "AVENIDA", "RUA", "CEP") — isso é o endereço do fornecedor, não o nome
 - Bancos emissores (IGNORAR como fornecedor): Sicredi, Bradesco, Itaú, Santander, Caixa, BB, Cora, Inter, Nubank, C6, BTG, Safra, BV, Banrisul, Unicred, Ailos, Cresol
 - valor = número decimal com PONTO como separador decimal (ex: 632.86, não 63286)
 - Se o valor aparecer como "632,86" retorne 632.86
