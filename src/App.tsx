@@ -374,7 +374,7 @@ const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) 
               <Tooltip
                 contentStyle={{ backgroundColor: '#1a1f2e', border: '1px solid #ffffff15', borderRadius: '12px' }}
                 itemStyle={{ color: '#dee2f7', fontSize: '12px' }}
-                formatter={(v: number) => [v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), '']}
+                formatter={(v: number) => [v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }), '']}
               />
               <Bar dataKey="receitas" fill="#10b981" radius={[3,3,0,0]} />
               <Bar dataKey="despesas" fill="#ef4444" radius={[3,3,0,0]} opacity={0.8} />
@@ -753,7 +753,7 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
                 )}
                 <span className="font-semibold text-sm leading-tight flex-1">{tx.fornecedor}</span>
                 <span className={cn("font-bold text-sm whitespace-nowrap", tx.valor < 0 ? "text-tertiary" : "text-primary")}>
-                  {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-on-surface-variant mb-3">
@@ -842,9 +842,9 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
                   <td className="px-8 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
                   <td className="px-8 py-4 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold">{tx.banco || '-'}</td>
                   <td className={cn("px-8 py-4 font-bold", tx.valor < 0 ? "text-tertiary" : "text-primary")}>
-                    {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     {Number(tx.juros) > 0 && (
-                      <p className="text-[9px] text-tertiary font-normal">(inclui {Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} juros)</p>
+                      <p className="text-[9px] text-tertiary font-normal">(inclui {Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })} juros)</p>
                     )}
                   </td>
                   <td className="px-8 py-4">
@@ -1342,9 +1342,9 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
         <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${tx.empresa || '-'}</td>
         <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${tx.vencimento}</td>
         <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${tx.pagamento || '-'}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right">${Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right;font-weight:bold">${valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right">${Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
+        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right;font-weight:bold">${valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${tx.status}</td>
       </tr>`;
     }).join('');
@@ -1392,9 +1392,9 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
       ${rows}
       <tr class="total-row">
         <td colspan="6" style="padding:8px;border:1px solid #ccc;text-align:right">TOTAL GERAL</td>
-        <td style="padding:8px;border:1px solid #ccc;text-align:right">${filteredData.reduce((a,tx) => a + Number(tx.valor), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-        <td style="padding:8px;border:1px solid #ccc;text-align:right">${periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}</td>
-        <td style="padding:8px;border:1px solid #ccc;text-align:right;font-weight:bold">${periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+        <td style="padding:8px;border:1px solid #ccc;text-align:right">${filteredData.reduce((a,tx) => a + Number(tx.valor), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="padding:8px;border:1px solid #ccc;text-align:right">${periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
+        <td style="padding:8px;border:1px solid #ccc;text-align:right;font-weight:bold">${periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         <td style="padding:8px;border:1px solid #ccc;text-align:center">${periodTotals.count} itens</td>
       </tr>
     </tbody>
@@ -1484,7 +1484,7 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
             {selectedTipo === 'RECEITA' ? 'Receitas' : selectedTipo === 'DESPESA' ? 'Despesas' : 'Total'} no Período
           </p>
           <p className="text-xl font-bold text-primary">
-            {periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            {periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <p className="text-[11px] text-on-surface-variant mt-1">{periodTotals.count} lançamentos</p>
         </div>
@@ -1512,7 +1512,7 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
                 <div className="flex justify-between items-start gap-2">
                   <span className="font-semibold text-sm flex-1 leading-tight">{tx.fornecedor}</span>
                   <span className="font-bold text-sm whitespace-nowrap">
-                    {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-on-surface-variant">
@@ -1563,10 +1563,10 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
                     <td className="px-8 py-4">{tx.empresa}</td>
                     <td className="px-8 py-4">{tx.vencimento}</td>
                     <td className="px-8 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
-                    <td className="px-8 py-4 text-right">{Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                    <td className="px-8 py-4 text-right text-tertiary text-xs">{Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}</td>
+                    <td className="px-8 py-4 text-right">{Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-8 py-4 text-right text-tertiary text-xs">{Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
                     <td className="px-8 py-4 text-right font-bold text-primary">
-                      {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="px-8 py-4">
                       <span className={cn(
@@ -1586,9 +1586,9 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
               <tfoot>
                 <tr className="border-t-2 border-white/20 font-bold">
                   <td colSpan={6} className="px-8 py-4 text-right text-on-surface-variant uppercase text-xs tracking-widest">Total Geral</td>
-                  <td className="px-8 py-4 text-right">{filteredData.reduce((a,tx) => a + Number(tx.valor), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                  <td className="px-8 py-4 text-right text-tertiary">{periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}</td>
-                  <td className="px-8 py-4 text-right text-primary text-lg">{periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                  <td className="px-8 py-4 text-right">{filteredData.reduce((a,tx) => a + Number(tx.valor), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-8 py-4 text-right text-tertiary">{periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
+                  <td className="px-8 py-4 text-right text-primary text-lg">{periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="px-8 py-4 text-xs text-on-surface-variant">{periodTotals.count} itens</td>
                 </tr>
               </tfoot>
@@ -1738,7 +1738,7 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
         <div className="text-right">
           <p className="text-[10px] font-bold text-on-surface-variant uppercase">Receitas no Período</p>
           <p className="text-xl font-bold text-primary">
-            {totalReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            {totalReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <p className="text-[11px] text-on-surface-variant mt-1">{filteredData.length} lançamentos de receita</p>
         </div>
@@ -1761,7 +1761,7 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
               <Tooltip
                 contentStyle={{ backgroundColor: '#161b2a', border: 'none', borderRadius: '8px' }}
                 itemStyle={{ color: '#dee2f7' }}
-                formatter={(value: number) => [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Receita']}
+                formatter={(value: number) => [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'Receita']}
               />
               <Area type="monotone" dataKey="value" stroke="#10b981" fill="#10b98120" strokeWidth={3} />
             </AreaChart>
@@ -1784,7 +1784,7 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
               <Tooltip
                 contentStyle={{ backgroundColor: '#161b2a', border: 'none', borderRadius: '8px' }}
                 itemStyle={{ color: '#dee2f7' }}
-                formatter={(value: number) => [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), 'Receita']}
+                formatter={(value: number) => [value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'Receita']}
               />
               <Bar dataKey="value" fill="#10b981" radius={[2, 2, 0, 0]} />
             </BarChart>
@@ -1828,7 +1828,7 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
                     <td className="px-8 py-4">{tx.vencimento}</td>
                     <td className="px-8 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
                     <td className="px-8 py-4 font-bold text-primary">
-                      {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                   </tr>
                 ))
@@ -1913,20 +1913,20 @@ const BancosTab = ({ banks, transactions, setShowNewBankModal, setEditingBank, d
               <div className="flex justify-between items-center">
                 <span className="text-xs text-on-surface-variant">Saldo Inicial</span>
                 <span className="text-sm font-bold" style={{ color: Number(bank.saldo) < 0 ? '#ef4444' : undefined }}>
-                  {Number(bank.saldo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {Number(bank.saldo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-xs text-on-surface-variant">Total Pago</span>
                 <span className="text-sm font-bold text-tertiary" style={{ color: (bankTotals[bank.nome] || 0) < 0 ? '#ef4444' : undefined }}>
-                  {bankTotals[bank.nome]?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || 'R$ 0,00'}
+                  {bankTotals[bank.nome]?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 'R$ 0,00'}
                 </span>
               </div>
               <div className="pt-2 border-t border-white/5">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-primary">Saldo Atual</span>
                   <span className="text-lg font-black" style={{ color: (Number(bank.saldo) - (bankTotals[bank.nome] || 0)) < 0 ? '#ef4444' : '#3b82f6' }}>
-                    {(Number(bank.saldo) - (bankTotals[bank.nome] || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {(Number(bank.saldo) - (bankTotals[bank.nome] || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -2201,7 +2201,7 @@ const SelectBankModal = ({ transactionId, valor, banks, onClose, onConfirm }: Se
       >
         <h3 className="text-xl font-bold font-headline mb-2">Confirmar Pagamento</h3>
         <p className="text-sm text-on-surface-variant mb-6">
-          Selecione o banco para registrar o pagamento de <span className="font-bold text-primary">{valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+          Selecione o banco para registrar o pagamento de <span className="font-bold text-primary">{valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </p>
         
         <div className="space-y-3 mb-6">
@@ -2931,15 +2931,15 @@ const SupplierDetailModal = ({ supplier, transactions, onClose }: { supplier: Su
         <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-white/5">
           <div className="p-6 bg-surface/40">
             <p className="text-[10px] font-black uppercase text-on-surface-variant/40 tracking-widest mb-1">Total Movimentado</p>
-            <p className="text-xl font-black font-headline">{kpis.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            <p className="text-xl font-black font-headline">{kpis.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="p-6 bg-surface/40">
             <p className="text-[10px] font-black uppercase text-primary/60 tracking-widest mb-1">Total Liquidado</p>
-            <p className="text-xl font-black font-headline text-primary">{kpis.pago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            <p className="text-xl font-black font-headline text-primary">{kpis.pago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="p-6 bg-surface/40">
             <p className="text-[10px] font-black uppercase text-secondary/60 tracking-widest mb-1">Saldo em Aberto</p>
-            <p className="text-xl font-black font-headline text-secondary">{kpis.aberto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            <p className="text-xl font-black font-headline text-secondary">{kpis.aberto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
         </div>
 
@@ -2958,7 +2958,7 @@ const SupplierDetailModal = ({ supplier, transactions, onClose }: { supplier: Su
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
-                  <span className={cn("text-sm font-black font-headline", tx.valor < 0 ? "text-tertiary" : "text-primary")}>{tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  <span className={cn("text-sm font-black font-headline", tx.valor < 0 ? "text-tertiary" : "text-primary")}>{tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   <span className={cn(
                     "text-[9px] font-black px-2 py-0.5 rounded-sm border uppercase tracking-widest",
                     tx.status === 'PAGO' ? "bg-primary/20 text-primary border-primary/30" : "bg-secondary/20 text-secondary border-secondary/30"
@@ -4106,7 +4106,7 @@ export default function App() {
       empresasSet.add(tx.empresa);
     }
     const kpis: KPI[] = [
-      { label: 'VALOR TOTAL', value: total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), color: '#3b82f6' },
+      { label: 'VALOR TOTAL', value: total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }), color: '#3b82f6' },
       { label: 'REGISTROS', value: transactions.length.toString(), description: 'Volume operacional', color: '#3b82f6' },
       { label: 'EMPRESAS', value: empresasSet.size.toString(), description: 'Unidades ativas', color: '#3b82f6' },
       { label: 'PENDENTES', value: pendentes.toString(), description: 'Aguardando conciliação', color: '#f59e0b' },

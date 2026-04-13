@@ -153,7 +153,7 @@ function parseOFX(raw: string): OFXTransaction[] {
 // ---------------------------------------------------------------------------
 
 const fmt = (v: number) =>
-  Math.abs(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  Math.abs(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const EMPRESAS = ['CN', 'FACEMS', 'LAB', 'CEI', 'UNOPAR'];
 
