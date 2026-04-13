@@ -948,16 +948,17 @@ async function handleExtractBoleto(req, res) {
       /BENEFICI[AÁ]RIO[:\s]+([\w\u00C0-\u017E\s.&/,-]{3,60})(?:\s+CNPJ|\s+AG[EÊ]|\s+\d{2}\/)/i,
       /CEDENTE[:\s]+([\w\u00C0-\u017E\s.&/,-]{3,60})(?:\s+CNPJ|\s+CPF)/i,
       /SACADOR[^:]*:[:\s]+([\w\u00C0-\u017E\s.&/,-]{3,60})(?:\s+-\s+CNPJ|\s+CNPJ)/i,
-      // Padrão: Nome seguido diretamente de CNPJ (ex: "Seguranca Eletronica Naviral Ltda - Me  18.717.282/0001-08")
+      // Nome seguido de CNPJ: "Empresa Ltda  18.717.282/0001-08"
       /([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,60})\s+\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/i,
+      // CNPJ seguido de nome: "CNPJ 15.413.826/0001-50  ENERGISA MATO GROSSO DO SUL"
+      /CNPJ[\s:]+\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}[\s\-]+([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,80}?)(?:\s+DOM\.|\s+INSC\.|\s+AV\.|\s+RUA|\s*$)/i,
     ];
     let rawBenefName = '';
     for (const p of benefPatterns) {
       const m = srcUpper.match(p);
       if (m?.[1]) {
         const candidate = m[1].trim().replace(/\s+/g, ' ');
-        // Rejeitar se for banco, pagador conhecido, label de campo ou muito curto
-        const rejectWords = ['BRADESCO','ITAU','SANTANDER','CAIXA','SICREDI','BANCO','PAGADOR','SACADO','RECIBO','AGENCIA','CODIGO','BENEFICI','ESPECIE','CARTEIRA','INSTRUCOES','LOCAL DE'];
+        const rejectWords = ['BRADESCO','ITAU','SANTANDER','CAIXA','SICREDI','BANCO','PAGADOR','SACADO','RECIBO','AGENCIA','CODIGO','BENEFICI','ESPECIE','CARTEIRA','INSTRUCOES','LOCAL DE','INSC','DOM.'];
         if (candidate.length >= 5 && !rejectWords.some(w => candidate.toUpperCase().includes(w))) {
           rawBenefName = candidate;
           break;
