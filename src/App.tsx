@@ -121,6 +121,31 @@ interface DashboardTabProps {
 
 const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) => {
   const [empresaFilter, setEmpresaFilter] = useState('TODOS');
+  const [periodoFilter, setPeriodoFilter] = useState('TODOS');
+
+  const anos = useMemo(() => {
+    const set = new Set<number>();
+    transactions.forEach((tx) => {
+      const parts = String(tx.vencimento || '').split('/');
+      if (parts.length === 3) {
+        const y = Number(parts[2]);
+        if (Number.isFinite(y) && y >= 1990 && y <= 2100) set.add(y);
+      }
+    });
+    return Array.from(set).sort((a, b) => a - b);
+  }, [transactions]);
+
+  useEffect(() => {
+    if (periodoFilter !== 'TODOS') return;
+    if (anos.includes(2024) && anos.includes(2025)) setPeriodoFilter('2024-2025');
+  }, [anos, periodoFilter]);
+
+  const periodos = useMemo(() => {
+    const list = ['TODOS'];
+    if (anos.includes(2024) && anos.includes(2025)) list.push('2024-2025');
+    anos.forEach((y) => list.push(String(y)));
+    return list;
+  }, [anos]);
 
   // Empresas normalizadas — agrupa CN/Cn/cn → CN, FACEMS/Facems → FACEMS etc.
   const empresas = useMemo(() => {
@@ -142,12 +167,21 @@ const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) 
 
   // Filtra usando a chave normalizada para pegar todas as variações
   const filteredTx = useMemo(() => {
-    if (empresaFilter === 'TODOS') return transactions;
+    const byPeriodo = transactions.filter((tx) => {
+      if (periodoFilter === 'TODOS') return true;
+      const parts = String(tx.vencimento || '').split('/');
+      if (parts.length !== 3) return false;
+      const y = Number(parts[2]);
+      if (!Number.isFinite(y)) return false;
+      if (periodoFilter === '2024-2025') return y === 2024 || y === 2025;
+      return String(y) === periodoFilter;
+    });
+    if (empresaFilter === 'TODOS') return byPeriodo;
     const key = empresaFilter.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return transactions.filter(tx =>
+    return byPeriodo.filter(tx =>
       (tx.empresa || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === key
     );
-  }, [transactions, empresaFilter]);
+  }, [transactions, empresaFilter, periodoFilter]);
 
   const statusChartData = [
     { name: 'Pagos', value: stats.pagos, color: '#10b981' },
@@ -217,6 +251,23 @@ const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) 
     <div className="space-y-6">
 
       {/* Filtro por empresa */}
+      <div className="flex flex-wrap items-center gap-2">
+        {periodos.map((p) => (
+          <button
+            key={p}
+            onClick={() => setPeriodoFilter(p)}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+              periodoFilter === p
+                ? "bg-primary text-background border-primary"
+                : "bg-white/5 text-on-surface-variant border-white/10 hover:border-primary/40 hover:text-on-surface"
+            )}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         {empresas.map(emp => (
           <button
