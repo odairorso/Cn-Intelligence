@@ -610,6 +610,15 @@ Analise visualmente o PDF anexo e extraia os dados.`;
       }
     }
 
+    const localNumero = extractLocalBoletoNumber(extractedText);
+    const finalNumero = normalizeBoletoNumber(extracted.numero_boleto || '') || localNumero;
+    if (finalNumero) extracted.numero_boleto = finalNumero;
+
+    const srcUpper = String(extractedText || '').toUpperCase();
+    if ((isAddressLike(extracted.fornecedor) || !extracted.fornecedor) && srcUpper.includes('ENERGISA')) {
+      extracted.fornecedor = 'ENERGISA';
+    }
+
     res.json(extracted);
   } catch (error) {
     console.error('[boleto] Error extracting boleto data:', error.message);

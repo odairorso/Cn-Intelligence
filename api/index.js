@@ -15,6 +15,13 @@ const normalizeBoletoNumber = (value) => {
   return raw.replace(/[^A-Z0-9]/g, '');
 };
 
+const isAddressLike = (value) => {
+  const v = String(value || '').toUpperCase();
+  if (!v) return false;
+  if (v.includes(' AV ') || v.includes('AV.') || v.includes('AVENIDA') || v.includes('RUA') || v.includes('CEP')) return true;
+  return false;
+};
+
 const extractLocalBoletoNumber = (text) => {
   const source = String(text || '').toUpperCase();
   const patterns = [
@@ -1200,6 +1207,10 @@ Responda APENAS com JSON válido:
         let name = fileName.replace(/\.pdf$/i, '').replace(/^(BOL|BOLETO|MAT)\s*/i, '').trim();
         extracted.fornecedor = name;
       }
+    }
+
+    if ((isAddressLike(extracted.fornecedor) || !extracted.fornecedor) && srcUpper.includes('ENERGISA')) {
+      extracted.fornecedor = 'ENERGISA';
     }
 
     const localNumero = extractLocalBoletoNumber(extractedText);
