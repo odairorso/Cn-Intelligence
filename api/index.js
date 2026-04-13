@@ -15,6 +15,45 @@ const normalizeBoletoNumber = (value) => {
   return raw.replace(/[^A-Z0-9]/g, '');
 };
 
+const extractLocalBoletoNumber = (text) => {
+  const source = String(text || '').toUpperCase();
+  const patterns = [
+    /NOSSO\s*N[UÚ]MERO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+    /N[UÚ]MERO\s*DO\s*DOCUMENTO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+    /N[ROº°]*\s*DOCUMENTO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+    /NR\.?\s*DOC\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+    /N[º°]?\s*DOC\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+    /DOCUMENTO\s*[:\s-]*([0-9]{6,20})/,
+    /COD(?:IGO)?\s*(?:DE)?\s*BARRAS\s*[:\s-]*([0-9]{47,48})/,
+    /C.{0,6}DIGO\s*(?:DE)?\s*BARRAS\s*[:\s-]*([0-9]{47,48})/,
+    /UTILIZE\s+O\s+C.{0,6}DIGO\s*[:\s-]*([A-Z0-9]{6,25})/,
+    /MATR.{0,6}CULA\s*[:\s-]*([0-9]{6,14}(?:[-/][0-9A-Z]{1,6}){1,8})/,
+    /NOTA\s+FISCAL\s+N[ROº°]*\s*[:\s-]*([0-9.]{6,25})/,
+    /([0-9]{11})\s+CADASTRE\s+SUA\s+FATURA/,
+  ];
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    if (match?.[1]) {
+      const normalized = normalizeBoletoNumber(match[1]);
+      if (normalized) return normalized;
+    }
+  }
+  const labeledBlockPatterns = [
+    /LINHA\s*DIGIT[AÁ]VEL[^0-9]*([0-9\s.]{40,160})/,
+    /C.{0,6}DIGO\s*DE\s*BARRAS[^0-9]*([0-9\s.]{40,160})/,
+  ];
+  for (const p of labeledBlockPatterns) {
+    const m = source.match(p);
+    const digits = (m?.[1]?.match(/\d/g) || []).join('');
+    if (digits.length === 47 || digits.length === 48) return digits;
+    if (digits.length > 48) return digits.slice(0, 48);
+    if (digits.length > 47) return digits.slice(0, 47);
+  }
+  const barcodeMatch = source.match(/\b([0-9]{47,48})\b/);
+  if (barcodeMatch?.[1]) return barcodeMatch[1];
+  return '';
+};
+
 const normSupplier = (s) => String(s || '')
   .normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '')
@@ -956,7 +995,7 @@ async function handleExtractBoleto(req, res) {
       const m = srcUpper.match(p);
       if (m?.[1]) {
         const candidate = m[1].trim().replace(/\s+/g, ' ');
-        const rejectWords = ['BRADESCO','ITAU','SANTANDER','CAIXA','SICREDI','BANCO','PAGADOR','SACADO','RECIBO','AGENCIA','CODIGO','BENEFICI','ESPECIE','CARTEIRA','INSTRUCOES','LOCAL DE','INSC','DOM.'];
+        const rejectWords = ['BRADESCO','ITAU','SANTANDER','CAIXA','SICREDI','BANCO','PAGADOR','SACADO','RECIBO','AGENCIA','CODIGO','BENEFICI','ESPECIE','CARTEIRA','INSTRUCOES','LOCAL DE','INSC','DOM.', 'AV.', 'AVENIDA', 'RUA', 'CEP '];
         if (candidate.length >= 5 && !rejectWords.some(w => candidate.toUpperCase().includes(w))) {
           rawBenefName = candidate;
           break;
@@ -987,8 +1026,6 @@ async function handleExtractBoleto(req, res) {
       // Tenta extrair localmente primeiro
       const dateMatch = srcUpper.match(/VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/);
       const valorMatch = srcUpper.match(/\(=\)\s*VALOR[^0-9]*([\d.,]+)|VALOR\s*DO\s*DOCUMENTO[:\s]+([\d.,]+)/);
-      const nossoNumMatch = srcUpper.match(/NOSSO\s*N[UÚ]MERO[:\s-]*([A-Z0-9]{6,40})/);
-      const nroDocMatch = srcUpper.match(/N[UÚ]MERO\s*DO\s*DOCUMENTO[:\s-]*([A-Z0-9]{6,40})/);
 
       const parseV = (s) => {
         if (!s) return 0;
@@ -1002,7 +1039,7 @@ async function handleExtractBoleto(req, res) {
 
       const vencimento = dateMatch?.[1] || '';
       const valor = parseV(valorMatch?.[1] || valorMatch?.[2] || '');
-      const numero_boleto = (nossoNumMatch?.[1] || nroDocMatch?.[1] || '').replace(/[^A-Z0-9]/g,'');
+      const numero_boleto = extractLocalBoletoNumber(srcUpper);
 
       // Extrai nome do Pagador do texto para usar como descrição (aceita acentos e caracteres especiais)
       const pagadorRawMatch = srcUpper.match(/PAGADOR\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
@@ -1032,7 +1069,7 @@ Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
           vencimento: mini.vencimento || vencimento,
           valor: mini.valor || valor,
           cnpj: rawCnpj || '',
-          descricao: pagadorDescricao || pattern.descricao || '',
+          descricao: `${fileName} - ${pagadorDescricao || pattern.descricao || ''}`.replace(/ - $/, ''),
           empresa: pattern.empresa || '',
           tipo: pattern.tipo || 'DESPESA',
           conta_contabil_id: pattern.conta_contabil_id || null,
@@ -1046,7 +1083,7 @@ Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
         vencimento,
         valor,
         cnpj: rawCnpj || '',
-        descricao: pagadorDescricao || pattern.descricao || '',
+        descricao: `${fileName} - ${pagadorDescricao || pattern.descricao || ''}`.replace(/ - $/, ''),
         empresa: pattern.empresa || '',
         tipo: pattern.tipo || 'DESPESA',
         conta_contabil_id: pattern.conta_contabil_id || null,
@@ -1069,13 +1106,14 @@ CAMPOS:
 1. fornecedor: Nome do beneficiário/cedente que emitiu o boleto — quem VAI RECEBER o dinheiro
    Procure por: "Beneficiário", "Cedente", "Sacador/Avalista", "Razão Social"
    ATENÇÃO: O campo "Pagador" ou "Sacado" é quem PAGA — NUNCA use como fornecedor
+   ATENÇÃO 2: NUNCA use um endereço como fornecedor (ex: se encontrar "AV. GURY MARQUES", "RUA...", "CEP", isso é o endereço do fornecedor, o nome dele vem antes).
    Se o beneficiário for uma pessoa física (ex: "Valmir Lopes de Souza"), use o nome dela
-   Exemplos corretos: HAPVIDA, SANESUL, ENERGISA, VSC CONTABILIDADE, Valmir Lopes de Souza
+   Exemplos corretos: HAPVIDA, SANESUL, ENERGISA, VSC CONTABILIDADE, Anhanguera Educacional Ltda
 2. vencimento: Data de vencimento no formato DD/MM/AAAA
 3. valor: Valor TOTAL em reais com ponto decimal (ex: 632.86)
    Procure por: "(=) Valor do Documento", "Valor do Documento", "Valor Cobrado"
 4. cnpj: CNPJ do beneficiário
-5. descricao: APENAS o nome completo do Pagador/Sacado (a pessoa ou empresa que está PAGANDO o boleto). Procure pelo campo "Pagador" ou "Sacado" no boleto. Exemplo: "ELAINE APARECIDA DA SILVA", "JAQUELINE DE AQUINO MAFRA". NÃO inclua o nome do arquivo, NÃO inclua tipo de serviço, NÃO inclua nada além do nome do pagador.
+5. descricao: DEVE OBRIGATORIAMENTE conter o nome do arquivo original e o nome completo do Pagador/Sacado (aluno). O formato DEVE SER: "[Nome do arquivo original] - [Nome do Pagador/Sacado]". Exemplo: "boleto_mensalidade.pdf - JOAO SILVA". NÃO escreva apenas o nome do aluno, sempre junte com o nome do arquivo fornecido.
 6. empresa: Empresa do Grupo CN que é o PAGADOR (campo "Pagador" ou "Sacado" no boleto)
    - Se "ANHANGUERA" ou "CENTRO EDUCACIONAL DE ITAQUIRAI" aparecer como pagador → "FACEMS"
    - Se "COLEGIO NAVIRAI" ou "COLEGIO NAVIRA" aparecer como pagador → "CN"
@@ -1163,6 +1201,10 @@ Responda APENAS com JSON válido:
         extracted.fornecedor = name;
       }
     }
+
+    const localNumero = extractLocalBoletoNumber(extractedText);
+    const finalNumero = normalizeBoletoNumber(extracted.numero_boleto || '') || localNumero;
+    if (finalNumero) extracted.numero_boleto = finalNumero;
 
     res.status(200).json(extracted);
   } catch (error) {
