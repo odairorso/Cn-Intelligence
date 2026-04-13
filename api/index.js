@@ -950,8 +950,6 @@ async function handleExtractBoleto(req, res) {
       /SACADOR[^:]*:[:\s]+([\w\u00C0-\u017E\s.&/,-]{3,60})(?:\s+-\s+CNPJ|\s+CNPJ)/i,
       // Nome seguido de CNPJ: "Empresa Ltda  18.717.282/0001-08"
       /([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,60})\s+\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/i,
-      // CNPJ seguido de nome: "CNPJ 15.413.826/0001-50  ENERGISA MATO GROSSO DO SUL"
-      /CNPJ[\s:]+\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}[\s\-]+([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,80}?)(?:\s+DOM\.|\s+INSC\.|\s+AV\.|\s+RUA|\s*$)/i,
     ];
     let rawBenefName = '';
     for (const p of benefPatterns) {
