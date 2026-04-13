@@ -3345,8 +3345,6 @@ export default function App() {
       /SACADO[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
       // Nome seguido de CNPJ
       /([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,60})\s+\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/i,
-      // CNPJ seguido de nome (ex: Energisa)
-      /CNPJ[\s:]+\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}[\s\-]+([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,80}?)(?:\s+DOM\.|\s+INSC\.|\s+AV\.|\s+RUA|\s*$)/i,
     ];
 
     for (const pattern of fornecedorPatterns) {
