@@ -3413,6 +3413,8 @@ export default function App() {
     let vencimento = '';
     let valor = 0;
 
+    const sanitizeBoletoValor = (v: number) => (Number.isFinite(v) && v > 0 && v <= 5000000 ? v : 0);
+
     const fornecedorPatterns = [
       /BENEFICI[AÁ]RIO[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
       /CEDENTE[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
@@ -3483,14 +3485,14 @@ export default function App() {
         } else {
           parsed = Number(raw.replace(/[^0-9.]/g, ''));
         }
-        if (!Number.isNaN(parsed) && parsed > 0) { valor = parsed; break; }
+        if (!Number.isNaN(parsed) && parsed > 0) { valor = sanitizeBoletoValor(parsed); break; }
       }
     }
 
     const linhaInfo = parseLinhaDigitavel(normalizedText);
     if (linhaInfo) {
       if (!vencimento) vencimento = linhaInfo.vencimento;
-      if (!valor && linhaInfo.valor > 0) valor = linhaInfo.valor;
+      if (!valor && linhaInfo.valor > 0) valor = sanitizeBoletoValor(linhaInfo.valor);
     }
 
     const numeroBoleto = extractLocalBoletoNumber(normalizedText);
@@ -3504,7 +3506,7 @@ export default function App() {
       fileName,
       fornecedor,
       vencimento,
-      valor,
+      valor: sanitizeBoletoValor(valor),
       descricao: pagadorNome || '',
       empresa: '',
       cnpj: '',
@@ -3516,7 +3518,13 @@ export default function App() {
   };
 
   const extractBoletoWithGemini = async (text: string, fileName: string, pdfBase64?: string): Promise<PdfImportDraft> => {
+    const sanitizeBoletoValor = (v: any) => {
+      const n = typeof v === 'number' ? v : Number(v);
+      return Number.isFinite(n) && n > 0 && n <= 5000000 ? n : 0;
+    };
+
     try {
+
       // Se tem texto suficiente, não manda o base64 — reduz payload em ~10x
       const hasGoodText = text.trim().length > 100;
       const payload = hasGoodText
@@ -3542,7 +3550,7 @@ export default function App() {
           fileName,
           fornecedor: data.fornecedor || 'Fornecedor não identificado',
           vencimento: data.vencimento || '',
-          valor: typeof data.valor === 'number' ? data.valor : 0,
+          valor: sanitizeBoletoValor(data.valor),
           descricao,
           empresa: data.empresa || '',
           cnpj: data.cnpj || '',
@@ -3560,11 +3568,11 @@ export default function App() {
         const nameFromFile = fileName.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ').trim();
         fallback.fornecedor = nameFromFile || 'Fornecedor não identificado';
       }
-      return { ...fallback, empresa: data.empresa || '', cnpj: data.cnpj || '', numero_boleto: data.numero_boleto || fallback.numero_boleto || '', tipo: 'DESPESA' };
+      return { ...fallback, valor: sanitizeBoletoValor((fallback as any).valor), empresa: data.empresa || '', cnpj: data.cnpj || '', numero_boleto: data.numero_boleto || fallback.numero_boleto || '', tipo: 'DESPESA' };
     } catch (err) {
       console.error('[boleto] API error, using local fallback:', err);
       const fallback = extractBoletoData(text, fileName);
-      return { ...fallback, empresa: '', cnpj: '', numero_boleto: '', tipo: 'DESPESA' };
+      return { ...fallback, valor: sanitizeBoletoValor((fallback as any).valor), empresa: '', cnpj: '', numero_boleto: '', tipo: 'DESPESA' };
     }
   };
 
