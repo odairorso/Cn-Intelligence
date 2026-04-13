@@ -3636,9 +3636,29 @@ export default function App() {
             });
           }
 
-          const data = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
-          data.fornecedor = resolveSupplierName(data.fornecedor, fullText);
-          return data;
+          const local = extractBoletoData(fullText, file.name);
+          local.fornecedor = resolveSupplierName(local.fornecedor, fullText);
+
+          const hasLocalCore = !!local.vencimento && local.valor > 0 && local.fornecedor !== 'Fornecedor não identificado';
+          if (hasLocalCore) return local;
+
+          const ai = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
+          ai.fornecedor = resolveSupplierName(ai.fornecedor, fullText);
+
+          const fornecedor = (!shouldRejectSupplierName(ai.fornecedor) && ai.fornecedor) ? ai.fornecedor : local.fornecedor;
+          const vencimento = local.vencimento || ai.vencimento;
+          const valor = local.valor > 0 ? local.valor : ai.valor;
+          const numero_boleto = normalizeBoletoNumber(ai.numero_boleto || '') || normalizeBoletoNumber(local.numero_boleto || '') || '';
+          const descricao = ai.descricao || local.descricao;
+
+          return {
+            ...ai,
+            fornecedor,
+            vencimento,
+            valor,
+            numero_boleto,
+            descricao,
+          };
         })
       );
 
