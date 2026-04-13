@@ -4921,7 +4921,11 @@ export default function App() {
                           type="number"
                           step="0.01"
                           value={row.valor}
-                          onChange={(e) => updatePdfRow(index, { valor: Number(e.target.value) })}
+                          onChange={(e) => {
+                            const raw = String(e.target.value || '').replace(',', '.');
+                            const n = Number(raw);
+                            updatePdfRow(index, { valor: Number.isFinite(n) ? n : 0 });
+                          }}
                           className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>

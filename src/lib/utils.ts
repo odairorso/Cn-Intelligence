@@ -139,4 +139,4 @@ export const matchesAccountType = (acc: ContaContabil, tipo: 'RECEITA' | 'DESPES
 
 // ─── Currency formatter ───────────────────────────────────────────────────────
 export const formatBRL = (value: number): string =>
-  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 });
