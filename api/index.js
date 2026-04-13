@@ -956,8 +956,8 @@ async function handleExtractBoleto(req, res) {
       const m = srcUpper.match(p);
       if (m?.[1]) {
         const candidate = m[1].trim().replace(/\s+/g, ' ');
-        // Rejeitar se for banco, pagador conhecido ou muito curto
-        const rejectWords = ['BRADESCO','ITAU','SANTANDER','CAIXA','SICREDI','BANCO','PAGADOR','SACADO','RECIBO'];
+        // Rejeitar se for banco, pagador conhecido, label de campo ou muito curto
+        const rejectWords = ['BRADESCO','ITAU','SANTANDER','CAIXA','SICREDI','BANCO','PAGADOR','SACADO','RECIBO','AGENCIA','CODIGO','BENEFICI','ESPECIE','CARTEIRA','INSTRUCOES','LOCAL DE'];
         if (candidate.length >= 5 && !rejectWords.some(w => candidate.toUpperCase().includes(w))) {
           rawBenefName = candidate;
           break;

@@ -3289,8 +3289,11 @@ export default function App() {
 
   const shouldRejectSupplierName = (name: string) => {
     const value = String(name || '').trim().toUpperCase();
-    if (!value) return true;
+    if (!value || value.length < 4) return true;
     if (value.includes('DATA DO DOCUMENTO') || value.includes('VENCIMENTO') || value.includes('NOSSO NUMERO')) return true;
+    if (value.includes('AGENCIA') || value.includes('CÓDIGO') || value.includes('CODIGO') || value.includes('BENEFICI')) return true;
+    if (value.includes('LOCAL DE PAGAMENTO') || value.includes('PAGAVEL') || value.includes('INSTRUCOES')) return true;
+    if (value.includes('ESPECIE') || value.includes('CARTEIRA') || value.includes('USO DO BANCO')) return true;
     const onlyNumericLike = value.replace(/[^0-9]/g, '').length >= Math.max(8, value.length - 2);
     if (onlyNumericLike) return true;
     if ((value.match(/[A-Z]/g) || []).length < 3) return true;
@@ -3358,6 +3361,11 @@ export default function App() {
         .filter((x) => x.score > 0)
         .sort((a, b) => b.score - a.score)[0];
       if (bestSupplier) fornecedor = bestSupplier.supplier.nome;
+    }
+
+    // Último recurso: usa o nome do arquivo
+    if (fornecedor === 'Fornecedor não identificado') {
+      fornecedor = fileName.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ').trim();
     }
 
     const datePatterns = [
