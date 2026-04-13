@@ -43,7 +43,7 @@ export function AnimatedNumber({ value, format = 'number', duration = 1200, clas
   }, [value, duration]);
 
   const formatted = format === 'currency'
-    ? display.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+    ? display.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2, minimumFractionDigits: 2 })
     : Math.round(display).toLocaleString('pt-BR');
 
   return <span className={className}>{formatted}</span>;
