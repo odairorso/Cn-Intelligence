@@ -119,7 +119,7 @@ interface DashboardTabProps {
   onMarkAsPaid: (tx: Transaction) => void;
 }
 
-const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) => {
+const DashboardTabOld = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) => {
   const [empresaFilter, setEmpresaFilter] = useState('TODOS');
   const [periodoFilter, setPeriodoFilter] = useState('TODOS');
 
@@ -532,6 +532,35 @@ const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) 
           )}
         </motion.div>
       </div>
+    </div>
+  );
+};
+
+const DashboardTab = ({ transactions }: DashboardTabProps) => {
+  const total = useMemo(() => {
+    return transactions
+      .filter((tx) => {
+        const parts = String(tx.vencimento || '').split('/');
+        if (parts.length !== 3) return false;
+        const y = Number(parts[2]);
+        return y === 2024 || y === 2025;
+      })
+      .reduce((acc, tx) => acc + (Number(tx.valor) || 0), 0);
+  }, [transactions]);
+
+  return (
+    <div className="space-y-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="glass-card p-6"
+      >
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/60 mb-2">VALOR TOTAL (2024-2025)</p>
+        <h3 className="text-2xl xl:text-4xl font-black font-headline text-on-surface">
+          <AnimatedNumber value={total} format="currency" duration={900} />
+        </h3>
+      </motion.div>
     </div>
   );
 };
@@ -4920,7 +4949,7 @@ export default function App() {
                         <input
                           type="number"
                           step="0.01"
-                          value={row.valor}
+                          value={Number.isFinite(row.valor) ? row.valor.toFixed(2) : ''}
                           onChange={(e) => {
                             const raw = String(e.target.value || '').replace(',', '.');
                             const n = Number(raw);
