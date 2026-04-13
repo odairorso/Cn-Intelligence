@@ -4786,9 +4786,10 @@ export default function App() {
                         <input
                           value={row.fornecedor}
                           onChange={(e) => updatePdfRow(index, { fornecedor: e.target.value })}
-                          onFocus={(e) => e.target.select()}
                           placeholder="Digite o fornecedor..."
-                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary cursor-text"
+                          autoComplete="off"
+                          spellCheck={false}
                         />
                       </div>
                       <div className="md:col-span-2">
