@@ -3340,12 +3340,15 @@ export default function App() {
   };
 
   const parseLinhaDigitavel = (text: string) => {
-    const digits = (text.match(/\d/g) || []).join('');
-    if (digits.length < 47) return null;
-    const line = digits.slice(0, 47);
+    const src = String(text || '');
+    const candidates = src.match(/\b\d{47,48}\b/g) || [];
+    if (!candidates.length) return null;
+    const raw = candidates[0];
+    const line = raw.length >= 47 ? raw.slice(0, 47) : raw;
     const fator = Number(line.slice(5, 9));
     const valor = Number(line.slice(9, 19)) / 100;
     if (!Number.isFinite(fator)) return null;
+    if (!Number.isFinite(valor) || valor <= 0 || valor > 500000) return null;
     const base = new Date(Date.UTC(1997, 9, 7));
     const dueDate = new Date(base.getTime() + fator * 24 * 60 * 60 * 1000);
     const dd = String(dueDate.getUTCDate()).padStart(2, '0');
@@ -3413,7 +3416,7 @@ export default function App() {
     let vencimento = '';
     let valor = 0;
 
-    const sanitizeBoletoValor = (v: number) => (Number.isFinite(v) && v > 0 && v <= 5000000 ? v : 0);
+    const sanitizeBoletoValor = (v: number) => (Number.isFinite(v) && v > 0 && v <= 500000 ? v : 0);
 
     const fornecedorPatterns = [
       /BENEFICI[AÁ]RIO[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
@@ -3492,7 +3495,7 @@ export default function App() {
     const linhaInfo = parseLinhaDigitavel(normalizedText);
     if (linhaInfo) {
       if (!vencimento) vencimento = linhaInfo.vencimento;
-      if (!valor && linhaInfo.valor > 0) valor = sanitizeBoletoValor(linhaInfo.valor);
+      if ((!valor || valor > 20000) && linhaInfo.valor > 0) valor = sanitizeBoletoValor(linhaInfo.valor);
     }
 
     const numeroBoleto = extractLocalBoletoNumber(normalizedText);
@@ -3520,7 +3523,7 @@ export default function App() {
   const extractBoletoWithGemini = async (text: string, fileName: string, pdfBase64?: string): Promise<PdfImportDraft> => {
     const sanitizeBoletoValor = (v: any) => {
       const n = typeof v === 'number' ? v : Number(v);
-      return Number.isFinite(n) && n > 0 && n <= 5000000 ? n : 0;
+      return Number.isFinite(n) && n > 0 && n <= 500000 ? n : 0;
     };
 
     try {
@@ -3546,11 +3549,16 @@ export default function App() {
         const inferredFromDescricao = normalizeBoletoNumber(data.descricao || '');
         const numero = normalizeBoletoNumber(data.numero_boleto || '') || fallbackNumero || inferredFromDescricao;
         const descricao = (data.descricao && data.descricao !== '-') ? data.descricao : '';
+        const linhaInfo = parseLinhaDigitavel(text);
+        const geminiValor = sanitizeBoletoValor(data.valor);
+        const valor = (linhaInfo?.valor && (!geminiValor || geminiValor > 20000))
+          ? sanitizeBoletoValor(linhaInfo.valor)
+          : geminiValor;
         return {
           fileName,
           fornecedor: data.fornecedor || 'Fornecedor não identificado',
           vencimento: data.vencimento || '',
-          valor: sanitizeBoletoValor(data.valor),
+          valor,
           descricao,
           empresa: data.empresa || '',
           cnpj: data.cnpj || '',

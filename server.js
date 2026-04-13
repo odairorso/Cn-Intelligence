@@ -601,6 +601,7 @@ Analise visualmente o PDF anexo e extraia os dados.`;
       }
     }
     if (!Number.isFinite(extracted.valor) || extracted.valor <= 0) extracted.valor = 0;
+    if (extracted.valor > 500000) extracted.valor = 0;
 
     // Fallback: extract fornecedor from filename if AI didn't find it
     if (!extracted.fornecedor || extracted.fornecedor === '' || extracted.fornecedor.toLowerCase() === 'não identificado') {
