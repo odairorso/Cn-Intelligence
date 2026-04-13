@@ -119,8 +119,7 @@ interface DashboardTabProps {
   onMarkAsPaid: (tx: Transaction) => void;
 }
 
-const DashboardTabOld = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) => {
-  const [empresaFilter, setEmpresaFilter] = useState('TODOS');
+const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) => {
   const [periodoFilter, setPeriodoFilter] = useState('TODOS');
 
   const anos = useMemo(() => {
@@ -137,51 +136,30 @@ const DashboardTabOld = ({ stats, transactions, onMarkAsPaid }: DashboardTabProp
 
   useEffect(() => {
     if (periodoFilter !== 'TODOS') return;
-    if (anos.includes(2024) && anos.includes(2025)) setPeriodoFilter('2024-2025');
+    if (anos.includes(2024) && anos.includes(2025) && anos.includes(2026)) setPeriodoFilter('2024-2026');
+    else if (anos.includes(2024) && anos.includes(2025)) setPeriodoFilter('2024-2025');
   }, [anos, periodoFilter]);
 
   const periodos = useMemo(() => {
     const list = ['TODOS'];
     if (anos.includes(2024) && anos.includes(2025)) list.push('2024-2025');
+    if (anos.includes(2024) && anos.includes(2025) && anos.includes(2026)) list.push('2024-2026');
     anos.forEach((y) => list.push(String(y)));
     return list;
   }, [anos]);
 
-  // Empresas normalizadas — agrupa CN/Cn/cn → CN, FACEMS/Facems → FACEMS etc.
-  const empresas = useMemo(() => {
-    const map = new Map<string, string>(); // normalizado → label canônico
-    transactions.forEach(tx => {
-      if (!tx.empresa) return;
-      const key = tx.empresa.trim().toUpperCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      // Só adiciona se ainda não existe, ou se o valor atual é mais "limpo" (todo maiúsculo)
-      if (!map.has(key)) map.set(key, tx.empresa.trim().toUpperCase());
-    });
-    // Filtra entradas que claramente não são empresas (muito longas, contêm números, etc.)
-    const valid = Array.from(map.entries())
-      .filter(([key]) => key.length <= 30 && !/\d{3,}/.test(key) && !/[()[\]{}]/.test(key))
-      .map(([, label]) => label)
-      .sort();
-    return ['TODOS', ...valid];
-  }, [transactions]);
-
-  // Filtra usando a chave normalizada para pegar todas as variações
   const filteredTx = useMemo(() => {
-    const byPeriodo = transactions.filter((tx) => {
+    return transactions.filter((tx) => {
       if (periodoFilter === 'TODOS') return true;
       const parts = String(tx.vencimento || '').split('/');
       if (parts.length !== 3) return false;
       const y = Number(parts[2]);
       if (!Number.isFinite(y)) return false;
       if (periodoFilter === '2024-2025') return y === 2024 || y === 2025;
+      if (periodoFilter === '2024-2026') return y === 2024 || y === 2025 || y === 2026;
       return String(y) === periodoFilter;
     });
-    if (empresaFilter === 'TODOS') return byPeriodo;
-    const key = empresaFilter.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return byPeriodo.filter(tx =>
-      (tx.empresa || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === key
-    );
-  }, [transactions, empresaFilter, periodoFilter]);
+  }, [transactions, periodoFilter]);
 
   const statusChartData = [
     { name: 'Pagos', value: stats.pagos, color: '#10b981' },
@@ -264,23 +242,6 @@ const DashboardTabOld = ({ stats, transactions, onMarkAsPaid }: DashboardTabProp
             )}
           >
             {p}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {empresas.map(emp => (
-          <button
-            key={emp}
-            onClick={() => setEmpresaFilter(emp)}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
-              empresaFilter === emp
-                ? "bg-primary text-background border-primary"
-                : "bg-white/5 text-on-surface-variant border-white/10 hover:border-primary/40 hover:text-on-surface"
-            )}
-          >
-            {emp}
           </button>
         ))}
       </div>
@@ -532,35 +493,6 @@ const DashboardTabOld = ({ stats, transactions, onMarkAsPaid }: DashboardTabProp
           )}
         </motion.div>
       </div>
-    </div>
-  );
-};
-
-const DashboardTab = ({ transactions }: DashboardTabProps) => {
-  const total = useMemo(() => {
-    return transactions
-      .filter((tx) => {
-        const parts = String(tx.vencimento || '').split('/');
-        if (parts.length !== 3) return false;
-        const y = Number(parts[2]);
-        return y === 2024 || y === 2025;
-      })
-      .reduce((acc, tx) => acc + (Number(tx.valor) || 0), 0);
-  }, [transactions]);
-
-  return (
-    <div className="space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="glass-card p-6"
-      >
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/60 mb-2">VALOR TOTAL (2024-2025)</p>
-        <h3 className="text-2xl xl:text-4xl font-black font-headline text-on-surface">
-          <AnimatedNumber value={total} format="currency" duration={900} />
-        </h3>
-      </motion.div>
     </div>
   );
 };
@@ -4332,7 +4264,7 @@ export default function App() {
             </h2>
             <div className="flex flex-wrap gap-3">
               <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-primary border border-primary/20 flex items-center gap-2">
-                <LayoutDashboard size={14} /> Grupo CN 2024-2025
+                <LayoutDashboard size={14} /> Grupo CN
               </span>
               <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-surface-variant flex items-center gap-2">
                 <CheckCircle size={14} /> {transactions.length} registros
