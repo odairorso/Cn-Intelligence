@@ -3465,6 +3465,7 @@ export default function App() {
       /VALOR\s+COBRADO[:\s]+R?\$?\s*([\d.,]+)/,
       /VALOR\s+TOTAL[:\s]+R?\$?\s*([\d.,]+)/,
       /VLR\s+PAGAR[:\s]+R?\$?\s*([\d.,]+)/,
+      /VALOR\s+([\d]{1,3}(?:[.,][\d]{3})*[.,][\d]{2})\s*\(=\)\s*VALOR\s+DO\s+DOCUMENTO/i,
       /R\$\s*([\d]{1,3}(?:[.,][\d]{3})*[.,][\d]{2})/,
       /\(=\)\s*Valor do Documento\s+([\d.,]+)/i,
     ];
