@@ -70,6 +70,7 @@ export function useAppData() {
   // ─── Fetchers ─────────────────────────────────────────────────────────────
   const fetchTransactions = useCallback(async () => {
     try {
+      // Backend now limits to 400 by default for performance
       const data = await api.getTransactions('guest');
       const normalized = data.map((tx) => {
         const raw = tx as any;
@@ -150,11 +151,11 @@ export function useAppData() {
     }
   }, [showNotification, fetchBoletoPatterns]);
 
-  // ─── Initial load — tudo em paralelo, sem esperar setupTables ───────────
+  // ─── Initial load — em paralelo, com limite de segurança para performance (400 itens) ───
   useEffect(() => {
     setIsLoading(true);
 
-    // Carrega tudo em paralelo — não bloqueia um pelo outro
+    // Carrega tudo em paralelo. Note que fetchTransactions agora respeita o limite do backend (400)
     Promise.all([
       fetchTransactions(),
       fetchSuppliers(),
@@ -290,23 +291,6 @@ export function useAppData() {
       console.error('Failed to delete bank:', error);
     }
   }, [showNotification, fetchBanks]);
-
-  // ─── Initial load — tudo em paralelo, sem esperar setupTables ───────────
-  useEffect(() => {
-    setIsLoading(true);
-
-    // Carrega tudo em paralelo — não bloqueia um pelo outro
-    Promise.all([
-      fetchTransactions(),
-      fetchSuppliers(),
-      fetchBanks(),
-      fetchContasContabeis(),
-      fetchBoletoPatterns(),
-    ]).finally(() => setIsLoading(false));
-
-    // setupTables roda em background sem bloquear o carregamento
-    api.setupTables().catch(console.error);
-  }, [fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns]);
 
   // ─── Company options ──────────────────────────────────────────────────────
   const normalizeCompanyName = (name: string) => String(name || '').trim().toUpperCase();
