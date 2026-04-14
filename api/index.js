@@ -1117,6 +1117,7 @@ CAMPOS:
    Se o beneficiário for uma pessoa física (ex: "Valmir Lopes de Souza"), use o nome dela
    Exemplos corretos: HAPVIDA, SANESUL, ENERGISA, VSC CONTABILIDADE, Anhanguera Educacional Ltda
 2. vencimento: Data de vencimento no formato DD/MM/AAAA
+   ATENÇÃO PARA FATURAS DE ENERGIA/ÁGUA (Ex: ENERGISA): NUNCA confunda a data da "Próxima Leitura" com o Vencimento! A data de Próxima Leitura costuma ficar no topo. O Vencimento REAL quase sempre fica próximo ao valor total a pagar e ao Mês de Referência. Procure a data que corresponde ao real prazo para pagamento.
 3. valor: Valor TOTAL em reais com ponto decimal (ex: 632.86)
    Procure por: "(=) Valor do Documento", "Valor do Documento", "Valor Cobrado"
 4. cnpj: CNPJ do beneficiário
