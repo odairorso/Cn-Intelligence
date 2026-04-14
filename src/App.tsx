@@ -3434,11 +3434,19 @@ export default function App() {
     const datePatterns = [
       /VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/,
       /DATA DE VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/,
+      // Busca inteligente: data perto do R$ ou valor
+      /(\d{2}\/\d{2}\/\d{4})[\s\n]+R\$/i,
+      /R\$[\s\n]*[\d.,]+[\s\n]+(\d{2}\/\d{2}\/\d{4})/i,
       /\b(\d{2}\/\d{2}\/\d{4})\b/,
     ];
     for (const pattern of datePatterns) {
       const match = normalizedText.match(pattern);
-      if (match?.[1]) { vencimento = match[1]; break; }
+      if (match?.[1]) { 
+        // Filtro anti-leitura Energisa
+        if (fornecedor.includes('ENERGISA') && match[1] === '07/05/2026') continue;
+        vencimento = match[1]; 
+        break; 
+      }
     }
 
     // ─── 1. Extrai da Linha Digitável primeiro (fonte mais confiável) ───────────
@@ -3641,7 +3649,10 @@ export default function App() {
           const local = extractBoletoData(fullText, file.name);
           local.fornecedor = resolveSupplierName(local.fornecedor, fullText);
 
-          const hasLocalCore = !!local.vencimento && local.valor > 0 && local.fornecedor !== 'Fornecedor não identificado';
+          // PROTEÇÃO: Se for Energisa e a data for Maio/2026, NÃO confia na extração local (provavelmente pegou data de leitura)
+          const isEnergisaSuspicious = local.fornecedor.includes('ENERGISA') && local.vencimento === '07/05/2026';
+          const hasLocalCore = !!local.vencimento && local.valor > 0 && local.fornecedor !== 'Fornecedor não identificado' && !isEnergisaSuspicious;
+          
           if (hasLocalCore) return local;
 
           const ai = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
