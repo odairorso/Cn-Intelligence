@@ -1,15 +1,15 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { 
-  LayoutDashboard, 
-  FileText, 
-  Building2, 
-  Settings, 
-  Bell, 
-  Wallet, 
-  HelpCircle, 
-  TrendingUp, 
-  CheckCircle, 
-  Calendar, 
+import {
+  LayoutDashboard,
+  FileText,
+  Building2,
+  Settings,
+  Bell,
+  Wallet,
+  HelpCircle,
+  TrendingUp,
+  CheckCircle,
+  Calendar,
   Upload,
   ChevronLeft,
   ChevronRight,
@@ -32,17 +32,18 @@ import {
   Printer,
   Merge
 } from 'lucide-react';
-import { 
-  PieChart, Pie, Cell, ResponsiveContainer, 
-  BarChart, Bar, XAxis, YAxis, Tooltip, 
+import {
+  PieChart, Pie, Cell, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, Tooltip,
   AreaChart, Area, CartesianGrid
 } from 'recharts';
-import * as XLSX from 'xlsx';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
+// Lazy loaded: importados apenas quando usados
+// import * as XLSX from 'xlsx';
+// import * as pdfjsLib from 'pdfjs-dist';
+// import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
 import { motion, AnimatePresence } from 'motion/react';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
+// pdfjsLib será configurado dinamicamente quando necessário
 
 import { Transaction, KPI, Supplier, TransactionStatus, Bank, ContaContabil } from './types';
 import { api } from './api';
@@ -81,7 +82,7 @@ type PdfImportDraft = {
 
 function KPIComponent({ kpi, index }: any) {
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
@@ -204,18 +205,34 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
     }
 
     // Fallback para cálculo local (apenas para filtros específicos de anos que não o atual)
+    // Otimizado: single pass O(n) ao invés de 36 passes O(36n)
     const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const currentYear = new Date().getFullYear();
-    return months.map((month, idx) => {
-      const monthTx = filteredTx.filter(tx => {
-        const parts = tx.vencimento.split('/');
-        return parts.length === 3 && parseInt(parts[1]) === idx + 1 && parts[2] === (periodoFilter === 'TODOS' ? String(currentYear) : periodoFilter);
-      });
-      const receitas = monthTx.filter(tx => tx.tipo === 'RECEITA').reduce((a, tx) => a + (Number(tx.valor) || 0), 0);
-      const despesas = monthTx.filter(tx => tx.tipo !== 'RECEITA').reduce((a, tx) => a + (Number(tx.valor) || 0), 0);
-      const saldo = receitas - despesas;
-      return { name: month, receitas, despesas, saldo };
+    const targetYear = periodoFilter === 'TODOS' ? String(currentYear) : periodoFilter;
+
+    // Single reduce para agregar todos os meses de uma vez
+    const monthlyAggregation = filteredTx.reduce((acc, tx) => {
+      const parts = tx.vencimento.split('/');
+      if (parts.length === 3 && parts[2] === targetYear) {
+        const monthIdx = parseInt(parts[1]) - 1;
+        if (monthIdx >= 0 && monthIdx < 12) {
+          const valor = Number(tx.valor) || 0;
+          if (tx.tipo === 'RECEITA') {
+            acc[monthIdx].receitas += valor;
+          } else {
+            acc[monthIdx].despesas += valor;
+          }
+        }
+      }
+      return acc;
+    }, months.map((name) => ({ name, receitas: 0, despesas: 0, saldo: 0 })));
+
+    // Cal saldo final
+    monthlyAggregation.forEach(m => {
+      m.saldo = m.receitas - m.despesas;
     });
+
+    return monthlyAggregation;
   }, [filteredTx, realMonthlyFlux, periodoFilter]);
 
   // Top 5 fornecedores por valor — Prioriza os dados reais do servidor
@@ -250,7 +267,7 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
     }
 
     let total = 0, pagos = 0, pendentes = 0, vencidos = 0;
-    const today = new Date(); today.setHours(0,0,0,0);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
     for (const tx of filteredTx) {
       const baseValor = Number(tx.valor) || 0;
       const juros = Number((tx as any).juros) || 0;
@@ -384,14 +401,14 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
               <XAxis dataKey="name" stroke="#c6c6cd" fontSize={10} axisLine={false} tickLine={false} />
               <YAxis stroke="#c6c6cd" fontSize={10} axisLine={false} tickLine={false}
-                tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
+                tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
               <Tooltip
                 contentStyle={{ backgroundColor: '#1a1f2e', border: '1px solid #ffffff15', borderRadius: '12px' }}
                 itemStyle={{ color: '#dee2f7', fontSize: '12px' }}
                 formatter={(v: number) => [v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }), '']}
               />
-              <Bar dataKey="receitas" fill="#10b981" radius={[3,3,0,0]} />
-              <Bar dataKey="despesas" fill="#ef4444" radius={[3,3,0,0]} opacity={0.8} />
+              <Bar dataKey="receitas" fill="#10b981" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="despesas" fill="#ef4444" radius={[3, 3, 0, 0]} opacity={0.8} />
             </BarChart>
           </ResponsiveContainer>
         </motion.div>
@@ -561,7 +578,7 @@ interface LancamentosTabProps {
   isLoadingMore?: boolean;
 }
 
-const LancamentosTab = ({ 
+const LancamentosTab = ({
   transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteTransaction, setShowNewTxModal, setEditingTx,
   onLoadMore, isLoadingMore
 }: LancamentosTabProps) => {
@@ -572,7 +589,7 @@ const LancamentosTab = ({
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  
+
   // Extrair meses e anos únicos para os filtros
   const availableYears = useMemo(() => {
     const years = transactions.map(tx => {
@@ -600,13 +617,13 @@ const LancamentosTab = ({
   const filtered = useMemo(() => {
     const searchLower = filter.toLowerCase();
     return transactions.filter(tx => {
-      const matchesSearch = tx.fornecedor.toLowerCase().includes(searchLower) || 
-                           (tx.descricao && tx.descricao.toLowerCase().includes(searchLower));
+      const matchesSearch = tx.fornecedor.toLowerCase().includes(searchLower) ||
+        (tx.descricao && tx.descricao.toLowerCase().includes(searchLower));
       const matchesStatus = statusFilter === 'TODOS' || tx.status === statusFilter;
-      
+
       let matchesMonth = true;
       let matchesYear = true;
-      
+
       if (monthFilter !== 'TODOS' || yearFilter !== 'TODOS') {
         const parts = tx.vencimento.split('/');
         if (parts.length === 3) {
@@ -676,8 +693,8 @@ const LancamentosTab = ({
         <div className="flex flex-wrap gap-3 flex-grow max-w-4xl">
           <div className="bg-surface-variant/20 flex items-center px-4 py-2.5 rounded-sm border border-white/5 flex-grow min-w-[200px] focus-within:border-primary/40 transition-all">
             <Search size={18} className="text-on-surface-variant" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="Buscar fornecedor ou descrição..."
               className="bg-transparent border-none text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-0 p-0 outline-none w-full ml-3"
               value={filter}
@@ -685,8 +702,8 @@ const LancamentosTab = ({
             />
           </div>
 
-          
-          <select 
+
+          <select
             className="bg-surface border border-white/10 text-on-surface text-sm rounded-sm px-4 py-2.5 outline-none focus:border-primary hover:bg-surface-variant/20 transition-all"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -697,7 +714,7 @@ const LancamentosTab = ({
             <option value="VENCIDO" className="bg-surface text-on-surface">VENCIDO</option>
           </select>
 
-          <select 
+          <select
             className="bg-surface border border-white/10 text-on-surface text-sm rounded-sm px-4 py-2.5 outline-none focus:border-primary hover:bg-surface-variant/20 transition-all"
             value={monthFilter}
             onChange={(e) => setMonthFilter(e.target.value)}
@@ -708,7 +725,7 @@ const LancamentosTab = ({
             ))}
           </select>
 
-          <select 
+          <select
             className="bg-surface border border-white/10 text-on-surface text-sm rounded-sm px-4 py-2.5 outline-none focus:border-primary hover:bg-surface-variant/20 transition-all"
             value={yearFilter}
             onChange={(e) => setYearFilter(e.target.value)}
@@ -737,7 +754,7 @@ const LancamentosTab = ({
               <Check size={18} strokeWidth={3} /> Receber {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
             </button>
           )}
-          <button 
+          <button
             onClick={() => setShowNewTxModal(true)}
             className="bg-primary text-background px-6 py-2.5 rounded-sm text-sm font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all whitespace-nowrap shadow-lg shadow-primary/10"
           >
@@ -992,13 +1009,13 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
     // Limit to first 500 unique to avoid performance issues with large datasets
     let virtualCount = 0;
     const seenVirtual = new Set<string>();
-    
+
     for (const tx of transactions) {
       if (virtualCount >= 500) break; // Limit virtual suppliers
-      
+
       const key = normalizeSupplierName(tx.fornecedor);
       if (!key || byKey.has(key) || seenVirtual.has(key)) continue;
-      
+
       seenVirtual.add(key);
       byKey.set(key, {
         id: `virtual-${key}`,
@@ -1022,24 +1039,24 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
 
   const duplicateGroups = useMemo(() => {
     const map = new Map<string, Set<string>>();
-    
+
     // Only process suppliers, not virtual ones
     suppliers.forEach((s) => {
       if (s.id?.startsWith('virtual-')) return; // Skip virtual suppliers
-      
+
       const key = normalizeSupplierName(s.nome);
       if (!key) return;
       if (!map.has(key)) map.set(key, new Set());
       map.get(key)!.add(s.nome);
     });
-    
+
     const out: Array<{ key: string; names: string[] }> = [];
     map.forEach((set, key) => {
       if (set.size <= 1) return; // Skip singles
       const arr = Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
       out.push({ key, names: arr });
     });
-    
+
     return out.sort((a, b) => a.names[0].localeCompare(b.names[0], 'pt-BR'));
   }, [suppliers]);
 
@@ -1048,7 +1065,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
           <h3 className="text-xl font-bold font-headline">Gestão de Fornecedores</h3>
-          <button 
+          <button
             onClick={syncSuppliers}
             className="bg-white/5 text-on-surface-variant px-4 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-white/10 transition-colors"
             title="Sincronizar fornecedores dos lançamentos"
@@ -1077,7 +1094,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
             <Merge size={14} /> Unificar Manual
           </button>
         </div>
-        <button 
+        <button
           onClick={() => setShowNewSupplierModal(true)}
           className="bg-primary text-background px-6 py-2.5 rounded-sm text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all"
         >
@@ -1157,7 +1174,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
         {filteredSuppliers.map(s => (
           <div key={s.id || normalizeSupplierName(s.nome)} className="glass-card p-6 flex flex-col gap-4 relative group cursor-pointer hover:border-primary/40" onClick={() => onSelectSupplier(s)}>
             {s.id && !String(s.id).startsWith('virtual-') && (
-              <button 
+              <button
                 onClick={(e) => { e.stopPropagation(); deleteSupplier(s.id); }}
                 className="absolute top-4 right-4 p-2 text-tertiary opacity-0 group-hover:opacity-100 transition-opacity hover:bg-tertiary/10 rounded-sm"
               >
@@ -1414,7 +1431,7 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
       ${rows}
       <tr class="total-row">
         <td colspan="6" style="padding:8px;border:1px solid #ccc;text-align:right">TOTAL GERAL</td>
-        <td style="padding:8px;border:1px solid #ccc;text-align:right">${filteredData.reduce((a,tx) => a + Number(tx.valor), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="padding:8px;border:1px solid #ccc;text-align:right">${filteredData.reduce((a, tx) => a + Number(tx.valor), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         <td style="padding:8px;border:1px solid #ccc;text-align:right">${periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
         <td style="padding:8px;border:1px solid #ccc;text-align:right;font-weight:bold">${periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         <td style="padding:8px;border:1px solid #ccc;text-align:center">${periodTotals.count} itens</td>
@@ -1439,7 +1456,7 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
       <div className="glass-card p-6 flex flex-wrap gap-4 items-end">
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-on-surface-variant uppercase">Tipo</label>
-          <select 
+          <select
             className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
             style={{ backgroundColor: '#1e1e2e' }}
             value={selectedTipo}
@@ -1452,7 +1469,7 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
         </div>
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-on-surface-variant uppercase">Ano</label>
-          <select 
+          <select
             className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
             value={selectedYear}
             onChange={e => setSelectedYear(e.target.value)}
@@ -1463,7 +1480,7 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
         </div>
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-on-surface-variant uppercase">Mês</label>
-          <select 
+          <select
             className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
             value={selectedMonth}
             onChange={e => setSelectedMonth(e.target.value)}
@@ -1485,7 +1502,7 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
         </div>
         <div className="space-y-1">
           <label className="text-[10px] font-bold text-on-surface-variant uppercase">Empresa</label>
-          <select 
+          <select
             className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
             value={selectedCompany}
             onChange={e => setSelectedCompany(e.target.value)}
@@ -1608,7 +1625,7 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
               <tfoot>
                 <tr className="border-t-2 border-white/20 font-bold">
                   <td colSpan={6} className="px-8 py-4 text-right text-on-surface-variant uppercase text-xs tracking-widest">Total Geral</td>
-                  <td className="px-8 py-4 text-right">{filteredData.reduce((a,tx) => a + Number(tx.valor), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-8 py-4 text-right">{filteredData.reduce((a, tx) => a + Number(tx.valor), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="px-8 py-4 text-right text-tertiary">{periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
                   <td className="px-8 py-4 text-right text-primary text-lg">{periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="px-8 py-4 text-xs text-on-surface-variant">{periodTotals.count} itens</td>
@@ -1892,7 +1909,7 @@ const BancosTab = ({ banks, transactions, setShowNewBankModal, setEditingBank, d
           <h3 className="text-xl font-bold font-headline">Contas Bancárias</h3>
           <p className="text-sm text-on-surface-variant mt-1">Gerencie suas contas bancárias e acompanhe os saldos</p>
         </div>
-        <button 
+        <button
           onClick={() => setShowNewBankModal(true)}
           className="bg-primary text-background px-6 py-2.5 rounded-sm text-sm font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
         >
@@ -1903,13 +1920,13 @@ const BancosTab = ({ banks, transactions, setShowNewBankModal, setEditingBank, d
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {banks.map(bank => (
           <div key={bank.id} className="glass-card p-6 relative group">
-            <button 
+            <button
               onClick={() => setEditingBank(bank)}
               className="absolute top-4 right-14 p-2 text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10 rounded-sm"
             >
               <Edit size={16} />
             </button>
-            <button 
+            <button
               onClick={() => deleteBank(bank.id)}
               className="absolute top-4 right-4 p-2 text-tertiary opacity-0 group-hover:opacity-100 transition-opacity hover:bg-tertiary/10 rounded-sm"
             >
@@ -2003,7 +2020,7 @@ const NewBankModal = ({ setShowNewBankModal, onSuccess }: NewBankModalProps) => 
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-      <motion.div 
+      <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className="glass-card p-10 w-full max-w-md border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
@@ -2012,12 +2029,12 @@ const NewBankModal = ({ setShowNewBankModal, onSuccess }: NewBankModalProps) => 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Nome do Banco</label>
-            <input 
+            <input
               type="text"
               list="bank-suggestions"
               className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
               value={formData.nome}
-              onChange={e => setFormData({...formData, nome: e.target.value})}
+              onChange={e => setFormData({ ...formData, nome: e.target.value })}
               placeholder="Ex: Sicredi Matriz, Itaú PJ, Caixa CEI"
               required
             />
@@ -2030,54 +2047,54 @@ const NewBankModal = ({ setShowNewBankModal, onSuccess }: NewBankModalProps) => 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Agência</label>
-              <input 
+              <input
                 type="text"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.agencia}
-                onChange={e => setFormData({...formData, agencia: e.target.value})}
+                onChange={e => setFormData({ ...formData, agencia: e.target.value })}
                 placeholder="Ex: 1234"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta</label>
-              <input 
+              <input
                 type="text"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.conta}
-                onChange={e => setFormData({...formData, conta: e.target.value})}
+                onChange={e => setFormData({ ...formData, conta: e.target.value })}
                 placeholder="Ex: 12345-6"
               />
             </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Saldo Inicial (R$)</label>
-            <input 
+            <input
               type="number" step="0.01"
               className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
               value={formData.saldo}
-              onChange={e => setFormData({...formData, saldo: e.target.value})}
+              onChange={e => setFormData({ ...formData, saldo: e.target.value })}
             />
           </div>
           <div>
             <label className="flex items-center gap-3 cursor-pointer">
-              <input 
+              <input
                 type="checkbox"
                 className="w-4 h-4 rounded border-white/20 bg-surface-variant/20 text-primary focus:ring-primary"
                 checked={formData.ativo}
-                onChange={e => setFormData({...formData, ativo: e.target.checked})}
+                onChange={e => setFormData({ ...formData, ativo: e.target.checked })}
               />
               <span className="text-sm text-on-surface">Conta ativa</span>
             </label>
           </div>
           <div className="flex gap-3 pt-4">
-            <button 
+            <button
               type="button"
               onClick={() => setShowNewBankModal(false)}
               className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
             >
               Cancelar
             </button>
-            <button 
+            <button
               type="submit"
               className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
             >
@@ -2125,7 +2142,7 @@ const EditBankModal = ({ bank, onClose, onSuccess }: EditBankModalProps) => {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-      <motion.div 
+      <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className="glass-card p-10 w-full max-w-md border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
@@ -2134,63 +2151,63 @@ const EditBankModal = ({ bank, onClose, onSuccess }: EditBankModalProps) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Nome do Banco</label>
-            <input 
+            <input
               type="text"
               className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
               value={formData.nome}
-              onChange={e => setFormData({...formData, nome: e.target.value})}
+              onChange={e => setFormData({ ...formData, nome: e.target.value })}
               required
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Agência</label>
-              <input 
+              <input
                 type="text"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.agencia}
-                onChange={e => setFormData({...formData, agencia: e.target.value})}
+                onChange={e => setFormData({ ...formData, agencia: e.target.value })}
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta</label>
-              <input 
+              <input
                 type="text"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.conta}
-                onChange={e => setFormData({...formData, conta: e.target.value})}
+                onChange={e => setFormData({ ...formData, conta: e.target.value })}
               />
             </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Saldo Inicial (R$)</label>
-            <input 
+            <input
               type="number" step="0.01"
               className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
               value={formData.saldo}
-              onChange={e => setFormData({...formData, saldo: e.target.value})}
+              onChange={e => setFormData({ ...formData, saldo: e.target.value })}
             />
           </div>
           <div>
             <label className="flex items-center gap-3 cursor-pointer">
-              <input 
+              <input
                 type="checkbox"
                 className="w-4 h-4 rounded border-white/20 bg-surface-variant/20 text-primary focus:ring-primary"
                 checked={formData.ativo}
-                onChange={e => setFormData({...formData, ativo: e.target.checked})}
+                onChange={e => setFormData({ ...formData, ativo: e.target.checked })}
               />
               <span className="text-sm text-on-surface">Conta ativa</span>
             </label>
           </div>
           <div className="flex gap-3 pt-4">
-            <button 
+            <button
               type="button"
               onClick={onClose}
               className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
             >
               Cancelar
             </button>
-            <button 
+            <button
               type="submit"
               className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
             >
@@ -2216,7 +2233,7 @@ const SelectBankModal = ({ transactionId, valor, banks, onClose, onConfirm }: Se
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-      <motion.div 
+      <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className="glass-card p-10 w-full max-w-md border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
@@ -2225,7 +2242,7 @@ const SelectBankModal = ({ transactionId, valor, banks, onClose, onConfirm }: Se
         <p className="text-sm text-on-surface-variant mb-6">
           Selecione o banco para registrar o pagamento de <span className="font-bold text-primary">{valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </p>
-        
+
         <div className="space-y-3 mb-6">
           {banks.filter(b => b.ativo).map(bank => (
             <button
@@ -2233,8 +2250,8 @@ const SelectBankModal = ({ transactionId, valor, banks, onClose, onConfirm }: Se
               onClick={() => setSelectedBank(bank.nome)}
               className={cn(
                 "w-full p-4 rounded-lg border text-left transition-all",
-                selectedBank === bank.nome 
-                  ? "border-primary bg-primary/10" 
+                selectedBank === bank.nome
+                  ? "border-primary bg-primary/10"
                   : "border-white/10 hover:border-primary/40"
               )}
             >
@@ -2249,13 +2266,13 @@ const SelectBankModal = ({ transactionId, valor, banks, onClose, onConfirm }: Se
         </div>
 
         <div className="flex gap-3">
-          <button 
+          <button
             onClick={onClose}
             className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
           >
             Cancelar
           </button>
-          <button 
+          <button
             onClick={() => selectedBank && onConfirm(selectedBank)}
             disabled={!selectedBank}
             className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2345,7 +2362,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-      <motion.div 
+      <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className="glass-card p-10 w-full max-w-lg border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-y-auto max-h-[90vh]"
@@ -2356,22 +2373,22 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor</label>
-              <select 
+              <select
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.fornecedor}
-                onChange={e => setFormData({...formData, fornecedor: e.target.value})}
+                onChange={e => setFormData({ ...formData, fornecedor: e.target.value })}
               >
                 {suppliers.map(s => <option key={s.id} value={s.nome} className="bg-[#161b2a] text-on-surface">{s.nome}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Banco / Conta</label>
-              <select 
+              <select
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.banco}
-                onChange={e => setFormData({...formData, banco: e.target.value})}
+                onChange={e => setFormData({ ...formData, banco: e.target.value })}
               >
                 <option value="" className="bg-[#161b2a] text-on-surface">Não informado</option>
                 {banks.filter(b => b.ativo).map(b => (
@@ -2382,21 +2399,21 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           </div>
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Descrição</label>
-            <input 
+            <input
               type="text" required
               className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
               value={formData.descricao}
-              onChange={e => setFormData({...formData, descricao: e.target.value})}
+              onChange={e => setFormData({ ...formData, descricao: e.target.value })}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Empresa</label>
-              <select 
+              <select
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.empresa}
-                onChange={e => setFormData({...formData, empresa: e.target.value})}
+                onChange={e => setFormData({ ...formData, empresa: e.target.value })}
               >
                 {companyOptions.map((company) => (
                   <option key={company} value={company} className="bg-[#161b2a]">{company}</option>
@@ -2406,11 +2423,11 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Tipo</label>
-              <select 
+              <select
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.tipo}
-                onChange={e => setFormData({...formData, tipo: e.target.value as 'RECEITA' | 'DESPESA'})}
+                onChange={e => setFormData({ ...formData, tipo: e.target.value as 'RECEITA' | 'DESPESA' })}
               >
                 <option value="DESPESA" className="bg-[#161b2a] text-on-surface">Despesa</option>
                 <option value="RECEITA" className="bg-[#161b2a] text-on-surface">Receita</option>
@@ -2420,13 +2437,13 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta Contábil</label>
             <div className="relative">
-              <div 
+              <div
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm cursor-pointer flex justify-between items-center"
                 style={{ backgroundColor: '#161b2a' }}
                 onClick={() => setShowContaDropdown(!showContaDropdown)}
               >
                 <span className={formData.conta_contabil_id ? 'text-on-surface' : 'text-on-surface-variant'}>
-                  {formData.conta_contabil_id 
+                  {formData.conta_contabil_id
                     ? contasContabeis.find(c => c.id === formData.conta_contabil_id)?.nome
                     : 'Selecione a conta'}
                 </span>
@@ -2448,10 +2465,10 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                     </div>
                   </div>
                   <div className="max-h-44 overflow-y-auto">
-                    <div 
+                    <div
                       className="px-3 py-2 text-sm text-on-surface-variant hover:bg-white/5 cursor-pointer"
                       onClick={() => {
-                        setFormData({...formData, conta_contabil_id: undefined});
+                        setFormData({ ...formData, conta_contabil_id: undefined });
                         setShowContaDropdown(false);
                         setSearchConta('');
                       }}
@@ -2466,12 +2483,12 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                         return c.codigo.toLowerCase().includes(q) || c.nome.toLowerCase().includes(q);
                       })
                       .map(c => (
-                        <div 
+                        <div
                           key={c.id}
                           className="px-3 py-2 text-sm hover:bg-white/5 cursor-pointer flex items-center gap-2"
                           style={{ backgroundColor: formData.conta_contabil_id === c.id ? 'rgba(59, 130, 246, 0.2)' : 'transparent' }}
                           onClick={() => {
-                            setFormData({...formData, conta_contabil_id: c.id});
+                            setFormData({ ...formData, conta_contabil_id: c.id });
                             setShowContaDropdown(false);
                             setSearchConta('');
                           }}
@@ -2488,11 +2505,11 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Status</label>
-              <select 
+              <select
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.status}
-                onChange={e => setFormData({...formData, status: e.target.value as TransactionStatus})}
+                onChange={e => setFormData({ ...formData, status: e.target.value as TransactionStatus })}
               >
                 <option value="PENDENTE" className="bg-[#161b2a] text-on-surface">PENDENTE</option>
                 <option value="PAGO" className="bg-[#161b2a] text-on-surface">PAGO</option>
@@ -2503,20 +2520,20 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Vencimento</label>
-              <input 
+              <input
                 type="date" required
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.vencimento}
-                onChange={e => setFormData({...formData, vencimento: e.target.value})}
+                onChange={e => setFormData({ ...formData, vencimento: e.target.value })}
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor (R$)</label>
-              <input 
+              <input
                 type="number" step="0.01" required
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.valor}
-                onChange={e => setFormData({...formData, valor: e.target.value})}
+                onChange={e => setFormData({ ...formData, valor: e.target.value })}
               />
             </div>
             <div>
@@ -2567,20 +2584,20 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
             <>
               <div>
                 <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Data de Pagamento</label>
-                <input 
+                <input
                   type="date" required
                   className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                   value={formData.pagamento}
-                  onChange={e => setFormData({...formData, pagamento: e.target.value})}
+                  onChange={e => setFormData({ ...formData, pagamento: e.target.value })}
                 />
               </div>
               <div>
                 <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Banco</label>
-                <select 
+                <select
                   className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                   style={{ backgroundColor: '#161b2a' }}
                   value={formData.banco}
-                  onChange={e => setFormData({...formData, banco: e.target.value})}
+                  onChange={e => setFormData({ ...formData, banco: e.target.value })}
                   required
                 >
                   <option value="" className="bg-[#161b2a] text-on-surface">Selecione...</option>
@@ -2592,14 +2609,14 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
             </>
           )}
           <div className="flex gap-3 pt-4">
-            <button 
+            <button
               type="button"
               onClick={() => setShowNewTxModal(false)}
               className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
             >
               Cancelar
             </button>
-            <button 
+            <button
               type="submit"
               className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
             >
@@ -2662,7 +2679,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-      <motion.div 
+      <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className="glass-card p-10 w-full max-w-lg border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
@@ -2673,11 +2690,11 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor</label>
-              <select 
+              <select
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.fornecedor}
-                onChange={e => setFormData({...formData, fornecedor: e.target.value})}
+                onChange={e => setFormData({ ...formData, fornecedor: e.target.value })}
               >
                 <option value={transaction.fornecedor} className="bg-[#161b2a] text-on-surface">{transaction.fornecedor}</option>
                 {suppliers.filter(s => s.nome !== transaction.fornecedor).map(s => (
@@ -2687,11 +2704,11 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Banco / Conta</label>
-              <select 
+              <select
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.banco}
-                onChange={e => setFormData({...formData, banco: e.target.value})}
+                onChange={e => setFormData({ ...formData, banco: e.target.value })}
               >
                 <option value="" className="bg-[#161b2a] text-on-surface">Não informado</option>
                 {banks.map(b => (
@@ -2702,22 +2719,22 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
           </div>
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Descrição</label>
-            <input 
+            <input
               type="text" required
               className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all"
               value={formData.descricao}
-              onChange={e => setFormData({...formData, descricao: e.target.value})}
+              onChange={e => setFormData({ ...formData, descricao: e.target.value })}
             />
 
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Empresa</label>
-              <select 
+              <select
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.empresa}
-                onChange={e => setFormData({...formData, empresa: e.target.value})}
+                onChange={e => setFormData({ ...formData, empresa: e.target.value })}
               >
                 {companyOptions.map((company) => (
                   <option key={company} value={company} className="bg-[#161b2a] text-on-surface">{company}</option>
@@ -2726,11 +2743,11 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Tipo</label>
-              <select 
+              <select
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.tipo || 'DESPESA'}
-                onChange={e => setFormData({...formData, tipo: e.target.value})}
+                onChange={e => setFormData({ ...formData, tipo: e.target.value })}
               >
                 <option value="DESPESA" className="bg-[#161b2a] text-on-surface">Despesa</option>
                 <option value="RECEITA" className="bg-[#161b2a] text-on-surface">Receita</option>
@@ -2741,13 +2758,13 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta Contábil</label>
               <div className="relative">
-                <div 
+                <div
                   className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm cursor-pointer flex justify-between items-center"
                   style={{ backgroundColor: '#161b2a' }}
                   onClick={() => setShowContaDropdown(!showContaDropdown)}
                 >
                   <span className={formData.conta_contabil_id !== undefined ? 'text-on-surface' : 'text-on-surface-variant'}>
-                    {formData.conta_contabil_id !== undefined 
+                    {formData.conta_contabil_id !== undefined
                       ? contasContabeis.find(c => c.id === formData.conta_contabil_id)?.nome
                       : 'Selecione a conta'}
                   </span>
@@ -2769,10 +2786,10 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                       </div>
                     </div>
                     <div className="max-h-44 overflow-y-auto">
-                      <div 
+                      <div
                         className="px-3 py-2 text-sm text-on-surface-variant hover:bg-white/5 cursor-pointer"
                         onClick={() => {
-                          setFormData({...formData, conta_contabil_id: undefined});
+                          setFormData({ ...formData, conta_contabil_id: undefined });
                           setShowContaDropdown(false);
                           setSearchConta('');
                         }}
@@ -2787,12 +2804,12 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                           return c.codigo.toLowerCase().includes(q) || c.nome.toLowerCase().includes(q);
                         })
                         .map(c => (
-                          <div 
+                          <div
                             key={c.id}
                             className="px-3 py-2 text-sm hover:bg-white/5 cursor-pointer flex items-center gap-2"
                             style={{ backgroundColor: formData.conta_contabil_id === c.id ? 'rgba(59, 130, 246, 0.2)' : 'transparent' }}
                             onClick={() => {
-                              setFormData({...formData, conta_contabil_id: c.id});
+                              setFormData({ ...formData, conta_contabil_id: c.id });
                               setShowContaDropdown(false);
                               setSearchConta('');
                             }}
@@ -2811,11 +2828,11 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Status</label>
-              <select 
+              <select
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }} // Forçar fundo escuro em alguns navegadores
                 value={formData.status}
-                onChange={e => setFormData({...formData, status: e.target.value as TransactionStatus})}
+                onChange={e => setFormData({ ...formData, status: e.target.value as TransactionStatus })}
               >
                 <option value="PENDENTE" className="bg-[#161b2a] text-on-surface">PENDENTE</option>
                 <option value="PAGO" className="bg-[#161b2a] text-on-surface">PAGO</option>
@@ -2827,26 +2844,26 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Vencimento</label>
-              <input 
+              <input
                 type="date" required
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.vencimento}
-                onChange={e => setFormData({...formData, vencimento: e.target.value})}
+                onChange={e => setFormData({ ...formData, vencimento: e.target.value })}
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor (R$)</label>
-              <input 
+              <input
                 type="number" step="0.01" required
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.valor}
-                onChange={e => setFormData({...formData, valor: e.target.value})}
+                onChange={e => setFormData({ ...formData, valor: e.target.value })}
               />
             </div>
             {formData.status === 'PAGO' && (
               <div>
                 <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor Pago (R$)</label>
-                <input 
+                <input
                   type="number" step="0.01"
                   className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                   value={formData.valorPago || ''}
@@ -2855,7 +2872,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                     const valorPago = Number(e.target.value) || 0;
                     const valorOriginal = Number(formData.valor) || 0;
                     const jurosCalculado = Math.max(0, valorPago - valorOriginal);
-                    setFormData({...formData, valorPago: valorPago, juros: jurosCalculado});
+                    setFormData({ ...formData, valorPago: valorPago, juros: jurosCalculado });
                   }}
                 />
                 {formData.juros > 0 && (
@@ -2869,23 +2886,23 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
           {formData.status === 'PAGO' && (
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Data de Pagamento</label>
-              <input 
+              <input
                 type="date" required
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.pagamento}
-                onChange={e => setFormData({...formData, pagamento: e.target.value})}
+                onChange={e => setFormData({ ...formData, pagamento: e.target.value })}
               />
             </div>
           )}
           <div className="flex gap-3 pt-6">
-            <button 
+            <button
               type="button"
               onClick={onClose}
               className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
             >
               Cancelar
             </button>
-            <button 
+            <button
               type="submit"
               className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
             >
@@ -2912,12 +2929,12 @@ const SupplierDetailModal = ({ supplier, transactions, onClose }: { supplier: Su
     return 0;
   };
 
-  const supplierTransactions = useMemo(() => 
+  const supplierTransactions = useMemo(() =>
     transactions.filter(t => isSupplierMatch(t.fornecedor, supplier.nome))
-    .sort((a, b) => {
-      return txDateToNumber(b.vencimento) - txDateToNumber(a.vencimento);
-    }),
-  [transactions, supplier]);
+      .sort((a, b) => {
+        return txDateToNumber(b.vencimento) - txDateToNumber(a.vencimento);
+      }),
+    [transactions, supplier]);
 
   const kpis = useMemo(() => {
     const total = supplierTransactions.reduce((acc, t) => acc + t.valor, 0);
@@ -2928,7 +2945,7 @@ const SupplierDetailModal = ({ supplier, transactions, onClose }: { supplier: Su
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-background/90 backdrop-blur-md">
-      <motion.div 
+      <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className="glass-card w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
@@ -3040,7 +3057,7 @@ const NewSupplierModal = ({ setShowNewSupplierModal, onSuccess }: NewSupplierMod
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-      <motion.div 
+      <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className="glass-card p-8 w-full max-w-2xl border border-white/10 shadow-2xl overflow-y-auto max-h-[90vh]"
@@ -3050,21 +3067,21 @@ const NewSupplierModal = ({ setShowNewSupplierModal, onSuccess }: NewSupplierMod
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Nome do Fornecedor</label>
-              <input 
+              <input
                 type="text" required
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all"
                 value={formData.nome}
-                onChange={e => setFormData({...formData, nome: e.target.value})}
+                onChange={e => setFormData({ ...formData, nome: e.target.value })}
               />
 
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">CNPJ</label>
-              <input 
+              <input
                 type="text"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.cnpj}
-                onChange={e => setFormData({...formData, cnpj: e.target.value})}
+                onChange={e => setFormData({ ...formData, cnpj: e.target.value })}
               />
             </div>
           </div>
@@ -3072,82 +3089,82 @@ const NewSupplierModal = ({ setShowNewSupplierModal, onSuccess }: NewSupplierMod
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">E-mail</label>
-              <input 
+              <input
                 type="email"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.email}
-                onChange={e => setFormData({...formData, email: e.target.value})}
+                onChange={e => setFormData({ ...formData, email: e.target.value })}
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Telefone</label>
-              <input 
+              <input
                 type="text"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.telefone}
-                onChange={e => setFormData({...formData, telefone: e.target.value})}
+                onChange={e => setFormData({ ...formData, telefone: e.target.value })}
               />
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Endereço</label>
-            <input 
+            <input
               type="text"
               className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
               value={formData.endereco}
-              onChange={e => setFormData({...formData, endereco: e.target.value})}
+              onChange={e => setFormData({ ...formData, endereco: e.target.value })}
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Cidade</label>
-              <input 
+              <input
                 type="text"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.cidade}
-                onChange={e => setFormData({...formData, cidade: e.target.value})}
+                onChange={e => setFormData({ ...formData, cidade: e.target.value })}
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Estado</label>
-              <input 
+              <input
                 type="text"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.estado}
-                onChange={e => setFormData({...formData, estado: e.target.value})}
+                onChange={e => setFormData({ ...formData, estado: e.target.value })}
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Categoria</label>
-              <input 
+              <input
                 type="text"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.categoria}
-                onChange={e => setFormData({...formData, categoria: e.target.value})}
+                onChange={e => setFormData({ ...formData, categoria: e.target.value })}
               />
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Observações</label>
-            <textarea 
+            <textarea
               className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary h-24 resize-none"
               value={formData.observacoes}
-              onChange={e => setFormData({...formData, observacoes: e.target.value})}
+              onChange={e => setFormData({ ...formData, observacoes: e.target.value })}
             />
           </div>
 
           <div className="flex gap-3 pt-4">
-            <button 
+            <button
               type="button"
               onClick={() => setShowNewSupplierModal(false)}
               className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
             >
               Cancelar
             </button>
-            <button 
+            <button
               type="submit"
               className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:opacity-90 shadow-lg shadow-primary/10 transition-all"
             >
@@ -3164,7 +3181,7 @@ const NewSupplierModal = ({ setShowNewSupplierModal, onSuccess }: NewSupplierMod
 // --- Main App ---
 
 export default function App() {
-  const { 
+  const {
     transactions, globalStats, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, isLoadingMore, boletoPatterns,
     fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns, fetchStats,
     showNotification, markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
@@ -3508,17 +3525,17 @@ export default function App() {
         .map((s) => {
           const normS = normalizeSupplierName(s.nome);
           if (!normS || normS.length < 3) return { supplier: s, score: 0 };
-          
+
           // Busca por palavra inteira (\b) para evitar que "atualizados" pegue "ATUALIZA"
           const regex = new RegExp(`\\b${normS}\\b`, 'i');
           const hasFullMatch = regex.test(normalizedText);
-          
+
           // Pontuação: comprimento do nome se for palavra inteira
           let score = hasFullMatch ? normS.length : 0;
-          
+
           // Super prioridade para parceiros estratégicos se encontrados no texto
           if (hasFullMatch && (normS === 'CLARO' || normS === 'ENERGISA')) score += 1000;
-          
+
           return { supplier: s, score };
         })
         .filter((x) => x.score > 0)
@@ -3541,11 +3558,11 @@ export default function App() {
     ];
     for (const pattern of datePatterns) {
       const match = normalizedText.match(pattern);
-      if (match?.[1]) { 
+      if (match?.[1]) {
         // Filtro anti-leitura Energisa
         if (fornecedor.includes('ENERGISA') && match[1] === '07/05/2026') continue;
-        vencimento = match[1]; 
-        break; 
+        vencimento = match[1];
+        break;
       }
     }
 
@@ -3634,7 +3651,7 @@ export default function App() {
 
     if (normalizedText.includes('ENERGISA')) {
       const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      
+
       // Limpeza específica para Energisa: remove datas de "Próxima Leitura" para não confundir o extrator
       const textForEnergisa = normalizedText.replace(/PRÓXIMA\s+LEITURA\s+PREVISTA\s+PARA\s+\d{2}\/\d{2}\/\d{4}/gi, '');
 
@@ -3747,6 +3764,11 @@ export default function App() {
     setIsProcessingPdf(true);
     showNotification(`Processando ${pdfFiles.length} boleto(s)...`, 'info');
 
+    // Lazy load pdfjs-dist apenas quando necessário
+    const pdfjsLib = await import('pdfjs-dist');
+    const pdfWorkerSrc = await import('pdfjs-dist/build/pdf.worker.min.js?url');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc.default;
+
     try {
       const extractedRows: PdfImportDraft[] = await Promise.all(
         pdfFiles.map(async (file) => {
@@ -3793,7 +3815,7 @@ export default function App() {
           // PROTEÇÃO: Se for Energisa e a data for Maio/2026, NÃO confia na extração local (provavelmente pegou data de leitura)
           const isEnergisaSuspicious = local.fornecedor.includes('ENERGISA') && local.vencimento === '07/05/2026';
           const hasLocalCore = !!local.vencimento && local.valor > 0 && local.fornecedor !== 'Fornecedor não identificado' && !isEnergisaSuspicious;
-          
+
           if (hasLocalCore) return local;
 
           const ai = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
@@ -3925,27 +3947,31 @@ export default function App() {
     reader.onload = async (e) => {
       try {
         showNotification('Processando arquivo... Por favor, aguarde.', 'info');
+
+        // Lazy load XLSX apenas quando necessário
+        const XLSX = await import('xlsx');
+
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-        
+
         let allDataMatrix: any[] = [];
 
         // Colunas consideradas "cabeçalho padrão"
-        const KNOWN_COLS = ['FORNECEDOR','FORNECEDORES','NOME','FAVORECIDO','CLIENTE','VALOR','VENCIMENTO','DATA','PAGAMENTO','SITUAÇÃO','SITUACAO'];
+        const KNOWN_COLS = ['FORNECEDOR', 'FORNECEDORES', 'NOME', 'FAVORECIDO', 'CLIENTE', 'VALOR', 'VENCIMENTO', 'DATA', 'PAGAMENTO', 'SITUAÇÃO', 'SITUACAO'];
 
         // Heurística de mapeamento posicional para abas sem cabeçalho padrão
         const isDateSerial = (v: any) => typeof v === 'number' && v > 40000 && v < 70000;
         const buildPositionalRow = (row: any[], sheetName: string): any => {
           const r: any = { _aba_origem: sheetName };
           const strings = row.map((v, i) => ({ v, i })).filter(x => typeof x.v === 'string' && String(x.v).trim() !== '');
-          const dates   = row.map((v, i) => ({ v, i })).filter(x => isDateSerial(x.v));
-          const nums    = row.map((v, i) => ({ v, i })).filter(x => typeof x.v === 'number' && !isDateSerial(x.v) && x.v > 0);
-          if (strings[0]) r['FORNECEDOR']  = strings[0].v;
-          if (strings[1]) r['DESCRIÇÃO']   = strings[1].v;
-          if (dates[0])   r['VENCIMENTO']  = dates[0].v;
-          if (dates[1])   r['DATA PAGAMENTO'] = dates[1].v;
-          if (nums[0])    r['VALOR']       = nums[0].v;
-          if (strings[2]) r['EMPRESA']     = strings[2].v;
+          const dates = row.map((v, i) => ({ v, i })).filter(x => isDateSerial(x.v));
+          const nums = row.map((v, i) => ({ v, i })).filter(x => typeof x.v === 'number' && !isDateSerial(x.v) && x.v > 0);
+          if (strings[0]) r['FORNECEDOR'] = strings[0].v;
+          if (strings[1]) r['DESCRIÇÃO'] = strings[1].v;
+          if (dates[0]) r['VENCIMENTO'] = dates[0].v;
+          if (dates[1]) r['DATA PAGAMENTO'] = dates[1].v;
+          if (nums[0]) r['VALOR'] = nums[0].v;
+          if (strings[2]) r['EMPRESA'] = strings[2].v;
           // último string pode ser status
           const last = strings[strings.length - 1];
           if (last && last !== strings[0] && last !== strings[1] && last !== strings[2]) r['SITUAÇÃO'] = last.v;
@@ -4024,25 +4050,25 @@ export default function App() {
           if (!val) return 0;
           const str = String(val).replace(/[R$\s]/g, '').trim();
           if (str === '' || str.toUpperCase() === 'TOTAL') return 0;
-          
+
           // Trata formatos como 1.500,00 ou 1500,00 ou 1500.00
           if (str.includes(',') && str.includes('.')) {
-             // Ex: 1.500,00 -> remove ponto, troca virgula por ponto
-             return Number(str.replace(/\./g, '').replace(',', '.'));
+            // Ex: 1.500,00 -> remove ponto, troca virgula por ponto
+            return Number(str.replace(/\./g, '').replace(',', '.'));
           } else if (str.includes(',')) {
-             // Ex: 1500,00
-             return Number(str.replace(',', '.'));
+            // Ex: 1500,00
+            return Number(str.replace(',', '.'));
           } else if ((str.match(/\./g) || []).length > 1) {
-             // Ex: 1.500.000 -> remove todos os pontos
-             return Number(str.replace(/\./g, ''));
+            // Ex: 1.500.000 -> remove todos os pontos
+            return Number(str.replace(/\./g, ''));
           }
-          
+
           const n = Number(str);
           return isNaN(n) ? 0 : n;
         };
 
         const localSuppliers = new Set(suppliers.map(s => s.nome));
-        
+
         let txBatch: Omit<Transaction, 'id'>[] = [];
         let supBatch: Omit<Supplier, 'id'>[] = [];
         let totalImported = 0;
@@ -4054,13 +4080,13 @@ export default function App() {
 
           const rawValor = getRowValue(row, ['VALOR', 'VALOR TOTAL', 'TOTAL', 'VALOR_TOTAL', 'QUANTIA', 'PREÇO', 'PRECO', 'SAIDA', 'SAÍDA', 'PAGAMENTO']);
           const sanitizedValor = parseValor(rawValor);
-          
+
           if (sanitizedValor === 0 && !rawValor) continue;
           if (String(rawFornecedor).toUpperCase() === 'FORNECEDOR' || String(rawFornecedor).toUpperCase() === 'CLIENTE') continue;
 
           const formatDate = (val: any) => {
             if (!val) return undefined;
-            
+
             if (val instanceof Date) {
               const dt = new Date(val);
               let day = dt.getUTCDate();
@@ -4098,17 +4124,17 @@ export default function App() {
 
 
           const fornecedorNome = String(rawFornecedor).trim();
-          
+
           const rawVencimento = getRowValue(row, ['VENCIMENTO', 'DATA VENCIMENTO', 'VENC']);
           const rawPagamento = getRowValue(row, ['DATA PAGAMENTO', 'PAGAMENTO', 'DATA PAGO', 'PAGO EM']);
 
           const vencimentoDate = formatDate(rawVencimento);
           const pagamentoDate = rawPagamento ? formatDate(rawPagamento) : undefined;
           if (!vencimentoDate) continue;
-          
+
           const rawStatus = String(getRowValue(row, ['STATUS', 'SITUAÇÃO', 'SITUACAO', 'PAGO', 'SIT 2']) || '').toUpperCase();
           let status: TransactionStatus = 'PENDENTE';
-          
+
           if (pagamentoDate || rawStatus.includes('PAGO')) {
             status = 'PAGO';
           } else if (rawStatus.includes('VENCIDO')) {
@@ -4131,7 +4157,7 @@ export default function App() {
             status: status,
             banco: rawBanco ? String(rawBanco) : undefined
           });
-          
+
           totalImported++;
           totalFinanceiro += sanitizedValor;
 
@@ -4178,12 +4204,12 @@ export default function App() {
           try {
             console.log(`Enviando lote final de ${txBatch.length} transações...`);
             await api.createTransactionsBatch(txBatch);
-          } catch(err) { console.error(err); }
+          } catch (err) { console.error(err); }
         }
         if (supBatch.length > 0) {
           try {
             await api.createSuppliersBatch(supBatch);
-          } catch(err) { console.error(err); }
+          } catch (err) { console.error(err); }
         }
 
         showNotification(`${totalImported} lançamentos processados na importação!`, 'success');
@@ -4287,7 +4313,7 @@ export default function App() {
         </div>
         {/* Skeleton cards */}
         <div className="grid grid-cols-3 gap-4 w-full max-w-2xl px-8 mt-4">
-          {[1,2,3].map(i => (
+          {[1, 2, 3].map(i => (
             <div key={i} className="glass-card p-5 animate-pulse">
               <div className="h-2 bg-white/10 rounded w-2/3 mb-3" />
               <div className="h-6 bg-white/10 rounded w-1/2" />
@@ -4313,13 +4339,13 @@ export default function App() {
           </div>
 
           <nav className="hidden lg:flex gap-6">
-            <button 
+            <button
               onClick={() => setActiveTab('dashboard')}
               className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'dashboard' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
               Dashboard
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('lancamentos')}
               className={cn("relative transition-all duration-200 font-medium text-sm", activeTab === 'lancamentos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
@@ -4330,37 +4356,37 @@ export default function App() {
                 </span>
               )}
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('fornecedores')}
               className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'fornecedores' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
               Fornecedores
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('relatorios')}
               className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'relatorios' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
               Relatórios
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('receitas')}
               className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'receitas' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
               Receitas
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('bancos')}
               className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'bancos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
               Bancos
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('extrato')}
               className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'extrato' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
               Extrato OFX
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('configuracoes')}
               className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'configuracoes' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
@@ -4383,56 +4409,56 @@ export default function App() {
 
       {/* Mobile Navigation (Bottom Bar) */}
       <nav className="lg:hidden fixed bottom-6 left-6 right-6 bg-surface/90 backdrop-blur-xl border border-white/10 z-50 flex justify-around items-center py-4 px-4 rounded-sm shadow-2xl">
-        <button 
+        <button
           onClick={() => setActiveTab('dashboard')}
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'dashboard' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
           <LayoutDashboard size={22} strokeWidth={activeTab === 'dashboard' ? 3 : 2} />
           <span className="text-[9px] font-black uppercase tracking-tighter">Dash</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('lancamentos')}
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'lancamentos' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
           <FileText size={22} strokeWidth={activeTab === 'lancamentos' ? 3 : 2} />
           <span className="text-[9px] font-black uppercase tracking-tighter">Lanç</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('fornecedores')}
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'fornecedores' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
           <Building2 size={22} strokeWidth={activeTab === 'fornecedores' ? 3 : 2} />
           <span className="text-[9px] font-black uppercase tracking-tighter">Forn</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('relatorios')}
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'relatorios' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
           <BarChart3 size={22} strokeWidth={activeTab === 'relatorios' ? 3 : 2} />
           <span className="text-[9px] font-black uppercase tracking-tighter">Relat</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('receitas')}
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'receitas' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
           <Wallet size={22} strokeWidth={activeTab === 'receitas' ? 3 : 2} />
           <span className="text-[9px] font-black uppercase tracking-tighter">Rec</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('bancos')}
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'bancos' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
           <CreditCard size={22} strokeWidth={activeTab === 'bancos' ? 3 : 2} />
           <span className="text-[9px] font-black uppercase tracking-tighter">Bancos</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('extrato')}
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'extrato' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
           <Download size={22} strokeWidth={activeTab === 'extrato' ? 3 : 2} />
           <span className="text-[9px] font-black uppercase tracking-tighter">OFX</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('configuracoes')}
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'configuracoes' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
@@ -4473,7 +4499,7 @@ export default function App() {
           <div className="flex flex-wrap gap-3">
             {activeTab === 'lancamentos' && (
               <>
-                <button 
+                <button
                   onClick={() => pdfInputRef.current?.click()}
                   className="bg-primary/15 text-primary px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/25 transition-all border border-primary/25"
                 >
@@ -4490,18 +4516,18 @@ export default function App() {
                 />
               </>
             )}
-            <button 
+            <button
               onClick={() => fileInputRef.current?.click()}
               className="bg-surface-variant/20 text-on-surface px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-surface-variant/40 transition-all border border-white/5"
             >
               <FileSpreadsheet size={18} className="text-primary" /> Importar CSV
             </button>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileUpload} 
-              accept=".xlsx, .xls, .csv" 
-              className="hidden" 
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept=".xlsx, .xls, .csv"
+              className="hidden"
             />
           </div>
         </div>
@@ -4516,31 +4542,31 @@ export default function App() {
             transition={{ duration: 0.2 }}
           >
             {activeTab === 'dashboard' && (
-              <DashboardTab 
-                transactions={transactions} 
+              <DashboardTab
+                transactions={transactions}
                 onMarkAsPaid={handleMarkAsPaidClick}
                 globalStats={globalStats}
                 fetchStats={fetchStats}
               />
             )}
             {activeTab === 'lancamentos' && (
-              <LancamentosTab 
-                transactions={transactions} 
+              <LancamentosTab
+                transactions={transactions}
                 onMarkAsPaid={handleMarkAsPaidClick}
                 onMarkAsPaidBatch={handleMarkAsPaidBatchClick}
-                deleteTransaction={deleteTransaction} 
-                setShowNewTxModal={setShowNewTxModal} 
+                deleteTransaction={deleteTransaction}
+                setShowNewTxModal={setShowNewTxModal}
                 setEditingTx={setEditingTx}
                 onLoadMore={() => fetchTransactions(true)}
                 isLoadingMore={isLoadingMore}
               />
             )}
             {activeTab === 'fornecedores' && (
-              <FornecedoresTab 
-                suppliers={suppliers} 
-                transactions={transactions} 
-                deleteSupplier={deleteSupplier} 
-                setShowNewSupplierModal={setShowNewSupplierModal} 
+              <FornecedoresTab
+                suppliers={suppliers}
+                transactions={transactions}
+                deleteSupplier={deleteSupplier}
+                setShowNewSupplierModal={setShowNewSupplierModal}
                 syncSuppliers={syncSuppliers}
                 onSelectSupplier={setDetailSupplier}
               />
@@ -4549,7 +4575,7 @@ export default function App() {
             {activeTab === 'relatorios' && <RelatoriosTab transactions={transactions} />}
             {activeTab === 'receitas' && <ReceitasTab transactions={transactions} onNewRevenue={() => { setNewTxInitialTipo('RECEITA'); setShowNewTxModal(true); }} />}
             {activeTab === 'bancos' && (
-              <BancosTab 
+              <BancosTab
                 banks={banks}
                 transactions={transactions}
                 setShowNewBankModal={setShowNewBankModal}
@@ -4817,7 +4843,7 @@ export default function App() {
                   <div className="space-y-4 max-w-xl mx-auto">
                     <div className="glass-card p-4">
                       <p className="text-[11px] text-on-surface-variant mb-3">Gerencie as contas contábeis usadas na classificação de lançamentos.</p>
-                      
+
                       {/* Botão Carregar Padrão */}
                       <button
                         onClick={async () => {
@@ -4833,7 +4859,7 @@ export default function App() {
                       >
                         Carregar Padrão (atualiza contas antigas)
                       </button>
-                      
+
                       <div className="flex gap-2 mb-4">
                         <input
                           type="text"
@@ -4864,7 +4890,7 @@ export default function App() {
                           Adicionar
                         </button>
                       </div>
-                      
+
                       {/* Caixa de Busca */}
                       <div className="relative mb-3">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60" size={14} />
@@ -4876,7 +4902,7 @@ export default function App() {
                           className="w-full bg-surface-variant/20 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
-                      
+
                       <div className="max-h-60 overflow-y-auto space-y-2">
                         {contasContabeis
                           .filter(c => {
@@ -4885,21 +4911,21 @@ export default function App() {
                             return c.codigo.toLowerCase().includes(q) || c.nome.toLowerCase().includes(q);
                           })
                           .map((conta) => (
-                          <div key={conta.id} className="flex items-center justify-between bg-surface-variant/10 border border-white/5 rounded-lg px-3 py-2">
-                            <div className="flex items-center gap-3">
-                              <span className={`text-xs font-bold px-2 py-1 rounded ${conta.tipo === 'RECEITA' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                                {conta.codigo}
-                              </span>
-                              <span className="text-sm">{conta.nome}</span>
+                            <div key={conta.id} className="flex items-center justify-between bg-surface-variant/10 border border-white/5 rounded-lg px-3 py-2">
+                              <div className="flex items-center gap-3">
+                                <span className={`text-xs font-bold px-2 py-1 rounded ${conta.tipo === 'RECEITA' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                  {conta.codigo}
+                                </span>
+                                <span className="text-sm">{conta.nome}</span>
+                              </div>
+                              <button
+                                onClick={() => deleteContaContabil(conta.id)}
+                                className="text-tertiary hover:text-tertiary/80"
+                              >
+                                <X size={14} />
+                              </button>
                             </div>
-                            <button
-                              onClick={() => deleteContaContabil(conta.id)}
-                              className="text-tertiary hover:text-tertiary/80"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ))}
+                          ))}
                         {contasContabeis.length === 0 && (
                           <p className="text-center text-xs text-on-surface-variant py-4">Nenhuma conta contábil cadastrada.</p>
                         )}
@@ -4916,7 +4942,7 @@ export default function App() {
                         <p className="text-sm font-bold text-on-surface">Limpar Duplicados</p>
                         <p className="text-[10px] text-on-surface-variant">Remove lançamentos com fornecedor + vencimento + valor + empresa iguais, mantendo apenas o mais antigo.</p>
                       </div>
-                      <button 
+                      <button
                         onClick={async () => {
                           if (!window.confirm('Isso removerá duplicados mantendo apenas o registro mais antigo. Continuar?')) return;
                           try {
@@ -4938,7 +4964,7 @@ export default function App() {
                         <p className="text-sm font-bold text-on-surface">Limpar Dados Suspeitos</p>
                         <p className="text-[10px] text-on-surface-variant">Remove valores &gt; R$ 500k, &lt; R$ 0.01, nulos, ou com fornecedor inválido.</p>
                       </div>
-                      <button 
+                      <button
                         onClick={async () => {
                           if (!window.confirm('Isso removerá dados suspeitos (valores extremos ou inválidos). Continuar?')) return;
                           try {
@@ -5003,7 +5029,7 @@ export default function App() {
 
                 <div className="pt-8 border-t border-white/5">
                   <h4 className="text-sm font-bold text-tertiary mb-4 uppercase tracking-widest">Zona de Perigo</h4>
-                  <button 
+                  <button
                     onClick={resetSystem}
                     className="bg-tertiary/10 text-tertiary px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-tertiary/20 transition-all mx-auto border border-tertiary/20"
                   >
@@ -5022,7 +5048,7 @@ export default function App() {
       {/* Modals */}
       <AnimatePresence>
         {detailSupplier && (
-          <SupplierDetailModal 
+          <SupplierDetailModal
             supplier={detailSupplier}
             transactions={transactions}
             onClose={() => setDetailSupplier(null)}
@@ -5158,10 +5184,10 @@ export default function App() {
                           {contasContabeis
                             .filter((conta) => matchesAccountType(conta, (row.tipo || 'DESPESA') as 'RECEITA' | 'DESPESA'))
                             .map((conta) => (
-                            <option key={conta.id} value={conta.id} style={{ backgroundColor: '#1e1e2e' }}>
-                              {conta.nome}
-                            </option>
-                          ))}
+                              <option key={conta.id} value={conta.id} style={{ backgroundColor: '#1e1e2e' }}>
+                                {conta.nome}
+                              </option>
+                            ))}
                         </select>
                       </div>
                       {row.cnpj && (
@@ -5202,12 +5228,12 @@ export default function App() {
       )}
 
       {showNewTxModal && (
-        <NewTxModal 
+        <NewTxModal
           suppliers={suppliers}
           banks={banks}
           contasContabeis={contasContabeis}
           companyOptions={companyOptions}
-          setShowNewTxModal={setShowNewTxModal} 
+          setShowNewTxModal={setShowNewTxModal}
           onSuccess={() => {
             fetchTransactions();
             showNotification('Lançamento salvo com sucesso!', 'success');
@@ -5217,8 +5243,8 @@ export default function App() {
       )}
 
       {showNewSupplierModal && (
-        <NewSupplierModal 
-          setShowNewSupplierModal={setShowNewSupplierModal} 
+        <NewSupplierModal
+          setShowNewSupplierModal={setShowNewSupplierModal}
           onSuccess={() => {
             fetchSuppliers();
             showNotification('Fornecedor cadastrado com sucesso!', 'success');
@@ -5227,8 +5253,8 @@ export default function App() {
       )}
 
       {showNewBankModal && (
-        <NewBankModal 
-          setShowNewBankModal={setShowNewBankModal} 
+        <NewBankModal
+          setShowNewBankModal={setShowNewBankModal}
           onSuccess={() => {
             fetchBanks();
             showNotification('Banco cadastrado com sucesso!', 'success');
@@ -5248,7 +5274,7 @@ export default function App() {
       )}
 
       {showPayModal && (
-        <SelectBankModal 
+        <SelectBankModal
           transactionId={showPayModal.id}
           valor={showPayModal.valor}
           banks={banks}
@@ -5275,7 +5301,7 @@ export default function App() {
 
 
       {editingTx && (
-        <EditTxModal 
+        <EditTxModal
           transaction={editingTx}
           suppliers={suppliers}
           banks={banks}
