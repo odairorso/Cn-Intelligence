@@ -327,16 +327,28 @@ export function useAppData() {
   const syncSuppliers = useCallback(async () => {
     const transactionSuppliers = new Set<string>(transactions.map(tx => tx.fornecedor));
     const existingNames = new Set<string>(suppliers.map(s => s.nome));
-    let count = 0;
-    for (const nome of transactionSuppliers) {
-      if (!existingNames.has(nome) && nome !== 'Desconhecido') {
-        await api.createSupplier({ uid: 'guest', nome, email: '', telefone: '', cnpj: '' });
-        count++;
+
+    // Coletar todos os fornecedores novos primeiro
+    const newSuppliers = Array.from(transactionSuppliers)
+      .filter(nome => !existingNames.has(nome) && nome !== 'Desconhecido')
+      .map(nome => ({
+        uid: 'guest',
+        nome,
+        email: '',
+        telefone: '',
+        cnpj: ''
+      }));
+
+    if (newSuppliers.length > 0) {
+      // Enviar todos de uma vez (batch) ao invés de um por um
+      try {
+        await api.createSuppliersBatch(newSuppliers as any);
+        showNotification(`${newSuppliers.length} novos fornecedores sincronizados!`, 'success');
+        fetchSuppliers();
+      } catch (error) {
+        console.error('Failed to sync suppliers batch:', error);
+        showNotification('Erro ao sincronizar fornecedores.', 'error');
       }
-    }
-    if (count > 0) {
-      showNotification(`${count} novos fornecedores sincronizados!`, 'success');
-      fetchSuppliers();
     } else {
       showNotification('Todos os fornecedores já estão cadastrados.', 'info');
     }

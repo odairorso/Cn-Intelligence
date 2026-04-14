@@ -62,9 +62,9 @@ export interface OFXTransaction {
 function parseOFXDate(raw: string): string {
   // Formatos: YYYYMMDDHHMMSS, YYYYMMDD, YYYYMMDD[+-]HH:MM
   const clean = raw.trim().replace(/\[.*\]/, '');
-  const year  = clean.slice(0, 4);
+  const year = clean.slice(0, 4);
   const month = clean.slice(4, 6);
-  const day   = clean.slice(6, 8);
+  const day = clean.slice(6, 8);
   return `${day}/${month}/${year}`;
 }
 
@@ -116,15 +116,15 @@ function parseOFX(raw: string): OFXTransaction[] {
   if (rawTxs.length === 0) return [];
 
   return rawTxs.map((txRaw) => {
-    const fitid   = getTagValue(txRaw, 'FITID')   || `ofx_${Math.random().toString(36).slice(2)}`;
-    const dtraw   = getTagValue(txRaw, 'DTPOSTED') || getTagValue(txRaw, 'DTTRADE') || '';
-    const amtRaw  = getTagValue(txRaw, 'TRNAMT')  || '0';
+    const fitid = getTagValue(txRaw, 'FITID') || `ofx_${Math.random().toString(36).slice(2)}`;
+    const dtraw = getTagValue(txRaw, 'DTPOSTED') || getTagValue(txRaw, 'DTTRADE') || '';
+    const amtRaw = getTagValue(txRaw, 'TRNAMT') || '0';
     const trntype = getTagValue(txRaw, 'TRNTYPE') || 'OTHER';
-    const memo    = getTagValue(txRaw, 'MEMO')    || getTagValue(txRaw, 'NAME') || 'Sem descrição';
+    const memo = getTagValue(txRaw, 'MEMO') || getTagValue(txRaw, 'NAME') || 'Sem descrição';
 
     // Limpa valor: remove espaços, troca vírgula por ponto
     const amtClean = amtRaw.replace(/\s/g, '').replace(',', '.');
-    const trnamt   = parseFloat(amtClean) || 0;
+    const trnamt = parseFloat(amtClean) || 0;
     const dtposted = dtraw ? parseOFXDate(dtraw) : '';
 
     const isCredit = trnamt > 0 || trntype === 'CREDIT' || trntype === 'INT' || trntype === 'DIV';
@@ -176,10 +176,10 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
   onSuccess,
   showNotification,
 }) => {
-  const [ofxRows, setOfxRows]     = useState<OFXTransaction[]>([]);
-  const [loading, setLoading]     = useState(false);
-  const [fileName, setFileName]   = useState('');
-  const [step, setStep]           = useState<'upload' | 'review' | 'done'>('upload');
+  const [ofxRows, setOfxRows] = useState<OFXTransaction[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const [step, setStep] = useState<'upload' | 'review' | 'done'>('upload');
   const [importCount, setImportCount] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const [activeSearchIdx, setActiveSearchIdx] = useState(-1);
@@ -189,38 +189,66 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
     String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
   // ── Detect duplicates ──────────────────────────────────────────────────
+  // Otimizado: pré-computa um Map de chaves para busca O(1) ao invés de O(n) por transação
   const isDuplicate = useCallback(
     (row: OFXTransaction) => {
       const rowValue = Math.abs(row.trnamt);
       const rowNormName = normalizeSupplierName(row.fornecedor);
+      const rowDate = row.dtposted;
 
-      return transactions.some((tx) => {
-        // Match by FITID in description
-        if (tx.descricao?.includes(row.fitid)) return true;
+      // Match by FITID - busca O(1) no Set
+      if (fitidSet.has(row.fitid)) return true;
 
-        // Match by value + date + supplier name (fuzzy)
-        const txValue = Number(tx.valor) + Number(tx.juros || 0);
-        if (Math.abs(txValue - rowValue) < 0.01 && tx.vencimento === row.dtposted) {
-          const txNormName = normalizeSupplierName(tx.fornecedor);
-          // Exact normalized match
-          if (txNormName === rowNormName) return true;
-          // One contains the other
-          if (txNormName.length >= 5 && rowNormName.includes(txNormName)) return true;
-          if (rowNormName.length >= 5 && txNormName.includes(rowNormName)) return true;
-        }
-        return false;
-      });
+      // Match by value + date + supplier name - busca O(1) no Map
+      const valueDateKey = `${rowValue.toFixed(2)}|${rowDate}`;
+      const possibleMatches = valueDateMap.get(valueDateKey);
+      if (!possibleMatches) return false;
+
+      // Verificar apenas os que compartilham mesma valor+data
+      for (const tx of possibleMatches) {
+        const txNormName = normalizeSupplierName(tx.fornecedor);
+        // Exact normalized match
+        if (txNormName === rowNormName) return true;
+        // One contains the other
+        if (txNormName.length >= 5 && rowNormName.includes(txNormName)) return true;
+        if (rowNormName.length >= 5 && txNormName.includes(rowNormName)) return true;
+      }
+      return false;
     },
-    [transactions]
+    [fitidSet, valueDateMap]
   );
+
+  // Pré-computar índices para busca rápida (executado apenas quando transactions muda)
+  const { fitidSet, valueDateMap } = useMemo(() => {
+    const fitids = new Set<string>();
+    const valueDateMap = new Map<string, Array<{ fornecedor: string }>>();
+
+    transactions.forEach((tx) => {
+      // Index FITIDs encontrados nas descrições
+      const fitidMatch = tx.descricao?.match(/\b([A-Z0-9]{10,30})\b/);
+      if (fitidMatch) {
+        fitids.add(fitidMatch[1]);
+      }
+
+      // Index por valor+data para fuzzy matching
+      const txValue = Number(tx.valor) + Number(tx.juros || 0);
+      const valueDateKey = `${txValue.toFixed(2)}|${tx.vencimento}`;
+      if (!valueDateMap.has(valueDateKey)) {
+        valueDateMap.set(valueDateKey, []);
+      }
+      valueDateMap.get(valueDateKey)!.push({ fornecedor: tx.fornecedor });
+    });
+
+    return { fitidSet: fitids, valueDateMap };
+  }, [transactions]);
 
   // ── File handler ───────────────────────────────────────────────────────
   const handleFile = useCallback(
     async (file: File) => {
       if (!file) return;
       if (!file.name.toLowerCase().endsWith('.ofx') &&
-          !file.name.toLowerCase().endsWith('.qfx') &&
-          !file.name.toLowerCase().endsWith('.ofc')) {
+        !file.name.toLowerCase().endsWith('.qfx') &&
+        !file.name.toLowerCase().endsWith('.ofc')) {
         showNotification('Selecione um arquivo OFX, QFX ou OFC válido.', 'error');
         return;
       }
@@ -339,11 +367,11 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
   };
 
   // ── Counters ───────────────────────────────────────────────────────────
-  const totalRows    = ofxRows.length;
-  const dupRows      = ofxRows.filter((r) => r.duplicate).length;
+  const totalRows = ofxRows.length;
+  const dupRows = ofxRows.filter((r) => r.duplicate).length;
   const selectedRows = ofxRows.filter((r) => r.selected && !r.duplicate).length;
-  const creditSum    = ofxRows.filter((r) => r.selected && r.trnamt > 0).reduce((s, r) => s + r.trnamt, 0);
-  const debitSum     = ofxRows.filter((r) => r.selected && r.trnamt < 0).reduce((s, r) => s + Math.abs(r.trnamt), 0);
+  const creditSum = ofxRows.filter((r) => r.selected && r.trnamt > 0).reduce((s, r) => s + r.trnamt, 0);
+  const debitSum = ofxRows.filter((r) => r.selected && r.trnamt < 0).reduce((s, r) => s + Math.abs(r.trnamt), 0);
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
@@ -524,8 +552,8 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
                       row.duplicate
                         ? 'opacity-40'
                         : row.selected
-                        ? 'bg-primary/5 hover:bg-primary/8'
-                        : 'hover:bg-white/5'
+                          ? 'bg-primary/5 hover:bg-primary/8'
+                          : 'hover:bg-white/5'
                     )}
                   >
                     {/* Row top */}
@@ -539,8 +567,8 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
                           row.duplicate
                             ? 'border-white/10 cursor-not-allowed'
                             : row.selected
-                            ? 'border-primary bg-primary/20'
-                            : 'border-white/20 hover:border-primary'
+                              ? 'border-primary bg-primary/20'
+                              : 'border-white/20 hover:border-primary'
                         )}
                       >
                         {row.selected && !row.duplicate && <Check size={12} className="text-primary" />}
@@ -650,8 +678,8 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
                             disabled={row.duplicate}
                           >
                             <option value="PENDENTE" style={{ backgroundColor: '#1e1e2e' }}>PENDENTE</option>
-                            <option value="PAGO"     style={{ backgroundColor: '#1e1e2e' }}>PAGO</option>
-                            <option value="VENCIDO"  style={{ backgroundColor: '#1e1e2e' }}>VENCIDO</option>
+                            <option value="PAGO" style={{ backgroundColor: '#1e1e2e' }}>PAGO</option>
+                            <option value="VENCIDO" style={{ backgroundColor: '#1e1e2e' }}>VENCIDO</option>
                           </select>
                         </div>
                       </div>
