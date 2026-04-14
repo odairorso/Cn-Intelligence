@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api';
 import { Transaction, Supplier, Bank, ContaContabil, TransactionStatus } from '../types';
 import { toDisplayDate, dateSortKey } from '../lib/utils';
@@ -40,6 +40,7 @@ export function useAppData() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [notification, setNotification] = useState<Notification | null>(null);
+  const transactionsLengthRef = useRef(0);
   const [boletoPatterns, setBoletoPatterns] = useState<Array<{
     id: number;
     cnpj: string;
@@ -105,7 +106,7 @@ export function useAppData() {
       if (append) setIsLoadingMore(true);
 
       const limit = 10000; // Aumentado para 10.000 para trazer tudo de forma otimizada
-      const offset = append ? transactions.length : 0;
+      const offset = append ? transactionsLengthRef.current : 0;
 
       const data = await api.getTransactions('guest', limit, offset);
       const normalized = data.map((tx) => {
@@ -120,11 +121,15 @@ export function useAppData() {
       });
 
       if (append) {
-        setTransactions(prev => [
-          ...prev,
-          ...normalized
-        ].sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento)));
+        setTransactions(prev => {
+          transactionsLengthRef.current = prev.length + normalized.length;
+          return [
+            ...prev,
+            ...normalized
+          ].sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento));
+        });
       } else {
+        transactionsLengthRef.current = normalized.length;
         setTransactions(
           normalized.sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento))
         );
@@ -135,7 +140,7 @@ export function useAppData() {
       if (append) setIsLoadingMore(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [append, transactions.length]);
+  }, []);
 
   const fetchSuppliers = useCallback(async () => {
     try {
