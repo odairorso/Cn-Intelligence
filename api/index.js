@@ -1103,14 +1103,26 @@ async function handleExtractBoleto(req, res) {
       /([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,60})\s+\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/i,
     ];
     let rawBenefName = '';
-    for (const p of benefPatterns) {
-      const m = srcUpper.match(p);
-      if (m?.[1]) {
-        const candidate = m[1].trim().replace(/\s+/g, ' ');
-        const rejectWords = ['BRADESCO','ITAU','SANTANDER','CAIXA','SICREDI','BANCO','PAGADOR','SACADO','RECIBO','AGENCIA','CODIGO','BENEFICI','ESPECIE','CARTEIRA','INSTRUCOES','LOCAL DE','INSC','DOM.', 'AV.', 'AVENIDA', 'RUA', 'CEP '];
-        if (candidate.length >= 5 && !rejectWords.some(w => candidate.toUpperCase().includes(w))) {
-          rawBenefName = candidate;
-          break;
+
+    // Hardcoded safety for common utilities
+    if (srcUpper.includes('SANESUL') || srcUpper.includes('SANEAMENTO DE MATO GROSSO')) {
+      rawBenefName = 'SANESUL';
+    } else if (srcUpper.includes('ENERGISA')) {
+      rawBenefName = 'ENERGISA';
+    } else if (srcUpper.includes('CLARO') || srcUpper.includes('NET RESIDENCIAL')) {
+      rawBenefName = 'CLARO';
+    } else if (srcUpper.includes('VIVO') || srcUpper.includes('TELEFONICA')) {
+      rawBenefName = 'VIVO';
+    } else {
+      for (const p of benefPatterns) {
+        const m = srcUpper.match(p);
+        if (m?.[1]) {
+          const candidate = m[1].trim().replace(/\s+/g, ' ');
+          const rejectWords = ['BRADESCO','ITAU','SANTANDER','CAIXA','SICREDI','BANCO','PAGADOR','SACADO','RECIBO','AGENCIA','CODIGO','BENEFICI','ESPECIE','CARTEIRA','INSTRUCOES','LOCAL DE','INSC','DOM.', 'AV.', 'AVENIDA', 'RUA', 'CEP '];
+          if (candidate.length >= 5 && !rejectWords.some(w => candidate.toUpperCase().includes(w))) {
+            rawBenefName = candidate;
+            break;
+          }
         }
       }
     }
@@ -1189,7 +1201,7 @@ TEXTO: ${extractedText.slice(0, 5000)}
 Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
 
         const miniResp = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-2.0-flash',
           contents: miniPrompt,
           config: { responseMimeType: 'application/json', temperature: 0 },
         });
@@ -1225,22 +1237,30 @@ Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
 
     // ── 2. Sem padrão — chama Gemini completo ────────────────────────────────
 
-    const promptBase = `Você é um especialista em boletos bancários brasileiros com 20 anos de experiência.
+    const promptBase = `Você é um especialista em boletos bancários brasileiros com 20 anos de experiência em automação financeira.
 
-REGRAS CRÍTICAS:
-- fornecedor = quem RECEBE o dinheiro (beneficiário/cedente), NUNCA o banco emissor
-- Bancos emissores (IGNORAR como fornecedor): Sicredi, Bradesco, Itaú, Santander, Caixa, BB, Cora, Inter, Nubank, C6, BTG, Safra, BV, Banrisul, Unicred
-- valor = número decimal com PONTO como separador (ex: 632.86).
-- ATENÇÃO VALOR UTILITY (Energisa/Claro/Sanesul): Use o "Valor Total a Pagar" ou "Total da Fatura". NUNCA extraia valores parciais, "Multas", "Juros", "Atualização Monetária" ou "Parcelas" como o valor principal. Se houver multa, ela já deve estar incluída no total que você vai extrair.
-- Se valor aparecer como "632,86" retorne 632.86 — se "2.092,71" retorne 2092.71
+REGRAS CRÍTICAS (Siga rigorosamente):
+1. FORNECEDOR (Beneficiário):
+   - É quem RECEBE o dinheiro (Ex: SANESUL, ENERGISA, CLARO, Condomínio Edifício X).
+   - NUNCA use o banco emissor (Sicredi, Bradesco, Itaú, Santander, Caixa, BB, Cora, Inter, Nubank, C6, Safra, etc).
+   - Se encontrar "BANCO DO BRASIL" e "SANESUL", o fornecedor é SANESUL.
+   - NUNCA use o "Pagador" ou "Sacado" as fornecedor.
+   - NUNCA use um endereço (Rua, Av, CEP) como nome do fornecedor.
 
-CAMPOS:
-1. fornecedor: Nome do beneficiário/cedente que emitiu o boleto — quem VAI RECEBER o dinheiro
-   Procure por: "Beneficiário", "Cedente", "Sacador/Avalista", "Razão Social"
-   ATENÇÃO: O campo "Pagador" ou "Sacado" é quem PAGA — NUNCA use como fornecedor
-   ATENÇÃO 2: NUNCA use um endereço como fornecedor (ex: se encontrar "AV. GURY MARQUES", "RUA...", "CEP", isso é o endereço do fornecedor, o nome dele vem antes).
-   Se o beneficiário for uma pessoa física (ex: "Valmir Lopes de Souza"), use o nome dela
-   Exemplos corretos: HAPVIDA, SANESUL, ENERGISA, VSC CONTABILIDADE, Anhanguera Educacional Ltda
+2. VALOR FINANCEIRO:
+   - Use o "Valor Total a Pagar" ou "Total da Fatura".
+   - NUNCA extraia "Multas", "Juros" ou "Atualização Monetária" como o valor principal.
+   - Formato: use PONTO decimal (ex: 142.46).
+
+3. VENCIMENTO:
+   - Procure por "Vencimento" ou "Data de Vencimento".
+   - Para ENERGISA/SANESUL: NUNCA use a "Data de Próxima Leitura". Use a data limite de pagamento.
+
+CAMPOS ADICIONAIS:
+- cnpj: CNPJ do fornecedor (só números).
+- numero_boleto: Linha digitável ou código de barras (só números).
+
+JSON FORMAT:
 {"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
 
     let prompt;
