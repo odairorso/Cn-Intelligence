@@ -3483,7 +3483,7 @@ export default function App() {
       // Último fallback: valor BR (>5) que aparece 2+ vezes no texto sem mora/multa
       // Padrão típico de boleto: valor aparece em múltiplos campos do resumo (ex: "699,00 01/04/2026 699,00")
       if (!valor) {
-        const allBrValues = [...textWithoutFees.matchAll(/(?<![,\\d])(\\d{1,3}(?:\\.\\d{3})*,\\d{2})(?![,\\d])/g)]
+        const allBrValues = [...textWithoutFees.matchAll(/(?<![,\d])(\d{1,3}(?:\.\d{3})*,\d{2})(?![,\d])/g)]
           .map(m => m[1])
           .filter(v => { const n = Number(v.replace(/\./g, '').replace(',', '.')); return n > 5; });
         const freq = new Map<string, number>();
