@@ -4859,6 +4859,7 @@ export default function App() {
                       <div className="md:col-span-3 relative">
                         <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Fornecedor</p>
                         <input
+                          list="supplier-suggestions"
                           value={row.fornecedor}
                           onChange={(e) => updatePdfRow(index, { fornecedor: e.target.value })}
                           placeholder="Digite o fornecedor..."
@@ -4975,8 +4976,8 @@ export default function App() {
                   </div>
                 ))}
                 <datalist id="supplier-suggestions">
-                  {suppliers.map((supplier) => (
-                    <option key={supplier.id || supplier.nome} value={supplier.nome} />
+                  {[...new Set([...suppliers.map(s => s.nome), ...transactions.map(t => t.fornecedor)])].sort().map((nome) => (
+                    <option key={nome} value={nome} />
                   ))}
                 </datalist>
               </div>
