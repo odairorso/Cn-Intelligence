@@ -49,15 +49,38 @@ export function useAppData() {
     setTimeout(() => setNotification(null), 3000);
   }, []);
 
+  const coerceMoney = (value: unknown): number => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    const raw = String(value ?? '').trim();
+    if (!raw) return 0;
+    const cleaned = raw.replace(/[^\d,.\-]/g, '');
+    if (!cleaned) return 0;
+    if (cleaned.includes(',') && cleaned.includes('.')) {
+      const n = Number(cleaned.replace(/\./g, '').replace(',', '.'));
+      return Number.isFinite(n) ? n : 0;
+    }
+    if (cleaned.includes(',')) {
+      const n = Number(cleaned.replace(',', '.'));
+      return Number.isFinite(n) ? n : 0;
+    }
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : 0;
+  };
+
   // ─── Fetchers ─────────────────────────────────────────────────────────────
   const fetchTransactions = useCallback(async () => {
     try {
       const data = await api.getTransactions('guest');
-      const normalized = data.map((tx) => ({
-        ...tx,
-        vencimento: toDisplayDate(tx.vencimento),
-        pagamento: tx.pagamento ? toDisplayDate(tx.pagamento) : undefined,
-      }));
+      const normalized = data.map((tx) => {
+        const raw = tx as any;
+        return {
+          ...tx,
+          valor: coerceMoney(raw.valor),
+          juros: coerceMoney(raw.juros),
+          vencimento: toDisplayDate(tx.vencimento),
+          pagamento: tx.pagamento ? toDisplayDate(tx.pagamento) : undefined,
+        } as Transaction;
+      });
       setTransactions(
         normalized.sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento))
       );
