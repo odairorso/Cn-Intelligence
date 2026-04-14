@@ -176,8 +176,8 @@ const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) 
         const parts = tx.vencimento.split('/');
         return parts.length === 3 && parseInt(parts[1]) === idx + 1 && parts[2] === String(currentYear);
       });
-      const receitas = monthTx.filter(tx => tx.tipo === 'RECEITA').reduce((a, tx) => a + tx.valor, 0);
-      const despesas = monthTx.filter(tx => tx.tipo !== 'RECEITA').reduce((a, tx) => a + tx.valor, 0);
+      const receitas = monthTx.filter(tx => tx.tipo === 'RECEITA').reduce((a, tx) => a + (Number(tx.valor) || 0), 0);
+      const despesas = monthTx.filter(tx => tx.tipo !== 'RECEITA').reduce((a, tx) => a + (Number(tx.valor) || 0), 0);
       const saldo = receitas - despesas;
       return { name: month, receitas, despesas, saldo };
     });
@@ -188,7 +188,7 @@ const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) 
     const supplierMap = new Map<string, number>();
     filteredTx.forEach(tx => {
       const current = supplierMap.get(tx.fornecedor) || 0;
-      supplierMap.set(tx.fornecedor, current + tx.valor);
+      supplierMap.set(tx.fornecedor, current + (Number(tx.valor) || 0));
     });
     return Array.from(supplierMap.entries())
       .sort((a, b) => b[1] - a[1])
@@ -201,7 +201,9 @@ const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) 
     let total = 0, pagos = 0, pendentes = 0, vencidos = 0;
     const today = new Date(); today.setHours(0,0,0,0);
     for (const tx of filteredTx) {
-      total += tx.valor;
+      const baseValor = Number(tx.valor) || 0;
+      const juros = Number((tx as any).juros) || 0;
+      total += baseValor + juros;
       if (tx.status === 'PAGO') pagos++;
       else if (tx.status === 'VENCIDO') vencidos++;
       else {
@@ -3302,13 +3304,28 @@ export default function App() {
 
   const parseLinhaDigitavel = (text: string) => {
     const src = String(text || '');
-    const candidates = src.match(/\b\d{47,48}\b/g) || [];
+
+    // Tenta encontrar 47-48 dígitos contíguos (formato normal)
+    const candidates: string[] = src.match(/\b\d{47,48}\b/g) || [];
+
+    // Tenta montar linha digitável a partir do formato fragmentado com pontos/espaços
+    // Ex: "00190.00009 01104.461007 00076.678176 1 14360000069900"
+    if (!candidates.length) {
+      // Formato fragmentado: "DDDDD.DDDDD DDDDD.DDDDDD DDDDD.DDDDDD D DDDDDDDDDDDDDD"
+      const fragmentPattern = /\d{5}\.\d{5}\s+\d{5}\.\d{6}\s+\d{5}\.\d{6}\s+\d\s+\d{14}/;
+      const fragMatch = src.match(fragmentPattern);
+      if (fragMatch) {
+        const assembled = fragMatch[0].replace(/[^0-9]/g, '');
+        if (assembled.length === 47 || assembled.length === 48) candidates.push(assembled);
+      }
+    }
+
     if (!candidates.length) return null;
     const raw = candidates[0];
     const line = raw.length >= 47 ? raw.slice(0, 47) : raw;
     const fator = Number(line.slice(5, 9));
     const valor = Number(line.slice(9, 19)) / 100;
-    if (!Number.isFinite(fator)) return null;
+    if (!Number.isFinite(fator) || fator <= 0) return null;
     if (!Number.isFinite(valor) || valor <= 0 || valor > 500000) return null;
     const base = new Date(Date.UTC(1997, 9, 7));
     const dueDate = new Date(base.getTime() + fator * 24 * 60 * 60 * 1000);
@@ -3421,43 +3438,63 @@ export default function App() {
       if (match?.[1]) { vencimento = match[1]; break; }
     }
 
-    const valuePatterns = [
-      /VALOR\s+(?:DO\s+)?DOCUMENTO[:\s]+R?\$?\s*([\d.,]+)/,
-      /VALOR\s+COBRADO[:\s]+R?\$?\s*([\d.,]+)/,
-      /VALOR\s+TOTAL[:\s]+R?\$?\s*([\d.,]+)/,
-      /VLR\s+PAGAR[:\s]+R?\$?\s*([\d.,]+)/,
-      /VALOR\s+([\d]{1,3}(?:[.,][\d]{3})*[.,][\d]{2})\s*\(=\)\s*VALOR\s+DO\s+DOCUMENTO/i,
-      /R\$\s*([\d]{1,3}(?:[.,][\d]{3})*[.,][\d]{2})/,
-      /\(=\)\s*Valor do Documento\s+([\d.,]+)/i,
-    ];
-    for (const pattern of valuePatterns) {
-      const match = normalizedText.match(pattern);
-      if (match?.[1]) {
-        const raw = match[1].trim();
-        let parsed = 0;
-        // Formato BR: 1.234,56
-        if (/^\d{1,3}(\.\d{3})+(,\d{2})$/.test(raw)) {
-          parsed = Number(raw.replace(/\./g, '').replace(',', '.'));
-        // Formato US: 1,234.56
-        } else if (/^\d{1,3}(,\d{3})+(\.\d{2})$/.test(raw)) {
-          parsed = Number(raw.replace(/,/g, ''));
-        // Só ponto decimal: 632.86
-        } else if (/^\d+\.\d{1,2}$/.test(raw)) {
-          parsed = Number(raw);
-        // Só vírgula decimal: 632,86
-        } else if (/^\d+,\d{1,2}$/.test(raw)) {
-          parsed = Number(raw.replace(',', '.'));
-        } else {
-          parsed = Number(raw.replace(/[^0-9.]/g, ''));
-        }
-        if (!Number.isNaN(parsed) && parsed > 0) { valor = sanitizeBoletoValor(parsed); break; }
-      }
-    }
-
+    // ─── 1. Extrai da Linha Digitável primeiro (fonte mais confiável) ───────────
     const linhaInfo = parseLinhaDigitavel(normalizedText);
     if (linhaInfo) {
       if (!vencimento) vencimento = linhaInfo.vencimento;
-      if ((!valor || valor > 20000) && linhaInfo.valor > 0) valor = sanitizeBoletoValor(linhaInfo.valor);
+      if (linhaInfo.valor > 0) valor = sanitizeBoletoValor(linhaInfo.valor);
+    }
+
+    // ─── 2. Fallback: patterns de texto (só usa se linha digitável não extraiu) ─
+    if (!valor) {
+      // Remove trechos de mora/multa/juros para o padrão R$ genérico não capturá-los
+      const textWithoutFees = normalizedText
+        .replace(/(?:MORA|MULTA|JUROS|\bPOR\s+DIA\b)[^\n]{0,80}/gi, '')
+        .replace(/(?:TAXA|ENCARGO)[^\n]{0,60}/gi, '');
+
+      const valuePatterns = [
+        { re: /VALOR\s+(?:DO\s+)?DOCUMENTO[:\s]+R?\$?\s*([\d.,]+)/, src: normalizedText },
+        { re: /VALOR\s+COBRADO[:\s]+R?\$?\s*([\d.,]+)/, src: normalizedText },
+        { re: /VALOR\s+TOTAL[:\s]+R?\$?\s*([\d.,]+)/, src: normalizedText },
+        { re: /VLR\s+PAGAR[:\s]+R?\$?\s*([\d.,]+)/, src: normalizedText },
+        { re: /VALOR\s+([\d]{1,3}(?:[.,][\d]{3})*[.,][\d]{2})\s*\(=\)\s*VALOR\s+DO\s+DOCUMENTO/i, src: normalizedText },
+        { re: /\(=\)\s*VALOR\s+DO\s+DOCUMENTO\s+([\d.,]+)/i, src: normalizedText },
+        // Padrão genérico R$ — usa o texto sem mora/multa para evitar falso positivo
+        { re: /R\$\s*([\d]{1,3}(?:[.,][\d]{3})*[.,][\d]{2})/, src: textWithoutFees },
+      ];
+
+      const parseBrValue = (raw: string): number => {
+        const s = raw.trim();
+        if (/^\d{1,3}(\.\d{3})+(,\d{2})$/.test(s)) return Number(s.replace(/\./g, '').replace(',', '.'));
+        if (/^\d{1,3}(,\d{3})+(\.\d{2})$/.test(s)) return Number(s.replace(/,/g, ''));
+        if (/^\d+\.\d{1,2}$/.test(s)) return Number(s);
+        if (/^\d+,\d{1,2}$/.test(s)) return Number(s.replace(',', '.'));
+        return Number(s.replace(/[^0-9.]/g, ''));
+      };
+
+      for (const { re, src } of valuePatterns) {
+        const match = src.match(re);
+        if (match?.[1]) {
+          const parsed = parseBrValue(match[1]);
+          if (!Number.isNaN(parsed) && parsed > 0) { valor = sanitizeBoletoValor(parsed); break; }
+        }
+      }
+
+      // Último fallback: valor BR (>5) que aparece 2+ vezes no texto sem mora/multa
+      // Padrão típico de boleto: valor aparece em múltiplos campos do resumo (ex: "699,00 01/04/2026 699,00")
+      if (!valor) {
+        const allBrValues = [...textWithoutFees.matchAll(/(?<![,\\d])(\\d{1,3}(?:\\.\\d{3})*,\\d{2})(?![,\\d])/g)]
+          .map(m => m[1])
+          .filter(v => { const n = Number(v.replace(/\./g, '').replace(',', '.')); return n > 5; });
+        const freq = new Map<string, number>();
+        allBrValues.forEach(v => freq.set(v, (freq.get(v) || 0) + 1));
+        const repeated = [...freq.entries()].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]);
+        if (repeated.length) {
+          const best = repeated[0][0];
+          const parsed = Number(best.replace(/\./g, '').replace(',', '.'));
+          if (!Number.isNaN(parsed) && parsed > 0) valor = sanitizeBoletoValor(parsed);
+        }
+      }
     }
 
     const numeroBoleto = extractLocalBoletoNumber(normalizedText);
@@ -4048,7 +4085,9 @@ export default function App() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     for (const tx of transactions) {
-      total += tx.valor;
+      const baseValor = Number(tx.valor) || 0;
+      const juros = Number((tx as any).juros) || 0;
+      total += baseValor + juros;
       if (tx.status === 'PAGO') {
         pagos++;
       } else if (tx.status === 'VENCIDO') {
