@@ -90,7 +90,7 @@ export function useAppData() {
   };
 
   // ─── Fetchers ─────────────────────────────────────────────────────────────
-  
+
   const fetchStats = useCallback(async (year?: string, period?: string) => {
     try {
       const stats = await api.getStats('guest', year, period);
@@ -103,10 +103,10 @@ export function useAppData() {
   const fetchTransactions = useCallback(async (append = false) => {
     try {
       if (append) setIsLoadingMore(true);
-      
+
       const limit = 10000; // Aumentado para 10.000 para trazer tudo de forma otimizada
       const offset = append ? transactions.length : 0;
-      
+
       const data = await api.getTransactions('guest', limit, offset);
       const normalized = data.map((tx) => {
         const raw = tx as any;
@@ -121,7 +121,7 @@ export function useAppData() {
 
       if (append) {
         setTransactions(prev => [
-          ...prev, 
+          ...prev,
           ...normalized
         ].sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento)));
       } else {
@@ -134,7 +134,8 @@ export function useAppData() {
     } finally {
       if (append) setIsLoadingMore(false);
     }
-  }, [transactions.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [append, transactions.length]);
 
   const fetchSuppliers = useCallback(async () => {
     try {
@@ -196,8 +197,9 @@ export function useAppData() {
     }
   }, [showNotification, fetchBoletoPatterns]);
 
-  // ─── Initial load — em paralelo ───
+  // ─── Initial load — em paralelo (executa apenas uma vez no mount) ───
   useEffect(() => {
+    let cancelled = false;
     setIsLoading(true);
 
     Promise.all([
@@ -207,10 +209,14 @@ export function useAppData() {
       fetchBanks(),
       fetchContasContabeis(),
       fetchBoletoPatterns(),
-    ]).finally(() => setIsLoading(false));
+    ]).finally(() => {
+      if (!cancelled) setIsLoading(false);
+    });
 
     api.setupTables().catch(console.error);
-  }, [fetchStats, fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns]);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Executa apenas uma vez no mount
 
   // ─── Auto-merge suppliers (max 1x a cada 6h) ─────────────────────────────
   useEffect(() => {
@@ -220,17 +226,21 @@ export function useAppData() {
       const last = Number(localStorage.getItem(key) || 0);
       if (Date.now() - last < 6 * 60 * 60 * 1000) return;
     } catch { /* ignore */ }
+    let cancelled = false;
     (async () => {
       try {
         await api.mergeSuppliersAuto();
+        if (cancelled) return;
         await fetchSuppliers();
-        await fetchTransactions();
+        if (cancelled) return;
+        // Não chama fetchTransactions aqui para evitar loop de reinicialização
         localStorage.setItem(key, String(Date.now()));
       } catch (e) {
         console.error('Auto-merge suppliers failed:', e);
       }
     })();
-  }, [suppliers.length, fetchSuppliers, fetchTransactions]);
+    return () => { cancelled = true; };
+  }, [suppliers.length, fetchSuppliers]);
 
   // ─── Persist company options ──────────────────────────────────────────────
   useEffect(() => {
