@@ -758,10 +758,10 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
       {/* Desktop: table */}
       <div className="glass-card overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left min-w-[1200px]">
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
-                <th className="px-4 py-4 w-10">
+                <th className="px-4 py-4 w-10 whitespace-nowrap">
                   <input
                     type="checkbox"
                     checked={allPagePendingSelected}
@@ -770,15 +770,15 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
                     title="Selecionar todos pendentes desta página"
                   />
                 </th>
-                <th className="px-8 py-4">Fornecedor</th>
-                <th className="px-8 py-4">Descrição</th>
-                <th className="px-8 py-4">Empresa</th>
-                <th className="px-8 py-4">Vencimento</th>
-                <th className="px-8 py-4">Pagamento</th>
-                <th className="px-8 py-4">Conta</th>
-                <th className="px-8 py-4">Valor</th>
-                <th className="px-8 py-4">Status</th>
-                <th className="px-8 py-4 sticky right-0 bg-surface z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)]">Ações</th>
+                <th className="px-8 py-4 whitespace-nowrap min-w-[180px]">Fornecedor</th>
+                <th className="px-8 py-4 whitespace-nowrap min-w-[280px]">Descrição</th>
+                <th className="px-8 py-4 whitespace-nowrap w-28">Empresa</th>
+                <th className="px-8 py-4 whitespace-nowrap w-32">Vencimento</th>
+                <th className="px-8 py-4 whitespace-nowrap w-32">Pagamento</th>
+                <th className="px-8 py-4 whitespace-nowrap w-28">Conta</th>
+                <th className="px-8 py-4 whitespace-nowrap w-36 text-right">Valor</th>
+                <th className="px-8 py-4 whitespace-nowrap w-28">Status</th>
+                <th className="px-8 py-4 whitespace-nowrap w-28 sticky right-0 bg-surface z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)]">Ações</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-white/5">
@@ -794,7 +794,7 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
                       />
                     )}
                   </td>
-                  <td className="px-8 py-4 font-semibold">{tx.fornecedor}</td>
+                  <td className="px-8 py-4 font-semibold whitespace-nowrap">{tx.fornecedor}</td>
                   <td className="px-8 py-4 text-on-surface-variant">{tx.descricao}</td>
                   <td className="px-8 py-4">
                     <span className="bg-primary/10 text-primary text-[10px] px-2 py-1 rounded">
@@ -804,7 +804,7 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
                   <td className="px-8 py-4">{tx.vencimento}</td>
                   <td className="px-8 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
                   <td className="px-8 py-4 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold">{tx.banco || '-'}</td>
-                  <td className={cn("px-8 py-4 font-bold", tx.valor < 0 ? "text-tertiary" : "text-primary")}>
+                  <td className={cn("px-8 py-4 font-bold text-right", tx.valor < 0 ? "text-tertiary" : "text-primary")}>
                     {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     {Number(tx.juros) > 0 && (
                       <p className="text-[9px] text-tertiary font-normal">(inclui {Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })} juros)</p>
