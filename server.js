@@ -482,50 +482,30 @@ app.post('/api/extract-boleto', async (req, res) => {
     const hasText = extractedText.length > 50;
 
     // Prompt ultra-detalhado para máxima extração
-    const promptBase = `Você é um especialista em boletos bancários brasileiros com 20 anos de experiência.
-Sua tarefa é extrair dados de boletos com MÁXIMA PRECISÃO.
+    const promptBase = `Você é um especialista em boletos bancários brasileiros com 20 anos de experiência em automação financeira.
 
-REGRAS CRÍTICAS:
-- fornecedor = quem RECEBE o dinheiro (beneficiário/cedente), NUNCA o banco emissor
-- NUNCA use um endereço como fornecedor (ex: "AV.", "AVENIDA", "RUA", "CEP") — isso é o endereço do fornecedor, não o nome
-- Bancos emissores (IGNORAR como fornecedor): Sicredi, Bradesco, Itaú, Santander, Caixa, BB, Cora, Inter, Nubank, C6, BTG, Safra, BV, Banrisul, Unicred, Ailos, Cresol
-- valor = número decimal com PONTO como separador decimal (ex: 632.86, não 63286)
-- Se o valor aparecer como "632,86" retorne 632.86
-- Se o valor aparecer como "2.092,71" retorne 2092.71
-- Se o valor aparecer como "2,092.71" retorne 2092.71
+REGRAS CRÍTICAS (Siga rigorosamente):
+1. FORNECEDOR (Beneficiário):
+   - É quem RECEBE o dinheiro (Ex: SANESUL, ENERGISA, CLARO, Condomínio Edifício X).
+   - NUNCA use o banco emissor (Sicredi, Bradesco, Itaú, Santander, Caixa, BB, Cora, Inter, Nubank, C6, Safra, etc).
+   - Se encontrar "BANCO DO BRASIL" e "SANESUL", o fornecedor é SANESUL.
+   - NUNCA use o "Pagador" ou "Sacado" como fornecedor.
+   - NUNCA use um endereço (Rua, Av, CEP) como nome do fornecedor.
 
-CAMPOS A EXTRAIR:
+2. VALOR FINANCEIRO:
+   - Use o "Valor Total a Pagar" ou "Total da Fatura".
+   - NUNCA extraia "Multas", "Juros" ou "Atualização Monetária" como o valor principal.
+   - Formato: use PONTO decimal (ex: 142.46).
 
-1. fornecedor: Nome da empresa/pessoa que emitiu o boleto
-   Procure por (nesta ordem): "Beneficiário", "Cedente", "Sacador/Avalista", "Razão Social", "Favorecido"
-   Exemplos válidos: HAPVIDA, SANESUL, ENERGISA, VSC CONTABILIDADE, PREFEITURA MUNICIPAL
-   
-2. vencimento: Data de vencimento no formato DD/MM/AAAA
-   Procure por: "Vencimento", "Data de Vencimento", "Venc."
-   
-3. valor: Valor TOTAL do boleto em reais (número com ponto decimal)
-   Procure por (nesta ordem): "(=) Valor do Documento", "Valor do Documento", "Valor Cobrado", "Valor Total", "Valor a Pagar"
-   ATENÇÃO: retorne APENAS o número, ex: 632.86
-   
-4. cnpj: CNPJ do beneficiário (formato: XX.XXX.XXX/XXXX-XX ou apenas dígitos)
+3. VENCIMENTO:
+   - Procure por "Vencimento" ou "Data de Vencimento".
+   - Para ENERGISA/SANESUL: NUNCA use a "Data de Próxima Leitura". Use a data limite de pagamento.
 
-5. descricao: Descrição do serviço. Se não houver, use o tipo de cobrança ou referência.
-   Exemplos: "Plano de Saúde", "Conta de Água", "Honorários Contábeis", "Mensalidade"
-   
-6. empresa: Qual empresa do Grupo CN é o PAGADOR (quem paga o boleto)
-   Opções: CN, FACEMS, LAB, CEI, UNOPAR, ELAINE
-   Procure por: "Pagador", "Sacado" — se aparecer "COLEGIO NAVIRAI" = CN, "FACEMS" = FACEMS
-   Se não identificar, deixe vazio.
-   
-7. numero_boleto: Número único do boleto (para evitar duplicatas)
-   Procure por (nesta ordem de prioridade):
-   a) "Nosso Número" ou "Nosso Numero" — campo mais confiável
-   b) "Número do Documento" ou "Numero do Documento" ou "Nro Documento" ou "Nr Documento"  
-   c) "Nro Doc" ou "Nr Doc" ou "Nº Doc"
-   d) Linha digitável (47-48 dígitos)
-   Retorne APENAS os dígitos/alfanuméricos, sem pontos, traços ou espaços.
+CAMPOS ADICIONAIS:
+- cnpj: CNPJ do fornecedor (só números).
+- numero_boleto: Linha digitável ou código de barras (só números).
 
-Responda APENAS com JSON válido, sem markdown, sem explicações:
+JSON FORMAT:
 {"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
 
     let prompt;
@@ -623,8 +603,30 @@ Analise visualmente o PDF anexo e extraia os dados.`;
     if (finalNumero) extracted.numero_boleto = finalNumero;
 
     const srcUpper = String(extractedText || '').toUpperCase();
-    if ((isAddressLike(extracted.fornecedor) || !extracted.fornecedor) && srcUpper.includes('ENERGISA')) {
+    
+    // Hardcoded safety for common utilities
+    if (srcUpper.includes('SANESUL') || srcUpper.includes('SANEAMENTO DE MATO GROSSO')) {
+      extracted.fornecedor = 'SANESUL';
+    } else if (srcUpper.includes('ENERGISA')) {
       extracted.fornecedor = 'ENERGISA';
+    } else if (srcUpper.includes('CLARO') || srcUpper.includes('NET RESIDENCIAL')) {
+      extracted.fornecedor = 'CLARO';
+    } else if (srcUpper.includes('VIVO') || srcUpper.includes('TELEFONICA')) {
+      extracted.fornecedor = 'VIVO';
+    }
+
+    // Clean address-like supplier names
+    const isAddressLike = (text) => {
+      if (!text) return false;
+      const t = text.toUpperCase();
+      return t.includes('AV.') || t.includes('AVENIDA') || t.includes('RUA ') || t.includes('CEP ') || t.includes('Nº ') || t.includes('RODOVIA');
+    };
+
+    if (isAddressLike(extracted.fornecedor)) {
+      if (srcUpper.includes('ENERGISA')) extracted.fornecedor = 'ENERGISA';
+      else if (srcUpper.includes('SANESUL')) extracted.fornecedor = 'SANESUL';
+      else if (srcUpper.includes('CLARO')) extracted.fornecedor = 'CLARO';
+      else if (srcUpper.includes('VIVO')) extracted.fornecedor = 'VIVO';
     }
 
     res.json(extracted);
