@@ -1230,6 +1230,10 @@ Responda APENAS com JSON válido:
       extracted.fornecedor = 'ENERGISA';
     }
 
+    if ((extracted.fornecedor === 'ATUALIZA' || !extracted.fornecedor) && srcUpper.includes('CLARO')) {
+      extracted.fornecedor = 'CLARO';
+    }
+
     // Post-processing filter for Energisa reading date
     if (extracted.fornecedor === 'ENERGISA' && extracted.vencimento === '07/05/2026') {
       const realDate = srcUpper.match(/(\d{2}\/04\/2026)/);

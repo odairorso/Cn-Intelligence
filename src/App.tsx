@@ -3420,7 +3420,22 @@ export default function App() {
 
     if (fornecedor === 'Fornecedor não identificado') {
       const bestSupplier = suppliers
-        .map((s) => ({ supplier: s, score: normalizedText.includes(normalizeSupplierName(s.nome)) ? normalizeSupplierName(s.nome).length : 0 }))
+        .map((s) => {
+          const normS = normalizeSupplierName(s.nome);
+          if (!normS || normS.length < 3) return { supplier: s, score: 0 };
+          
+          // Busca por palavra inteira (\b) para evitar que "atualizados" pegue "ATUALIZA"
+          const regex = new RegExp(`\\b${normS}\\b`, 'i');
+          const hasFullMatch = regex.test(normalizedText);
+          
+          // Pontuação: comprimento do nome se for palavra inteira
+          let score = hasFullMatch ? normS.length : 0;
+          
+          // Super prioridade para parceiros estratégicos se encontrados no texto
+          if (hasFullMatch && (normS === 'CLARO' || normS === 'ENERGISA')) score += 1000;
+          
+          return { supplier: s, score };
+        })
         .filter((x) => x.score > 0)
         .sort((a, b) => b.score - a.score)[0];
       if (bestSupplier) fornecedor = bestSupplier.supplier.nome;
