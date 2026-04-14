@@ -37,13 +37,12 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   AreaChart, Area, CartesianGrid
 } from 'recharts';
-// Lazy loaded: importados apenas quando usados
-// import * as XLSX from 'xlsx';
-// import * as pdfjsLib from 'pdfjs-dist';
-// import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
+import * as XLSX from 'xlsx';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
 import { motion, AnimatePresence } from 'motion/react';
 
-// pdfjsLib será configurado dinamicamente quando necessário
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 import { Transaction, KPI, Supplier, TransactionStatus, Bank, ContaContabil } from './types';
 import { api } from './api';
@@ -3764,11 +3763,6 @@ export default function App() {
     setIsProcessingPdf(true);
     showNotification(`Processando ${pdfFiles.length} boleto(s)...`, 'info');
 
-    // Lazy load pdfjs-dist apenas quando necessário
-    const pdfjsLib = await import('pdfjs-dist');
-    const pdfWorkerSrc = await import('pdfjs-dist/build/pdf.worker.min.js?url');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc.default;
-
     try {
       const extractedRows: PdfImportDraft[] = await Promise.all(
         pdfFiles.map(async (file) => {
@@ -3947,10 +3941,6 @@ export default function App() {
     reader.onload = async (e) => {
       try {
         showNotification('Processando arquivo... Por favor, aguarde.', 'info');
-
-        // Lazy load XLSX apenas quando necessário
-        const XLSX = await import('xlsx');
-
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
 
