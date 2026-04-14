@@ -827,15 +827,16 @@ app.get('/api', async (req, res) => {
         const { uid: statsUid, year, period } = req.query;
         const sUid = statsUid || 'guest';
         
+        const isRange = (val) => /^\d{4}-\d{4}$/.test(val);
         let dateFilter = '';
-        const params = [sUid];
-        if (year && year !== 'TODOS') {
+        
+        if (year && year !== 'TODOS' && !isRange(year)) {
           const y = parseInt(year);
           dateFilter = `AND vencimento >= '${y}-01-01' AND vencimento <= '${y}-12-31'`;
-        } else if (period === '2024-2025') {
-          dateFilter = `AND vencimento >= '2024-01-01' AND vencimento <= '2025-12-31'`;
-        } else if (period === '2024-2026') {
-          dateFilter = `AND vencimento >= '2024-01-01' AND vencimento <= '2026-12-31'`;
+        } else if (isRange(year) || isRange(period)) {
+          const range = isRange(year) ? year : period;
+          const [start, end] = range.split('-');
+          dateFilter = `AND vencimento >= '${start}-01-01' AND vencimento <= '${end}-12-31'`;
         }
 
         const kpiRes = await pool.query(`
@@ -852,7 +853,9 @@ app.get('/api', async (req, res) => {
         const kpis = kpiRes.rows[0];
 
         let fluxRes;
-        if (year && year !== 'TODOS') {
+        const activeRange = isRange(year) ? year : (isRange(period) ? period : null);
+
+        if (year && year !== 'TODOS' && !activeRange) {
           const y = parseInt(year);
           fluxRes = await pool.query(`
             SELECT 
@@ -861,6 +864,16 @@ app.get('/api', async (req, res) => {
               COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
             FROM transactions
             WHERE uid = $1 AND vencimento >= '${y}-01-01' AND vencimento <= '${y}-12-31'
+            GROUP BY EXTRACT(MONTH FROM vencimento) ORDER BY month_num`, [sUid]);
+        } else if (activeRange) {
+          const [start, end] = activeRange.split('-');
+          fluxRes = await pool.query(`
+            SELECT 
+              EXTRACT(MONTH FROM vencimento) as month_num,
+              COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
+              COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
+            FROM transactions
+            WHERE uid = $1 AND vencimento >= '${start}-01-01' AND vencimento <= '${end}-12-31'
             GROUP BY EXTRACT(MONTH FROM vencimento) ORDER BY month_num`, [sUid]);
         } else {
           fluxRes = await pool.query(`
