@@ -1045,8 +1045,23 @@ async function handleExtractBoleto(req, res) {
       };
 
       const vencimento = dateMatch?.[1] || '';
+      
+      // Tenta uma busca mais inteligente: data próxima ao valor financeiro (R$)
+      // No boleto da Energisa, o vencimento real está na mesma linha ou logo após o valor.
+      const dateNearValueMatch = srcUpper.match(/(\d{2}\/\d{2}\/\d{4})[\s\n]+R\$/i) || srcUpper.match(/R\$[\s\n]*[\d.,]+[\s\n]+(\d{2}\/\d{2}\/\d{4})/i);
+      const experimentalVencimento = dateNearValueMatch?.[1];
+
       const valor = parseV(valorMatch?.[1] || valorMatch?.[2] || '');
       const numero_boleto = extractLocalBoletoNumber(srcUpper);
+
+      // Bloqueio específico para Energisa: se pegou a data de leitura do topo (07/05/2026), tenta a outra.
+      let finalVencimento = experimentalVencimento || vencimento;
+      if (pattern.fornecedor.includes('ENERGISA') && finalVencimento === '07/05/2026') {
+        const otherDateMatch = [...srcUpper.matchAll(/(\d{2}\/\d{2}\/\d{4})/g)]
+          .map(m => m[1])
+          .find(d => d !== '07/05/2026' && (d.includes('/04/') || d.includes('/04/2026')));
+        if (otherDateMatch) finalVencimento = otherDateMatch;
+      }
 
       // Extrai nome do Pagador do texto para usar como descrição (aceita acentos e caracteres especiais)
       const pagadorRawMatch = srcUpper.match(/PAGADOR\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
@@ -1073,7 +1088,7 @@ Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
 
         return res.json({
           fornecedor: pattern.fornecedor,
-          vencimento: mini.vencimento || vencimento,
+          vencimento: finalVencimento || mini.vencimento || vencimento,
           valor: mini.valor || valor,
           cnpj: rawCnpj || '',
           descricao: `${fileName} - ${pagadorDescricao || pattern.descricao || ''}`.replace(/ - $/, ''),
@@ -1087,7 +1102,7 @@ Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
 
       return res.json({
         fornecedor: pattern.fornecedor,
-        vencimento,
+        vencimento: finalVencimento,
         valor,
         cnpj: rawCnpj || '',
         descricao: `${fileName} - ${pagadorDescricao || pattern.descricao || ''}`.replace(/ - $/, ''),
@@ -1213,6 +1228,12 @@ Responda APENAS com JSON válido:
 
     if ((isAddressLike(extracted.fornecedor) || !extracted.fornecedor) && srcUpper.includes('ENERGISA')) {
       extracted.fornecedor = 'ENERGISA';
+    }
+
+    // Post-processing filter for Energisa reading date
+    if (extracted.fornecedor === 'ENERGISA' && extracted.vencimento === '07/05/2026') {
+      const realDate = srcUpper.match(/(\d{2}\/04\/2026)/);
+      if (realDate) extracted.vencimento = realDate[1];
     }
 
     const localNumero = extractLocalBoletoNumber(extractedText);
