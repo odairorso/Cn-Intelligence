@@ -11,12 +11,34 @@ export interface Notification {
   type: NotificationType;
 }
 
+export interface GlobalStats {
+  kpis: {
+    total_receitas: number;
+    total_despesas: number;
+    count_pagos: number;
+    count_pendentes: number;
+    count_vencidos: number;
+    total_count: number;
+  };
+  monthlyFlux: Array<{
+    month_num: number;
+    receitas: number;
+    despesas: number;
+  }>;
+  topSuppliers: Array<{
+    name: string;
+    value: number;
+  }>;
+}
+
 export function useAppData() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [contasContabeis, setContasContabeis] = useState<ContaContabil[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [notification, setNotification] = useState<Notification | null>(null);
   const [boletoPatterns, setBoletoPatterns] = useState<Array<{
     id: number;
@@ -68,10 +90,24 @@ export function useAppData() {
   };
 
   // ─── Fetchers ─────────────────────────────────────────────────────────────
-  const fetchTransactions = useCallback(async () => {
+  
+  const fetchStats = useCallback(async (year?: string, period?: string) => {
     try {
-      // Backend now limits to 400 by default for performance
-      const data = await api.getTransactions('guest');
+      const stats = await api.getStats('guest', year, period);
+      setGlobalStats(stats);
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+    }
+  }, []);
+
+  const fetchTransactions = useCallback(async (append = false) => {
+    try {
+      if (append) setIsLoadingMore(true);
+      
+      const limit = 10000; // Aumentado para 10.000 para trazer tudo de forma otimizada
+      const offset = append ? transactions.length : 0;
+      
+      const data = await api.getTransactions('guest', limit, offset);
       const normalized = data.map((tx) => {
         const raw = tx as any;
         return {
@@ -82,13 +118,23 @@ export function useAppData() {
           pagamento: tx.pagamento ? toDisplayDate(tx.pagamento) : undefined,
         } as Transaction;
       });
-      setTransactions(
-        normalized.sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento))
-      );
+
+      if (append) {
+        setTransactions(prev => [
+          ...prev, 
+          ...normalized
+        ].sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento)));
+      } else {
+        setTransactions(
+          normalized.sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento))
+        );
+      }
     } catch (error) {
       console.error('Failed to fetch transactions:', error);
+    } finally {
+      if (append) setIsLoadingMore(false);
     }
-  }, []);
+  }, [transactions.length]);
 
   const fetchSuppliers = useCallback(async () => {
     try {
@@ -130,7 +176,6 @@ export function useAppData() {
     }
   }, [showNotification]);
 
-  // ─── Boleto Patterns ─────────────────────────────────────────────────────
   const fetchBoletoPatterns = useCallback(async () => {
     try {
       const data = await api.getBoletoPatterns();
@@ -151,12 +196,12 @@ export function useAppData() {
     }
   }, [showNotification, fetchBoletoPatterns]);
 
-  // ─── Initial load — em paralelo, com limite de segurança para performance (400 itens) ───
+  // ─── Initial load — em paralelo ───
   useEffect(() => {
     setIsLoading(true);
 
-    // Carrega tudo em paralelo. Note que fetchTransactions agora respeita o limite do backend (400)
     Promise.all([
+      fetchStats(),
       fetchTransactions(),
       fetchSuppliers(),
       fetchBanks(),
@@ -164,9 +209,8 @@ export function useAppData() {
       fetchBoletoPatterns(),
     ]).finally(() => setIsLoading(false));
 
-    // setupTables roda em background sem bloquear o carregamento
     api.setupTables().catch(console.error);
-  }, [fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns]);
+  }, [fetchStats, fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns]);
 
   // ─── Auto-merge suppliers (max 1x a cada 6h) ─────────────────────────────
   useEffect(() => {
@@ -202,11 +246,13 @@ export function useAppData() {
       prev.map(tx => tx.id === id ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: today, banco } : tx)
     );
     showNotification('Lançamento marcado como pago!', 'success');
-    api.updateTransaction(id, { status: 'PAGO', pagamento: today, banco }).catch(err => {
+    api.updateTransaction(id, { status: 'PAGO', pagamento: today, banco }).then(() => {
+      fetchStats();
+    }).catch(err => {
       console.error('Failed to mark as paid:', err);
       fetchTransactions();
     });
-  }, [showNotification, fetchTransactions]);
+  }, [showNotification, fetchTransactions, fetchStats]);
 
   const markAsPaidBatch = useCallback(async (ids: string[], banco: string) => {
     const today = new Date().toLocaleDateString('pt-BR');
@@ -214,11 +260,13 @@ export function useAppData() {
       prev.map(tx => ids.includes(tx.id) ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: today, banco } : tx)
     );
     showNotification(`${ids.length} lançamento(s) marcado(s) como pago!`, 'success');
-    api.updateTransactionsBatch(ids, banco).catch(err => {
+    api.updateTransactionsBatch(ids, banco).then(() => {
+      fetchStats();
+    }).catch(err => {
       console.error('Failed to mark batch as paid:', err);
       fetchTransactions();
     });
-  }, [showNotification, fetchTransactions]);
+  }, [showNotification, fetchTransactions, fetchStats]);
 
   const updateTransaction = useCallback(async (updatedTx: Transaction) => {
     const { id, ...data } = updatedTx;
@@ -236,21 +284,24 @@ export function useAppData() {
           .sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento))
       );
       showNotification('Lançamento atualizado!', 'success');
+      fetchStats();
     } catch (err) {
       console.error('Failed to update transaction:', err);
       showNotification('Erro ao atualizar lançamento.', 'error');
       fetchTransactions();
     }
-  }, [showNotification, fetchTransactions]);
+  }, [showNotification, fetchTransactions, fetchStats]);
 
   const deleteTransaction = useCallback(async (id: string) => {
     setTransactions(prev => prev.filter(tx => tx.id !== id));
     showNotification('Lançamento excluído.', 'info');
-    api.deleteTransaction(id).catch(err => {
+    api.deleteTransaction(id).then(() => {
+      fetchStats();
+    }).catch(err => {
       console.error('Failed to delete transaction:', err);
       fetchTransactions();
     });
-  }, [showNotification, fetchTransactions]);
+  }, [showNotification, fetchTransactions, fetchStats]);
 
   // ─── Supplier actions ─────────────────────────────────────────────────────
   const deleteSupplier = useCallback(async (id: string) => {
@@ -324,9 +375,9 @@ export function useAppData() {
 
   return {
     // State
-    transactions, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, boletoPatterns,
+    transactions, globalStats, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, isLoadingMore, boletoPatterns,
     // Fetchers
-    fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns,
+    fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns, fetchStats,
     // Actions
     showNotification,
     markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,

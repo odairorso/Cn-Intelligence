@@ -5,9 +5,43 @@ const API_BASE = '/api';
 
 export const api = {
   // ─── Transactions ──────────────────────────────────────────────────────────
-  async getTransactions(_uid: string): Promise<Transaction[]> {
-    const res = await fetch(`${API_BASE}?route=transactions`);
+  async getTransactions(_uid: string, limit?: number, offset?: number): Promise<Transaction[]> {
+    const params = new URLSearchParams();
+    params.append('route', 'transactions');
+    if (limit) params.append('limit', String(limit));
+    if (offset) params.append('offset', String(offset));
+
+    const res = await fetch(`${API_BASE}?${params.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch transactions');
+    return res.json();
+  },
+
+  async getStats(_uid: string, year?: string, period?: string): Promise<{
+    kpis: {
+      total_receitas: number;
+      total_despesas: number;
+      count_pagos: number;
+      count_pendentes: number;
+      count_vencidos: number;
+      total_count: number;
+    };
+    monthlyFlux: Array<{
+      month_num: number;
+      receitas: number;
+      despesas: number;
+    }>;
+    topSuppliers: Array<{
+      name: string;
+      value: number;
+    }>;
+  }> {
+    const params = new URLSearchParams();
+    params.append('route', 'stats');
+    if (year) params.append('year', year);
+    if (period) params.append('period', period);
+
+    const res = await fetch(`${API_BASE}?${params.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch stats');
     return res.json();
   },
 

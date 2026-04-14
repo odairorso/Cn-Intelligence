@@ -154,10 +154,10 @@ async function handleTransactions(req, res) {
   if (req.method === 'GET') {
     try {
       const { uid, limit, offset } = req.query;
-      const parsedLimit = limit ? parseInt(limit) : 400; // Padrão 400 para performance
+      const parsedLimit = limit ? parseInt(limit) : 10000; // Aumentado para 10.000 para "valores completos"
       const parsedOffset = offset ? parseInt(offset) : 0;
 
-      // Carrega as transações com limite para performance (4.000+ é muito para um único fetch)
+      // Carrega as transações com limite maior (otimizado para trazer tudo o que o usuário precisa)
       const rows = uid
         ? await sql`SELECT * FROM transactions WHERE uid = ${uid} ORDER BY vencimento DESC LIMIT ${parsedLimit} OFFSET ${parsedOffset}`
         : await sql`SELECT * FROM transactions ORDER BY vencimento DESC LIMIT ${parsedLimit} OFFSET ${parsedOffset}`;
@@ -211,6 +211,91 @@ async function handleTransactions(req, res) {
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
+}
+
+
+// GET /api?route=stats — retorna agregados globais para o dashboard
+async function handleStats(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const { uid, year, period } = req.query;
+    const filterUid = uid || 'guest';
+    
+    // Filtro de data dinâmico
+    let dateFilterSql;
+    if (year && year !== 'TODOS') {
+      const y = parseInt(year);
+      dateFilterSql = sql`AND vencimento >= ${y + '-01-01'} AND vencimento <= ${y + '-12-31'}`;
+    } else if (period === '2024-2025') {
+      dateFilterSql = sql`AND vencimento >= '2024-01-01' AND vencimento <= '2025-12-31'`;
+    } else if (period === '2024-2026') {
+      dateFilterSql = sql`AND vencimento >= '2024-01-01' AND vencimento <= '2026-12-31'`;
+    } else {
+      dateFilterSql = sql``; // TODOS
+    }
+
+    // 1. KPIs Agrupados (Somas e Contagens)
+    const kpiRows = await sql`
+      SELECT 
+        COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as total_receitas,
+        COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as total_despesas,
+        COUNT(CASE WHEN status = 'PAGO' THEN 1 END) as count_pagos,
+        COUNT(CASE WHEN status = 'PENDENTE' AND (vencimento >= CURRENT_DATE OR vencimento IS NULL) THEN 1 END) as count_pendentes,
+        COUNT(CASE WHEN status = 'VENCIDO' OR (status = 'PENDENTE' AND vencimento < CURRENT_DATE) THEN 1 END) as count_vencidos,
+        COUNT(*) as total_count
+      FROM transactions
+      WHERE uid = ${filterUid} ${dateFilterSql}`;
+    
+    // 2. Fluxo Mensal
+    let fluxRows;
+    if (year && year !== 'TODOS') {
+      const y = parseInt(year);
+      fluxRows = await sql`
+        SELECT 
+          EXTRACT(MONTH FROM vencimento) as month_num,
+          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
+          COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
+        FROM transactions
+        WHERE uid = ${filterUid} 
+          AND vencimento >= ${y + '-01-01'}
+          AND vencimento <= ${y + '-12-31'}
+        GROUP BY EXTRACT(MONTH FROM vencimento)
+        ORDER BY month_num`;
+    } else {
+      // Padrão: Ano Atual
+      fluxRows = await sql`
+        SELECT 
+          EXTRACT(MONTH FROM vencimento) as month_num,
+          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
+          COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
+        FROM transactions
+        WHERE uid = ${filterUid} 
+          AND vencimento >= DATE_TRUNC('year', CURRENT_DATE)
+          AND vencimento < DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year'
+        GROUP BY EXTRACT(MONTH FROM vencimento)
+        ORDER BY month_num`;
+    }
+
+    // 3. Top Fornecedores
+    const supplierRows = await sql`
+      SELECT 
+        fornecedor as name,
+        COALESCE(SUM(valor + COALESCE(juros, 0)), 0) as value
+      FROM transactions
+      WHERE uid = ${filterUid} ${dateFilterSql}
+      GROUP BY fornecedor
+      ORDER BY value DESC
+      LIMIT 10`;
+
+    return res.json({
+      kpis: kpiRows[0],
+      monthlyFlux: fluxRows,
+      topSuppliers: supplierRows
+    });
+  } catch (e) {
+    console.error('[stats] Error:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
 }
 
 // POST /api?route=transactions-batch
@@ -1039,12 +1124,16 @@ async function handleExtractBoleto(req, res) {
 
       const parseV = (s) => {
         if (!s) return 0;
-        const r = s.trim();
-        if (/^\d{1,3}(\.\d{3})+(,\d{2})$/.test(r)) return parseFloat(r.replace(/\./g,'').replace(',','.'));
-        if (/^\d{1,3}(,\d{3})+(\.\d{2})$/.test(r)) return parseFloat(r.replace(/,/g,''));
-        if (/^\d+\.\d{1,2}$/.test(r)) return parseFloat(r);
-        if (/^\d+,\d{1,2}$/.test(r)) return parseFloat(r.replace(',','.'));
-        return 0;
+        const r = s.trim().replace(/[R$\s]/g, '');
+        // Se tem ponto E vírgula (ex: 1.250,00)
+        if (r.includes('.') && r.includes(',')) {
+          // Se o ponto vem antes da vírgula (formato brasileiro)
+          if (r.indexOf('.') < r.indexOf(',')) return parseFloat(r.replace(/\./g,'').replace(',','.'));
+          // Formato americano com vírgula como separador de milhar
+          return parseFloat(r.replace(/,/g,''));
+        }
+        if (r.includes(',')) return parseFloat(r.replace(',','.'));
+        return parseFloat(r) || 0;
       };
 
       const vencimento = dateMatch?.[1] || '';
@@ -1124,7 +1213,8 @@ Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
 REGRAS CRÍTICAS:
 - fornecedor = quem RECEBE o dinheiro (beneficiário/cedente), NUNCA o banco emissor
 - Bancos emissores (IGNORAR como fornecedor): Sicredi, Bradesco, Itaú, Santander, Caixa, BB, Cora, Inter, Nubank, C6, BTG, Safra, BV, Banrisul, Unicred
-- valor = número decimal com PONTO como separador (ex: 632.86, não 63286)
+- valor = número decimal com PONTO como separador (ex: 632.86).
+- ATENÇÃO VALOR UTILITY (Energisa/Claro/Sanesul): Use o "Valor Total a Pagar" ou "Total da Fatura". NUNCA extraia valores parciais, "Multas", "Juros", "Atualização Monetária" ou "Parcelas" como o valor principal. Se houver multa, ela já deve estar incluída no total que você vai extrair.
 - Se valor aparecer como "632,86" retorne 632.86 — se "2.092,71" retorne 2092.71
 
 CAMPOS:
@@ -1134,28 +1224,6 @@ CAMPOS:
    ATENÇÃO 2: NUNCA use um endereço como fornecedor (ex: se encontrar "AV. GURY MARQUES", "RUA...", "CEP", isso é o endereço do fornecedor, o nome dele vem antes).
    Se o beneficiário for uma pessoa física (ex: "Valmir Lopes de Souza"), use o nome dela
    Exemplos corretos: HAPVIDA, SANESUL, ENERGISA, VSC CONTABILIDADE, Anhanguera Educacional Ltda
-2. vencimento: Data de vencimento no formato DD/MM/AAAA
-   ATENÇÃO PARA FATURAS DE ENERGIA/ÁGUA (Ex: ENERGISA): NUNCA confunda a data da "Próxima Leitura" com o Vencimento! A data de Próxima Leitura costuma ficar no topo. O Vencimento REAL quase sempre fica próximo ao valor total a pagar e ao Mês de Referência. Procure a data que corresponde ao real prazo para pagamento.
-3. valor: Valor TOTAL em reais com ponto decimal (ex: 632.86)
-   Procure por: "(=) Valor do Documento", "Valor do Documento", "Valor Cobrado"
-4. cnpj: CNPJ do beneficiário
-5. descricao: DEVE OBRIGATORIAMENTE conter o nome do arquivo original e o nome completo do Pagador/Sacado (aluno). O formato DEVE SER: "[Nome do arquivo original] - [Nome do Pagador/Sacado]". Exemplo: "boleto_mensalidade.pdf - JOAO SILVA". NÃO escreva apenas o nome do aluno, sempre junte com o nome do arquivo fornecido.
-6. empresa: Empresa do Grupo CN que é o PAGADOR (campo "Pagador" ou "Sacado" no boleto)
-   - Se "ANHANGUERA" ou "CENTRO EDUCACIONAL DE ITAQUIRAI" aparecer como pagador → "FACEMS"
-   - Se "COLEGIO NAVIRAI" ou "COLEGIO NAVIRA" aparecer como pagador → "CN"
-   - Se "FACEMS" aparecer como pagador → "FACEMS"
-   - Se "LABORATORIO" aparecer como pagador → "LAB"
-   - Se "CEI" aparecer como pagador → "CEI"
-   - Se "UNOPAR" aparecer como pagador → "UNOPAR"
-   - Se "ELAINE" aparecer como pagador → "ELAINE"
-   - Se não identificar, deixe vazio
-7. numero_boleto: Número único do boleto (nesta ordem de prioridade):
-   a) "Nosso Número" ou "Nosso Numero" — mais confiável
-   b) "Número do Documento" ou "Numero do Documento" ou "Nro Documento"
-   c) Linha digitável (47-48 dígitos)
-   Retorne APENAS dígitos/alfanuméricos sem pontos ou espaços.
-
-Responda APENAS com JSON válido:
 {"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
 
     let prompt;
@@ -1181,7 +1249,7 @@ Responda APENAS com JSON válido:
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.0-flash',
       contents,
       config: {
         responseMimeType: 'application/json',
@@ -1305,6 +1373,8 @@ export default async function handler(req, res) {
       return handleBoletoPatterns(req, res);
     case 'extract-boleto':
       return handleExtractBoleto(req, res);
+    case 'stats':
+      return handleStats(req, res);
     default:
       return res.status(404).json({ error: 'Route not found' });
   }
