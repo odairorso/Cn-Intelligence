@@ -1056,11 +1056,11 @@ async function handleExtractBoleto(req, res) {
       if (!vencimento || !valor) {
         // Chama Gemini com prompt mínimo só para data/valor
         const miniPrompt = `Extraia do texto de boleto abaixo APENAS:
-- vencimento: data de vencimento no formato DD/MM/AAAA
+- vencimento: data de vencimento no formato DD/MM/AAAA (IMPORTANTE: Para faturas de energia, NUNCA use a data de 'Próxima Leitura'! Use o Vencimento real próximo ao valor total).
 - valor: valor total em reais com ponto decimal (ex: 105.00)
 - numero_boleto: Nosso Número ou Número do Documento (só dígitos)
 
-TEXTO: ${extractedText.slice(0, 1000)}
+TEXTO: ${extractedText.slice(0, 5000)}
 
 Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
 
