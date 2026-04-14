@@ -114,7 +114,6 @@ function KPIComponent({ kpi, index }: any) {
 // --- Tab Components ---
 
 interface DashboardTabProps {
-  stats: any;
   transactions: Transaction[];
   onMarkAsPaid: (tx: Transaction) => void;
   globalStats: any;
@@ -3344,6 +3343,12 @@ export default function App() {
         if (normalized) return normalized;
       }
     }
+
+    const multiBlockMatch = source.match(/(\d{11}-\d)\s+(\d{11}-\d)\s+(\d{11}-\d)\s+(\d{11}-\d)/);
+    if (multiBlockMatch) {
+      const assembled = multiBlockMatch[0].replace(/[^0-9]/g, '');
+      if (assembled.length === 47 || assembled.length === 48) return assembled;
+    }
     const labeledBlockPatterns = [
       /LINHA\s*DIGIT[AÁ]VEL[^0-9]*([0-9\s.]{40,160})/,
       /C.{0,6}DIGO\s*DE\s*BARRAS[^0-9]*([0-9\s.]{40,160})/,
@@ -3357,6 +3362,13 @@ export default function App() {
     }
     const barcodeMatch = source.match(/\b([0-9]{47,48})\b/);
     if (barcodeMatch?.[1]) return barcodeMatch[1];
+
+    const fragmentPattern = /\d{5}\.\d{5}\s+\d{5}\.\d{6}\s+\d{5}\.\d{6}\s+\d\s+\d{14}/;
+    const fragMatch = source.match(fragmentPattern);
+    if (fragMatch?.[0]) {
+      const assembled = fragMatch[0].replace(/[^0-9]/g, '');
+      if (assembled.length === 47 || assembled.length === 48) return assembled;
+    }
     return '';
   };
 
@@ -3420,6 +3432,24 @@ export default function App() {
         .sort((a, b) => b.key.length - a.key.length)[0];
       if (energisaMatch) return energisaMatch.supplier.nome;
       return 'ENERGISA';
+    }
+
+    if (normalizedDetected.includes('SANESUL') || normalizedSource.includes('SANESUL')) {
+      const sanesulMatch = suppliers
+        .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
+        .filter((x) => x.key.includes('SANESUL'))
+        .sort((a, b) => b.key.length - a.key.length)[0];
+      if (sanesulMatch) return sanesulMatch.supplier.nome;
+      return 'SANESUL';
+    }
+
+    if (normalizedDetected.includes('INVIO') || normalizedSource.includes('INVIO')) {
+      const invMatch = suppliers
+        .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
+        .filter((x) => x.key.includes('INVIO'))
+        .sort((a, b) => b.key.length - a.key.length)[0];
+      if (invMatch) return invMatch.supplier.nome;
+      return validDetected || 'INVIOLAVEL';
     }
 
     if (normalizedDetected.includes('EDITORA') || normalizedSource.includes('EDITORA')) {
@@ -3578,6 +3608,27 @@ export default function App() {
           const parsed = Number(best.replace(/\./g, '').replace(',', '.'));
           if (!Number.isNaN(parsed) && parsed > 0) valor = sanitizeBoletoValor(parsed);
         }
+      }
+    }
+
+    if (normalizedText.includes('SANESUL')) {
+      const m = normalizedText.match(/VENCIMENTO\s+(\d{2}\/\d{2}\/\d{4})/);
+      if (m?.[1]) vencimento = m[1];
+
+      if (!valor) {
+        const m2 = normalizedText.match(/TOTAL\s+A\s+PAGAR[^0-9]{0,180}(\d{1,3}(?:\.\d{3})*,\d{2})/);
+        if (m2?.[1]) {
+          const parsed = Number(m2[1].replace(/\./g, '').replace(',', '.'));
+          if (Number.isFinite(parsed) && parsed > 0) valor = sanitizeBoletoValor(parsed);
+        }
+      }
+
+      if (fornecedor === 'Fornecedor não identificado' || shouldRejectSupplierName(fornecedor)) {
+        const sanesulMatch = suppliers
+          .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
+          .filter((x) => x.key.includes('SANESUL'))
+          .sort((a, b) => b.key.length - a.key.length)[0];
+        fornecedor = sanesulMatch ? sanesulMatch.supplier.nome : 'SANESUL';
       }
     }
 
