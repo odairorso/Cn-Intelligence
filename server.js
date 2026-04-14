@@ -171,10 +171,17 @@ app.delete('/api/banks/:id', async (req, res) => {
 });
 
 // Transactions API
+// GET /api/transactions
 app.get('/api/transactions', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM transactions ORDER BY vencimento DESC');
-    // Format dates to string DD/MM/YYYY for the frontend
+    const { uid, limit, offset } = req.query;
+    const parsedLimit = limit ? parseInt(limit) : 10000;
+    const parsedOffset = offset ? parseInt(offset) : 0;
+
+    const result = uid
+      ? await pool.query('SELECT * FROM transactions WHERE uid = $1 ORDER BY vencimento DESC LIMIT $2 OFFSET $3', [uid, parsedLimit, parsedOffset])
+      : await pool.query('SELECT * FROM transactions ORDER BY vencimento DESC LIMIT $1 OFFSET $2', [parsedLimit, parsedOffset]);
+
     const formatted = result.rows.map(tx => ({
       ...tx,
       vencimento: tx.vencimento ? new Date(tx.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
@@ -555,7 +562,7 @@ Analise visualmente o PDF anexo e extraia os dados.`;
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.0-flash',
       contents,
       config: {
         responseMimeType: 'application/json',
@@ -797,16 +804,103 @@ app.get('/api', async (req, res) => {
   
   try {
     switch (route) {
-      case 'transactions':
-        const result = await pool.query('SELECT * FROM transactions ORDER BY vencimento DESC');
-        const formatted = result.rows.map(tx => ({
+      case 'transactions': {
+        const { uid: queryUid, limit: queryLimit, offset: queryOffset } = req.query;
+        const pLimit = queryLimit ? parseInt(queryLimit) : 10000;
+        const pOffset = queryOffset ? parseInt(queryOffset) : 0;
+        
+        const txResult = queryUid
+          ? await pool.query('SELECT * FROM transactions WHERE uid = $1 ORDER BY vencimento DESC LIMIT $2 OFFSET $3', [queryUid, pLimit, pOffset])
+          : await pool.query('SELECT * FROM transactions ORDER BY vencimento DESC LIMIT $1 OFFSET $2', [pLimit, pOffset]);
+          
+        const txFormatted = txResult.rows.map(tx => ({
           ...tx,
           vencimento: tx.vencimento ? new Date(tx.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
           pagamento: tx.pagamento ? new Date(tx.pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
           valor: Number(tx.valor),
           juros: Number(tx.juros || 0),
         }));
-        return res.json(formatted);
+        return res.json(txFormatted);
+      }
+        
+      case 'stats': {
+        const { uid: statsUid, year, period } = req.query;
+        const sUid = statsUid || 'guest';
+        
+        let dateFilter = '';
+        const params = [sUid];
+        if (year && year !== 'TODOS') {
+          const y = parseInt(year);
+          dateFilter = `AND vencimento >= '${y}-01-01' AND vencimento <= '${y}-12-31'`;
+        } else if (period === '2024-2025') {
+          dateFilter = `AND vencimento >= '2024-01-01' AND vencimento <= '2025-12-31'`;
+        } else if (period === '2024-2026') {
+          dateFilter = `AND vencimento >= '2024-01-01' AND vencimento <= '2026-12-31'`;
+        }
+
+        const kpiRes = await pool.query(`
+          SELECT 
+            COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as total_receitas,
+            COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as total_despesas,
+            COUNT(CASE WHEN status = 'PAGO' THEN 1 END) as count_pagos,
+            COUNT(CASE WHEN status = 'PENDENTE' AND (vencimento >= CURRENT_DATE OR vencimento IS NULL) THEN 1 END) as count_pendentes,
+            COUNT(CASE WHEN status = 'VENCIDO' OR (status = 'PENDENTE' AND vencimento < CURRENT_DATE) THEN 1 END) as count_vencidos,
+            COUNT(*) as total_count
+          FROM transactions
+          WHERE uid = $1 ${dateFilter}`, [sUid]);
+
+        const kpis = kpiRes.rows[0];
+
+        let fluxRes;
+        if (year && year !== 'TODOS') {
+          const y = parseInt(year);
+          fluxRes = await pool.query(`
+            SELECT 
+              EXTRACT(MONTH FROM vencimento) as month_num,
+              COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
+              COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
+            FROM transactions
+            WHERE uid = $1 AND vencimento >= '${y}-01-01' AND vencimento <= '${y}-12-31'
+            GROUP BY EXTRACT(MONTH FROM vencimento) ORDER BY month_num`, [sUid]);
+        } else {
+          fluxRes = await pool.query(`
+            SELECT 
+              EXTRACT(MONTH FROM vencimento) as month_num,
+              COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
+              COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
+            FROM transactions
+            WHERE uid = $1 
+              AND vencimento >= DATE_TRUNC('year', CURRENT_DATE)
+              AND vencimento < DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year'
+            GROUP BY EXTRACT(MONTH FROM vencimento) ORDER BY month_num`, [sUid]);
+        }
+
+        const supplierRes = await pool.query(`
+          SELECT fornecedor as name, SUM(valor) as value
+          FROM transactions
+          WHERE uid = $1 ${dateFilter}
+          GROUP BY fornecedor ORDER BY value DESC LIMIT 5`, [sUid]);
+
+        return res.json({
+          kpis: {
+            total_receitas: Number(kpis.total_receitas),
+            total_despesas: Number(kpis.total_despesas),
+            count_pagos: parseInt(kpis.count_pagos),
+            count_pendentes: parseInt(kpis.count_pendentes),
+            count_vencidos: parseInt(kpis.count_vencidos),
+            total_count: parseInt(kpis.total_count)
+          },
+          monthlyFlux: fluxRes.rows.map(r => ({
+            month_num: parseInt(r.month_num),
+            receitas: Number(r.receitas),
+            despesas: Number(r.despesas)
+          })),
+          topSuppliers: supplierRes.rows.map(r => ({
+            name: r.name,
+            value: Number(r.value)
+          }))
+        });
+      }
         
       case 'suppliers':
         const suppliersResult = uid

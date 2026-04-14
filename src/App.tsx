@@ -117,10 +117,32 @@ interface DashboardTabProps {
   stats: any;
   transactions: Transaction[];
   onMarkAsPaid: (tx: Transaction) => void;
+  globalStats: any;
+  fetchStats: (year?: string, period?: string) => Promise<void>;
 }
 
-const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) => {
+const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: DashboardTabProps) => {
   const [periodoFilter, setPeriodoFilter] = useState('TODOS');
+  const [isFetching, setIsFetching] = useState(false);
+
+  // Valores reais vindos do servidor
+  const realKpis = globalStats?.kpis;
+  const realMonthlyFlux = globalStats?.monthlyFlux;
+  const realTopSuppliers = globalStats?.topSuppliers;
+
+  // Atualiza stats sempre que o filtro de periodo mudar
+  useEffect(() => {
+    const updateStats = async () => {
+      setIsFetching(true);
+      if (periodoFilter === 'TODOS') {
+        await fetchStats();
+      } else {
+        await fetchStats(periodoFilter, 'year');
+      }
+      setIsFetching(false);
+    };
+    updateStats();
+  }, [periodoFilter, fetchStats]);
 
   const anos = useMemo(() => {
     const set = new Set<number>();
@@ -162,29 +184,47 @@ const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) 
   }, [transactions, periodoFilter]);
 
   const statusChartData = [
-    { name: 'Pagos', value: stats.pagos, color: '#10b981' },
-    { name: 'Pendentes', value: stats.pendentes, color: '#f59e0b' },
-    { name: 'Vencidos', value: stats.vencidos, color: '#ef4444' },
+    { name: 'Pagos', value: realKpis?.count_pagos || 0, color: '#10b981' },
+    { name: 'Pendentes', value: realKpis?.count_pendentes || 0, color: '#f59e0b' },
+    { name: 'Vencidos', value: realKpis?.count_vencidos || 0, color: '#ef4444' },
   ];
 
-  // Gráfico receitas vs despesas por mês
+  // Gráfico receitas vs despesas por mês — Prioriza os dados reais do servidor
   const monthlyFlux = useMemo(() => {
+    if (realMonthlyFlux) {
+      const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      return months.map((month, idx) => {
+        const stat = realMonthlyFlux.find(s => Number(s.month_num) === idx + 1);
+        return {
+          name: month,
+          receitas: stat ? Number(stat.receitas) : 0,
+          despesas: stat ? Number(stat.despesas) : 0,
+          saldo: (stat ? Number(stat.receitas) : 0) - (stat ? Number(stat.despesas) : 0)
+        };
+      });
+    }
+
+    // Fallback para cálculo local (apenas para filtros específicos de anos que não o atual)
     const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const currentYear = new Date().getFullYear();
     return months.map((month, idx) => {
       const monthTx = filteredTx.filter(tx => {
         const parts = tx.vencimento.split('/');
-        return parts.length === 3 && parseInt(parts[1]) === idx + 1 && parts[2] === String(currentYear);
+        return parts.length === 3 && parseInt(parts[1]) === idx + 1 && parts[2] === (periodoFilter === 'TODOS' ? String(currentYear) : periodoFilter);
       });
       const receitas = monthTx.filter(tx => tx.tipo === 'RECEITA').reduce((a, tx) => a + (Number(tx.valor) || 0), 0);
       const despesas = monthTx.filter(tx => tx.tipo !== 'RECEITA').reduce((a, tx) => a + (Number(tx.valor) || 0), 0);
       const saldo = receitas - despesas;
       return { name: month, receitas, despesas, saldo };
     });
-  }, [filteredTx]);
+  }, [filteredTx, realMonthlyFlux, periodoFilter]);
 
-  // Top 5 fornecedores por valor
+  // Top 5 fornecedores por valor — Prioriza os dados reais do servidor
   const topSuppliers = useMemo(() => {
+    if (realTopSuppliers) {
+      return realTopSuppliers.slice(0, 5);
+    }
+
     const supplierMap = new Map<string, number>();
     filteredTx.forEach(tx => {
       const current = supplierMap.get(tx.fornecedor) || 0;
@@ -194,10 +234,22 @@ const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) 
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([name, value]) => ({ name, value }));
-  }, [filteredTx]);
+  }, [filteredTx, realTopSuppliers, periodoFilter]);
 
-  // Stats filtrados
+  // Stats filtrados — Prioriza os dados reais do servidor para o valor TOTAL global
   const filteredStats = useMemo(() => {
+    if (realKpis) {
+      return {
+        total: Number(realKpis.total_receitas) + Number(realKpis.total_despesas), // Soma absoluta apenas para o KPI de registros
+        total_financeiro: Number(realKpis.total_receitas) - Number(realKpis.total_despesas),
+        receitas: Number(realKpis.total_receitas),
+        despesas: Number(realKpis.total_despesas),
+        pagos: Number(realKpis.count_pagos),
+        pendentes: Number(realKpis.count_pendentes),
+        vencidos: Number(realKpis.count_vencidos)
+      };
+    }
+
     let total = 0, pagos = 0, pendentes = 0, vencidos = 0;
     const today = new Date(); today.setHours(0,0,0,0);
     for (const tx of filteredTx) {
@@ -214,10 +266,10 @@ const DashboardTab = ({ stats, transactions, onMarkAsPaid }: DashboardTabProps) 
         } else pendentes++;
       }
     }
-    return { total, pagos, pendentes, vencidos };
-  }, [filteredTx]);
+    return { total, pagos, pendentes, vencidos, total_financeiro: total };
+  }, [filteredTx, realKpis, periodoFilter]);
 
-  const totalTx = filteredTx.length || 1;
+  const totalTx = (periodoFilter === 'TODOS' && realKpis?.total_count) ? Number(realKpis.total_count) : (filteredTx.length || 1);
   const pagosPercent = Math.round((filteredStats.pagos / totalTx) * 100);
   const pendentesPercent = Math.round((filteredStats.pendentes / totalTx) * 100);
   const vencidosPercent = Math.round((filteredStats.vencidos / totalTx) * 100);
@@ -506,9 +558,14 @@ interface LancamentosTabProps {
   deleteTransaction: (id: string) => void;
   setShowNewTxModal: (show: boolean) => void;
   setEditingTx: (tx: Transaction) => void;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
 }
 
-const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteTransaction, setShowNewTxModal, setEditingTx }: LancamentosTabProps) => {
+const LancamentosTab = ({ 
+  transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteTransaction, setShowNewTxModal, setEditingTx,
+  onLoadMore, isLoadingMore
+}: LancamentosTabProps) => {
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [monthFilter, setMonthFilter] = useState('TODOS');
@@ -3108,15 +3165,13 @@ const NewSupplierModal = ({ setShowNewSupplierModal, onSuccess }: NewSupplierMod
 // --- Main App ---
 
 export default function App() {
-  const {
-    transactions, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, boletoPatterns,
-    fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns,
-    showNotification,
-    markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
+  const { 
+    transactions, globalStats, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, isLoadingMore, boletoPatterns,
+    fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns, fetchStats,
+    showNotification, markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
     deleteSupplier, syncSuppliers,
     deleteBank,
     addCompanyOption, removeCompanyOption, updateCompanyOption,
-    setCompanyOptions,
     deleteBoletoPattern,
   } = useAppData();
 
@@ -3468,7 +3523,10 @@ export default function App() {
     const linhaInfo = parseLinhaDigitavel(normalizedText);
     if (linhaInfo) {
       if (!vencimento) vencimento = linhaInfo.vencimento;
-      if (linhaInfo.valor > 0) valor = sanitizeBoletoValor(linhaInfo.valor);
+      if (linhaInfo.valor > 0) {
+        // Energisa: ignora valores baixos (geralmente multas/mora) na linha digitável se houver valor total
+        valor = sanitizeBoletoValor(linhaInfo.valor);
+      }
     }
 
     // ─── 2. Fallback: patterns de texto (só usa se linha digitável não extraiu) ─
@@ -3525,13 +3583,17 @@ export default function App() {
 
     if (normalizedText.includes('ENERGISA')) {
       const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
+      // Limpeza específica para Energisa: remove datas de "Próxima Leitura" para não confundir o extrator
+      const textForEnergisa = normalizedText.replace(/PRÓXIMA\s+LEITURA\s+PREVISTA\s+PARA\s+\d{2}\/\d{2}\/\d{4}/gi, '');
+
       if (valor > 0) {
         const valorBr = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const m = normalizedText.match(new RegExp(`(\\d{2}\\/\\d{2}\\/\\d{4})\\s+R\\$\\s*${escapeRegExp(valorBr)}`));
+        const m = textForEnergisa.match(new RegExp(`(\\d{2}\\/\\d{2}\\/\\d{4})\\s+R\\$\\s*${escapeRegExp(valorBr)}`));
         if (m?.[1]) vencimento = m[1];
       }
       if (!vencimento) {
-        const m = normalizedText.match(/(\d{2}\/\d{2}\/\d{4})\s+R\$\s*[\d.,]+\s+(?:JANEIRO|FEVEREIRO|MARÇO|MARCO|ABRIL|MAIO|JUNHO|JULHO|AGOSTO|SETEMBRO|OUTUBRO|NOVEMBRO|DEZEMBRO)\s*\/\s*\d{4}/);
+        const m = textForEnergisa.match(/(\d{2}\/\d{2}\/\d{4})\s+R\$\s*[\d.,]+\s+(?:JANEIRO|FEVEREIRO|MARÇO|MARCO|ABRIL|MAIO|JUNHO|JULHO|AGOSTO|SETEMBRO|OUTUBRO|NOVEMBRO|DEZEMBRO)\s*\/\s*\d{4}/);
         if (m?.[1]) vencimento = m[1];
       }
     }
@@ -4404,9 +4466,10 @@ export default function App() {
           >
             {activeTab === 'dashboard' && (
               <DashboardTab 
-                stats={stats} 
                 transactions={transactions} 
-                onMarkAsPaid={handleMarkAsPaidClick} 
+                onMarkAsPaid={handleMarkAsPaidClick}
+                globalStats={globalStats}
+                fetchStats={fetchStats}
               />
             )}
             {activeTab === 'lancamentos' && (
@@ -4417,6 +4480,8 @@ export default function App() {
                 deleteTransaction={deleteTransaction} 
                 setShowNewTxModal={setShowNewTxModal} 
                 setEditingTx={setEditingTx}
+                onLoadMore={() => fetchTransactions(true)}
+                isLoadingMore={isLoadingMore}
               />
             )}
             {activeTab === 'fornecedores' && (
