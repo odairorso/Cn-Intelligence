@@ -773,11 +773,14 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
                 <th className="px-8 py-4 whitespace-nowrap min-w-[150px]">Fornecedor</th>
                 <th className="px-8 py-4 whitespace-nowrap w-[250px]">Descrição</th>
                 <th className="px-8 py-4 whitespace-nowrap w-36 text-right">Valor</th>
-                <th className="px-8 py-4 whitespace-nowrap w-28">Status</th>
+                <th className="px-8 py-4 whitespace-nowrap w-28 hidden lg:table-cell">Status</th>
                 <th className="px-8 py-4 whitespace-nowrap w-28">Empresa</th>
-                <th className="px-8 py-4 whitespace-nowrap w-32">Vencimento</th>
-                <th className="px-8 py-4 whitespace-nowrap w-32">Pagamento</th>
-                <th className="px-8 py-4 whitespace-nowrap w-28">Conta</th>
+                <th className="px-8 py-4 whitespace-nowrap w-32">
+                  <span className="lg:hidden">Venc.</span>
+                  <span className="hidden lg:inline">Vencimento</span>
+                </th>
+                <th className="px-8 py-4 whitespace-nowrap w-32 hidden xl:table-cell">Pagamento</th>
+                <th className="px-8 py-4 whitespace-nowrap w-28 hidden xl:table-cell">Conta</th>
                 <th className="px-8 py-4 whitespace-nowrap w-24 sticky right-0 bg-surface z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)]">Ações</th>
               </tr>
             </thead>
@@ -802,7 +805,7 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
                       <p className="text-[9px] text-tertiary font-normal">(inclui {Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })} juros)</p>
                     )}
                   </td>
-                  <td className="px-8 py-4">
+                  <td className="px-8 py-4 hidden lg:table-cell">
                     <span className={cn(
                       "text-[10px] font-bold px-3 py-1 rounded-full border",
                       tx.status === 'PAGO' && "bg-primary/20 text-primary border-primary/30",
@@ -818,8 +821,8 @@ const LancamentosTab = ({ transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteT
                     </span>
                   </td>
                   <td className="px-8 py-4 whitespace-nowrap">{tx.vencimento}</td>
-                  <td className="px-8 py-4 text-on-surface-variant whitespace-nowrap">{tx.pagamento || '-'}</td>
-                  <td className="px-8 py-4 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold truncate max-w-[100px]" title={tx.banco}>{tx.banco || '-'}</td>
+                  <td className="px-8 py-4 text-on-surface-variant whitespace-nowrap hidden xl:table-cell">{tx.pagamento || '-'}</td>
+                  <td className="px-8 py-4 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold truncate max-w-[100px] hidden xl:table-cell" title={tx.banco}>{tx.banco || '-'}</td>
                   <td className="px-8 py-4 sticky right-0 bg-surface z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] group-hover:bg-surface-variant/20 transition-colors">
                     <div className="flex gap-2 justify-end">
                       {tx.status !== 'PAGO' && (
