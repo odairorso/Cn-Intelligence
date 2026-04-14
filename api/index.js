@@ -223,13 +223,15 @@ async function handleStats(req, res) {
     
     // Filtro de data dinâmico
     let dateFilterSql;
-    if (year && year !== 'TODOS') {
+    const isRange = (val) => /^\d{4}-\d{4}$/.test(val);
+
+    if (year && year !== 'TODOS' && !isRange(year)) {
       const y = parseInt(year);
       dateFilterSql = sql`AND vencimento >= ${y + '-01-01'} AND vencimento <= ${y + '-12-31'}`;
-    } else if (period === '2024-2025') {
-      dateFilterSql = sql`AND vencimento >= '2024-01-01' AND vencimento <= '2025-12-31'`;
-    } else if (period === '2024-2026') {
-      dateFilterSql = sql`AND vencimento >= '2024-01-01' AND vencimento <= '2026-12-31'`;
+    } else if (isRange(year) || isRange(period)) {
+      const range = isRange(year) ? year : period;
+      const [start, end] = range.split('-');
+      dateFilterSql = sql`AND vencimento >= ${start + '-01-01'} AND vencimento <= ${end + '-12-31'}`;
     } else {
       dateFilterSql = sql``; // TODOS
     }
@@ -248,7 +250,9 @@ async function handleStats(req, res) {
     
     // 2. Fluxo Mensal
     let fluxRows;
-    if (year && year !== 'TODOS') {
+    const activeRange = isRange(year) ? year : (isRange(period) ? period : null);
+
+    if (year && year !== 'TODOS' && !activeRange) {
       const y = parseInt(year);
       fluxRows = await sql`
         SELECT 
@@ -261,8 +265,21 @@ async function handleStats(req, res) {
           AND vencimento <= ${y + '-12-31'}
         GROUP BY EXTRACT(MONTH FROM vencimento)
         ORDER BY month_num`;
+    } else if (activeRange) {
+      const [start, end] = activeRange.split('-');
+      fluxRows = await sql`
+        SELECT 
+          EXTRACT(MONTH FROM vencimento) as month_num,
+          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
+          COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
+        FROM transactions
+        WHERE uid = ${filterUid} 
+          AND vencimento >= ${start + '-01-01'}
+          AND vencimento <= ${end + '-12-31'}
+        GROUP BY EXTRACT(MONTH FROM vencimento)
+        ORDER BY month_num`;
     } else {
-      // Padrão: Ano Atual
+      // Padrão: Ano Atual ou TODOS (mostra acumulado por mês do ano corrente)
       fluxRows = await sql`
         SELECT 
           EXTRACT(MONTH FROM vencimento) as month_num,
