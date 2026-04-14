@@ -3508,6 +3508,19 @@ export default function App() {
       }
     }
 
+    if (normalizedText.includes('ENERGISA')) {
+      const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (valor > 0) {
+        const valorBr = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const m = normalizedText.match(new RegExp(`(\\d{2}\\/\\d{2}\\/\\d{4})\\s+R\\$\\s*${escapeRegExp(valorBr)}`));
+        if (m?.[1]) vencimento = m[1];
+      }
+      if (!vencimento) {
+        const m = normalizedText.match(/(\d{2}\/\d{2}\/\d{4})\s+R\$\s*[\d.,]+\s+(?:JANEIRO|FEVEREIRO|MARÇO|MARCO|ABRIL|MAIO|JUNHO|JULHO|AGOSTO|SETEMBRO|OUTUBRO|NOVEMBRO|DEZEMBRO)\s*\/\s*\d{4}/);
+        if (m?.[1]) vencimento = m[1];
+      }
+    }
+
     const numeroBoleto = extractLocalBoletoNumber(normalizedText);
 
     // Extrair nome do Pagador/Sacado para usar como descrição (aceita acentos)
