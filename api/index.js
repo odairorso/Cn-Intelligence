@@ -1371,6 +1371,42 @@ JSON FORMAT:
   }
 }
 
+// GET /api?route=export-backup
+async function handleExportBackup(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const [transactions, suppliers, banks, contasContabeis, boletoPatterns] = await Promise.all([
+      sql`SELECT * FROM transactions ORDER BY created_at DESC`,
+      sql`SELECT * FROM suppliers ORDER BY nome`,
+      sql`SELECT * FROM banks ORDER BY nome`,
+      sql`SELECT * FROM contas_contabeis ORDER BY codigo`,
+      sql`SELECT * FROM boleto_patterns ORDER BY created_at DESC`
+    ]);
+
+    const backup = {
+      metadata: {
+        timestamp: new Date().toISOString(),
+        version: '1.0',
+        source: 'Neon PostgreSQL'
+      },
+      data: {
+        transactions: transactions || [],
+        suppliers: suppliers || [],
+        banks: banks || [],
+        contas_contabeis: contasContabeis || [],
+        boleto_patterns: boletoPatterns || []
+      }
+    };
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename=backup-cn-${new Date().toISOString().split('T')[0]}.json`);
+    return res.json(backup);
+  } catch (e) {
+    console.error('[backup] Error:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
 // --- Main Router ---
 export default async function handler(req, res) {
   setCors(res);
