@@ -105,7 +105,7 @@ export function useAppData() {
     try {
       if (append) setIsLoadingMore(true);
 
-      const limit = 10000; // Aumentado para 10.000 para trazer tudo de forma otimizada
+      const limit = 50; // Carrega 50 por vez para performance ideal
       const offset = append ? transactionsLengthRef.current : 0;
 
       const data = await api.getTransactions('guest', limit, offset);
@@ -122,11 +122,12 @@ export function useAppData() {
 
       if (append) {
         setTransactions(prev => {
-          transactionsLengthRef.current = prev.length + normalized.length;
-          return [
+          const next = [
             ...prev,
             ...normalized
           ].sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento));
+          transactionsLengthRef.current = next.length;
+          return next;
         });
       } else {
         transactionsLengthRef.current = normalized.length;
