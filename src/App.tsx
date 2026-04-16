@@ -933,7 +933,7 @@ const LancamentosTab = ({
       {totalPages > 1 && (
         <div className="flex items-center justify-between gap-4 pt-2">
           <span className="text-xs text-on-surface-variant">
-            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} de {filtered.length} lançamentos
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} de {filtered.length} lançamentos (carregados)
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -954,6 +954,25 @@ const LancamentosTab = ({
           </div>
         </div>
       )}
+
+      {/* Carregar mais do Banco de Dados */}
+      <div className="flex justify-center pt-4 border-t border-white/5">
+        <button
+          onClick={onLoadMore}
+          disabled={isLoadingMore}
+          className="flex items-center gap-2 px-6 py-3 bg-primary/10 text-primary rounded-xl text-sm font-bold hover:bg-primary/20 transition-all disabled:opacity-50"
+        >
+          {isLoadingMore ? (
+            <>
+              <Loader2 size={18} className="animate-spin" /> Carregando do Banco...
+            </>
+          ) : (
+            <>
+              <RefreshCw size={18} /> Carregar mais registros do Banco de Dados
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 };
@@ -3287,6 +3306,30 @@ export default function App() {
     showNotification('Logo removida.', 'info');
   };
 
+  const handleExportBackup = async () => {
+    try {
+      showNotification('Gerando backup... Aguarde.', 'info');
+      const response = await fetch('/api?route=export-backup');
+      if (!response.ok) throw new Error('Falha ao gerar backup');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+      a.download = `backup-cn-intelligence-${timestamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      showNotification('Backup exportado com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao exportar backup:', error);
+      showNotification('Erro ao exportar backup. Tente novamente.', 'error');
+    }
+  };
+
   // --- Handlers ---
 
   const normalizeBoletoNumber = (value?: string) => {
@@ -4623,6 +4666,36 @@ export default function App() {
                           className="h-20 w-20 object-contain rounded-sm border border-white/10 bg-white/5 p-2"
                         />
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Backup do Sistema */}
+                <div className="pt-8 border-t border-white/5">
+                  <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">💾 Backup dos Dados</h4>
+                  <div className="space-y-4 max-w-xl mx-auto">
+                    <div className="glass-card p-6">
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                          <Download size={24} className="text-primary" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-bold text-on-surface mb-1">Exportar Backup Completo</p>
+                          <p className="text-[11px] text-on-surface-variant">
+                            Baixa um arquivo JSON com todos os dados (transações, fornecedores, bancos, contas contábeis).
+                            Backup automático diário também é feito via GitHub Actions.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleExportBackup}
+                        className="w-full bg-primary/20 text-primary px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/30 transition-all border border-primary/30"
+                      >
+                        <Download size={18} /> Exportar Backup Agora
+                      </button>
+                      <p className="text-[10px] text-on-surface-variant/60 mt-3 text-center">
+                        💡 Dica: O backup automático é feito todo dia às 3h. Você pode baixar manualmente a qualquer momento.
+                      </p>
                     </div>
                   </div>
                 </div>

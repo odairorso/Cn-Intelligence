@@ -115,7 +115,7 @@ async function ensureContasTable() {
       ativo BOOLEAN DEFAULT true,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`;
-  
+
   // Atualiza ou insere contas padrão (upsert por código)
   const defaultAccounts = [
     ['3.1', 'Folha de Pagamento', 'DESPESA'],
@@ -136,7 +136,7 @@ async function ensureContasTable() {
     ['4.5', 'Aplicação Bancária', 'RECEITA'],
     ['4.6', 'Outras Receitas', 'RECEITA'],
   ];
-  
+
   for (const [codigo, nome, tipo] of defaultAccounts) {
     const exists = await sql`SELECT id FROM contas_contabeis WHERE codigo = ${codigo} LIMIT 1`;
     if (exists.length === 0) {
@@ -154,10 +154,9 @@ async function handleTransactions(req, res) {
   if (req.method === 'GET') {
     try {
       const { uid, limit, offset } = req.query;
-      const parsedLimit = limit ? parseInt(limit) : 10000; // Aumentado para 10.000 para "valores completos"
+      const parsedLimit = limit ? parseInt(limit) : 50; // Padrão 50 para performance
       const parsedOffset = offset ? parseInt(offset) : 0;
 
-      // Carrega as transações com limite maior (otimizado para trazer tudo o que o usuário precisa)
       const rows = uid
         ? await sql`SELECT * FROM transactions WHERE uid = ${uid} ORDER BY vencimento DESC LIMIT ${parsedLimit} OFFSET ${parsedOffset}`
         : await sql`SELECT * FROM transactions ORDER BY vencimento DESC LIMIT ${parsedLimit} OFFSET ${parsedOffset}`;
@@ -220,7 +219,7 @@ async function handleStats(req, res) {
   try {
     const { uid, year, period } = req.query;
     const filterUid = uid || 'guest';
-    
+
     // Filtro de data dinâmico
     let dateFilterSql;
     const isRange = (val) => /^\d{4}-\d{4}$/.test(val);
@@ -247,7 +246,7 @@ async function handleStats(req, res) {
         COUNT(*) as total_count
       FROM transactions
       WHERE uid = ${filterUid} ${dateFilterSql}`;
-    
+
     // 2. Fluxo Mensal
     let fluxRows;
     const activeRange = isRange(year) ? year : (isRange(period) ? period : null);
@@ -321,7 +320,7 @@ async function handleTransactionsBatch(req, res) {
 
   const transactions = req.body;
   console.log('[batch] Received:', JSON.stringify(transactions?.slice(0, 2), null, 2));
-  
+
   if (!Array.isArray(transactions) || transactions.length === 0) {
     console.log('[batch] Invalid: not an array or empty');
     return res.status(400).json({ error: 'Invalid batch data' });
@@ -332,33 +331,33 @@ async function handleTransactionsBatch(req, res) {
     let blocked = 0;
     let errors = [];
     const seenKeys = new Set();
-    
+
     for (let i = 0; i < transactions.length; i++) {
       const tx = transactions[i];
       const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = tx;
-      
+
       // Validate required fields
       if (!fornecedor || !vencimento || valor === undefined || valor === null) {
         console.log(`[batch] Skipping row ${i}: missing required fields`, { fornecedor, vencimento, valor });
         errors.push({ index: i, error: 'Missing required fields' });
         continue;
       }
-      
+
       const vDate = parseDateToPg(vencimento) || new Date().toISOString().split('T')[0];
       const pDate = parseDateToPg(pagamento);
       const normalizedNumber = normalizeBoletoNumber(numero_boleto);
-      
+
       const descKey = String(descricao || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       const empKey = String(empresa || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       const localKey = normalizedNumber
         ? `BOLETO:${normalizedNumber}`
         : `BASE:${String(fornecedor || '').toUpperCase()}|${vDate}|${Number(valor || 0).toFixed(2)}|${descKey}|${empKey}`;
-      
+
       if (seenKeys.has(localKey)) {
         blocked++;
         continue;
       }
-      
+
       const duplicateRows = normalizedNumber
         ? await sql`
             SELECT id FROM transactions
@@ -372,12 +371,12 @@ async function handleTransactionsBatch(req, res) {
               AND upper(coalesce(descricao, '')) = upper(${descricao || ''})
               AND upper(coalesce(empresa, '')) = upper(${empresa || ''})
             LIMIT 1`;
-      
+
       if (duplicateRows.length) {
         blocked++;
         continue;
       }
-      
+
       await sql`
         INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id)
         VALUES (${uid || 'guest'}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'},
@@ -385,7 +384,7 @@ async function handleTransactionsBatch(req, res) {
       created++;
       seenKeys.add(localKey);
     }
-    
+
     console.log(`[batch] Done: ${created} created, ${blocked} blocked, ${errors.length} errors`);
     return res.status(201).json({ message: 'Batch processed', count: created, blocked, errors });
   } catch (e) {
@@ -580,10 +579,10 @@ async function handleSuppliersMergeAuto(req, res) {
 
   try {
     console.log('[merge-auto] Starting auto merge process...');
-    
+
     const suppliers = await sql`SELECT id, nome FROM suppliers ORDER BY nome`;
     const txs = await sql`SELECT id, fornecedor FROM transactions`;
-    
+
     console.log(`[merge-auto] Found ${suppliers.length} suppliers and ${txs.length} transactions`);
 
     // Count frequency of each fornecedor in transactions
@@ -613,11 +612,11 @@ async function handleSuppliersMergeAuto(req, res) {
 
     for (const [key, items] of groups.entries()) {
       if (items.length <= 1) continue; // Skip uniques
-      
+
       groupsProcessed++;
       const names = items.map(i => i.nome);
       console.log(`[merge-auto] Group "${key}": ${names.length} variants: ${names.join(' | ')}`);
-      
+
       // Choose canonical name (most frequent in transactions, fallback to longest)
       let canonical = names[0];
       let bestScore = -1;
@@ -673,10 +672,10 @@ async function handleSuppliersMergeAuto(req, res) {
     }
 
     console.log(`[merge-auto] Completed: ${groupsProcessed} groups, ${totalUpdated} transactions updated, ${totalRemoved} suppliers removed`);
-    
-    return res.json({ 
-      updated: totalUpdated, 
-      removed: totalRemoved, 
+
+    return res.json({
+      updated: totalUpdated,
+      removed: totalRemoved,
       groupsProcessed,
       message: `${groupsProcessed} grupos unificados, ${totalUpdated} transações atualizadas, ${totalRemoved} fornecedores removidos`
     });
@@ -912,7 +911,7 @@ async function handleSetupTables(req, res) {
       ['4.5', 'Aplicação Bancária', 'RECEITA'],
       ['4.6', 'Outras Receitas', 'RECEITA'],
     ];
-    
+
     for (const [codigo, nome, tipo] of defaultAccounts) {
       const exists = await sql`SELECT id FROM contas_contabeis WHERE codigo = ${codigo} LIMIT 1`;
       if (exists.length === 0) {
@@ -945,11 +944,11 @@ async function handleSetupTables(req, res) {
 }
 
 // Helper: normaliza nome para chave de busca
-const normName = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-  .toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+const normName = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
 
 // Helper: extrai CNPJ limpo
-const cleanCnpj = (s) => String(s || '').replace(/[^0-9]/g,'');
+const cleanCnpj = (s) => String(s || '').replace(/[^0-9]/g, '');
 
 // Consulta padrão aprendido pelo CNPJ ou nome normalizado
 async function lookupPattern(cnpj, nomeNormalizado) {
@@ -1038,7 +1037,7 @@ async function handleSaveBoletoPattern(req, res) {
     if (cnpjClean.length >= 11) {
       await sql`
         INSERT INTO boleto_patterns (cnpj, nome_normalizado, fornecedor, empresa, tipo, conta_contabil_id)
-        VALUES (${cnpjClean}, ${nomeNorm}, ${fornecedor}, ${empresa||null}, ${tipo||'DESPESA'}, ${conta_contabil_id||null})
+        VALUES (${cnpjClean}, ${nomeNorm}, ${fornecedor}, ${empresa || null}, ${tipo || 'DESPESA'}, ${conta_contabil_id || null})
         ON CONFLICT (cnpj) DO UPDATE SET
           fornecedor = EXCLUDED.fornecedor,
           empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
@@ -1049,7 +1048,7 @@ async function handleSaveBoletoPattern(req, res) {
     } else {
       await sql`
         INSERT INTO boleto_patterns (nome_normalizado, fornecedor, empresa, tipo, conta_contabil_id)
-        VALUES (${nomeNorm}, ${fornecedor}, ${empresa||null}, ${tipo||'DESPESA'}, ${conta_contabil_id||null})
+        VALUES (${nomeNorm}, ${fornecedor}, ${empresa || null}, ${tipo || 'DESPESA'}, ${conta_contabil_id || null})
         ON CONFLICT (nome_normalizado) DO UPDATE SET
           fornecedor = EXCLUDED.fornecedor,
           empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
@@ -1118,7 +1117,7 @@ async function handleExtractBoleto(req, res) {
         const m = srcUpper.match(p);
         if (m?.[1]) {
           const candidate = m[1].trim().replace(/\s+/g, ' ');
-          const rejectWords = ['BRADESCO','ITAU','SANTANDER','CAIXA','SICREDI','BANCO','PAGADOR','SACADO','RECIBO','AGENCIA','CODIGO','BENEFICI','ESPECIE','CARTEIRA','INSTRUCOES','LOCAL DE','INSC','DOM.', 'AV.', 'AVENIDA', 'RUA', 'CEP '];
+          const rejectWords = ['BRADESCO', 'ITAU', 'SANTANDER', 'CAIXA', 'SICREDI', 'BANCO', 'PAGADOR', 'SACADO', 'RECIBO', 'AGENCIA', 'CODIGO', 'BENEFICI', 'ESPECIE', 'CARTEIRA', 'INSTRUCOES', 'LOCAL DE', 'INSC', 'DOM.', 'AV.', 'AVENIDA', 'RUA', 'CEP '];
           if (candidate.length >= 5 && !rejectWords.some(w => candidate.toUpperCase().includes(w))) {
             rawBenefName = candidate;
             break;
@@ -1134,8 +1133,8 @@ async function handleExtractBoleto(req, res) {
     // CNPJ do beneficiário = primeiro CNPJ que não está associado ao pagador
     const rawCnpj = allCnpjs.find(c => {
       // Verifica se esse CNPJ aparece próximo ao nome do pagador
-      const cnpjIdx = srcUpper.indexOf(c.slice(0,8)); // busca pelos primeiros 8 dígitos
-      const pagIdx = pagadorNome ? srcUpper.indexOf(pagadorNome.slice(0,10)) : -1;
+      const cnpjIdx = srcUpper.indexOf(c.slice(0, 8)); // busca pelos primeiros 8 dígitos
+      const pagIdx = pagadorNome ? srcUpper.indexOf(pagadorNome.slice(0, 10)) : -1;
       if (pagIdx === -1) return true; // sem pagador identificado, usa o primeiro
       return Math.abs(cnpjIdx - pagIdx) > 200; // CNPJ longe do pagador = beneficiário
     }) || allCnpjs[0] || '';
@@ -1157,16 +1156,16 @@ async function handleExtractBoleto(req, res) {
         // Se tem ponto E vírgula (ex: 1.250,00)
         if (r.includes('.') && r.includes(',')) {
           // Se o ponto vem antes da vírgula (formato brasileiro)
-          if (r.indexOf('.') < r.indexOf(',')) return parseFloat(r.replace(/\./g,'').replace(',','.'));
+          if (r.indexOf('.') < r.indexOf(',')) return parseFloat(r.replace(/\./g, '').replace(',', '.'));
           // Formato americano com vírgula como separador de milhar
-          return parseFloat(r.replace(/,/g,''));
+          return parseFloat(r.replace(/,/g, ''));
         }
-        if (r.includes(',')) return parseFloat(r.replace(',','.'));
+        if (r.includes(',')) return parseFloat(r.replace(',', '.'));
         return parseFloat(r) || 0;
       };
 
       const vencimento = dateMatch?.[1] || '';
-      
+
       // Tenta uma busca mais inteligente: data próxima ao valor financeiro (R$)
       // No boleto da Energisa, o vencimento real está na mesma linha ou logo após o valor.
       const dateNearValueMatch = srcUpper.match(/(\d{2}\/\d{2}\/\d{4})[\s\n]+R\$/i) || srcUpper.match(/R\$[\s\n]*[\d.,]+[\s\n]+(\d{2}\/\d{2}\/\d{4})/i);
@@ -1205,7 +1204,7 @@ Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
           contents: miniPrompt,
           config: { responseMimeType: 'application/json', temperature: 0 },
         });
-        const mini = JSON.parse((miniResp.text || '{}').replace(/```json|```/gi,'').trim());
+        const mini = JSON.parse((miniResp.text || '{}').replace(/```json|```/gi, '').trim());
 
         return res.json({
           fornecedor: pattern.fornecedor,
@@ -1412,6 +1411,8 @@ export default async function handler(req, res) {
       return handleExtractBoleto(req, res);
     case 'stats':
       return handleStats(req, res);
+    case 'export-backup':
+      return handleExportBackup(req, res);
     default:
       return res.status(404).json({ error: 'Route not found' });
   }
