@@ -651,9 +651,10 @@ const LancamentosTab = ({
 
   // Reset page when filters change
   useEffect(() => { setPage(0); }, [filter, statusFilter, monthFilter, yearFilter, sortOrder]);
-  // Clear selection when filters change
-  useEffect(() => { setSelectedIds(new Set()); }, [filter, statusFilter, monthFilter, yearFilter, sortOrder, page]);
-  // Clear selection when transactions update (e.g. after batch pay)
+  // Preserve selection when filters change (do not clear)
+  // The selection will automatically stay consistent with the filtered list.
+  // If needed, we could prune IDs that are no longer in the filtered view elsewhere.
+  // Clear selection only when transactions update (e.g. after batch pay)
   useEffect(() => {
     setSelectedIds(prev => {
       if (prev.size === 0) return prev;
@@ -695,6 +696,7 @@ const LancamentosTab = ({
   };
 
   const selectedTxs = transactions.filter(tx => selectedIds.has(tx.id));
+const selectedTotal = selectedTxs.reduce((s, tx) => s + Number(tx.valor) + Number(tx.juros || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -760,7 +762,7 @@ const LancamentosTab = ({
               onClick={() => onMarkAsPaidBatch(selectedTxs)}
               className="bg-primary/20 border border-primary/40 text-primary px-5 py-2.5 rounded-sm text-sm font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary/30 transition-all whitespace-nowrap"
             >
-              <Check size={18} strokeWidth={3} /> Receber {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+              <Check size={18} strokeWidth={3} /> Receber {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''} – {formatBRL(selectedTotal)}
             </button>
           )}
           <button
@@ -2272,11 +2274,12 @@ interface SelectBankModalProps {
   valor: number;
   banks: Bank[];
   onClose: () => void;
-  onConfirm: (banco: string) => void;
+  onConfirm: (banco: string, dataPagamento: string) => void;
 }
 
 const SelectBankModal = ({ transactionId, valor, banks, onClose, onConfirm }: SelectBankModalProps) => {
   const [selectedBank, setSelectedBank] = useState('');
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
@@ -2286,9 +2289,19 @@ const SelectBankModal = ({ transactionId, valor, banks, onClose, onConfirm }: Se
         className="glass-card p-10 w-full max-w-md border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
       >
         <h3 className="text-xl font-bold font-headline mb-2">Confirmar Pagamento</h3>
-        <p className="text-sm text-on-surface-variant mb-6">
+        <p className="text-sm text-on-surface-variant mb-4">
           Selecione o banco para registrar o pagamento de <span className="font-bold text-primary">{valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </p>
+
+        <div className="mb-6">
+          <label className="block text-xs font-bold text-on-surface-variant uppercase mb-2">Data do Pagamento</label>
+          <input
+            type="date"
+            value={paymentDate}
+            onChange={(e) => setPaymentDate(e.target.value)}
+            className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-3 text-sm outline-none focus:border-primary text-on-surface"
+          />
+        </div>
 
         <div className="space-y-3 mb-6">
           {banks.filter(b => b.ativo).map(bank => (
@@ -2320,7 +2333,7 @@ const SelectBankModal = ({ transactionId, valor, banks, onClose, onConfirm }: Se
             Cancelar
           </button>
           <button
-            onClick={() => selectedBank && onConfirm(selectedBank)}
+            onClick={() => selectedBank && onConfirm(selectedBank, paymentDate)}
             disabled={!selectedBank}
             className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -5418,8 +5431,8 @@ export default function App() {
           valor={showPayModal.valor}
           banks={banks}
           onClose={() => setShowPayModal(null)}
-          onConfirm={(banco) => {
-            markAsPaid(showPayModal.id, banco);
+          onConfirm={(banco, dataPagamento) => {
+            markAsPaid(showPayModal.id, banco, dataPagamento);
             setShowPayModal(null);
           }}
         />
@@ -5431,8 +5444,8 @@ export default function App() {
           valor={showPayBatchModal.reduce((sum, tx) => sum + tx.valor, 0)}
           banks={banks}
           onClose={() => setShowPayBatchModal(null)}
-          onConfirm={(banco) => {
-            markAsPaidBatch(showPayBatchModal.map(t => t.id), banco);
+          onConfirm={(banco, dataPagamento) => {
+            markAsPaidBatch(showPayBatchModal.map(t => t.id), banco, dataPagamento);
             setShowPayBatchModal(null);
           }}
         />
