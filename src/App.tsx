@@ -1329,9 +1329,10 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
 
 interface RelatoriosTabProps {
   transactions: Transaction[];
+  fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string) => void;
 }
 
-const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
+const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) => {
   const years = useMemo(() => {
     const y = transactions.map(tx => {
       const dateParts = tx.vencimento.includes('-') ? tx.vencimento.split('-') : tx.vencimento.split('/');
