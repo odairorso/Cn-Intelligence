@@ -4632,7 +4632,7 @@ export default function App() {
                 deleteTransaction={deleteTransaction}
                 setShowNewTxModal={setShowNewTxModal}
                 setEditingTx={setEditingTx}
-                onLoadMore={() => fetchTransactions(true)}
+                onLoadMore={(append, year, month, search) => fetchTransactions(append, year, month, search)}
                 isLoadingMore={isLoadingMore}
               />
             )}
