@@ -1342,6 +1342,7 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
   const [selectedMonth, setSelectedMonth] = useState<string>('TODOS');
   const [selectedCompany, setSelectedCompany] = useState<string>('TODOS');
   const [selectedTipo, setSelectedTipo] = useState<string>('TODOS');
+  const [selectedStatus, setSelectedStatus] = useState<string>('TODOS');
 
   const companies = useMemo(() => {
     const map = new Map<string, string>();
@@ -1364,9 +1365,10 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
       const matchesCompany = selectedCompany === 'TODOS' || normalizeCompanyKey(tx.empresa) === selectedCompany;
       const txTipo = tx.tipo || (isRevenueTransaction(tx) ? 'RECEITA' : 'DESPESA');
       const matchesTipo = selectedTipo === 'TODOS' || txTipo === selectedTipo;
-      return matchesYear && matchesMonth && matchesCompany && matchesTipo;
+      const matchesStatus = selectedStatus === 'TODOS' || tx.status === selectedStatus;
+      return matchesYear && matchesMonth && matchesCompany && matchesTipo && matchesStatus;
     });
-  }, [transactions, selectedYear, selectedMonth, selectedCompany, selectedTipo]);
+  }, [transactions, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus]);
 
   const periodTotals = useMemo(() => {
     let total = 0;
@@ -1527,6 +1529,18 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
           >
             <option value="TODOS" className="bg-surface text-on-surface">Todas</option>
             {companies.map(c => <option key={c.value} value={c.value} className="bg-surface text-on-surface">{c.label}</option>)}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase">Status</label>
+          <select
+            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+            value={selectedStatus}
+            onChange={e => setSelectedStatus(e.target.value)}
+          >
+            <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
+            <option value="PENDENTE" className="bg-surface text-on-surface">Pendentes</option>
+            <option value="PAGO" className="bg-surface text-on-surface">Pagos</option>
           </select>
         </div>
         <div className="flex-grow"></div>
