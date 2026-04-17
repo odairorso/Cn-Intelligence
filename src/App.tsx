@@ -573,7 +573,7 @@ interface LancamentosTabProps {
   deleteTransaction: (id: string) => void;
   setShowNewTxModal: (show: boolean) => void;
   setEditingTx: (tx: Transaction) => void;
-  onLoadMore?: () => void;
+  onLoadMore?: (append?: boolean, year?: string, month?: string, search?: string) => void;
   isLoadingMore?: boolean;
 }
 
@@ -588,6 +588,16 @@ const LancamentosTab = ({
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Busca no servidor ao mudar filtros (debounce para o texto)
+  useEffect(() => {
+    if (onLoadMore) {
+      const timer = setTimeout(() => {
+        onLoadMore(false, yearFilter, monthFilter, filter);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [filter, yearFilter, monthFilter, onLoadMore]);
 
   // Extrair meses e anos únicos para os filtros
   const availableYears = useMemo(() => {

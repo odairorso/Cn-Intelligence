@@ -101,14 +101,14 @@ export function useAppData() {
     }
   }, []);
 
-  const fetchTransactions = useCallback(async (append = false, year?: string, month?: string) => {
+  const fetchTransactions = useCallback(async (append = false, year?: string, month?: string, search?: string) => {
     try {
       if (append) setIsLoadingMore(true);
 
-      const limit = (year && year !== 'TODOS') ? 5000 : 50; // Aumenta limite se estiver filtrando por ano
+      const limit = (year && year !== 'TODOS') || search ? 5000 : 50; // Aumenta limite se estiver filtrando por ano ou buscando
       const offset = append ? transactionsLengthRef.current : 0;
 
-      const data = await api.getTransactions('guest', limit, offset, year, month);
+      const data = await api.getTransactions('guest', limit, offset, year, month, search);
       const normalized = data.map((tx) => {
         const raw = tx as any;
         return {

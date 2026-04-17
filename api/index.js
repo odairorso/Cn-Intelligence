@@ -153,14 +153,19 @@ async function ensureContasTable() {
 async function handleTransactions(req, res) {
   if (req.method === 'GET') {
     try {
-      const { uid, limit, offset, year, month } = req.query;
-      // Se tiver filtro de ano, aumentamos o limite para garantir que o relatório pegue tudo do período
-      const defaultLimit = (year && year !== 'TODOS') ? 5000 : 50;
+      const { uid, limit, offset, year, month, search } = req.query;
+      // Se tiver busca ou filtro de ano, aumentamos o limite para garantir que o resultado seja completo
+      const defaultLimit = (year && year !== 'TODOS') || search ? 5000 : 50;
       const parsedLimit = limit ? parseInt(limit) : defaultLimit;
       const parsedOffset = offset ? parseInt(offset) : 0;
 
       let query = sql`SELECT * FROM transactions WHERE 1=1`;
       if (uid) query = sql`${query} AND uid = ${uid}`;
+
+      if (search) {
+        const s = `%${search}%`;
+        query = sql`${query} AND (fornecedor ILIKE ${s} OR descricao ILIKE ${s} OR empresa ILIKE ${s})`;
+      }
 
       if (year && year !== 'TODOS') {
         const start = `${year}-01-01`;
