@@ -5,11 +5,13 @@ const API_BASE = '/api';
 
 export const api = {
   // ─── Transactions ──────────────────────────────────────────────────────────
-  async getTransactions(_uid: string, limit?: number, offset?: number): Promise<Transaction[]> {
+  async getTransactions(_uid: string, limit?: number, offset?: number, year?: string, month?: string): Promise<Transaction[]> {
     const params = new URLSearchParams();
     params.append('route', 'transactions');
     if (limit) params.append('limit', String(limit));
     if (offset) params.append('offset', String(offset));
+    if (year) params.append('year', year);
+    if (month) params.append('month', month);
 
     const res = await fetch(`${API_BASE}?${params.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch transactions');

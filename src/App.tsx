@@ -1344,6 +1344,10 @@ const RelatoriosTab = ({ transactions }: RelatoriosTabProps) => {
   const [selectedTipo, setSelectedTipo] = useState<string>('TODOS');
   const [selectedStatus, setSelectedStatus] = useState<string>('TODOS');
 
+  useEffect(() => {
+    fetchTransactions(false, selectedYear, selectedMonth);
+  }, [selectedYear, selectedMonth, fetchTransactions]);
+
   const companies = useMemo(() => {
     const map = new Map<string, string>();
     for (const tx of transactions) {
@@ -2344,6 +2348,13 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
   });
   const [searchConta, setSearchConta] = useState('');
   const [showContaDropdown, setShowContaDropdown] = useState(false);
+  const [searchSupplier, setSearchSupplier] = useState('');
+
+  const filteredSuppliers = useMemo(() => {
+    return suppliers.filter(s =>
+      s.nome.toLowerCase().includes(searchSupplier.toLowerCase())
+    ).slice(0, 100); // Limit to 100 for performance
+  }, [suppliers, searchSupplier]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2684,6 +2695,13 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
   });
   const [searchConta, setSearchConta] = useState('');
   const [showContaDropdown, setShowContaDropdown] = useState(false);
+  const [searchSupplier, setSearchSupplier] = useState('');
+
+  const filteredSuppliers = useMemo(() => {
+    return suppliers.filter(s =>
+      s.nome.toLowerCase().includes(searchSupplier.toLowerCase())
+    ).slice(0, 100); // Limit to 100 for performance
+  }, [suppliers, searchSupplier]);
 
   useEffect(() => {
     setFormData({

@@ -153,13 +153,27 @@ async function ensureContasTable() {
 async function handleTransactions(req, res) {
   if (req.method === 'GET') {
     try {
-      const { uid, limit, offset } = req.query;
-      const parsedLimit = limit ? parseInt(limit) : 50; // Padrão 50 para performance
+      const { uid, limit, offset, year, month } = req.query;
+      // Se tiver filtro de ano, aumentamos o limite para garantir que o relatório pegue tudo do período
+      const defaultLimit = (year && year !== 'TODOS') ? 5000 : 50;
+      const parsedLimit = limit ? parseInt(limit) : defaultLimit;
       const parsedOffset = offset ? parseInt(offset) : 0;
 
-      const rows = uid
-        ? await sql`SELECT * FROM transactions WHERE uid = ${uid} ORDER BY vencimento DESC LIMIT ${parsedLimit} OFFSET ${parsedOffset}`
-        : await sql`SELECT * FROM transactions ORDER BY vencimento DESC LIMIT ${parsedLimit} OFFSET ${parsedOffset}`;
+      let query = sql`SELECT * FROM transactions WHERE 1=1`;
+      if (uid) query = sql`${query} AND uid = ${uid}`;
+
+      if (year && year !== 'TODOS') {
+        const start = `${year}-01-01`;
+        const end = `${year}-12-31`;
+        query = sql`${query} AND vencimento >= ${start} AND vencimento <= ${end}`;
+      }
+
+      if (month && month !== 'TODOS') {
+        const m = month.padStart(2, '0');
+        query = sql`${query} AND TO_CHAR(vencimento, 'MM') = ${m}`;
+      }
+
+      const rows = await sql`${query} ORDER BY vencimento DESC LIMIT ${parsedLimit} OFFSET ${parsedOffset}`;
 
       const formatted = rows.map(tx => ({
         ...tx,
