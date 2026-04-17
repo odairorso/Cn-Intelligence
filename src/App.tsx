@@ -4676,7 +4676,12 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'relatorios' && <RelatoriosTab transactions={transactions} />}
+            {activeTab === 'relatorios' && (
+              <RelatoriosTab
+                transactions={transactions}
+                fetchTransactions={fetchTransactions}
+              />
+            )}
             {activeTab === 'receitas' && <ReceitasTab transactions={transactions} onNewRevenue={() => { setNewTxInitialTipo('RECEITA'); setShowNewTxModal(true); }} />}
             {activeTab === 'bancos' && (
               <BancosTab
