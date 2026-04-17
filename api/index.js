@@ -162,20 +162,21 @@ async function handleTransactions(req, res) {
       let query = sql`SELECT * FROM transactions WHERE 1=1`;
       if (uid) query = sql`${query} AND uid = ${uid}`;
 
+      // Se houver busca, ignoramos filtros de ano/mês para encontrar em todo o histórico
       if (search) {
         const s = `%${search}%`;
         query = sql`${query} AND (fornecedor ILIKE ${s} OR descricao ILIKE ${s} OR empresa ILIKE ${s})`;
-      }
-
-      if (year && year !== 'TODOS') {
-        const start = `${year}-01-01`;
-        const end = `${year}-12-31`;
-        query = sql`${query} AND vencimento >= ${start} AND vencimento <= ${end}`;
-      }
-
-      if (month && month !== 'TODOS') {
-        const m = month.padStart(2, '0');
-        query = sql`${query} AND TO_CHAR(vencimento, 'MM') = ${m}`;
+      } else {
+        // Filtros de período só se aplicam se NÃO houver busca ativa
+        if (year && year !== 'TODOS') {
+          const start = `${year}-01-01`;
+          const end = `${year}-12-31`;
+          query = sql`${query} AND vencimento >= ${start} AND vencimento <= ${end}`;
+        }
+        if (month && month !== 'TODOS') {
+          const m = month.padStart(2, '0');
+          query = sql`${query} AND TO_CHAR(vencimento, 'MM') = ${m}`;
+        }
       }
 
       const rows = await sql`${query} ORDER BY vencimento DESC LIMIT ${parsedLimit} OFFSET ${parsedOffset}`;
