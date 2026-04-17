@@ -2426,14 +2426,42 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor</label>
-              <select
-                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
-                style={{ backgroundColor: '#161b2a' }}
-                value={formData.fornecedor}
-                onChange={e => setFormData({ ...formData, fornecedor: e.target.value })}
-              >
-                {suppliers.map(s => <option key={s.id} value={s.nome} className="bg-[#161b2a] text-on-surface">{s.nome}</option>)}
-              </select>
+              <div className="relative">
+                <input
+                  type="text" required
+                  placeholder="Buscar fornecedor..."
+                  className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface"
+                  style={{ backgroundColor: '#161b2a' }}
+                  value={formData.fornecedor}
+                  onChange={e => {
+                    setFormData({ ...formData, fornecedor: e.target.value });
+                    setSearchSupplier(e.target.value);
+                  }}
+                  onFocus={() => setSearchSupplier(formData.fornecedor)}
+                />
+                {searchSupplier && (
+                  <div className="absolute z-[110] w-full mt-1 bg-[#161b2a] border border-white/10 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    {filteredSuppliers.length > 0 ? (
+                      filteredSuppliers.map(s => (
+                        <div
+                          key={s.id}
+                          className="px-4 py-2 text-sm hover:bg-white/5 cursor-pointer text-on-surface"
+                          onClick={() => {
+                            setFormData({ ...formData, fornecedor: s.nome });
+                            setSearchSupplier('');
+                          }}
+                        >
+                          {s.nome}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-2 text-sm text-on-surface-variant italic">
+                        Nenhum fornecedor encontrado (será criado um novo)
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Banco / Conta</label>
