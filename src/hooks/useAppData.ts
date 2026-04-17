@@ -256,13 +256,15 @@ export function useAppData() {
   }, [companyOptions]);
 
   // ─── Transaction actions ──────────────────────────────────────────────────
-  const markAsPaid = useCallback(async (id: string, banco: string) => {
+  const markAsPaid = useCallback(async (id: string, banco: string, dataPagamento?: string) => {
     const today = new Date().toLocaleDateString('pt-BR');
+    const finalDate = dataPagamento ? toDisplayDate(dataPagamento) : today;
+
     setTransactions(prev =>
-      prev.map(tx => tx.id === id ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: today, banco } : tx)
+      prev.map(tx => tx.id === id ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: finalDate, banco } : tx)
     );
     showNotification('Lançamento marcado como pago!', 'success');
-    api.updateTransaction(id, { status: 'PAGO', pagamento: today, banco }).then(() => {
+    api.updateTransaction(id, { status: 'PAGO', pagamento: finalDate, banco }).then(() => {
       fetchStats();
     }).catch(err => {
       console.error('Failed to mark as paid:', err);
@@ -270,13 +272,15 @@ export function useAppData() {
     });
   }, [showNotification, fetchTransactions, fetchStats]);
 
-  const markAsPaidBatch = useCallback(async (ids: string[], banco: string) => {
+  const markAsPaidBatch = useCallback(async (ids: string[], banco: string, dataPagamento?: string) => {
     const today = new Date().toLocaleDateString('pt-BR');
+    const finalDate = dataPagamento ? toDisplayDate(dataPagamento) : today;
+
     setTransactions(prev =>
-      prev.map(tx => ids.includes(tx.id) ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: today, banco } : tx)
+      prev.map(tx => ids.includes(tx.id) ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: finalDate, banco } : tx)
     );
     showNotification(`${ids.length} lançamento(s) marcado(s) como pago!`, 'success');
-    api.updateTransactionsBatch(ids, banco).then(() => {
+    api.updateTransactionsBatch(ids, banco, finalDate).then(() => {
       fetchStats();
     }).catch(err => {
       console.error('Failed to mark batch as paid:', err);

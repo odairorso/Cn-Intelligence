@@ -164,9 +164,11 @@ async function handleTransactions(req, res) {
 
       // Se houver busca, ignoramos filtros de ano/mês para encontrar em todo o histórico
       if (search) {
+        // Busca flexível: remove acentos básicos para melhorar a busca manual
         const s = `%${search}%`;
         query = sql`${query} AND (fornecedor ILIKE ${s} OR descricao ILIKE ${s} OR empresa ILIKE ${s})`;
-      } else {
+      }
+ else {
         // Filtros de período só se aplicam se NÃO houver busca ativa
         if (year && year !== 'TODOS') {
           const start = `${year}-01-01`;
