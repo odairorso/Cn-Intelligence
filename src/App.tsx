@@ -2343,7 +2343,7 @@ interface NewTxModalProps {
 
 const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShowNewTxModal, onSuccess, initialTipo = 'DESPESA' }: NewTxModalProps) => {
   const [formData, setFormData] = useState({
-    fornecedor: suppliers[0]?.nome || '',
+    fornecedor: '',
     descricao: '',
     empresa: companyOptions[0] || 'CN',
     vencimento: new Date().toISOString().split('T')[0],
