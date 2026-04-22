@@ -451,6 +451,7 @@ async function handleTransactionsBatchUpdate(req, res) {
 // PUT/DELETE /api?route=transactions&id=xxx
 async function handleTransactionById(req, res) {
   const { id } = req.query;
+  console.log(`[handleTransactionById] ID: ${id}, Pagamento received: ${req.body?.pagamento}`);
 
   if (req.method === 'PUT') {
     try {

@@ -257,8 +257,7 @@ export function useAppData() {
 
   // ─── Transaction actions ──────────────────────────────────────────────────
   const markAsPaid = useCallback(async (id: string, banco: string, dataPagamento?: string) => {
-    const today = new Date().toLocaleDateString('pt-BR');
-    const finalDate = dataPagamento ? toDisplayDate(dataPagamento) : today;
+    const finalDate = dataPagamento ? toDisplayDate(dataPagamento) : '';
 
     setTransactions(prev =>
       prev.map(tx => tx.id === id ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: finalDate, banco } : tx)
@@ -273,8 +272,7 @@ export function useAppData() {
   }, [showNotification, fetchTransactions, fetchStats]);
 
   const markAsPaidBatch = useCallback(async (ids: string[], banco: string, dataPagamento?: string) => {
-    const today = new Date().toLocaleDateString('pt-BR');
-    const finalDate = dataPagamento ? toDisplayDate(dataPagamento) : today;
+    const finalDate = dataPagamento ? toDisplayDate(dataPagamento) : '';
 
     setTransactions(prev =>
       prev.map(tx => ids.includes(tx.id) ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: finalDate, banco } : tx)
