@@ -257,14 +257,16 @@ export function useAppData() {
 
   // ─── Transaction actions ──────────────────────────────────────────────────
   const markAsPaid = useCallback(async (id: string, banco: string, dataPagamento?: string) => {
-    const finalDate = dataPagamento ? toDisplayDate(dataPagamento) : '';
+    // dataPagamento vem do modal como YYYY-MM-DD
+    const displayDate = dataPagamento ? toDisplayDate(dataPagamento) : '';
 
     setTransactions(prev =>
-      prev.map(tx => tx.id === id ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: finalDate, banco } : tx)
+      prev.map(tx => tx.id === id ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: displayDate, banco } : tx)
     );
     showNotification('Lançamento marcado como pago!', 'success');
-    console.log(`[markAsPaid] Sending update for ${id}. Date: ${finalDate}`);
-    api.updateTransaction(id, { status: 'PAGO', pagamento: finalDate, banco }).then(() => {
+    
+    // Enviamos a data original (YYYY-MM-DD) para a API
+    api.updateTransaction(id, { status: 'PAGO', pagamento: dataPagamento, banco }).then(() => {
       fetchStats();
     }).catch(err => {
       console.error('Failed to mark as paid:', err);
@@ -273,14 +275,16 @@ export function useAppData() {
   }, [showNotification, fetchTransactions, fetchStats]);
 
   const markAsPaidBatch = useCallback(async (ids: string[], banco: string, dataPagamento?: string) => {
-    const finalDate = dataPagamento ? toDisplayDate(dataPagamento) : '';
+    // dataPagamento vem do modal como YYYY-MM-DD
+    const displayDate = dataPagamento ? toDisplayDate(dataPagamento) : '';
 
     setTransactions(prev =>
-      prev.map(tx => ids.includes(tx.id) ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: finalDate, banco } : tx)
+      prev.map(tx => ids.includes(tx.id) ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: displayDate, banco } : tx)
     );
     showNotification(`${ids.length} lançamento(s) marcado(s) como pago!`, 'success');
-    console.log(`[markAsPaidBatch] Sending batch update for ${ids.length} items. Date: ${finalDate}`);
-    api.updateTransactionsBatch(ids, banco, finalDate).then(() => {
+    
+    // Enviamos a data original (YYYY-MM-DD) para a API
+    api.updateTransactionsBatch(ids, banco, dataPagamento).then(() => {
       fetchStats();
     }).catch(err => {
       console.error('Failed to mark batch as paid:', err);

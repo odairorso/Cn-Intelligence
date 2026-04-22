@@ -660,7 +660,7 @@ const LancamentosTab = ({
       if (prev.size === 0) return prev;
       // Remove ids that are now PAGO
       const paidIds = new Set(transactions.filter(tx => tx.status === 'PAGO').map(tx => tx.id));
-      const next = new Map(prev);
+      const next = new Map<string, Transaction>(prev);
       let changed = false;
       for (const id of next.keys()) {
         if (paidIds.has(id)) {
@@ -677,7 +677,7 @@ const LancamentosTab = ({
 
   const toggleSelect = (tx: Transaction) => {
     const isSelected = selectedMap.has(tx.id);
-    const next = new Map(selectedMap);
+    const next = new Map<string, Transaction>(selectedMap);
     if (isSelected) {
       next.delete(tx.id);
     } else {
@@ -690,7 +690,7 @@ const LancamentosTab = ({
   const allPagePendingSelected = pendingOnPage.length > 0 && pendingOnPage.every(tx => selectedMap.has(tx.id));
 
   const toggleSelectAll = () => {
-    const next = new Map(selectedMap);
+    const next = new Map<string, Transaction>(selectedMap);
     if (allPagePendingSelected) {
       pendingOnPage.forEach(tx => next.delete(tx.id));
     } else {
@@ -699,7 +699,7 @@ const LancamentosTab = ({
     setSelectedMap(next);
   };
 
-  const selectedTxs = Array.from(selectedMap.values());
+  const selectedTxs: Transaction[] = Array.from(selectedMap.values());
   const selectedTotal = selectedTxs.reduce((s, tx) => s + Number(tx.valor) + Number(tx.juros || 0), 0);
 
   return (
@@ -2285,6 +2285,7 @@ interface SelectBankModalProps {
 const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, onConfirm }: SelectBankModalProps) => {
   const [selectedBank, setSelectedBank] = useState('');
   const [paymentDate, setPaymentDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
+  const paymentDateRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (initialDate) {
@@ -2310,6 +2311,7 @@ const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, on
           <label className="block text-xs font-bold text-on-surface-variant uppercase mb-2">Data do Pagamento</label>
           <input
             type="date"
+            ref={paymentDateRef}
             value={paymentDate}
             onChange={(e) => setPaymentDate(e.target.value)}
             className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-3 text-sm outline-none focus:border-primary text-on-surface"
@@ -2346,7 +2348,12 @@ const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, on
             Cancelar
           </button>
           <button
-            onClick={() => selectedBank && onConfirm(selectedBank, paymentDate)}
+            onClick={() => {
+              if (!selectedBank) return;
+              const raw = paymentDateRef.current?.value || paymentDate;
+              const normalized = toInputDate(raw) || raw;
+              onConfirm(selectedBank, normalized);
+            }}
             disabled={!selectedBank}
             className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
