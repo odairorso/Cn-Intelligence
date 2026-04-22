@@ -5457,7 +5457,7 @@ export default function App() {
           transactionId="batch"
           valor={showPayBatchModal.reduce((sum, tx) => sum + tx.valor, 0)}
           banks={banks}
-          initialDate={new Date().toISOString().split('T')[0]}
+          initialDate={showPayBatchModal.length > 0 ? toInputDate(showPayBatchModal[0].vencimento) : undefined}
           onClose={() => setShowPayBatchModal(null)}
           onConfirm={(banco, dataPagamento) => {
             markAsPaidBatch(showPayBatchModal.map(t => t.id), banco, dataPagamento);
