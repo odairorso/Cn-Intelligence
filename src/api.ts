@@ -67,11 +67,11 @@ export const api = {
     if (!res.ok) throw new Error('Failed to create transactions batch');
   },
 
-  async updateTransactionsBatch(ids: string[], banco: string): Promise<void> {
+  async updateTransactionsBatch(ids: string[], banco: string, dataPagamento?: string): Promise<void> {
     const res = await fetch(`${API_BASE}?route=transactions-batch-update`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids, banco }),
+      body: JSON.stringify({ ids, banco, dataPagamento }),
     });
     if (!res.ok) throw new Error('Failed to update transactions batch');
   },
