@@ -587,7 +587,7 @@ const LancamentosTab = ({
   const [yearFilter, setYearFilter] = useState('TODOS');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [page, setPage] = useState(0);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedMap, setSelectedMap] = useState<Map<string, Transaction>>(new Map());
 
   // Busca no servidor ao mudar filtros (debounce para o texto)
   useEffect(() => {
@@ -656,47 +656,51 @@ const LancamentosTab = ({
   // If needed, we could prune IDs that are no longer in the filtered view elsewhere.
   // Clear selection only when transactions update (e.g. after batch pay)
   useEffect(() => {
-    setSelectedIds(prev => {
+    setSelectedMap(prev => {
       if (prev.size === 0) return prev;
       // Remove ids that are now PAGO
       const paidIds = new Set(transactions.filter(tx => tx.status === 'PAGO').map(tx => tx.id));
-      const next = new Set([...prev].filter(id => !paidIds.has(id)));
-      return next.size === prev.size ? prev : next;
+      const next = new Map(prev);
+      let changed = false;
+      for (const id of next.keys()) {
+        if (paidIds.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
     });
   }, [transactions]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const pendingOnPage = paginated.filter(tx => tx.status !== 'PAGO');
-  const allPagePendingSelected = pendingOnPage.length > 0 && pendingOnPage.every(tx => selectedIds.has(tx.id));
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  const toggleSelect = (tx: Transaction) => {
+    const isSelected = selectedMap.has(tx.id);
+    const next = new Map(selectedMap);
+    if (isSelected) {
+      next.delete(tx.id);
+    } else {
+      next.set(tx.id, tx);
+    }
+    setSelectedMap(next);
   };
+
+  const pendingOnPage = paginated.filter(tx => tx.status === 'PENDENTE');
+  const allPagePendingSelected = pendingOnPage.length > 0 && pendingOnPage.every(tx => selectedMap.has(tx.id));
 
   const toggleSelectAll = () => {
+    const next = new Map(selectedMap);
     if (allPagePendingSelected) {
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        pendingOnPage.forEach(tx => next.delete(tx.id));
-        return next;
-      });
+      pendingOnPage.forEach(tx => next.delete(tx.id));
     } else {
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        pendingOnPage.forEach(tx => next.add(tx.id));
-        return next;
-      });
+      pendingOnPage.forEach(tx => next.set(tx.id, tx));
     }
+    setSelectedMap(next);
   };
 
-  const selectedTxs = transactions.filter(tx => selectedIds.has(tx.id));
-const selectedTotal = selectedTxs.reduce((s, tx) => s + Number(tx.valor) + Number(tx.juros || 0), 0);
+  const selectedTxs = Array.from(selectedMap.values());
+  const selectedTotal = selectedTxs.reduce((s, tx) => s + Number(tx.valor) + Number(tx.juros || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -757,12 +761,12 @@ const selectedTotal = selectedTxs.reduce((s, tx) => s + Number(tx.valor) + Numbe
 
         </div>
         <div className="flex gap-2">
-          {selectedIds.size > 0 && (
+          {selectedMap.size > 0 && (
             <button
               onClick={() => onMarkAsPaidBatch(selectedTxs)}
               className="bg-primary/20 border border-primary/40 text-primary px-5 py-2.5 rounded-sm text-sm font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary/30 transition-all whitespace-nowrap"
             >
-              <Check size={18} strokeWidth={3} /> Receber {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''} – {formatBRL(selectedTotal)}
+              <Check size={18} strokeWidth={3} /> Receber {selectedMap.size} selecionado{selectedMap.size > 1 ? 's' : ''} – {formatBRL(selectedTotal)}
             </button>
           )}
           <button
@@ -793,8 +797,8 @@ const selectedTotal = selectedTxs.reduce((s, tx) => s + Number(tx.valor) + Numbe
                 {tx.status !== 'PAGO' && (
                   <input
                     type="checkbox"
-                    checked={selectedIds.has(tx.id)}
-                    onChange={() => toggleSelect(tx.id)}
+                    checked={selectedMap.has(tx.id)}
+                    onChange={() => toggleSelect(tx)}
                     className="mt-1 accent-primary cursor-pointer"
                   />
                 )}
@@ -870,13 +874,13 @@ const selectedTotal = selectedTxs.reduce((s, tx) => s + Number(tx.valor) + Numbe
             </thead>
             <tbody className="text-sm divide-y divide-white/5">
               {paginated.map((tx) => (
-                <tr key={tx.id} className={cn("hover:bg-white/5 transition-colors", selectedIds.has(tx.id) && "bg-primary/5")}>
+                <tr key={tx.id} className={cn("hover:bg-white/5 transition-colors", selectedMap.has(tx.id) && "bg-primary/5")}>
                   <td className="px-4 py-4">
                     {tx.status !== 'PAGO' && (
                       <input
                         type="checkbox"
-                        checked={selectedIds.has(tx.id)}
-                        onChange={() => toggleSelect(tx.id)}
+                        checked={selectedMap.has(tx.id)}
+                        onChange={() => toggleSelect(tx)}
                         className="accent-primary cursor-pointer"
                       />
                     )}
