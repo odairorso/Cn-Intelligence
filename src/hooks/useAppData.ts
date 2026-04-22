@@ -283,13 +283,30 @@ export function useAppData() {
     );
     showNotification(`${ids.length} lançamento(s) marcado(s) como pago!`, 'success');
     
-    // Enviamos a data original (YYYY-MM-DD) para a API
-    api.updateTransactionsBatch(ids, banco, dataPagamento).then(() => {
+    const payload = { status: 'PAGO' as TransactionStatus, pagamento: dataPagamento, banco };
+    const chunkSize = 25;
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += chunkSize) chunks.push(ids.slice(i, i + chunkSize));
+
+    let failed = 0;
+    try {
+      for (const chunk of chunks) {
+        const results = await Promise.allSettled(chunk.map(id => api.updateTransaction(id, payload)));
+        failed += results.filter(r => r.status === 'rejected').length;
+      }
+
+      if (failed > 0) {
+        showNotification(`Falha ao registrar ${failed} de ${ids.length} pagamentos.`, 'error');
+        fetchTransactions();
+        return;
+      }
+
       fetchStats();
-    }).catch(err => {
+      fetchTransactions();
+    } catch (err) {
       console.error('Failed to mark batch as paid:', err);
       fetchTransactions();
-    });
+    }
   }, [showNotification, fetchTransactions, fetchStats]);
 
   const updateTransaction = useCallback(async (updatedTx: Transaction) => {
