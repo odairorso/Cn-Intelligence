@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard,
   FileText,
@@ -188,7 +188,7 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
     { name: 'Vencidos', value: realKpis?.count_vencidos || 0, color: '#ef4444' },
   ];
 
-  // GrÃ¡fico receitas vs despesas por mÃªs â€” Prioriza os dados reais do servidor
+  // Gráfico receitas vs despesas por mês — Prioriza os dados reais do servidor
   const monthlyFlux = useMemo(() => {
     if (realMonthlyFlux) {
       const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -203,8 +203,8 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
       });
     }
 
-    // Fallback para cÃ¡lculo local (apenas para filtros especÃ­ficos de anos que nÃ£o o atual)
-    // Otimizado: single pass O(n) ao invÃ©s de 36 passes O(36n)
+    // Fallback para cálculo local (apenas para filtros específicos de anos que não o atual)
+    // Otimizado: single pass O(n) ao invés de 36 passes O(36n)
     const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const currentYear = new Date().getFullYear();
     const targetYear = periodoFilter === 'TODOS' ? String(currentYear) : periodoFilter;
@@ -234,7 +234,7 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
     return monthlyAggregation;
   }, [filteredTx, realMonthlyFlux, periodoFilter]);
 
-  // Top 5 fornecedores por valor â€” Prioriza os dados reais do servidor
+  // Top 5 fornecedores por valor — Prioriza os dados reais do servidor
   const topSuppliers = useMemo(() => {
     if (realTopSuppliers) {
       return realTopSuppliers.slice(0, 5);
@@ -251,7 +251,7 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
       .map(([name, value]) => ({ name, value }));
   }, [filteredTx, realTopSuppliers, periodoFilter]);
 
-  // Stats filtrados â€” Prioriza os dados reais do servidor para o valor TOTAL global
+  // Stats filtrados — Prioriza os dados reais do servidor para o valor TOTAL global
   const filteredStats = useMemo(() => {
     if (realKpis) {
       return {
@@ -289,10 +289,10 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
   const pendentesPercent = Math.round((filteredStats.pendentes / totalTx) * 100);
   const vencidosPercent = Math.round((filteredStats.vencidos / totalTx) * 100);
 
-  // Ãndice de saÃºde financeira
+  // Índice de saúde financeira
   const healthScore = pagosPercent;
   const healthColor = healthScore >= 80 ? '#10b981' : healthScore >= 60 ? '#f59e0b' : '#ef4444';
-  const healthLabel = healthScore >= 80 ? 'SaudÃ¡vel' : healthScore >= 60 ? 'AtenÃ§Ã£o' : 'CrÃ­tico';
+  const healthLabel = healthScore >= 80 ? 'Saudável' : healthScore >= 60 ? 'Atenção' : 'Crítico';
 
   return (
     <div className="space-y-6">
@@ -322,8 +322,8 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
           { label: 'REGISTROS', value: filteredTx.length, format: 'number' as const, color: '#3b82f6', desc: 'Volume operacional' },
           { label: 'PENDENTES', value: filteredStats.pendentes, format: 'number' as const, color: '#f59e0b', desc: 'Aguardando' },
           { label: 'PAGOS', value: filteredStats.pagos, format: 'number' as const, color: '#10b981', desc: 'Liquidados' },
-          { label: 'VENCIDOS', value: filteredStats.vencidos, format: 'number' as const, color: '#ef4444', desc: 'AÃ§Ã£o necessÃ¡ria' },
-          { label: 'SAÃšDE', value: healthScore, format: 'number' as const, color: healthColor, desc: healthLabel, suffix: '%' },
+          { label: 'VENCIDOS', value: filteredStats.vencidos, format: 'number' as const, color: '#ef4444', desc: 'Ação necessária' },
+          { label: 'SAÚDE', value: healthScore, format: 'number' as const, color: healthColor, desc: healthLabel, suffix: '%' },
         ].map((kpi, i) => (
           <motion.div
             key={i}
@@ -381,7 +381,7 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
         ))}
       </div>
 
-      {/* GrÃ¡ficos */}
+      {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Receitas vs Despesas */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-card p-6">
@@ -415,8 +415,8 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
         {/* Status Donut */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="glass-card p-6">
           <div className="mb-6">
-            <h4 className="text-lg font-bold font-headline">Status dos LanÃ§amentos</h4>
-            <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">DistribuiÃ§Ã£o atual</p>
+            <h4 className="text-lg font-bold font-headline">Status dos Lançamentos</h4>
+            <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Distribuição atual</p>
           </div>
           <div className="flex items-center justify-center relative">
             {filteredTx.length === 0 ? (
@@ -433,7 +433,7 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
                     <Tooltip
                       contentStyle={{ backgroundColor: '#1a1f2e', border: '1px solid #ffffff15', borderRadius: '12px' }}
                       itemStyle={{ color: '#dee2f7' }}
-                      formatter={(v: number) => [`${v} lanÃ§amentos`, '']}
+                      formatter={(v: number) => [`${v} lançamentos`, '']}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -455,7 +455,7 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
         </motion.div>
       </div>
 
-      {/* Top Fornecedores + Ãšltimos LanÃ§amentos */}
+      {/* Top Fornecedores + Últimos Lançamentos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }} className="glass-card p-6">
           <div className="mb-6">
@@ -498,7 +498,7 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }} className="glass-card p-6 lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h4 className="text-lg font-bold font-headline">Ãšltimos LanÃ§amentos</h4>
+              <h4 className="text-lg font-bold font-headline">Últimos Lançamentos</h4>
               <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Atividade recente</p>
             </div>
             <span className="text-[10px] font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">{filteredTx.length} total</span>
@@ -506,7 +506,7 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
           {filteredTx.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-on-surface-variant opacity-40">
               <FileText size={48} className="mb-4" />
-              <p className="text-sm font-medium">Nenhum lanÃ§amento encontrado</p>
+              <p className="text-sm font-medium">Nenhum lançamento encontrado</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -599,7 +599,7 @@ const LancamentosTab = ({
     }
   }, [filter, yearFilter, monthFilter, onLoadMore]);
 
-  // Extrair meses e anos Ãºnicos para os filtros
+  // Extrair meses e anos únicos para os filtros
   const availableYears = useMemo(() => {
     const years = transactions.map(tx => {
       const parts = tx.vencimento.split('/');
@@ -611,7 +611,7 @@ const LancamentosTab = ({
   const availableMonths = [
     { value: '01', label: 'Janeiro' },
     { value: '02', label: 'Fevereiro' },
-    { value: '03', label: 'MarÃ§o' },
+    { value: '03', label: 'Março' },
     { value: '04', label: 'Abril' },
     { value: '05', label: 'Maio' },
     { value: '06', label: 'Junho' },
@@ -710,7 +710,7 @@ const LancamentosTab = ({
             <Search size={18} className="text-on-surface-variant" />
             <input
               type="text"
-              placeholder="Buscar fornecedor ou descriÃ§Ã£o..."
+              placeholder="Buscar fornecedor ou descrição..."
               className="bg-transparent border-none text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-0 p-0 outline-none w-full ml-3"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
@@ -756,7 +756,7 @@ const LancamentosTab = ({
             className="bg-surface border border-white/10 text-on-surface-variant text-xs font-bold uppercase px-3 py-2.5 rounded-sm hover:bg-surface-variant/20 hover:text-on-surface transition-all whitespace-nowrap"
             title={sortOrder === 'desc' ? 'Mais recentes primeiro' : 'Mais antigos primeiro'}
           >
-            {sortOrder === 'desc' ? 'â†“ Recentes' : 'â†‘ Antigos'}
+            {sortOrder === 'desc' ? '↓ Recentes' : '↑ Antigos'}
           </button>
 
         </div>
@@ -766,14 +766,14 @@ const LancamentosTab = ({
               onClick={() => onMarkAsPaidBatch(selectedTxs)}
               className="bg-primary/20 border border-primary/40 text-primary px-5 py-2.5 rounded-sm text-sm font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary/30 transition-all whitespace-nowrap"
             >
-              <Check size={18} strokeWidth={3} /> Receber {selectedMap.size} selecionado{selectedMap.size > 1 ? 's' : ''} â€“ {formatBRL(selectedTotal)}
+              <Check size={18} strokeWidth={3} /> Receber {selectedMap.size} selecionado{selectedMap.size > 1 ? 's' : ''} – {formatBRL(selectedTotal)}
             </button>
           )}
           <button
             onClick={() => setShowNewTxModal(true)}
             className="bg-primary text-background px-6 py-2.5 rounded-sm text-sm font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all whitespace-nowrap shadow-lg shadow-primary/10"
           >
-            <Plus size={18} strokeWidth={3} /> Novo LanÃ§amento
+            <Plus size={18} strokeWidth={3} /> Novo Lançamento
           </button>
         </div>
 
@@ -783,7 +783,7 @@ const LancamentosTab = ({
       <div className="space-y-3 md:hidden">
         {filtered.length === 0 ? (
           <div className="glass-card p-8 text-center text-on-surface-variant italic text-sm">
-            Nenhum lanÃ§amento encontrado.
+            Nenhum lançamento encontrado.
           </div>
         ) : (
           paginated.map((tx) => (
@@ -855,11 +855,11 @@ const LancamentosTab = ({
                     checked={allPagePendingSelected}
                     onChange={toggleSelectAll}
                     className="accent-primary cursor-pointer"
-                    title="Selecionar todos pendentes desta pÃ¡gina"
+                    title="Selecionar todos pendentes desta página"
                   />
                 </th>
                 <th className="px-8 py-4 whitespace-nowrap min-w-[150px]">Fornecedor</th>
-                <th className="px-8 py-4 whitespace-nowrap w-[250px]">DescriÃ§Ã£o</th>
+                <th className="px-8 py-4 whitespace-nowrap w-[250px]">Descrição</th>
                 <th className="px-8 py-4 whitespace-nowrap w-36 text-right">Valor</th>
                 <th className="px-8 py-4 whitespace-nowrap w-28 hidden lg:table-cell">Status</th>
                 <th className="px-8 py-4 whitespace-nowrap w-28">Empresa</th>
@@ -869,7 +869,7 @@ const LancamentosTab = ({
                 </th>
                 <th className="px-8 py-4 whitespace-nowrap w-32 hidden xl:table-cell">Pagamento</th>
                 <th className="px-8 py-4 whitespace-nowrap w-28 hidden xl:table-cell">Conta</th>
-                <th className="px-8 py-4 whitespace-nowrap w-24 sticky right-0 bg-surface z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)]">AÃ§Ãµes</th>
+                <th className="px-8 py-4 whitespace-nowrap w-24 sticky right-0 bg-surface z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)]">Ações</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-white/5">
@@ -945,11 +945,11 @@ const LancamentosTab = ({
         </div>
       </div>
 
-      {/* PaginaÃ§Ã£o */}
+      {/* Paginação */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between gap-4 pt-2">
           <span className="text-xs text-on-surface-variant">
-            {page * PAGE_SIZE + 1}â€“{Math.min((page + 1) * PAGE_SIZE, filtered.length)} de {filtered.length} lanÃ§amentos (carregados)
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} de {filtered.length} lançamentos (carregados)
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -1098,11 +1098,11 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <h3 className="text-xl font-bold font-headline">GestÃ£o de Fornecedores</h3>
+          <h3 className="text-xl font-bold font-headline">Gestão de Fornecedores</h3>
           <button
             onClick={syncSuppliers}
             className="bg-white/5 text-on-surface-variant px-4 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-white/10 transition-colors"
-            title="Sincronizar fornecedores dos lanÃ§amentos"
+            title="Sincronizar fornecedores dos lançamentos"
           >
             <RefreshCw size={14} /> Sincronizar
           </button>
@@ -1116,7 +1116,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
               }
             }}
             className="bg-primary/10 text-primary px-4 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-primary/20 transition-colors"
-            title="Unificar variaÃ§Ãµes automaticamente"
+            title="Unificar variações automaticamente"
           >
             <Merge size={14} /> Unificar Auto
           </button>
@@ -1163,7 +1163,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
                     <option key={n} value={n}>{n}</option>
                   ))}
                 </select>
-                <span className="text-[10px] font-bold text-on-surface-variant uppercase">â† manter</span>
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase">← manter</span>
                 <div className="flex flex-wrap gap-2">
                   {g.names.map((n) => (
                     <label key={n} className="inline-flex items-center gap-1 text-xs">
@@ -1221,23 +1221,23 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
               </div>
               <div>
                 <h4 className="font-bold text-on-surface">{s.nome}</h4>
-                <p className="text-[10px] font-black text-on-surface-variant/60 tracking-wider mt-0.5">{s.cnpj || 'CNPJ NÃƒO INFORMADO'}</p>
+                <p className="text-[10px] font-black text-on-surface-variant/60 tracking-wider mt-0.5">{s.cnpj || 'CNPJ NÃO INFORMADO'}</p>
               </div>
             </div>
             <div className="space-y-2 text-sm mt-2">
               <p className="flex items-center gap-2 text-on-surface-variant/80 text-xs font-medium">
-                <FileText size={14} className="opacity-40" /> {s.email || 'E-mail nÃ£o informado'}
+                <FileText size={14} className="opacity-40" /> {s.email || 'E-mail não informado'}
               </p>
               <p className="flex items-center gap-2 text-on-surface-variant/80 text-xs font-medium">
-                <HelpCircle size={14} className="opacity-40" /> {s.telefone || 'Telefone nÃ£o informado'}
+                <HelpCircle size={14} className="opacity-40" /> {s.telefone || 'Telefone não informado'}
               </p>
             </div>
             <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center">
               <p className="text-[10px] font-black text-primary uppercase tracking-widest">
-                {getTransactionCount(s.nome)} LanÃ§amentos
+                {getTransactionCount(s.nome)} Lançamentos
               </p>
               <button className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest hover:text-primary transition-colors">
-                Detalhes â†’
+                Detalhes →
               </button>
             </div>
           </div>
@@ -1249,7 +1249,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
         )}
       </div>
 
-      {/* Modal de UnificaÃ§Ã£o Manual */}
+      {/* Modal de Unificação Manual */}
       {showMergeModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
           <motion.div
@@ -1259,7 +1259,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
           >
             <h3 className="text-xl font-bold font-headline mb-2">Unificar Fornecedores</h3>
             <p className="text-sm text-on-surface-variant mb-6">
-              Todos os lanÃ§amentos do fornecedor <span className="text-tertiary font-bold">a remover</span> serÃ£o migrados para o <span className="text-primary font-bold">nome final</span>.
+              Todos os lançamentos do fornecedor <span className="text-tertiary font-bold">a remover</span> serão migrados para o <span className="text-primary font-bold">nome final</span>.
             </p>
 
             <div className="space-y-4 mb-6">
@@ -1293,7 +1293,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
 
             {manualMergeTarget && manualMergeAlias && (
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-6 text-xs text-on-surface-variant">
-                Todos os lanÃ§amentos de <span className="font-bold text-tertiary">"{manualMergeAlias}"</span> passarÃ£o a se chamar <span className="font-bold text-primary">"{manualMergeTarget}"</span>.
+                Todos os lançamentos de <span className="font-bold text-tertiary">"{manualMergeAlias}"</span> passarão a se chamar <span className="font-bold text-primary">"{manualMergeTarget}"</span>.
               </div>
             )}
 
@@ -1402,7 +1402,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
   }, [filteredData]);
 
   const monthLabel = useMemo(() => {
-    const months: Record<string, string> = { '01': 'Janeiro', '02': 'Fevereiro', '03': 'MarÃ§o', '04': 'Abril', '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto', '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro' };
+    const months: Record<string, string> = { '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril', '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto', '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro' };
     return selectedMonth === 'TODOS' ? 'Todos os Meses' : months[selectedMonth] || selectedMonth;
   }, [selectedMonth]);
 
@@ -1410,7 +1410,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const tipoLabel = selectedTipo === 'TODOS' ? 'Fluxo de Caixa' : selectedTipo === 'RECEITA' ? 'RelatÃ³rio de Receitas' : 'RelatÃ³rio de Despesas';
+    const tipoLabel = selectedTipo === 'TODOS' ? 'Fluxo de Caixa' : selectedTipo === 'RECEITA' ? 'Relatório de Receitas' : 'Relatório de Despesas';
     const now = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 
     const rows = filteredData.map((tx, i) => {
@@ -1450,15 +1450,15 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
 </head>
 <body>
   <h1>${tipoLabel}</h1>
-  <p class="subtitle">ColÃ©gio NaviraÃ­ - Grupo CN</p>
-  <p class="info">PerÃ­odo: ${monthLabel} de ${selectedYear} | Empresa: ${selectedCompany === 'TODOS' ? 'Todas' : selectedCompany} | Emitido em: ${now}</p>
+  <p class="subtitle">Colégio Naviraí - Grupo CN</p>
+  <p class="info">Período: ${monthLabel} de ${selectedYear} | Empresa: ${selectedCompany === 'TODOS' ? 'Todas' : selectedCompany} | Emitido em: ${now}</p>
   
   <table>
     <thead>
       <tr>
         <th style="width:30px;text-align:center">#</th>
         <th>Fornecedor</th>
-        <th>DescriÃ§Ã£o</th>
+        <th>Descrição</th>
         <th style="text-align:center">Empresa</th>
         <th style="text-align:center">Vencimento</th>
         <th style="text-align:center">Pagamento</th>
@@ -1481,10 +1481,10 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
   </table>
 
   <div class="footer">
-    <p>RelatÃ³rio gerado automaticamente pelo sistema Fluxo de Caixa CN</p>
+    <p>Relatório gerado automaticamente pelo sistema Fluxo de Caixa CN</p>
   </div>
   <div class="signature">
-    <div class="signature-line">ResponsÃ¡vel</div>
+    <div class="signature-line">Responsável</div>
   </div>
 </body>
 </html>`);
@@ -1520,7 +1520,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-on-surface-variant uppercase">MÃªs</label>
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase">Mês</label>
           <select
             className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
             value={selectedMonth}
@@ -1529,7 +1529,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
             <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
             <option value="01" className="bg-surface text-on-surface">Janeiro</option>
             <option value="02" className="bg-surface text-on-surface">Fevereiro</option>
-            <option value="03" className="bg-surface text-on-surface">MarÃ§o</option>
+            <option value="03" className="bg-surface text-on-surface">Março</option>
             <option value="04" className="bg-surface text-on-surface">Abril</option>
             <option value="05" className="bg-surface text-on-surface">Maio</option>
             <option value="06" className="bg-surface text-on-surface">Junho</option>
@@ -1573,19 +1573,19 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
         </button>
         <div className="text-right">
           <p className="text-[10px] font-bold text-on-surface-variant uppercase">
-            {selectedTipo === 'RECEITA' ? 'Receitas' : selectedTipo === 'DESPESA' ? 'Despesas' : 'Total'} no PerÃ­odo
+            {selectedTipo === 'RECEITA' ? 'Receitas' : selectedTipo === 'DESPESA' ? 'Despesas' : 'Total'} no Período
           </p>
           <p className="text-xl font-bold text-primary">
             {periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
-          <p className="text-[11px] text-on-surface-variant mt-1">{periodTotals.count} lanÃ§amentos</p>
+          <p className="text-[11px] text-on-surface-variant mt-1">{periodTotals.count} lançamentos</p>
         </div>
       </div>
 
       <div className="glass-card overflow-hidden">
         <div className="px-6 py-4 md:px-8 md:py-6 border-b border-white/5 flex justify-between items-center">
           <h4 className="text-base md:text-lg font-bold font-headline">
-            {selectedTipo === 'RECEITA' ? 'Receitas' : selectedTipo === 'DESPESA' ? 'Despesas' : 'LanÃ§amentos'} no PerÃ­odo
+            {selectedTipo === 'RECEITA' ? 'Receitas' : selectedTipo === 'DESPESA' ? 'Despesas' : 'Lançamentos'} no Período
           </h4>
           <span className="text-xs text-on-surface-variant font-bold uppercase tracking-widest">
             {filteredData.length} registros
@@ -1596,7 +1596,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
         <div className="divide-y divide-white/5 md:hidden">
           {filteredData.length === 0 ? (
             <p className="px-6 py-10 text-center text-on-surface-variant italic text-sm">
-              Nenhum lanÃ§amento encontrado.
+              Nenhum lançamento encontrado.
             </p>
           ) : (
             filteredData.map((tx) => (
@@ -1629,7 +1629,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
                 <th className="px-8 py-4">#</th>
                 <th className="px-8 py-4">Fornecedor</th>
-                <th className="px-8 py-4">DescriÃ§Ã£o</th>
+                <th className="px-8 py-4">Descrição</th>
                 <th className="px-8 py-4">Empresa</th>
                 <th className="px-8 py-4">Vencimento</th>
                 <th className="px-8 py-4">Pagamento</th>
@@ -1643,7 +1643,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
               {filteredData.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="px-8 py-12 text-center text-on-surface-variant italic">
-                    Nenhum lanÃ§amento encontrado para os filtros selecionados.
+                    Nenhum lançamento encontrado para os filtros selecionados.
                   </td>
                 </tr>
               ) : (
@@ -1789,7 +1789,7 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-bold text-on-surface-variant uppercase">MÃªs</label>
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase">Mês</label>
           <select
             className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
             value={selectedMonth}
@@ -1798,7 +1798,7 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
             <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
             <option value="01" className="bg-surface text-on-surface">Janeiro</option>
             <option value="02" className="bg-surface text-on-surface">Fevereiro</option>
-            <option value="03" className="bg-surface text-on-surface">MarÃ§o</option>
+            <option value="03" className="bg-surface text-on-surface">Março</option>
             <option value="04" className="bg-surface text-on-surface">Abril</option>
             <option value="05" className="bg-surface text-on-surface">Maio</option>
             <option value="06" className="bg-surface text-on-surface">Junho</option>
@@ -1828,11 +1828,11 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
           <Plus size={16} /> Nova Receita
         </button>
         <div className="text-right">
-          <p className="text-[10px] font-bold text-on-surface-variant uppercase">Receitas no PerÃ­odo</p>
+          <p className="text-[10px] font-bold text-on-surface-variant uppercase">Receitas no Período</p>
           <p className="text-xl font-bold text-primary">
             {totalReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
-          <p className="text-[11px] text-on-surface-variant mt-1">{filteredData.length} lanÃ§amentos de receita</p>
+          <p className="text-[11px] text-on-surface-variant mt-1">{filteredData.length} lançamentos de receita</p>
         </div>
       </div>
 
@@ -1886,7 +1886,7 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
 
       <div className="glass-card overflow-hidden">
         <div className="px-6 py-4 md:px-8 md:py-6 border-b border-white/5 flex justify-between items-center">
-          <h4 className="text-base md:text-lg font-bold font-headline">Receitas no PerÃ­odo</h4>
+          <h4 className="text-base md:text-lg font-bold font-headline">Receitas no Período</h4>
           <span className="text-xs text-on-surface-variant font-bold uppercase tracking-widest">
             {filteredData.length} registros
           </span>
@@ -1897,7 +1897,7 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
                 <th className="px-8 py-4">Fornecedor</th>
-                <th className="px-8 py-4">DescriÃ§Ã£o</th>
+                <th className="px-8 py-4">Descrição</th>
                 <th className="px-8 py-4">Empresa</th>
                 <th className="px-8 py-4">Vencimento</th>
                 <th className="px-8 py-4">Pagamento</th>
@@ -1959,8 +1959,8 @@ const BancosTab = ({ banks, transactions, setShowNewBankModal, setEditingBank, d
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h3 className="text-xl font-bold font-headline">Contas BancÃ¡rias</h3>
-          <p className="text-sm text-on-surface-variant mt-1">Gerencie suas contas bancÃ¡rias e acompanhe os saldos</p>
+          <h3 className="text-xl font-bold font-headline">Contas Bancárias</h3>
+          <p className="text-sm text-on-surface-variant mt-1">Gerencie suas contas bancárias e acompanhe os saldos</p>
         </div>
         <button
           onClick={() => setShowNewBankModal(true)}
@@ -1996,7 +1996,7 @@ const BancosTab = ({ banks, transactions, setShowNewBankModal, setEditingBank, d
                 </p>
                 {(bank.agencia || bank.conta) && (
                   <p className="text-[10px] text-on-surface-variant/60 mt-1">
-                    {bank.agencia ? `Ag ${bank.agencia}` : ''}{bank.agencia && bank.conta ? ' â€¢ ' : ''}{bank.conta ? `Conta ${bank.conta}` : ''}
+                    {bank.agencia ? `Ag ${bank.agencia}` : ''}{bank.agencia && bank.conta ? ' • ' : ''}{bank.conta ? `Conta ${bank.conta}` : ''}
                   </p>
                 )}
               </div>
@@ -2028,7 +2028,7 @@ const BancosTab = ({ banks, transactions, setShowNewBankModal, setEditingBank, d
         {banks.length === 0 && (
           <div className="col-span-full glass-card p-12 text-center">
             <CreditCard size={48} className="mx-auto text-on-surface-variant opacity-20 mb-4" />
-            <p className="text-on-surface-variant">Nenhuma conta bancÃ¡ria cadastrada</p>
+            <p className="text-on-surface-variant">Nenhuma conta bancária cadastrada</p>
             <p className="text-xs text-on-surface-variant/60 mt-1">Clique em "Nova Conta" para adicionar</p>
           </div>
         )}
@@ -2078,7 +2078,7 @@ const NewBankModal = ({ setShowNewBankModal, onSuccess }: NewBankModalProps) => 
         animate={{ scale: 1, opacity: 1 }}
         className="glass-card p-10 w-full max-w-md border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
       >
-        <h3 className="text-xl font-bold font-headline mb-6">Nova Conta BancÃ¡ria</h3>
+        <h3 className="text-xl font-bold font-headline mb-6">Nova Conta Bancária</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Nome do Banco</label>
@@ -2088,7 +2088,7 @@ const NewBankModal = ({ setShowNewBankModal, onSuccess }: NewBankModalProps) => 
               className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
               value={formData.nome}
               onChange={e => setFormData({ ...formData, nome: e.target.value })}
-              placeholder="Ex: Sicredi Matriz, ItaÃº PJ, Caixa CEI"
+              placeholder="Ex: Sicredi Matriz, Itaú PJ, Caixa CEI"
               required
             />
             <datalist id="bank-suggestions">
@@ -2099,7 +2099,7 @@ const NewBankModal = ({ setShowNewBankModal, onSuccess }: NewBankModalProps) => 
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">AgÃªncia</label>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Agência</label>
               <input
                 type="text"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
@@ -2200,7 +2200,7 @@ const EditBankModal = ({ bank, onClose, onSuccess }: EditBankModalProps) => {
         animate={{ scale: 1, opacity: 1 }}
         className="glass-card p-10 w-full max-w-md border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
       >
-        <h3 className="text-xl font-bold font-headline mb-6">Editar Conta BancÃ¡ria</h3>
+        <h3 className="text-xl font-bold font-headline mb-6">Editar Conta Bancária</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Nome do Banco</label>
@@ -2214,7 +2214,7 @@ const EditBankModal = ({ bank, onClose, onSuccess }: EditBankModalProps) => {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">AgÃªncia</label>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Agência</label>
               <input
                 type="text"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
@@ -2264,7 +2264,7 @@ const EditBankModal = ({ bank, onClose, onSuccess }: EditBankModalProps) => {
               type="submit"
               className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
             >
-              Salvar AlteraÃ§Ãµes
+              Salvar Alterações
             </button>
           </div>
         </form>
@@ -2292,7 +2292,7 @@ const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, on
   useEffect(() => {
     setPaymentDate(todayIso);
     setDateError('');
-  }, [initialDate, transactionId]);
+  }, [transactionId]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
@@ -2463,7 +2463,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
         className="glass-card p-10 w-full max-w-lg border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-y-auto max-h-[90vh]"
 
       >
-        <h3 className="text-xl font-bold font-headline mb-6">Novo LanÃ§amento</h3>
+        <h3 className="text-xl font-bold font-headline mb-6">Novo Lançamento</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -2498,7 +2498,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                       ))
                     ) : (
                       <div className="px-4 py-2 text-sm text-on-surface-variant italic">
-                        Nenhum fornecedor encontrado (serÃ¡ criado um novo)
+                        Nenhum fornecedor encontrado (será criado um novo)
                       </div>
                     )}
                   </div>
@@ -2513,7 +2513,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                 value={formData.banco}
                 onChange={e => setFormData({ ...formData, banco: e.target.value })}
               >
-                <option value="" className="bg-[#161b2a] text-on-surface">NÃ£o informado</option>
+                <option value="" className="bg-[#161b2a] text-on-surface">Não informado</option>
                 {banks.filter(b => b.ativo).map(b => (
                   <option key={b.id} value={b.nome} className="bg-[#161b2a] text-on-surface">{b.nome}</option>
                 ))}
@@ -2521,7 +2521,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">DescriÃ§Ã£o</label>
+            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Descrição</label>
             <input
               type="text" required
               className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
@@ -2558,7 +2558,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta ContÃ¡bil</label>
+            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta Contábil</label>
             <div className="relative">
               <div
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm cursor-pointer flex justify-between items-center"
@@ -2743,7 +2743,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
               type="submit"
               className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
             >
-              Salvar LanÃ§amento
+              Salvar Lançamento
             </button>
           </div>
 
@@ -2815,7 +2815,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
         className="glass-card p-10 w-full max-w-lg border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
 
       >
-        <h3 className="text-xl font-bold font-headline mb-6">Editar LanÃ§amento</h3>
+        <h3 className="text-xl font-bold font-headline mb-6">Editar Lançamento</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -2840,7 +2840,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                 value={formData.banco}
                 onChange={e => setFormData({ ...formData, banco: e.target.value })}
               >
-                <option value="" className="bg-[#161b2a] text-on-surface">NÃ£o informado</option>
+                <option value="" className="bg-[#161b2a] text-on-surface">Não informado</option>
                 {banks.map(b => (
                   <option key={b.id} value={b.nome} className="bg-[#161b2a] text-on-surface">{b.nome}</option>
                 ))}
@@ -2848,7 +2848,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">DescriÃ§Ã£o</label>
+            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Descrição</label>
             <input
               type="text" required
               className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all"
@@ -2886,7 +2886,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta ContÃ¡bil</label>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta Contábil</label>
               <div className="relative">
                 <div
                   className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm cursor-pointer flex justify-between items-center"
@@ -2953,14 +2953,14 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                 )}
               </div>
               {contasContabeis.filter(c => matchesAccountType(c, formData.tipo)).length === 0 && (
-                <p className="text-[10px] text-on-surface-variant mt-1">Nenhuma conta encontrada para {formData.tipo}. Cadastre em ConfiguraÃ§Ãµes.</p>
+                <p className="text-[10px] text-on-surface-variant mt-1">Nenhuma conta encontrada para {formData.tipo}. Cadastre em Configurações.</p>
               )}
             </div>
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Status</label>
               <select
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
-                style={{ backgroundColor: '#161b2a' }} // ForÃ§ar fundo escuro em alguns navegadores
+                style={{ backgroundColor: '#161b2a' }} // Forçar fundo escuro em alguns navegadores
                 value={formData.status}
                 onChange={e => setFormData({ ...formData, status: e.target.value as TransactionStatus })}
               >
@@ -3036,7 +3036,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               type="submit"
               className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
             >
-              Salvar AlteraÃ§Ãµes
+              Salvar Alterações
             </button>
           </div>
 
@@ -3088,7 +3088,7 @@ const SupplierDetailModal = ({ supplier, transactions, onClose }: { supplier: Su
             </div>
             <div>
               <h2 className="text-2xl font-black font-headline premium-gradient-text tracking-tighter uppercase">{supplier.nome}</h2>
-              <p className="text-xs font-bold text-on-surface-variant/60 tracking-[0.2em] mt-1">{supplier.cnpj || 'CNPJ NÃƒO INFORMADO'}</p>
+              <p className="text-xs font-bold text-on-surface-variant/60 tracking-[0.2em] mt-1">{supplier.cnpj || 'CNPJ NÃO INFORMADO'}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-sm transition-colors text-on-surface-variant">
@@ -3112,9 +3112,9 @@ const SupplierDetailModal = ({ supplier, transactions, onClose }: { supplier: Su
           </div>
         </div>
 
-        {/* Lista de HistÃ³rico */}
+        {/* Lista de Histórico */}
         <div className="flex-grow overflow-y-auto p-8">
-          <h4 className="text-xs font-black uppercase tracking-[0.3em] text-on-surface-variant/40 mb-6">HistÃ³rico Financeiro</h4>
+          <h4 className="text-xs font-black uppercase tracking-[0.3em] text-on-surface-variant/40 mb-6">Histórico Financeiro</h4>
           <div className="space-y-3">
             {supplierTransactions.map((tx) => (
               <div key={tx.id} className="flex items-center justify-between p-4 bg-white/5 rounded-sm border-l-2 hover:bg-white/10 transition-all group" style={{ borderLeftColor: tx.status === 'PAGO' ? '#10b981' : '#f59e0b' }}>
@@ -3138,7 +3138,7 @@ const SupplierDetailModal = ({ supplier, transactions, onClose }: { supplier: Su
               </div>
             ))}
             {supplierTransactions.length === 0 && (
-              <p className="text-sm text-on-surface-variant text-center py-12">Nenhum lanÃ§amento encontrado para este fornecedor.</p>
+              <p className="text-sm text-on-surface-variant text-center py-12">Nenhum lançamento encontrado para este fornecedor.</p>
             )}
           </div>
         </div>
@@ -3238,7 +3238,7 @@ const NewSupplierModal = ({ setShowNewSupplierModal, onSuccess }: NewSupplierMod
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">EndereÃ§o</label>
+            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Endereço</label>
             <input
               type="text"
               className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
@@ -3278,7 +3278,7 @@ const NewSupplierModal = ({ setShowNewSupplierModal, onSuccess }: NewSupplierMod
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">ObservaÃ§Ãµes</label>
+            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Observações</label>
             <textarea
               className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary h-24 resize-none"
               value={formData.observacoes}
@@ -3351,7 +3351,7 @@ export default function App() {
 
   const addContaContabil = async () => {
     if (!newContaContabil.codigo || !newContaContabil.nome) {
-      showNotification('Informe o cÃ³digo e o nome da conta.', 'error');
+      showNotification('Informe o código e o nome da conta.', 'error');
       return;
     }
     try {
@@ -3360,11 +3360,11 @@ export default function App() {
         nome: newContaContabil.nome,
         tipo: newContaContabil.tipo as 'RECEITA' | 'DESPESA',
       });
-      showNotification('Conta contÃ¡bil adicionada!', 'success');
+      showNotification('Conta contábil adicionada!', 'success');
       setNewContaContabil({ codigo: '', nome: '', tipo: 'DESPESA' });
       fetchContasContabeis();
     } catch {
-      showNotification('Erro ao adicionar conta contÃ¡bil.', 'error');
+      showNotification('Erro ao adicionar conta contábil.', 'error');
     }
   };
 
@@ -3372,10 +3372,10 @@ export default function App() {
     if (!window.confirm('Tem certeza que deseja excluir esta conta?')) return;
     try {
       await api.updateContaContabil(id, { ativo: false });
-      showNotification('Conta contÃ¡bil excluÃ­da!', 'success');
+      showNotification('Conta contábil excluída!', 'success');
       fetchContasContabeis();
     } catch {
-      showNotification('Erro ao excluir conta contÃ¡bil.', 'error');
+      showNotification('Erro ao excluir conta contábil.', 'error');
     }
   };
 
@@ -3396,7 +3396,7 @@ export default function App() {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      showNotification('Selecione um arquivo de imagem vÃ¡lido.', 'error');
+      showNotification('Selecione um arquivo de imagem válido.', 'error');
       return;
     }
     const reader = new FileReader();
@@ -3492,19 +3492,19 @@ export default function App() {
   const extractLocalBoletoNumber = (text: string) => {
     const source = String(text || '').toUpperCase();
     const patterns = [
-      // Nosso NÃºmero (com ou sem acento, com ou sem espaÃ§o)
-      /NOSSO\s*N[UÃš]MERO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+      // Nosso Número (com ou sem acento, com ou sem espaço)
+      /NOSSO\s*N[UÚ]MERO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
       // Numero do Documento
-      /N[UÃš]MERO\s*DO\s*DOCUMENTO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
-      /N[ROÂºÂ°]*\s*DOCUMENTO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+      /N[UÚ]MERO\s*DO\s*DOCUMENTO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+      /N[ROº°]*\s*DOCUMENTO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
       /NR\.?\s*DOC\s*[:\s-]*([A-Z0-9./-]{6,40})/,
-      /N[ÂºÂ°]?\s*DOC\s*[:\s-]*([A-Z0-9./-]{6,40})/,
+      /N[º°]?\s*DOC\s*[:\s-]*([A-Z0-9./-]{6,40})/,
       /DOCUMENTO\s*[:\s-]*([0-9]{6,20})/,
       /COD(?:IGO)?\s*(?:DE)?\s*BARRAS\s*[:\s-]*([0-9]{47,48})/,
       /C.{0,6}DIGO\s*(?:DE)?\s*BARRAS\s*[:\s-]*([0-9]{47,48})/,
       /UTILIZE\s+O\s+C.{0,6}DIGO\s*[:\s-]*([A-Z0-9]{6,25})/,
       /MATR.{0,6}CULA\s*[:\s-]*([0-9]{6,14}(?:[-/][0-9A-Z]{1,6}){1,8})/,
-      /NOTA\s+FISCAL\s+N[ROÂºÂ°]*\s*[:\s-]*([0-9.]{6,25})/,
+      /NOTA\s+FISCAL\s+N[ROº°]*\s*[:\s-]*([0-9.]{6,25})/,
       /([0-9]{11})\s+CADASTRE\s+SUA\s+FATURA/,
     ];
     for (const pattern of patterns) {
@@ -3521,7 +3521,7 @@ export default function App() {
       if (assembled.length === 47 || assembled.length === 48) return assembled;
     }
     const labeledBlockPatterns = [
-      /LINHA\s*DIGIT[AÃ]VEL[^0-9]*([0-9\s.]{40,160})/,
+      /LINHA\s*DIGIT[AÁ]VEL[^0-9]*([0-9\s.]{40,160})/,
       /C.{0,6}DIGO\s*DE\s*BARRAS[^0-9]*([0-9\s.]{40,160})/,
     ];
     for (const p of labeledBlockPatterns) {
@@ -3546,10 +3546,10 @@ export default function App() {
   const parseLinhaDigitavel = (text: string) => {
     const src = String(text || '');
 
-    // Tenta encontrar 47-48 dÃ­gitos contÃ­guos (formato normal)
+    // Tenta encontrar 47-48 dígitos contíguos (formato normal)
     const candidates: string[] = src.match(/\b\d{47,48}\b/g) || [];
 
-    // Tenta montar linha digitÃ¡vel a partir do formato fragmentado com pontos/espaÃ§os
+    // Tenta montar linha digitável a partir do formato fragmentado com pontos/espaços
     // Ex: "00190.00009 01104.461007 00076.678176 1 14360000069900"
     if (!candidates.length) {
       // Formato fragmentado: "DDDDD.DDDDD DDDDD.DDDDDD DDDDD.DDDDDD D DDDDDDDDDDDDDD"
@@ -3580,7 +3580,7 @@ export default function App() {
     const value = String(name || '').trim().toUpperCase();
     if (!value || value.length < 4) return true;
     if (value.includes('DATA DO DOCUMENTO') || value.includes('VENCIMENTO') || value.includes('NOSSO NUMERO')) return true;
-    if (value.includes('AGENCIA') || value.includes('CÃ“DIGO') || value.includes('CODIGO') || value.includes('BENEFICI')) return true;
+    if (value.includes('AGENCIA') || value.includes('CÓDIGO') || value.includes('CODIGO') || value.includes('BENEFICI')) return true;
     if (value.includes('LOCAL DE PAGAMENTO') || value.includes('PAGAVEL') || value.includes('INSTRUCOES')) return true;
     if (value.includes('ESPECIE') || value.includes('CARTEIRA') || value.includes('USO DO BANCO')) return true;
     if (value.includes('AVENIDA') || value.includes(' AV ') || value.includes('AV.') || value.includes('RUA') || value.includes('CEP')) return true;
@@ -3636,7 +3636,7 @@ export default function App() {
       if (direct) return direct.nome;
     }
 
-    if (!validDetected || validDetected === 'Fornecedor nÃ£o identificado') {
+    if (!validDetected || validDetected === 'Fornecedor não identificado') {
       const byText = suppliers
         .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
         .filter((x) => x.key.length >= 5 && normalizedSource.includes(x.key))
@@ -3644,23 +3644,23 @@ export default function App() {
       if (byText) return byText.supplier.nome;
     }
 
-    return validDetected || 'Fornecedor nÃ£o identificado';
+    return validDetected || 'Fornecedor não identificado';
   };
 
   const extractBoletoData = (text: string, fileName: string): PdfImportDraft => {
     const normalizedText = text.toUpperCase().replace(/\s+/g, ' ');
-    let fornecedor = 'Fornecedor nÃ£o identificado';
+    let fornecedor = 'Fornecedor não identificado';
     let vencimento = '';
     let valor = 0;
 
     const sanitizeBoletoValor = (v: number) => (Number.isFinite(v) && v > 0 && v <= 500000 ? v : 0);
 
     const fornecedorPatterns = [
-      /BENEFICI[AÃ]RIO[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
+      /BENEFICI[AÁ]RIO[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
       /CEDENTE[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
       /VENDEDOR[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/i,
       /EMISSOR[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/i,
-      /RAZ[AÃƒ]O SOCIAL[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/i,
+      /RAZ[AÃ]O SOCIAL[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/i,
       /SACADO[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
       // Nome seguido de CNPJ
       /([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,60})\s+\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/i,
@@ -3674,7 +3674,7 @@ export default function App() {
       }
     }
 
-    if (fornecedor === 'Fornecedor nÃ£o identificado') {
+    if (fornecedor === 'Fornecedor não identificado') {
       const bestSupplier = suppliers
         .map((s) => {
           const normS = normalizeSupplierName(s.nome);
@@ -3684,10 +3684,10 @@ export default function App() {
           const regex = new RegExp(`\\b${normS}\\b`, 'i');
           const hasFullMatch = regex.test(normalizedText);
 
-          // PontuaÃ§Ã£o: comprimento do nome se for palavra inteira
+          // Pontuação: comprimento do nome se for palavra inteira
           let score = hasFullMatch ? normS.length : 0;
 
-          // Super prioridade para parceiros estratÃ©gicos se encontrados no texto
+          // Super prioridade para parceiros estratégicos se encontrados no texto
           if (hasFullMatch && (normS === 'CLARO' || normS === 'ENERGISA')) score += 1000;
 
           return { supplier: s, score };
@@ -3697,8 +3697,8 @@ export default function App() {
       if (bestSupplier) fornecedor = bestSupplier.supplier.nome;
     }
 
-    // Ãšltimo recurso: usa o nome do arquivo
-    if (fornecedor === 'Fornecedor nÃ£o identificado') {
+    // Último recurso: usa o nome do arquivo
+    if (fornecedor === 'Fornecedor não identificado') {
       fornecedor = fileName.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ').trim();
     }
 
@@ -3720,19 +3720,19 @@ export default function App() {
       }
     }
 
-    // â”€â”€â”€ 1. Extrai da Linha DigitÃ¡vel primeiro (fonte mais confiÃ¡vel) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── 1. Extrai da Linha Digitável primeiro (fonte mais confiável) ───────────
     const linhaInfo = parseLinhaDigitavel(normalizedText);
     if (linhaInfo) {
       if (!vencimento) vencimento = linhaInfo.vencimento;
       if (linhaInfo.valor > 0) {
-        // Energisa: ignora valores baixos (geralmente multas/mora) na linha digitÃ¡vel se houver valor total
+        // Energisa: ignora valores baixos (geralmente multas/mora) na linha digitável se houver valor total
         valor = sanitizeBoletoValor(linhaInfo.valor);
       }
     }
 
-    // â”€â”€â”€ 2. Fallback: patterns de texto (sÃ³ usa se linha digitÃ¡vel nÃ£o extraiu) â”€
+    // ─── 2. Fallback: patterns de texto (só usa se linha digitável não extraiu) ─
     if (!valor) {
-      // Remove trechos de mora/multa/juros para o padrÃ£o R$ genÃ©rico nÃ£o capturÃ¡-los
+      // Remove trechos de mora/multa/juros para o padrão R$ genérico não capturá-los
       const textWithoutFees = normalizedText
         .replace(/(?:MORA|MULTA|JUROS|\bPOR\s+DIA\b)[^\n]{0,80}/gi, '')
         .replace(/(?:TAXA|ENCARGO)[^\n]{0,60}/gi, '');
@@ -3744,7 +3744,7 @@ export default function App() {
         { re: /VLR\s+PAGAR[:\s]+R?\$?\s*([\d.,]+)/, src: normalizedText },
         { re: /VALOR\s+([\d]{1,3}(?:[.,][\d]{3})*[.,][\d]{2})\s*\(=\)\s*VALOR\s+DO\s+DOCUMENTO/i, src: normalizedText },
         { re: /\(=\)\s*VALOR\s+DO\s+DOCUMENTO\s+([\d.,]+)/i, src: normalizedText },
-        // PadrÃ£o genÃ©rico R$ â€” usa o texto sem mora/multa para evitar falso positivo
+        // Padrão genérico R$ — usa o texto sem mora/multa para evitar falso positivo
         { re: /R\$\s*([\d]{1,3}(?:[.,][\d]{3})*[.,][\d]{2})/, src: textWithoutFees },
       ];
 
@@ -3765,8 +3765,8 @@ export default function App() {
         }
       }
 
-      // Ãšltimo fallback: valor BR (>5) que aparece 2+ vezes no texto sem mora/multa
-      // PadrÃ£o tÃ­pico de boleto: valor aparece em mÃºltiplos campos do resumo (ex: "699,00 01/04/2026 699,00")
+      // Último fallback: valor BR (>5) que aparece 2+ vezes no texto sem mora/multa
+      // Padrão típico de boleto: valor aparece em múltiplos campos do resumo (ex: "699,00 01/04/2026 699,00")
       if (!valor) {
         const allBrValues = [...textWithoutFees.matchAll(/(?<![,\d])(\d{1,3}(?:\.\d{3})*,\d{2})(?![,\d])/g)]
           .map(m => m[1])
@@ -3794,7 +3794,7 @@ export default function App() {
         }
       }
 
-      if (fornecedor === 'Fornecedor nÃ£o identificado' || shouldRejectSupplierName(fornecedor)) {
+      if (fornecedor === 'Fornecedor não identificado' || shouldRejectSupplierName(fornecedor)) {
         const sanesulMatch = suppliers
           .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
           .filter((x) => x.key.includes('SANESUL'))
@@ -3806,8 +3806,8 @@ export default function App() {
     if (normalizedText.includes('ENERGISA')) {
       const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      // Limpeza especÃ­fica para Energisa: remove datas de "PrÃ³xima Leitura" para nÃ£o confundir o extrator
-      const textForEnergisa = normalizedText.replace(/PRÃ“XIMA\s+LEITURA\s+PREVISTA\s+PARA\s+\d{2}\/\d{2}\/\d{4}/gi, '');
+      // Limpeza específica para Energisa: remove datas de "Próxima Leitura" para não confundir o extrator
+      const textForEnergisa = normalizedText.replace(/PRÓXIMA\s+LEITURA\s+PREVISTA\s+PARA\s+\d{2}\/\d{2}\/\d{4}/gi, '');
 
       if (valor > 0) {
         const valorBr = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -3815,14 +3815,14 @@ export default function App() {
         if (m?.[1]) vencimento = m[1];
       }
       if (!vencimento) {
-        const m = textForEnergisa.match(/(\d{2}\/\d{2}\/\d{4})\s+R\$\s*[\d.,]+\s+(?:JANEIRO|FEVEREIRO|MARÃ‡O|MARCO|ABRIL|MAIO|JUNHO|JULHO|AGOSTO|SETEMBRO|OUTUBRO|NOVEMBRO|DEZEMBRO)\s*\/\s*\d{4}/);
+        const m = textForEnergisa.match(/(\d{2}\/\d{2}\/\d{4})\s+R\$\s*[\d.,]+\s+(?:JANEIRO|FEVEREIRO|MARÇO|MARCO|ABRIL|MAIO|JUNHO|JULHO|AGOSTO|SETEMBRO|OUTUBRO|NOVEMBRO|DEZEMBRO)\s*\/\s*\d{4}/);
         if (m?.[1]) vencimento = m[1];
       }
     }
 
     const numeroBoleto = extractLocalBoletoNumber(normalizedText);
 
-    // Extrair nome do Pagador/Sacado para usar como descriÃ§Ã£o (aceita acentos)
+    // Extrair nome do Pagador/Sacado para usar como descrição (aceita acentos)
     const pagadorMatch = normalizedText.match(/PAGADOR\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
     const sacadoMatch = normalizedText.match(/SACADO\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
     const pagadorNome = ((pagadorMatch?.[1] || sacadoMatch?.[1] || '')).trim().replace(/\s+/g, ' ');
@@ -3850,7 +3850,7 @@ export default function App() {
 
     try {
 
-      // Se tem texto suficiente, nÃ£o manda o base64 â€” reduz payload em ~10x
+      // Se tem texto suficiente, não manda o base64 — reduz payload em ~10x
       const hasGoodText = text.trim().length > 100;
       const payload = hasGoodText
         ? { text, fileName }
@@ -3864,7 +3864,7 @@ export default function App() {
       if (!response.ok) throw new Error(`API error: ${response.status}`);
       const data = await response.json();
 
-      const hasValidData = data.fornecedor && data.fornecedor !== 'Fornecedor nÃ£o identificado' && (data.valor > 0 || data.vencimento);
+      const hasValidData = data.fornecedor && data.fornecedor !== 'Fornecedor não identificado' && (data.valor > 0 || data.vencimento);
 
       if (hasValidData) {
         const fallbackNumero = extractLocalBoletoNumber(text);
@@ -3878,7 +3878,7 @@ export default function App() {
           : geminiValor;
         return {
           fileName,
-          fornecedor: data.fornecedor || 'Fornecedor nÃ£o identificado',
+          fornecedor: data.fornecedor || 'Fornecedor não identificado',
           vencimento: data.vencimento || '',
           valor,
           descricao,
@@ -3894,9 +3894,9 @@ export default function App() {
       console.log('[boleto] Gemini returned empty data, using local fallback');
       const fallback = extractBoletoData(text, fileName);
       // Se nem o fallback local extraiu dados, usa o nome do arquivo como fornecedor
-      if (fallback.fornecedor === 'Fornecedor nÃ£o identificado') {
+      if (fallback.fornecedor === 'Fornecedor não identificado') {
         const nameFromFile = fileName.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ').trim();
-        fallback.fornecedor = nameFromFile || 'Fornecedor nÃ£o identificado';
+        fallback.fornecedor = nameFromFile || 'Fornecedor não identificado';
       }
       return { ...fallback, valor: sanitizeBoletoValor((fallback as any).valor), empresa: data.empresa || '', cnpj: data.cnpj || '', numero_boleto: data.numero_boleto || fallback.numero_boleto || '', tipo: 'DESPESA' };
     } catch (err) {
@@ -3911,7 +3911,7 @@ export default function App() {
     if (!files.length) return;
     const pdfFiles = files.filter((file) => file.type === 'application/pdf');
     if (!pdfFiles.length) {
-      showNotification('Selecione pelo menos um arquivo PDF vÃ¡lido.', 'error');
+      showNotification('Selecione pelo menos um arquivo PDF válido.', 'error');
       return;
     }
 
@@ -3944,8 +3944,8 @@ export default function App() {
 
           const hasGoodText = fullText.trim().length > 100;
 
-          // SÃ³ converte para base64 se o texto extraÃ­do for insuficiente
-          // Usa FileReader (mais rÃ¡pido que loop byte a byte)
+          // Só converte para base64 se o texto extraído for insuficiente
+          // Usa FileReader (mais rápido que loop byte a byte)
           let pdfBase64 = '';
           if (!hasGoodText) {
             pdfBase64 = await new Promise<string>((resolve) => {
@@ -3961,9 +3961,9 @@ export default function App() {
           const local = extractBoletoData(fullText, file.name);
           local.fornecedor = resolveSupplierName(local.fornecedor, fullText);
 
-          // PROTEÃ‡ÃƒO: Se for Energisa e a data for Maio/2026, NÃƒO confia na extraÃ§Ã£o local (provavelmente pegou data de leitura)
+          // PROTEÇÃO: Se for Energisa e a data for Maio/2026, NÃO confia na extração local (provavelmente pegou data de leitura)
           const isEnergisaSuspicious = local.fornecedor.includes('ENERGISA') && local.vencimento === '07/05/2026';
-          const hasLocalCore = !!local.vencimento && local.valor > 0 && local.fornecedor !== 'Fornecedor nÃ£o identificado' && !isEnergisaSuspicious;
+          const hasLocalCore = !!local.vencimento && local.valor > 0 && local.fornecedor !== 'Fornecedor não identificado' && !isEnergisaSuspicious;
 
           if (hasLocalCore) return local;
 
@@ -3988,7 +3988,7 @@ export default function App() {
       );
 
       if (!extractedRows.length) {
-        showNotification('Nenhum dado foi extraÃ­do dos PDFs.', 'error');
+        showNotification('Nenhum dado foi extraído dos PDFs.', 'error');
         return;
       }
 
@@ -4015,7 +4015,7 @@ export default function App() {
       const blockedCount = recheckedRows.length - nonDuplicateRows.length;
 
       if (!nonDuplicateRows.length) {
-        showNotification('Todos os boletos jÃ¡ foram lanÃ§ados e foram bloqueados.', 'info');
+        showNotification('Todos os boletos já foram lançados e foram bloqueados.', 'info');
         return;
       }
 
@@ -4047,7 +4047,7 @@ export default function App() {
       }
 
       const newSuppliers = canonicalRows
-        .filter((row) => row.fornecedor !== 'Fornecedor nÃ£o identificado')
+        .filter((row) => row.fornecedor !== 'Fornecedor não identificado')
         .filter((row) => !suppliers.some((s) => isSupplierMatch(row.fornecedor, s.nome)))
         .map((row) => ({
           uid: 'guest',
@@ -4061,10 +4061,10 @@ export default function App() {
         await api.createSuppliersBatch(newSuppliers as any);
       }
 
-      // Salva padrÃµes aprendidos para cada boleto confirmado
+      // Salva padrões aprendidos para cada boleto confirmado
       // Roda em background sem bloquear o fluxo
       canonicalRows.forEach(row => {
-        if (row.fornecedor && row.fornecedor !== 'Fornecedor nÃ£o identificado') {
+        if (row.fornecedor && row.fornecedor !== 'Fornecedor não identificado') {
           api.saveBoletoPattern({
             cnpj: row.cnpj,
             nome_beneficiario: row.fornecedor,
@@ -4084,7 +4084,7 @@ export default function App() {
       showNotification(`${nonDuplicateRows.length} boleto(s) importado(s). ${blockedCount} bloqueado(s) por duplicidade.`, 'success');
     } catch (error) {
       console.error('Error creating transaction from PDF:', error);
-      showNotification('Erro ao salvar lanÃ§amentos de boleto.', 'error');
+      showNotification('Erro ao salvar lançamentos de boleto.', 'error');
     }
   };
 
@@ -4101,10 +4101,10 @@ export default function App() {
 
         let allDataMatrix: any[] = [];
 
-        // Colunas consideradas "cabeÃ§alho padrÃ£o"
-        const KNOWN_COLS = ['FORNECEDOR', 'FORNECEDORES', 'NOME', 'FAVORECIDO', 'CLIENTE', 'VALOR', 'VENCIMENTO', 'DATA', 'PAGAMENTO', 'SITUAÃ‡ÃƒO', 'SITUACAO'];
+        // Colunas consideradas "cabeçalho padrão"
+        const KNOWN_COLS = ['FORNECEDOR', 'FORNECEDORES', 'NOME', 'FAVORECIDO', 'CLIENTE', 'VALOR', 'VENCIMENTO', 'DATA', 'PAGAMENTO', 'SITUAÇÃO', 'SITUACAO'];
 
-        // HeurÃ­stica de mapeamento posicional para abas sem cabeÃ§alho padrÃ£o
+        // Heurística de mapeamento posicional para abas sem cabeçalho padrão
         const isDateSerial = (v: any) => typeof v === 'number' && v > 40000 && v < 70000;
         const buildPositionalRow = (row: any[], sheetName: string): any => {
           const r: any = { _aba_origem: sheetName };
@@ -4112,20 +4112,20 @@ export default function App() {
           const dates = row.map((v, i) => ({ v, i })).filter(x => isDateSerial(x.v));
           const nums = row.map((v, i) => ({ v, i })).filter(x => typeof x.v === 'number' && !isDateSerial(x.v) && x.v > 0);
           if (strings[0]) r['FORNECEDOR'] = strings[0].v;
-          if (strings[1]) r['DESCRIÃ‡ÃƒO'] = strings[1].v;
+          if (strings[1]) r['DESCRIÇÃO'] = strings[1].v;
           if (dates[0]) r['VENCIMENTO'] = dates[0].v;
           if (dates[1]) r['DATA PAGAMENTO'] = dates[1].v;
           if (nums[0]) r['VALOR'] = nums[0].v;
           if (strings[2]) r['EMPRESA'] = strings[2].v;
-          // Ãºltimo string pode ser status
+          // último string pode ser status
           const last = strings[strings.length - 1];
-          if (last && last !== strings[0] && last !== strings[1] && last !== strings[2]) r['SITUAÃ‡ÃƒO'] = last.v;
+          if (last && last !== strings[0] && last !== strings[1] && last !== strings[2]) r['SITUAÇÃO'] = last.v;
           return r;
         };
 
         // Iterar sobre todas as abas do Excel
         for (const sheetName of workbook.SheetNames) {
-          // Ignora abas de sumÃ¡rio que nÃ£o sÃ£o lanÃ§amentos
+          // Ignora abas de sumário que não são lançamentos
           if (['CASHFLOW'].includes(sheetName.trim().toUpperCase())) continue;
 
           const worksheet = workbook.Sheets[sheetName];
@@ -4135,12 +4135,12 @@ export default function App() {
 
           if (sheetMatrix.length < 1) continue; // Pula abas vazias
 
-          // Verifica se a primeira linha contÃ©m colunas padrÃ£o
+          // Verifica se a primeira linha contém colunas padrão
           const firstRowUpper = sheetMatrix[0].map(h => String(h || '').trim().toUpperCase());
           const hasStandardHeader = firstRowUpper.some(h => KNOWN_COLS.includes(h));
 
           if (hasStandardHeader) {
-            // Fluxo normal: primeira linha = cabeÃ§alho
+            // Fluxo normal: primeira linha = cabeçalho
             const headers = firstRowUpper;
             for (let i = 1; i < sheetMatrix.length; i++) {
               const row = sheetMatrix[i];
@@ -4154,7 +4154,7 @@ export default function App() {
               allDataMatrix.push(rowData);
             }
           } else {
-            // Aba sem cabeÃ§alho padrÃ£o (ex: ABRIL, ManutenÃ§ao): mapeia todas as linhas por posiÃ§Ã£o
+            // Aba sem cabeçalho padrão (ex: ABRIL, Manutençao): mapeia todas as linhas por posição
             for (let i = 0; i < sheetMatrix.length; i++) {
               const row = sheetMatrix[i];
               if (!row || row.length === 0) continue;
@@ -4178,8 +4178,8 @@ export default function App() {
               return row[foundKey];
             }
           }
-          // Partial match apenas para descriÃ§Ã£o e observaÃ§Ãµes
-          if (keys.includes('DESCRIÃ‡ÃƒO') || keys.includes('OBSERVACAO')) {
+          // Partial match apenas para descrição e observações
+          if (keys.includes('DESCRIÇÃO') || keys.includes('OBSERVACAO')) {
             for (const key of keys) {
               const foundKey = Object.keys(row).find(rk => rk.toUpperCase().includes(key.toUpperCase()));
               if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && row[foundKey] !== '') {
@@ -4223,7 +4223,7 @@ export default function App() {
           const rawFornecedor = getRowValue(row, ['FORNECEDOR', 'FORNECEDORES', 'FORNECEDOR_NOME', 'NOME', 'FAVORECIDO', 'CLIENTE']);
           if (!rawFornecedor || String(rawFornecedor).toUpperCase().includes('TOTAL')) continue;
 
-          const rawValor = getRowValue(row, ['VALOR', 'VALOR TOTAL', 'TOTAL', 'VALOR_TOTAL', 'QUANTIA', 'PREÃ‡O', 'PRECO', 'SAIDA', 'SAÃDA', 'PAGAMENTO']);
+          const rawValor = getRowValue(row, ['VALOR', 'VALOR TOTAL', 'TOTAL', 'VALOR_TOTAL', 'QUANTIA', 'PREÇO', 'PRECO', 'SAIDA', 'SAÍDA', 'PAGAMENTO']);
           const sanitizedValor = parseValor(rawValor);
 
           if (sanitizedValor === 0 && !rawValor) continue;
@@ -4277,7 +4277,7 @@ export default function App() {
           const pagamentoDate = rawPagamento ? formatDate(rawPagamento) : undefined;
           if (!vencimentoDate) continue;
 
-          const rawStatus = String(getRowValue(row, ['STATUS', 'SITUAÃ‡ÃƒO', 'SITUACAO', 'PAGO', 'SIT 2']) || '').toUpperCase();
+          const rawStatus = String(getRowValue(row, ['STATUS', 'SITUAÇÃO', 'SITUACAO', 'PAGO', 'SIT 2']) || '').toUpperCase();
           let status: TransactionStatus = 'PENDENTE';
 
           if (pagamentoDate || rawStatus.includes('PAGO')) {
@@ -4286,10 +4286,10 @@ export default function App() {
             status = 'VENCIDO';
           }
 
-          const rawDescricao = getRowValue(row, ['DESCRIÃ‡ÃƒO', 'DESCRICAO', 'OBSERVACAO', 'OBSERVAÃ‡ÃƒO', 'OBS 1', 'OBS 2', 'OBS', 'DETALHE']);
+          const rawDescricao = getRowValue(row, ['DESCRIÇÃO', 'DESCRICAO', 'OBSERVACAO', 'OBSERVAÇÃO', 'OBS 1', 'OBS 2', 'OBS', 'DETALHE']);
           const rawEmpresa = getRowValue(row, ['EMPRESA', 'UNIDADE', 'LOJA', 'OBS 2', 'GRUPO']);
 
-          const rawBanco = getRowValue(row, ['BANCO', 'CONTA', 'INSTITUIÃ‡ÃƒO', 'INSTITUICAO']);
+          const rawBanco = getRowValue(row, ['BANCO', 'CONTA', 'INSTITUIÇÃO', 'INSTITUICAO']);
 
           txBatch.push({
             uid: 'guest',
@@ -4323,11 +4323,11 @@ export default function App() {
           // Lotes menores (250) e usar await com try-catch individual por lote para evitar queda
           if (txBatch.length >= 250) {
             try {
-              console.log(`Enviando lote de ${txBatch.length} transaÃ§Ãµes...`);
+              console.log(`Enviando lote de ${txBatch.length} transações...`);
               await api.createTransactionsBatch(txBatch);
               txBatch = [];
             } catch (err) {
-              console.error('Erro no lote de transaÃ§Ãµes', err);
+              console.error('Erro no lote de transações', err);
               txBatch = [];
             }
           }
@@ -4347,7 +4347,7 @@ export default function App() {
         // Lotes finais
         if (txBatch.length > 0) {
           try {
-            console.log(`Enviando lote final de ${txBatch.length} transaÃ§Ãµes...`);
+            console.log(`Enviando lote final de ${txBatch.length} transações...`);
             await api.createTransactionsBatch(txBatch);
           } catch (err) { console.error(err); }
         }
@@ -4357,7 +4357,7 @@ export default function App() {
           } catch (err) { console.error(err); }
         }
 
-        showNotification(`${totalImported} lanÃ§amentos processados na importaÃ§Ã£o!`, 'success');
+        showNotification(`${totalImported} lançamentos processados na importação!`, 'success');
         fetchTransactions();
         fetchSuppliers();
       } catch (err) {
@@ -4388,7 +4388,7 @@ export default function App() {
   };
 
   const resetSystem = async () => {
-    if (!window.confirm('ATENÃ‡ÃƒO: Isso apagarÃ¡ TODOS os seus lanÃ§amentos e fornecedores da nuvem. Deseja continuar?')) return;
+    if (!window.confirm('ATENÇÃO: Isso apagará TODOS os seus lançamentos e fornecedores da nuvem. Deseja continuar?')) return;
     try {
       showNotification('Iniciando limpeza de dados...', 'info');
       await api.resetDatabase();
@@ -4435,9 +4435,9 @@ export default function App() {
       { label: 'VALOR TOTAL', value: total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }), color: '#3b82f6' },
       { label: 'REGISTROS', value: transactions.length.toString(), description: 'Volume operacional', color: '#3b82f6' },
       { label: 'EMPRESAS', value: empresasSet.size.toString(), description: 'Unidades ativas', color: '#3b82f6' },
-      { label: 'PENDENTES', value: pendentes.toString(), description: 'Aguardando conciliaÃ§Ã£o', color: '#f59e0b' },
+      { label: 'PENDENTES', value: pendentes.toString(), description: 'Aguardando conciliação', color: '#f59e0b' },
       { label: 'PAGOS', value: pagos.toString(), description: 'Liquidados', color: '#3b82f6' },
-      { label: 'VENCIDOS', value: vencidos.toString(), description: 'AÃ§Ã£o imediata necessÃ¡ria', color: '#ef4444' },
+      { label: 'VENCIDOS', value: vencidos.toString(), description: 'Ação imediata necessária', color: '#ef4444' },
     ];
     return { total, pagos, pendentes, vencidos, kpis };
   }, [transactions]);
@@ -4494,7 +4494,7 @@ export default function App() {
               onClick={() => setActiveTab('lancamentos')}
               className={cn("relative transition-all duration-200 font-medium text-sm", activeTab === 'lancamentos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
-              LanÃ§amentos
+              Lançamentos
               {stats.vencidos > 0 && (
                 <span className="absolute -top-2 -right-3 bg-tertiary text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
                   {stats.vencidos}
@@ -4511,7 +4511,7 @@ export default function App() {
               onClick={() => setActiveTab('relatorios')}
               className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'relatorios' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
-              RelatÃ³rios
+              Relatórios
             </button>
             <button
               onClick={() => setActiveTab('receitas')}
@@ -4535,7 +4535,7 @@ export default function App() {
               onClick={() => setActiveTab('configuracoes')}
               className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'configuracoes' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
             >
-              ConfiguraÃ§Ãµes
+              Configurações
             </button>
           </nav>
         </div>
@@ -4566,7 +4566,7 @@ export default function App() {
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'lancamentos' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
         >
           <FileText size={22} strokeWidth={activeTab === 'lancamentos' ? 3 : 2} />
-          <span className="text-[9px] font-black uppercase tracking-tighter">LanÃ§</span>
+          <span className="text-[9px] font-black uppercase tracking-tighter">Lanç</span>
         </button>
         <button
           onClick={() => setActiveTab('fornecedores')}
@@ -4618,14 +4618,14 @@ export default function App() {
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
           <div>
             <h2 className="text-2xl md:text-4xl font-extrabold font-headline text-on-surface mb-3 tracking-tight">
-              {activeTab === 'dashboard' && 'ðŸ’° Dashboard Fluxo de Caixa'}
-              {activeTab === 'lancamentos' && 'ðŸ“‹ GestÃ£o de LanÃ§amentos'}
-              {activeTab === 'fornecedores' && 'ðŸ¢ Fornecedores'}
-              {activeTab === 'relatorios' && 'ðŸ“ˆ RelatÃ³rios Financeiros'}
-              {activeTab === 'receitas' && 'ðŸ’¸ Receitas'}
-              {activeTab === 'bancos' && 'ðŸ¦ Bancos'}
-              {activeTab === 'extrato' && 'ðŸ“„ Importar Extrato OFX'}
-              {activeTab === 'configuracoes' && 'âš™ï¸ ConfiguraÃ§Ãµes'}
+              {activeTab === 'dashboard' && '💰 Dashboard Fluxo de Caixa'}
+              {activeTab === 'lancamentos' && '📋 Gestão de Lançamentos'}
+              {activeTab === 'fornecedores' && '🏢 Fornecedores'}
+              {activeTab === 'relatorios' && '📈 Relatórios Financeiros'}
+              {activeTab === 'receitas' && '💸 Receitas'}
+              {activeTab === 'bancos' && '🏦 Bancos'}
+              {activeTab === 'extrato' && '📄 Importar Extrato OFX'}
+              {activeTab === 'configuracoes' && '⚙️ Configurações'}
             </h2>
             <div className="flex flex-wrap gap-3">
               <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-primary border border-primary/20 flex items-center gap-2">
@@ -4635,7 +4635,7 @@ export default function App() {
                 <CheckCircle size={14} /> {transactions.length} registros
               </span>
               <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-surface-variant flex items-center gap-2">
-                <Calendar size={14} /> {[...new Set(transactions.map(t => t.vencimento.substring(0, 7)))].length} perÃ­odos
+                <Calendar size={14} /> {[...new Set(transactions.map(t => t.vencimento.substring(0, 7)))].length} períodos
               </span>
             </div>
           </div>
@@ -4746,9 +4746,9 @@ export default function App() {
               <div className="glass-card p-10 text-center space-y-6">
                 <Settings size={48} className="mx-auto text-on-surface-variant opacity-20" />
                 <div className="space-y-2">
-                  <h3 className="text-xl font-bold">ConfiguraÃ§Ãµes do Sistema</h3>
+                  <h3 className="text-xl font-bold">Configurações do Sistema</h3>
                   <p className="text-on-surface-variant max-w-md mx-auto">
-                    Aqui vocÃª poderÃ¡ gerenciar usuÃ¡rios, permissÃµes e integraÃ§Ãµes bancÃ¡rias em futuras atualizaÃ§Ãµes.
+                    Aqui você poderá gerenciar usuários, permissões e integrações bancárias em futuras atualizações.
                   </p>
                 </div>
 
@@ -4779,7 +4779,7 @@ export default function App() {
                       <div className="mt-4 flex justify-center">
                         <img
                           src={currentBrandLogo}
-                          alt="PrÃ©via da logo"
+                          alt="Prévia da logo"
                           className="h-20 w-20 object-contain rounded-sm border border-white/10 bg-white/5 p-2"
                         />
                       </div>
@@ -4789,7 +4789,7 @@ export default function App() {
 
                 {/* Backup do Sistema */}
                 <div className="pt-8 border-t border-white/5">
-                  <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">ðŸ’¾ Backup dos Dados</h4>
+                  <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">💾 Backup dos Dados</h4>
                   <div className="space-y-4 max-w-xl mx-auto">
                     <div className="glass-card p-6">
                       <div className="flex items-start gap-4 mb-4">
@@ -4799,8 +4799,8 @@ export default function App() {
                         <div className="text-left">
                           <p className="text-sm font-bold text-on-surface mb-1">Exportar Backup Completo</p>
                           <p className="text-[11px] text-on-surface-variant">
-                            Baixa um arquivo JSON com todos os dados (transaÃ§Ãµes, fornecedores, bancos, contas contÃ¡beis).
-                            Backup automÃ¡tico diÃ¡rio tambÃ©m Ã© feito via GitHub Actions.
+                            Baixa um arquivo JSON com todos os dados (transações, fornecedores, bancos, contas contábeis).
+                            Backup automático diário também é feito via GitHub Actions.
                           </p>
                         </div>
                       </div>
@@ -4811,7 +4811,7 @@ export default function App() {
                         <Download size={18} /> Exportar Backup Agora
                       </button>
                       <p className="text-[10px] text-on-surface-variant/60 mt-3 text-center">
-                        ðŸ’¡ Dica: O backup automÃ¡tico Ã© feito todo dia Ã s 3h. VocÃª pode baixar manualmente a qualquer momento.
+                        💡 Dica: O backup automático é feito todo dia às 3h. Você pode baixar manualmente a qualquer momento.
                       </p>
                     </div>
                   </div>
@@ -4821,7 +4821,7 @@ export default function App() {
                   <h4 className="text-sm font-bold text-secondary mb-4 uppercase tracking-widest">Empresas</h4>
                   <div className="space-y-4 max-w-xl mx-auto">
                     <div className="glass-card p-4">
-                      <p className="text-[11px] text-on-surface-variant mb-3">Gerencie a lista de empresas usada nos lanÃ§amentos e na automaÃ§Ã£o de boletos.</p>
+                      <p className="text-[11px] text-on-surface-variant mb-3">Gerencie a lista de empresas usada nos lançamentos e na automação de boletos.</p>
                       <div className="flex gap-2">
                         <input
                           type="text"
@@ -4893,7 +4893,7 @@ export default function App() {
                     <div className="glass-card p-4">
                       <div className="grid grid-cols-12 gap-2">
                         <div className="col-span-3">
-                          <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">CÃ³digo</p>
+                          <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Código</p>
                           <input
                             value={newContaContabil.codigo}
                             onChange={(e) => setNewContaContabil(prev => ({ ...prev, codigo: e.target.value }))}
@@ -4927,7 +4927,7 @@ export default function App() {
                           onClick={async () => {
                             try {
                               if (!newContaContabil.codigo || !newContaContabil.nome) {
-                                showNotification('Preencha cÃ³digo e nome.', 'error');
+                                showNotification('Preencha código e nome.', 'error');
                                 return;
                               }
                               await api.createContaContabil({
@@ -4937,7 +4937,7 @@ export default function App() {
                               });
                               setNewContaContabil({ codigo: '', nome: '', tipo: 'DESPESA' });
                               await fetchContasContabeis();
-                              showNotification('Conta contÃ¡bil cadastrada!', 'success');
+                              showNotification('Conta contábil cadastrada!', 'success');
                             } catch (e) {
                               showNotification('Erro ao cadastrar conta.', 'error');
                             }
@@ -4951,14 +4951,14 @@ export default function App() {
                             try {
                               await api.setupTables();
                               await fetchContasContabeis();
-                              showNotification('Plano de contas padrÃ£o carregado.', 'success');
+                              showNotification('Plano de contas padrão carregado.', 'success');
                             } catch {
-                              showNotification('Erro ao carregar plano padrÃ£o.', 'error');
+                              showNotification('Erro ao carregar plano padrão.', 'error');
                             }
                           }}
                           className="ml-3 bg-primary/10 text-primary px-4 py-2 rounded-lg text-xs font-bold border border-primary/20 hover:bg-primary/20 transition-all"
                         >
-                          Carregar PadrÃ£o
+                          Carregar Padrão
                         </button>
                       </div>
                     </div>
@@ -5019,25 +5019,25 @@ export default function App() {
                   </div>
                 </div>
                 <div className="pt-8 border-t border-white/5">
-                  <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Contas ContÃ¡beis</h4>
+                  <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Contas Contábeis</h4>
                   <div className="space-y-4 max-w-xl mx-auto">
                     <div className="glass-card p-4">
-                      <p className="text-[11px] text-on-surface-variant mb-3">Gerencie as contas contÃ¡beis usadas na classificaÃ§Ã£o de lanÃ§amentos.</p>
+                      <p className="text-[11px] text-on-surface-variant mb-3">Gerencie as contas contábeis usadas na classificação de lançamentos.</p>
 
-                      {/* BotÃ£o Carregar PadrÃ£o */}
+                      {/* Botão Carregar Padrão */}
                       <button
                         onClick={async () => {
                           try {
                             await api.setupTables();
                             await fetchContasContabeis();
-                            showNotification('Contas padrÃ£o carregadas!', 'success');
+                            showNotification('Contas padrão carregadas!', 'success');
                           } catch (error) {
-                            showNotification('Erro ao carregar contas padrÃ£o.', 'error');
+                            showNotification('Erro ao carregar contas padrão.', 'error');
                           }
                         }}
                         className="w-full mb-4 bg-primary/10 text-primary px-4 py-2 rounded-lg text-xs font-bold border border-primary/20 hover:bg-primary/20 transition-all"
                       >
-                        Carregar PadrÃ£o (atualiza contas antigas)
+                        Carregar Padrão (atualiza contas antigas)
                       </button>
 
                       <div className="flex gap-2 mb-4">
@@ -5045,7 +5045,7 @@ export default function App() {
                           type="text"
                           value={newContaContabil.codigo}
                           onChange={(e) => setNewContaContabil({ ...newContaContabil, codigo: e.target.value })}
-                          placeholder="CÃ³digo (ex: 3.10)"
+                          placeholder="Código (ex: 3.10)"
                           className="w-24 bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                         <input
@@ -5107,7 +5107,7 @@ export default function App() {
                             </div>
                           ))}
                         {contasContabeis.length === 0 && (
-                          <p className="text-center text-xs text-on-surface-variant py-4">Nenhuma conta contÃ¡bil cadastrada.</p>
+                          <p className="text-center text-xs text-on-surface-variant py-4">Nenhuma conta contábil cadastrada.</p>
                         )}
                       </div>
                     </div>
@@ -5120,11 +5120,11 @@ export default function App() {
                     <div className="glass-card p-4 flex items-center justify-between">
                       <div className="text-left">
                         <p className="text-sm font-bold text-on-surface">Limpar Duplicados</p>
-                        <p className="text-[10px] text-on-surface-variant">Remove lanÃ§amentos com fornecedor + vencimento + valor + empresa iguais, mantendo apenas o mais antigo.</p>
+                        <p className="text-[10px] text-on-surface-variant">Remove lançamentos com fornecedor + vencimento + valor + empresa iguais, mantendo apenas o mais antigo.</p>
                       </div>
                       <button
                         onClick={async () => {
-                          if (!window.confirm('Isso removerÃ¡ duplicados mantendo apenas o registro mais antigo. Continuar?')) return;
+                          if (!window.confirm('Isso removerá duplicados mantendo apenas o registro mais antigo. Continuar?')) return;
                           try {
                             const result = await api.cleanDuplicates();
                             showNotification(`${result.deleted} duplicados removidos!`, 'success');
@@ -5142,11 +5142,11 @@ export default function App() {
                     <div className="glass-card p-4 flex items-center justify-between">
                       <div className="text-left">
                         <p className="text-sm font-bold text-on-surface">Limpar Dados Suspeitos</p>
-                        <p className="text-[10px] text-on-surface-variant">Remove valores &gt; R$ 500k, &lt; R$ 0.01, nulos, ou com fornecedor invÃ¡lido.</p>
+                        <p className="text-[10px] text-on-surface-variant">Remove valores &gt; R$ 500k, &lt; R$ 0.01, nulos, ou com fornecedor inválido.</p>
                       </div>
                       <button
                         onClick={async () => {
-                          if (!window.confirm('Isso removerÃ¡ dados suspeitos (valores extremos ou invÃ¡lidos). Continuar?')) return;
+                          if (!window.confirm('Isso removerá dados suspeitos (valores extremos ou inválidos). Continuar?')) return;
                           try {
                             const result = await api.cleanSuspicious();
                             showNotification(`${result.deleted} registros suspeitos removidos!`, 'success');
@@ -5164,11 +5164,11 @@ export default function App() {
                 </div>
 
                 <div className="pt-8 border-t border-white/5">
-                  <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">PadrÃµes de Boletos</h4>
+                  <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Padrões de Boletos</h4>
                   <div className="space-y-4 max-w-2xl mx-auto">
                     <div className="glass-card p-4">
                       <p className="text-[11px] text-on-surface-variant mb-3">
-                        Gerencie os padrÃµes aprendidos automaticamente ao importar boletos. Se um fornecedor estiver errado, delete o padrÃ£o para que o sistema peÃ§a para configurar novamente na prÃ³xima importaÃ§Ã£o.
+                        Gerencie os padrões aprendidos automaticamente ao importar boletos. Se um fornecedor estiver errado, delete o padrão para que o sistema peça para configurar novamente na próxima importação.
                       </p>
                       <button
                         onClick={() => fetchBoletoPatterns()}
@@ -5178,20 +5178,20 @@ export default function App() {
                       </button>
                       <div className="max-h-60 overflow-y-auto space-y-2">
                         {boletoPatterns.length === 0 ? (
-                          <p className="text-center text-xs text-on-surface-variant py-4">Nenhum padrÃ£o aprendido ainda.</p>
+                          <p className="text-center text-xs text-on-surface-variant py-4">Nenhum padrão aprendido ainda.</p>
                         ) : (
                           boletoPatterns.map((pattern) => (
                             <div key={pattern.id} className="flex items-center justify-between bg-surface-variant/10 border border-white/5 rounded-lg px-3 py-2">
                               <div className="flex flex-col">
                                 <span className="text-sm font-bold">{pattern.fornecedor}</span>
                                 <span className="text-[10px] text-on-surface-variant">
-                                  {pattern.nome_normalizado} â€¢ {pattern.confirmacoes}x confirmado
-                                  {pattern.empresa && ` â€¢ ${pattern.empresa}`}
+                                  {pattern.nome_normalizado} • {pattern.confirmacoes}x confirmado
+                                  {pattern.empresa && ` • ${pattern.empresa}`}
                                 </span>
                               </div>
                               <button
                                 onClick={() => {
-                                  if (window.confirm(`Excluir padrÃ£o "${pattern.fornecedor}"?`)) {
+                                  if (window.confirm(`Excluir padrão "${pattern.fornecedor}"?`)) {
                                     deleteBoletoPattern(pattern.id);
                                   }
                                 }}
@@ -5216,7 +5216,7 @@ export default function App() {
                     <Trash2 size={18} /> Resetar Todo o Sistema
                   </button>
                   <p className="text-[10px] text-on-surface-variant mt-3">
-                    Isso apagarÃ¡ todos os seus lanÃ§amentos e fornecedores salvos na nuvem.
+                    Isso apagará todos os seus lançamentos e fornecedores salvos na nuvem.
                   </p>
                 </div>
               </div>
@@ -5241,7 +5241,7 @@ export default function App() {
           <div className="bg-surface border border-white/10 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
               <h3 className="text-lg md:text-xl font-bold font-headline flex items-center gap-2">
-                <FileUp className="text-primary" size={20} /> AutomaÃ§Ã£o de Boletos
+                <FileUp className="text-primary" size={20} /> Automação de Boletos
               </h3>
               <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                 {pdfExtractedRows.length} arquivo(s)
@@ -5303,26 +5303,26 @@ export default function App() {
                               ? "text-tertiary border-tertiary/40 bg-tertiary/10"
                               : "text-primary border-primary/40 bg-primary/10"
                         )}>
-                          {!row.numero_boleto ? 'Sem nÃºmero' : row.duplicate ? 'Duplicado' : 'Novo'}
+                          {!row.numero_boleto ? 'Sem número' : row.duplicate ? 'Duplicado' : 'Novo'}
                         </span>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mt-2">
                       <div className="md:col-span-5">
-                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">DescriÃ§Ã£o</p>
+                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Descrição</p>
                         <input
                           value={row.descricao}
                           onChange={(e) => updatePdfRow(index, { descricao: e.target.value })}
-                          placeholder="DescriÃ§Ã£o do boleto"
+                          placeholder="Descrição do boleto"
                           className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
                       <div className="md:col-span-4">
-                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">NÃºmero do Boleto</p>
+                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Número do Boleto</p>
                         <input
                           value={row.numero_boleto || ''}
                           onChange={(e) => updatePdfRow(index, { numero_boleto: e.target.value })}
-                          placeholder="Nosso nÃºmero / Nro documento"
+                          placeholder="Nosso número / Nro documento"
                           className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
@@ -5353,7 +5353,7 @@ export default function App() {
                         </select>
                       </div>
                       <div className="md:col-span-3">
-                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Conta ContÃ¡bil</p>
+                        <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Conta Contábil</p>
                         <select
                           value={row.conta_contabil_id || ''}
                           onChange={(e) => updatePdfRow(index, { conta_contabil_id: e.target.value ? Number(e.target.value) : undefined })}
@@ -5400,7 +5400,7 @@ export default function App() {
                 onClick={handleConfirmPdfImport}
                 className="bg-primary text-background px-5 py-2 rounded-lg text-sm font-black uppercase tracking-widest hover:bg-primary-dark transition-all"
               >
-                Confirmar ImportaÃ§Ã£o
+                Confirmar Importação
               </button>
             </div>
           </div>
@@ -5416,7 +5416,7 @@ export default function App() {
           setShowNewTxModal={setShowNewTxModal}
           onSuccess={() => {
             fetchTransactions();
-            showNotification('LanÃ§amento salvo com sucesso!', 'success');
+            showNotification('Lançamento salvo com sucesso!', 'success');
           }}
           initialTipo={newTxInitialTipo}
         />
@@ -5497,7 +5497,7 @@ export default function App() {
       <footer className="bg-surface border-t border-white/5 hidden lg:flex flex-col md:flex-row justify-between items-center px-8 w-full py-6 mt-auto">
         <div className="mb-4 md:mb-0">
           <p className="text-[11px] font-medium uppercase tracking-wider text-on-surface-variant">
-            Dashboard Fluxo de Caixa - Grupo CN | Dados atualizados em tempo real | Â© 2025
+            Dashboard Fluxo de Caixa - Grupo CN | Dados atualizados em tempo real | © 2025
           </p>
         </div>
         <div className="flex gap-6">
