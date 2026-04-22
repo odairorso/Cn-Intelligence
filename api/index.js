@@ -428,6 +428,8 @@ async function handleTransactionsBatchUpdate(req, res) {
     const today = new Date().toISOString().split('T')[0];
     const finalDate = parseDateToPg(dataPagamento) || today;
     
+    console.log(`[batch-update] Starting update for ${ids.length} ids. Banco: ${banco}, Data: ${finalDate} (Received: ${dataPagamento})`);
+
     let updated = 0;
     for (const id of ids) {
       const rows = await sql`
@@ -438,7 +440,7 @@ async function handleTransactionsBatchUpdate(req, res) {
       `;
       updated += rows.length;
     }
-    console.log(`[batch-update] Updated ${updated} of ${ids.length} transactions with date ${finalDate}`);
+    console.log(`[batch-update] Successfully updated ${updated} transactions.`);
     return res.json({ message: 'Batch updated', count: updated });
   } catch (e) {
     console.error('[batch-update] Error:', e.message);
