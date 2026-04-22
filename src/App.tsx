@@ -2277,13 +2277,14 @@ interface SelectBankModalProps {
   transactionId: string;
   valor: number;
   banks: Bank[];
+  initialDate?: string;
   onClose: () => void;
   onConfirm: (banco: string, dataPagamento: string) => void;
 }
 
-const SelectBankModal = ({ transactionId, valor, banks, onClose, onConfirm }: SelectBankModalProps) => {
+const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, onConfirm }: SelectBankModalProps) => {
   const [selectedBank, setSelectedBank] = useState('');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentDate, setPaymentDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
@@ -5434,6 +5435,7 @@ export default function App() {
           transactionId={showPayModal.id}
           valor={showPayModal.valor}
           banks={banks}
+          initialDate={toInputDate(showPayModal.vencimento)}
           onClose={() => setShowPayModal(null)}
           onConfirm={(banco, dataPagamento) => {
             markAsPaid(showPayModal.id, banco, dataPagamento);
@@ -5447,6 +5449,7 @@ export default function App() {
           transactionId="batch"
           valor={showPayBatchModal.reduce((sum, tx) => sum + tx.valor, 0)}
           banks={banks}
+          initialDate={showPayBatchModal.length > 0 ? toInputDate(showPayBatchModal[0].vencimento) : undefined}
           onClose={() => setShowPayBatchModal(null)}
           onConfirm={(banco, dataPagamento) => {
             markAsPaidBatch(showPayBatchModal.map(t => t.id), banco, dataPagamento);
