@@ -14,7 +14,7 @@ export const api = {
     if (month) params.append('month', month);
     if (search) params.append('search', search);
 
-    const res = await fetch(`${API_BASE}?${params.toString()}`);
+    const res = await fetch(`${API_BASE}?${params.toString()}`, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch transactions');
     return res.json();
   },
@@ -43,7 +43,7 @@ export const api = {
     if (year) params.append('year', year);
     if (period) params.append('period', period);
 
-    const res = await fetch(`${API_BASE}?${params.toString()}`);
+    const res = await fetch(`${API_BASE}?${params.toString()}`, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch stats');
     return res.json();
   },
@@ -93,7 +93,7 @@ export const api = {
 
   // ─── Suppliers ─────────────────────────────────────────────────────────────
   async getSuppliers(_uid: string): Promise<Supplier[]> {
-    const res = await fetch(`${API_BASE}?route=suppliers`);
+    const res = await fetch(`${API_BASE}?route=suppliers`, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch suppliers');
     return res.json();
   },
@@ -140,7 +140,7 @@ export const api = {
 
   // ─── Banks ─────────────────────────────────────────────────────────────────
   async getBanks(_uid: string): Promise<Bank[]> {
-    const res = await fetch(`${API_BASE}?route=banks`);
+    const res = await fetch(`${API_BASE}?route=banks`, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch banks');
     return res.json();
   },
@@ -172,7 +172,7 @@ export const api = {
 
   // ─── Contas Contábeis ──────────────────────────────────────────────────────
   async getContasContabeis(): Promise<ContaContabil[]> {
-    const res = await fetch(`${API_BASE}?route=contas-contabeis`);
+    const res = await fetch(`${API_BASE}?route=contas-contabeis`, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch contas contabeis');
     return res.json();
   },
@@ -258,7 +258,7 @@ export const api = {
     tipo: string;
     confirmacoes: number;
   }>> {
-    const res = await fetch(`${API_BASE}?route=boleto-patterns`);
+    const res = await fetch(`${API_BASE}?route=boleto-patterns`, { cache: 'no-store' });
     if (!res.ok) throw new Error('Failed to fetch patterns');
     return res.json();
   },
