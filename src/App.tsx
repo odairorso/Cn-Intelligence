@@ -2286,6 +2286,14 @@ const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, on
   const [selectedBank, setSelectedBank] = useState('');
   const [paymentDate, setPaymentDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
 
+  useEffect(() => {
+    if (initialDate) {
+      setPaymentDate(initialDate);
+    } else {
+      setPaymentDate(new Date().toISOString().split('T')[0]);
+    }
+  }, [initialDate, transactionId]);
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
       <motion.div
@@ -5449,7 +5457,7 @@ export default function App() {
           transactionId="batch"
           valor={showPayBatchModal.reduce((sum, tx) => sum + tx.valor, 0)}
           banks={banks}
-          initialDate={showPayBatchModal.length > 0 ? toInputDate(showPayBatchModal[0].vencimento) : undefined}
+          initialDate={new Date().toISOString().split('T')[0]}
           onClose={() => setShowPayBatchModal(null)}
           onConfirm={(banco, dataPagamento) => {
             markAsPaidBatch(showPayBatchModal.map(t => t.id), banco, dataPagamento);
@@ -5457,7 +5465,6 @@ export default function App() {
           }}
         />
       )}
-
 
       {editingTx && (
         <EditTxModal
