@@ -263,6 +263,7 @@ export function useAppData() {
       prev.map(tx => tx.id === id ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: finalDate, banco } : tx)
     );
     showNotification('Lançamento marcado como pago!', 'success');
+    console.log(`[markAsPaid] Sending update for ${id}. Date: ${finalDate}`);
     api.updateTransaction(id, { status: 'PAGO', pagamento: finalDate, banco }).then(() => {
       fetchStats();
     }).catch(err => {
@@ -278,6 +279,7 @@ export function useAppData() {
       prev.map(tx => ids.includes(tx.id) ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: finalDate, banco } : tx)
     );
     showNotification(`${ids.length} lançamento(s) marcado(s) como pago!`, 'success');
+    console.log(`[markAsPaidBatch] Sending batch update for ${ids.length} items. Date: ${finalDate}`);
     api.updateTransactionsBatch(ids, banco, finalDate).then(() => {
       fetchStats();
     }).catch(err => {

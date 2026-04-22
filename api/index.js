@@ -425,8 +425,7 @@ async function handleTransactionsBatchUpdate(req, res) {
   }
 
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const finalDate = parseDateToPg(dataPagamento) || today;
+    const finalDate = parseDateToPg(dataPagamento);
     
     console.log(`[batch-update] Starting update for ${ids.length} ids. Banco: ${banco}, Data: ${finalDate} (Received: ${dataPagamento})`);
 
