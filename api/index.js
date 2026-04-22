@@ -419,24 +419,26 @@ async function handleTransactionsBatch(req, res) {
 async function handleTransactionsBatchUpdate(req, res) {
   if (req.method !== 'PUT') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { ids, banco } = req.body;
+  const { ids, banco, dataPagamento } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ error: 'ids must be a non-empty array' });
   }
 
   try {
     const today = new Date().toISOString().split('T')[0];
+    const finalDate = parseDateToPg(dataPagamento) || today;
+    
     let updated = 0;
     for (const id of ids) {
       const rows = await sql`
         UPDATE transactions
-        SET status = 'PAGO', pagamento = ${today}, banco = ${banco || null}
+        SET status = 'PAGO', pagamento = ${finalDate}, banco = ${banco || null}
         WHERE id = ${id} AND status != 'PAGO'
         RETURNING id
       `;
       updated += rows.length;
     }
-    console.log(`[batch-update] Updated ${updated} of ${ids.length} transactions`);
+    console.log(`[batch-update] Updated ${updated} of ${ids.length} transactions with date ${finalDate}`);
     return res.json({ message: 'Batch updated', count: updated });
   } catch (e) {
     console.error('[batch-update] Error:', e.message);
