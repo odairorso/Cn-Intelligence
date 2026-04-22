@@ -2284,15 +2284,19 @@ interface SelectBankModalProps {
 
 const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, onConfirm }: SelectBankModalProps) => {
   const [selectedBank, setSelectedBank] = useState('');
-  const [paymentDate, setPaymentDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
+  const todayIso = new Date().toISOString().split('T')[0];
+  const initialIso = (initialDate ? (toInputDate(initialDate) || initialDate) : todayIso) || todayIso;
+  const [paymentDate, setPaymentDate] = useState(initialIso);
+  const [paymentDateText, setPaymentDateText] = useState(toDisplayDate(initialIso));
+  const [dateError, setDateError] = useState('');
   const paymentDateRef = useRef<HTMLInputElement | null>(null);
+  const paymentDateTextRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (initialDate) {
-      setPaymentDate(initialDate);
-    } else {
-      setPaymentDate(new Date().toISOString().split('T')[0]);
-    }
+    const nextIso = (initialDate ? (toInputDate(initialDate) || initialDate) : todayIso) || todayIso;
+    setPaymentDate(nextIso);
+    setPaymentDateText(toDisplayDate(nextIso));
+    setDateError('');
   }, [initialDate, transactionId]);
 
   return (
@@ -2313,9 +2317,33 @@ const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, on
             type="date"
             ref={paymentDateRef}
             value={paymentDate}
-            onChange={(e) => setPaymentDate(e.target.value)}
+            onChange={(e) => {
+              setPaymentDate(e.target.value);
+              setPaymentDateText(toDisplayDate(e.target.value));
+              setDateError('');
+            }}
             className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-3 text-sm outline-none focus:border-primary text-on-surface"
           />
+          <input
+            type="text"
+            ref={paymentDateTextRef}
+            value={paymentDateText}
+            onChange={(e) => {
+              const next = e.target.value;
+              setPaymentDateText(next);
+              const parsed = toInputDate(next);
+              if (parsed) setPaymentDate(parsed);
+              setDateError('');
+            }}
+            placeholder="DD/MM/AAAA"
+            className={cn(
+              "mt-2 w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-3 text-sm outline-none focus:border-primary text-on-surface",
+              dateError && "border-tertiary/60 focus:border-tertiary/60"
+            )}
+          />
+          {dateError && (
+            <p className="mt-2 text-xs font-bold text-tertiary">{dateError}</p>
+          )}
         </div>
 
         <div className="space-y-3 mb-6">
@@ -2350,8 +2378,13 @@ const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, on
           <button
             onClick={() => {
               if (!selectedBank) return;
-              const raw = paymentDateRef.current?.value || paymentDate;
-              const normalized = toInputDate(raw) || raw;
+              const rawIso = paymentDateRef.current?.value || paymentDate;
+              const rawText = paymentDateTextRef.current?.value || paymentDateText;
+              const normalized = toInputDate(rawText) || toInputDate(rawIso) || rawIso;
+              if (!normalized) {
+                setDateError('Informe uma data válida (DD/MM/AAAA).');
+                return;
+              }
               onConfirm(selectedBank, normalized);
             }}
             disabled={!selectedBank}
