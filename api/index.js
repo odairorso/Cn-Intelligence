@@ -455,22 +455,23 @@ async function handleTransactionById(req, res) {
   if (req.method === 'PUT') {
     try {
       const { status, pagamento, vencimento, fornecedor, descricao, empresa, valor, banco, tipo, juros, numero_boleto, conta_contabil_id } = req.body;
-      const pDate = pagamento ? parseDateToPg(pagamento) : null;
-      const vDate = vencimento ? parseDateToPg(vencimento) : null;
+      const pDate = pagamento !== undefined ? parseDateToPg(pagamento) : undefined;
+      const vDate = vencimento !== undefined ? parseDateToPg(vencimento) : undefined;
+
       const rows = await sql`
         UPDATE transactions SET
           status     = COALESCE(${status}, status),
-          pagamento  = ${pDate},
-          vencimento = COALESCE(${vDate}, vencimento),
+          pagamento  = ${pagamento !== undefined ? pDate : sql`pagamento`},
+          vencimento = ${vencimento !== undefined ? vDate : sql`vencimento`},
           fornecedor = COALESCE(${fornecedor}, fornecedor),
           descricao  = COALESCE(${descricao}, descricao),
           empresa    = COALESCE(${empresa}, empresa),
           valor      = COALESCE(${valor !== undefined ? Number(valor) : null}, valor),
-          banco      = ${banco !== undefined ? banco : null},
+          banco      = ${banco !== undefined ? (banco || null) : sql`banco`},
           tipo       = COALESCE(${tipo}, tipo),
-          juros      = ${juros !== undefined ? Number(juros) : null},
-          numero_boleto = ${numero_boleto !== undefined ? numero_boleto : null},
-          conta_contabil_id = ${conta_contabil_id !== undefined ? conta_contabil_id : null}
+          juros      = COALESCE(${juros !== undefined ? (juros ? Number(juros) : null) : null}, juros),
+          numero_boleto = COALESCE(${numero_boleto}, numero_boleto),
+          conta_contabil_id = ${conta_contabil_id !== undefined ? (conta_contabil_id ? Number(conta_contabil_id) : null) : sql`conta_contabil_id`}
         WHERE id = ${id}
         RETURNING *`;
       const tx = rows[0];
