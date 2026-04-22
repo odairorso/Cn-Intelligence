@@ -7,7 +7,7 @@
  * 2. Siga as instruções de integração no App.tsx abaixo
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Upload,
@@ -188,6 +188,28 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
   const normalizeSupplierName = (v: string) =>
     String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
+  // Pré-computar índices para busca rápida (executado apenas quando transactions muda)
+  const { fitidSet, valueDateMap } = useMemo(() => {
+    const fitids = new Set<string>();
+    const valueDateMap = new Map<string, Array<{ fornecedor: string }>>();
+
+    transactions.forEach((tx) => {
+      const fitidMatch = tx.descricao?.match(/\b([A-Z0-9]{10,30})\b/);
+      if (fitidMatch) {
+        fitids.add(fitidMatch[1]);
+      }
+
+      const txValue = Number(tx.valor) + Number(tx.juros || 0);
+      const valueDateKey = `${txValue.toFixed(2)}|${tx.vencimento}`;
+      if (!valueDateMap.has(valueDateKey)) {
+        valueDateMap.set(valueDateKey, []);
+      }
+      valueDateMap.get(valueDateKey)!.push({ fornecedor: tx.fornecedor });
+    });
+
+    return { fitidSet: fitids, valueDateMap };
+  }, [transactions]);
+
   // ── Detect duplicates ──────────────────────────────────────────────────
   // Otimizado: pré-computa um Map de chaves para busca O(1) ao invés de O(n) por transação
   const isDuplicate = useCallback(
@@ -217,30 +239,6 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
     },
     [fitidSet, valueDateMap]
   );
-
-  // Pré-computar índices para busca rápida (executado apenas quando transactions muda)
-  const { fitidSet, valueDateMap } = useMemo(() => {
-    const fitids = new Set<string>();
-    const valueDateMap = new Map<string, Array<{ fornecedor: string }>>();
-
-    transactions.forEach((tx) => {
-      // Index FITIDs encontrados nas descrições
-      const fitidMatch = tx.descricao?.match(/\b([A-Z0-9]{10,30})\b/);
-      if (fitidMatch) {
-        fitids.add(fitidMatch[1]);
-      }
-
-      // Index por valor+data para fuzzy matching
-      const txValue = Number(tx.valor) + Number(tx.juros || 0);
-      const valueDateKey = `${txValue.toFixed(2)}|${tx.vencimento}`;
-      if (!valueDateMap.has(valueDateKey)) {
-        valueDateMap.set(valueDateKey, []);
-      }
-      valueDateMap.get(valueDateKey)!.push({ fornecedor: tx.fornecedor });
-    });
-
-    return { fitidSet: fitids, valueDateMap };
-  }, [transactions]);
 
   // ── File handler ───────────────────────────────────────────────────────
   const handleFile = useCallback(
