@@ -2285,14 +2285,12 @@ interface SelectBankModalProps {
 const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, onConfirm }: SelectBankModalProps) => {
   const [selectedBank, setSelectedBank] = useState('');
   const todayIso = new Date().toISOString().split('T')[0];
-  const initialIso = (initialDate ? (toInputDate(initialDate) || initialDate) : todayIso) || todayIso;
-  const [paymentDate, setPaymentDate] = useState(initialIso);
+  const [paymentDate, setPaymentDate] = useState(todayIso);
   const [dateError, setDateError] = useState('');
   const paymentDateRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    const nextIso = (initialDate ? (toInputDate(initialDate) || initialDate) : todayIso) || todayIso;
-    setPaymentDate(nextIso);
+    setPaymentDate(todayIso);
     setDateError('');
   }, [initialDate, transactionId]);
 
