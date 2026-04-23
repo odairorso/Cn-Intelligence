@@ -4082,9 +4082,12 @@ export default function App() {
       await fetchTransactions();
       await fetchSuppliers();
       showNotification(`${nonDuplicateRows.length} boleto(s) importado(s). ${blockedCount} bloqueado(s) por duplicidade.`, 'success');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating transaction from PDF:', error);
-      showNotification('Erro ao salvar lançamentos de boleto.', 'error');
+      const msg = error.message === 'Boleto já lançado' 
+        ? 'Este boleto já foi lançado no sistema.'
+        : 'Erro ao salvar lançamentos de boleto.';
+      showNotification(msg, 'error');
     }
   };
 

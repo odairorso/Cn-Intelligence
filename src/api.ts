@@ -54,7 +54,13 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Failed to create transaction');
+    if (!res.ok) {
+      if (res.status === 409) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Boleto já lançado');
+      }
+      throw new Error('Failed to create transaction');
+    }
     return res.json();
   },
 
