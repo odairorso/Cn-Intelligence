@@ -1,6 +1,6 @@
 import type { ContaContabil } from '../types';
 
-export const DEFAULT_COMPANIES = ['CN', 'CEI', 'UNOPAR', 'FACEMS', 'ELAINE', 'POLO DE ITAQUIRAI'];
+export const DEFAULT_COMPANIES = ['CN', 'CEI', 'UNOPAR', 'FACEMS', 'ELAINE', 'POLO DE ITAQUIRAI', 'LABORATÓRIO'];
 
 export const DEFAULT_ACCOUNTS: ContaContabil[] = [
   { id: 0, codigo: '3.1',  nome: 'Folha de Pagamento',    tipo: 'DESPESA', ativo: true },
