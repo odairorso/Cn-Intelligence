@@ -1410,24 +1410,42 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
   }, [transactions, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, todayKey]);
 
   const periodTotals = useMemo(() => {
-    let total = 0;
+    let total = 0; // Previsto (Accrual)
     let totalReceitas = 0;
     let totalDespesas = 0;
     let jurosTotal = 0;
+
+    let realizadoTotal = 0; // Realizado (Cash flow)
+    let realizadoReceitas = 0;
+    let realizadoDespesas = 0;
+
     for (const tx of filteredData) {
       const isRev = tx.tipo === 'RECEITA' || (tx.tipo !== 'DESPESA' && isRevenueTransaction(tx));
-      const valorComJuros = Number(tx.valor) + Number(tx.juros || 0);
+      const valorTotal = Number(tx.valor) + Number(tx.juros || 0);
+      const isPago = effectiveStatus(tx) === 'PAGO';
       
       if (isRev) {
-        totalReceitas += valorComJuros;
-        total += valorComJuros;
+        totalReceitas += valorTotal;
+        total += valorTotal;
+        if (isPago) {
+          realizadoReceitas += valorTotal;
+          realizadoTotal += valorTotal;
+        }
       } else {
-        totalDespesas += valorComJuros;
-        total -= valorComJuros;
+        totalDespesas += valorTotal;
+        total -= valorTotal;
+        if (isPago) {
+          realizadoDespesas += valorTotal;
+          realizadoTotal -= valorTotal;
+        }
       }
       jurosTotal += Number(tx.juros || 0);
     }
-    return { total, totalReceitas, totalDespesas, jurosTotal, count: filteredData.length };
+    return { 
+      total, totalReceitas, totalDespesas, jurosTotal, 
+      realizadoTotal, realizadoReceitas, realizadoDespesas,
+      count: filteredData.length 
+    };
   }, [filteredData]);
 
   const monthLabel = useMemo(() => {
@@ -1444,6 +1462,11 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
       }
 
       const tipoLabel = selectedTipo === 'TODOS' ? 'Fluxo de Caixa' : selectedTipo === 'RECEITA' ? 'Relatório de Receitas' : 'Relatório de Despesas';
+      const statusLabel = selectedStatus === 'TODOS'
+        ? 'Todos'
+        : selectedStatus === 'NAO_PAGO'
+          ? 'Não Pagos'
+          : selectedStatus;
       const now = new Date().toLocaleString('pt-BR', { 
         day: '2-digit', month: 'long', year: 'numeric', 
         hour: '2-digit', minute: '2-digit' 
@@ -1455,11 +1478,13 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
         const s = effectiveStatus(tx);
         return s === 'PENDENTE' || s === 'VENCIDO';
       }).reduce((acc, tx) => acc + (Number(tx.valor) || 0) + (Number(tx.juros || 0)), 0);
+      const hasNaoPagos = pendentesCount + vencidosCount > 0;
 
       const rows = filteredData.map((tx, i) => {
         const isRev = tx.tipo === 'RECEITA' || (tx.tipo !== 'DESPESA' && isRevenueTransaction(tx));
         const valorTotal = (Number(tx.valor) || 0) + (Number(tx.juros || 0));
         const status = effectiveStatus(tx);
+        const isNaoPago = status !== 'PAGO';
         
         let statusColor = '#666';
         let rowBg = 'transparent';
@@ -1479,6 +1504,9 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
 
         const tipoColor = isRev ? '#10b981' : '#ef4444';
         const tipoText = isRev ? 'RECEITA' : 'DESPESA';
+        const valorColor = isNaoPago ? '#f59e0b' : '#0f172a';
+        const jurosColor = isNaoPago ? '#f59e0b' : '#ef4444';
+        const totalColor = isNaoPago ? '#f59e0b' : tipoColor;
 
         return `<tr style="background-color: ${rowBg}">
           <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${i + 1}</td>
@@ -1488,9 +1516,9 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
           <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.empresa || '-'}</td>
           <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.vencimento || '-'}</td>
           <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.pagamento || '-'}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:10pt">${(Number(tx.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:9pt;color:#ef4444">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;color:${tipoColor};font-size:10pt">${(isRev ? '' : '-')}${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:10pt;color:${valorColor};font-weight:${isNaoPago ? 'bold' : 'normal'}">${(Number(tx.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:9pt;color:${jurosColor};font-weight:${isNaoPago ? 'bold' : 'normal'}">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;color:${totalColor};font-size:10pt">${(isRev ? '' : '-')}${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           <td style="padding:8px;border:1px solid #ddd;text-align:center;font-weight:${statusWeight};color:${statusColor};font-size:9pt">${status}</td>
         </tr>`;
       }).join('');
@@ -1524,7 +1552,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
   <div class="header">
     <div class="header-info">
       <h1>${tipoLabel}</h1>
-      <p>Colégio Naviraí - Grupo CN | Período: ${monthLabel} de ${selectedYear}</p>
+          <p>Colégio Naviraí - Grupo CN | Período: ${monthLabel} de ${selectedYear} | Status: ${statusLabel}</p>
     </div>
     <div style="text-align: right; font-size: 9pt; color: #64748b; font-weight: 600;">
       Gerado em: ${now}
@@ -1570,14 +1598,15 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
     <tbody>
       ${rows}
       <tr class="total-row">
-        <td colspan="7" style="padding:12px;text-align:right;text-transform:uppercase;letter-spacing:1px;font-size:9pt">Saldo Líquido do Período</td>
+        <td colspan="7" style="padding:12px;text-align:right;text-transform:uppercase;letter-spacing:1px;font-size:9pt">${selectedStatus === 'TODOS' ? 'Saldo Líquido do Período' : 'Saldo do Filtro Aplicado'}</td>
         <td style="padding:12px;text-align:right;color:#64748b;font-size:8pt">
           (+) ${periodTotals.totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}<br/>
           (-) ${periodTotals.totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
         </td>
         <td style="padding:12px;text-align:right;color:#ef4444">${periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '-'}</td>
-        <td style="padding:12px;text-align:right;font-size:13pt;color:${periodTotals.total >= 0 ? '#10b981' : '#ef4444'}">
+        <td style="padding:12px;text-align:right;font-size:13pt;color:${hasNaoPagos ? '#f59e0b' : (periodTotals.total >= 0 ? '#10b981' : '#ef4444')}">
           ${periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          ${hasNaoPagos ? `<div style="font-size:8pt;color:#b45309;font-weight:700;">há ${vencidosCount + pendentesCount} não pagos</div>` : ''}
         </td>
         <td style="padding:12px;text-align:center;font-size:8pt;color:#64748b">${periodTotals.count} registros</td>
       </tr>
@@ -1590,9 +1619,14 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
 </body>
 </html>`);
       printWindow.document.close();
+      printWindow.focus();
+      try { printWindow.print(); } catch {}
       setTimeout(() => {
-        printWindow.print();
-      }, 1000);
+        try {
+          printWindow.focus();
+          printWindow.print();
+        } catch {}
+      }, 200);
     } catch (error) {
       console.error('Erro ao imprimir:', error);
       alert('Erro ao gerar o relatório. Verifique os dados e tente novamente.');
@@ -1681,14 +1715,20 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
         >
           <Printer size={16} /> Imprimir / PDF
         </button>
-        <div className="text-right">
-          <p className="text-[10px] font-bold text-on-surface-variant uppercase">
-            {selectedTipo === 'RECEITA' ? 'Receitas' : selectedTipo === 'DESPESA' ? 'Despesas' : 'Total'} no Período
-          </p>
-          <p className="text-xl font-bold text-primary">
-            {periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-          <p className="text-[11px] text-on-surface-variant mt-1">{periodTotals.count} lançamentos</p>
+        <div className="flex gap-6 text-right">
+          <div className="flex flex-col">
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase">Saldo Realizado (Caixa)</p>
+            <p className={cn("text-lg font-bold", periodTotals.realizadoTotal >= 0 ? "text-primary" : "text-tertiary")}>
+              {periodTotals.realizadoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="flex flex-col">
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase">Saldo Previsto (Final)</p>
+            <p className={cn("text-lg font-bold", periodTotals.total >= 0 ? "text-primary" : "text-tertiary")}>
+              {periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <p className="text-[9px] text-on-surface-variant font-medium">{periodTotals.count} lançamentos</p>
+          </div>
         </div>
       </div>
 
@@ -1711,11 +1751,15 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
           ) : (
             filteredData.map((tx) => {
               const status = effectiveStatus(tx);
+              const isNaoPago = status !== 'PAGO';
               return (
                 <div key={tx.id} className="px-4 py-3 flex flex-col gap-1">
                   <div className="flex justify-between items-start gap-2">
                     <span className="font-semibold text-sm flex-1 leading-tight">{tx.fornecedor}</span>
-                    <span className="font-bold text-sm whitespace-nowrap">
+                    <span className={cn(
+                      "font-bold text-sm whitespace-nowrap",
+                      isNaoPago && "text-[#f59e0b]"
+                    )}>
                       {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -1764,8 +1808,13 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
                 filteredData.map((tx, i) => {
                   const isRev = tx.tipo === 'RECEITA' || (tx.tipo !== 'DESPESA' && isRevenueTransaction(tx));
                   const status = effectiveStatus(tx);
+                  const isNaoPago = status !== 'PAGO';
                   return (
-                    <tr key={tx.id} className="hover:bg-white/5 transition-colors">
+                    <tr key={tx.id} className={cn(
+                      "hover:bg-white/5 transition-colors",
+                      status === 'PENDENTE' && "bg-[#f59e0b]/5",
+                      status === 'VENCIDO' && "bg-[#ef4444]/5"
+                    )}>
                       <td className="px-8 py-4 text-on-surface-variant text-xs">{i + 1}</td>
                       <td className="px-8 py-4">
                         <span className={cn(
@@ -1780,9 +1829,22 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
                       <td className="px-8 py-4">{tx.empresa}</td>
                       <td className="px-8 py-4">{tx.vencimento}</td>
                       <td className="px-8 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
-                      <td className="px-8 py-4 text-right">{Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="px-8 py-4 text-right text-tertiary text-xs">{Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
-                      <td className={cn("px-8 py-4 text-right font-bold", isRev ? "text-primary" : "text-tertiary")}>
+                      <td className={cn(
+                        "px-8 py-4 text-right",
+                        isNaoPago && "text-[#f59e0b] font-semibold"
+                      )}>
+                        {Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className={cn(
+                        "px-8 py-4 text-right text-xs",
+                        isNaoPago ? "text-[#f59e0b]" : "text-tertiary"
+                      )}>
+                        {Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                      </td>
+                      <td className={cn(
+                        "px-8 py-4 text-right font-bold",
+                        isNaoPago ? "text-[#f59e0b]" : (isRev ? "text-primary" : "text-tertiary")
+                      )}>
                         {(isRev ? '' : '-')}{(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-8 py-4">
@@ -1803,7 +1865,9 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
             {filteredData.length > 0 && (
               <tfoot>
                 <tr className="border-t-2 border-white/20 font-bold">
-                  <td colSpan={7} className="px-8 py-4 text-right text-on-surface-variant uppercase text-xs tracking-widest">Total Geral (Saldo)</td>
+                  <td colSpan={7} className="px-8 py-4 text-right text-on-surface-variant uppercase text-xs tracking-widest">
+                    {selectedStatus === 'TODOS' ? 'Total Geral (Saldo)' : 'Total do Filtro (Saldo)'}
+                  </td>
                   <td className="px-8 py-4 text-right text-on-surface-variant text-xs">
                     Rec: {periodTotals.totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}<br/>
                     Des: {periodTotals.totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
