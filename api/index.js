@@ -193,7 +193,7 @@ async function handleTransactions(req, res) {
       return res.json(formatted);
     } catch (e) {
       console.error(e);
-      return res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message, stack: e.stack });
     }
   }
 
@@ -227,7 +227,7 @@ async function handleTransactions(req, res) {
       return res.status(201).json(rows[0]);
     } catch (e) {
       console.error(e);
-      return res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: e.message, stack: e.stack });
     }
   }
 
