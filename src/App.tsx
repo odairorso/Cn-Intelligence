@@ -1584,9 +1584,9 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
       <div class="value">${periodTotals.totalDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
     </div>
     <div class="summary-box highlight">
-      <div class="label">Aguardando Pagamento</div>
-      <div class="value">${pendentesValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
-      <div style="font-size: 8pt; color: #b45309; margin-top: 4px; font-weight: 800;">${vencidosCount + pendentesCount} ITENS PENDENTES</div>
+      <div class="label">A Pagar (Em Aberto)</div>
+      <div class="value">${periodTotals.naoPagoDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+      <div style="font-size: 8pt; color: #b45309; margin-top: 4px; font-weight: 800;">${periodTotals.naoPagoCount} ITENS PENDENTES</div>
     </div>
   </div>
   
@@ -1609,18 +1609,26 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
     <tbody>
       ${rows}
       <tr class="total-row">
-        <td colspan="7" style="padding:12px;text-align:right;text-transform:uppercase;letter-spacing:1px;font-size:9pt">${selectedStatus === 'TODOS' ? 'Saldo Líquido do Período' : 'Saldo do Filtro Aplicado'}</td>
+        <td colspan="7" style="padding:12px;text-align:right;text-transform:uppercase;letter-spacing:1px;font-size:9pt">Resumo de Saldos</td>
         <td style="padding:12px;text-align:right;color:#64748b;font-size:8pt">
           (+) ${periodTotals.totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}<br/>
           (-) ${periodTotals.totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
         </td>
         <td style="padding:12px;text-align:right;color:#ef4444">${periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '-'}</td>
-        <td style="padding:12px;text-align:right;font-size:13pt;color:${hasNaoPagos ? '#f59e0b' : (periodTotals.total >= 0 ? '#10b981' : '#ef4444')}">
+        <td style="padding:12px;text-align:right;font-size:13pt;color:${periodTotals.total >= 0 ? '#10b981' : '#ef4444'}">
           ${periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-          ${hasNaoPagos ? `<div style="font-size:8pt;color:#b45309;font-weight:700;">há ${vencidosCount + pendentesCount} não pagos</div>` : ''}
+          <div style="font-size:8pt;color:#64748b;font-weight:700;">SALDO PREVISTO FINAL</div>
         </td>
         <td style="padding:12px;text-align:center;font-size:8pt;color:#64748b">${periodTotals.count} registros</td>
       </tr>
+      ${periodTotals.naoPagoDespesas > 0 ? `
+      <tr style="background-color: #fffbeb;">
+        <td colspan="9" style="padding:12px;text-align:right;font-weight:800;color:#b45309;text-transform:uppercase;font-size:9pt">Total Pendente a Pagar (Em Aberto):</td>
+        <td style="padding:12px;text-align:right;font-size:14pt;color:#f59e0b;font-weight:900;">
+          - ${periodTotals.naoPagoDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        </td>
+        <td style="padding:12px;text-align:center;font-size:8pt;color:#b45309;font-weight:800;">${periodTotals.naoPagoCount} PENDÊNCIAS</td>
+      </tr>` : ''}
     </tbody>
   </table>
 
