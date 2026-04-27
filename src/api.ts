@@ -3,6 +3,25 @@ import type { Transaction, Supplier, Bank, ContaContabil } from './types';
 // O backend no Vercel usa api/index.js com roteamento por ?route=
 const API_BASE = '/api';
 
+const buildHttpError = async (res: Response, fallback: string) => {
+  const contentType = res.headers.get('content-type') || '';
+  try {
+    if (contentType.includes('application/json')) {
+      const data = await res.json().catch(() => null);
+      const message =
+        (data && typeof data === 'object' && 'message' in data && typeof (data as any).message === 'string' && (data as any).message) ||
+        (data && typeof data === 'object' && 'error' in data && typeof (data as any).error === 'string' && (data as any).error) ||
+        null;
+      return new Error(message ? `${fallback}: ${message}` : `${fallback} (HTTP ${res.status})`);
+    }
+    const text = await res.text().catch(() => '');
+    const compact = String(text || '').trim().slice(0, 400);
+    return new Error(compact ? `${fallback}: ${compact}` : `${fallback} (HTTP ${res.status})`);
+  } catch {
+    return new Error(`${fallback} (HTTP ${res.status})`);
+  }
+};
+
 export const api = {
   // ─── Transactions ──────────────────────────────────────────────────────────
   async getTransactions(_uid: string, limit?: number, offset?: number, year?: string, month?: string, search?: string): Promise<Transaction[]> {
@@ -15,7 +34,7 @@ export const api = {
     if (search) params.append('search', search);
 
     const res = await fetch(`${API_BASE}?${params.toString()}`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to fetch transactions');
+    if (!res.ok) throw await buildHttpError(res, 'Failed to fetch transactions');
     return res.json();
   },
 
@@ -44,7 +63,7 @@ export const api = {
     if (period) params.append('period', period);
 
     const res = await fetch(`${API_BASE}?${params.toString()}`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to fetch stats');
+    if (!res.ok) throw await buildHttpError(res, 'Failed to fetch stats');
     return res.json();
   },
 
@@ -70,7 +89,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Failed to create transactions batch');
+    if (!res.ok) throw await buildHttpError(res, 'Failed to create transactions batch');
   },
 
   async updateTransactionsBatch(ids: string[], banco: string, dataPagamento?: string): Promise<void> {
@@ -79,7 +98,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids, banco, dataPagamento }),
     });
-    if (!res.ok) throw new Error('Failed to update transactions batch');
+    if (!res.ok) throw await buildHttpError(res, 'Failed to update transactions batch');
   },
 
   async updateTransaction(id: string, data: Partial<Transaction>): Promise<Transaction> {
@@ -88,7 +107,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Failed to update transaction');
+    if (!res.ok) throw await buildHttpError(res, 'Failed to update transaction');
     return res.json();
   },
 
@@ -100,7 +119,7 @@ export const api = {
   // ─── Suppliers ─────────────────────────────────────────────────────────────
   async getSuppliers(_uid: string): Promise<Supplier[]> {
     const res = await fetch(`${API_BASE}?route=suppliers`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to fetch suppliers');
+    if (!res.ok) throw await buildHttpError(res, 'Failed to fetch suppliers');
     return res.json();
   },
 
@@ -147,7 +166,7 @@ export const api = {
   // ─── Banks ─────────────────────────────────────────────────────────────────
   async getBanks(_uid: string): Promise<Bank[]> {
     const res = await fetch(`${API_BASE}?route=banks`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to fetch banks');
+    if (!res.ok) throw await buildHttpError(res, 'Failed to fetch banks');
     return res.json();
   },
 
@@ -179,7 +198,7 @@ export const api = {
   // ─── Contas Contábeis ──────────────────────────────────────────────────────
   async getContasContabeis(): Promise<ContaContabil[]> {
     const res = await fetch(`${API_BASE}?route=contas-contabeis`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to fetch contas contabeis');
+    if (!res.ok) throw await buildHttpError(res, 'Failed to fetch contas contabeis');
     return res.json();
   },
 
@@ -206,7 +225,7 @@ export const api = {
   // ─── Utilities ─────────────────────────────────────────────────────────────
   async setupTables(): Promise<void> {
     const res = await fetch(`${API_BASE}?route=setup-tables`, { method: 'POST' });
-    if (!res.ok) throw new Error('Failed to setup tables');
+    if (!res.ok) throw await buildHttpError(res, 'Failed to setup tables');
   },
 
   async resetDatabase(): Promise<void> {
@@ -265,7 +284,7 @@ export const api = {
     confirmacoes: number;
   }>> {
     const res = await fetch(`${API_BASE}?route=boleto-patterns`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to fetch patterns');
+    if (!res.ok) throw await buildHttpError(res, 'Failed to fetch patterns');
     return res.json();
   },
 

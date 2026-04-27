@@ -3,6 +3,8 @@ import { GoogleGenAI } from '@google/genai';
 
 export const config = { runtime: 'nodejs' };
 
+
+
 // --- Helpers ---
 const normalizeBoletoNumber = (value) => {
   if (value === null || value === undefined || value === '') return '';
@@ -1478,7 +1480,6 @@ async function handleExportBackup(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   try {
     const [transactions, suppliers, banks, contasContabeis, boletoPatterns] = await Promise.all([
-    const [transactions, suppliers, banks, contasContabeis, boletoPatterns] = await Promise.all([
       sql`SELECT * FROM transactions ORDER BY created_at DESC`,
       sql`SELECT * FROM suppliers ORDER BY nome`,
       sql`SELECT * FROM banks ORDER BY nome`,
@@ -1512,17 +1513,75 @@ async function handleExportBackup(req, res) {
 
 async function handleDbCheck(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const rawConn =
+    process.env.DATABASE_URL ||
+    process.env.URL_DO_BANCO_DE_DADOS ||
+    process.env.DATABASE_URLL ||
+    '';
+
+  const connection = (() => {
+    if (!rawConn) return null;
+    try {
+      const u = new URL(rawConn);
+      return {
+        protocol: u.protocol,
+        host: u.hostname || null,
+        port: u.port ? Number(u.port) : null,
+        database: u.pathname ? u.pathname.replace(/^\//, '') : null,
+        user: u.username || null,
+        hasPassword: Boolean(u.password),
+        sslmode: u.searchParams.get('sslmode'),
+      };
+    } catch (err) {
+      return { parseError: true };
+    }
+  })();
+
   try {
     const rows = await sql`SELECT 1 AS ok`;
+    const serverInfoRows = await sql`
+      SELECT
+        current_database() AS database,
+        current_user AS user,
+        inet_server_addr()::text AS server_addr,
+        inet_server_port() AS server_port,
+        version() AS version
+    `;
+
+    const tableRegRows = await sql`
+      SELECT
+        to_regclass('public.transactions')::text AS transactions,
+        to_regclass('public.suppliers')::text AS suppliers,
+        to_regclass('public.banks')::text AS banks,
+        to_regclass('public.contas_contabeis')::text AS contas_contabeis,
+        to_regclass('public.boleto_patterns')::text AS boleto_patterns
+    `;
+
+    const tableReg = tableRegRows?.[0] ?? null;
+    const txInfo = tableReg?.transactions
+      ? (await sql`
+          SELECT
+            COUNT(*)::int AS count,
+            MIN(vencimento) AS min_vencimento,
+            MAX(vencimento) AS max_vencimento
+          FROM transactions
+        `)?.[0] ?? null
+      : null;
+
     return res.json({
       ok: true,
       result: rows?.[0] ?? null,
+      connection,
+      server: serverInfoRows?.[0] ?? null,
+      tables: tableReg,
+      transactions: txInfo,
       node: process.version,
     });
   } catch (e) {
     const err = e || {};
     return res.status(500).json({
       ok: false,
+      connection,
       name: err.name,
       message: err.message,
       code: err.code,
@@ -1543,58 +1602,87 @@ export default async function handler(req, res) {
 
   const { route, id } = req.query;
 
-  switch (route) {
-    case 'health':
-      return res.json({
-        ok: true,
-        node: process.version,
-        env: {
-          DATABASE_URL: process.env.DATABASE_URL ? 'PRESENT' : 'MISSING',
-          URL_DO_BANCO_DE_DADOS: process.env.URL_DO_BANCO_DE_DADOS ? 'PRESENT' : 'MISSING',
-          DATABASE_URLL: process.env.DATABASE_URLL ? 'PRESENT' : 'MISSING'
-        },
-        vercel: {
-          commit: process.env.VERCEL_GIT_COMMIT_SHA || null,
-          deployment: process.env.VERCEL_DEPLOYMENT_ID || null,
-        }
-      });
-    case 'db-check':
-      return handleDbCheck(req, res);
-    case 'transactions':
-      if (id) return handleTransactionById(req, res);
-      return handleTransactions(req, res);
-    case 'transactions-batch':
-      return handleTransactionsBatch(req, res);
-    case 'transactions-batch-update':
-      return handleTransactionsBatchUpdate(req, res);
-    case 'suppliers':
-      if (id) return handleSupplierById(req, res);
-      return handleSuppliers(req, res);
-    case 'suppliers-batch':
-      return handleSuppliersBatch(req, res);
-    case 'suppliers-merge':
-      return handleSuppliersMerge(req, res);
-    case 'suppliers-merge-auto':
-      return handleSuppliersMergeAuto(req, res);
-    case 'banks':
-      if (id) return handleBankById(req, res);
-      return handleBanks(req, res);
-    case 'contas-contabeis':
-      return handleContasContabeis(req, res);
-    case 'setup-tables':
-      return handleSetupTables(req, res);
-    case 'save-boleto-pattern':
-      return handleSaveBoletoPattern(req, res);
-    case 'boleto-patterns':
-      if (id) return handleDeleteBoletoPattern(req, res);
-      return handleBoletoPatterns(req, res);
-    case 'extract-boleto':
-      return handleExtractBoleto(req, res);
-    case 'stats':
-      return handleStats(req, res);
-    case 'export-backup':
-      return handleExportBackup(req, res);
-    default:
-      return res.status(404).json({ error: 'Route not found' });
+  try {
+    switch (route) {
+      case 'health':
+        return res.json({
+          ok: true,
+          node: process.version,
+          env: {
+            DATABASE_URL: process.env.DATABASE_URL ? 'PRESENT' : 'MISSING',
+            URL_DO_BANCO_DE_DADOS: process.env.URL_DO_BANCO_DE_DADOS ? 'PRESENT' : 'MISSING',
+            DATABASE_URLL: process.env.DATABASE_URLL ? 'PRESENT' : 'MISSING'
+          },
+          vercel: {
+            commit: process.env.VERCEL_GIT_COMMIT_SHA || null,
+            deployment: process.env.VERCEL_DEPLOYMENT_ID || null,
+            region: process.env.VERCEL_REGION || null,
+          }
+        });
+      case 'db-check':
+        return handleDbCheck(req, res);
+      case 'transactions':
+        if (id) return handleTransactionById(req, res);
+        return handleTransactions(req, res);
+      case 'transactions-batch':
+        return handleTransactionsBatch(req, res);
+      case 'transactions-batch-update':
+        return handleTransactionsBatchUpdate(req, res);
+      case 'suppliers':
+        if (id) return handleSupplierById(req, res);
+        return handleSuppliers(req, res);
+      case 'suppliers-batch':
+        return handleSuppliersBatch(req, res);
+      case 'suppliers-merge':
+        return handleSuppliersMerge(req, res);
+      case 'suppliers-merge-auto':
+        return handleSuppliersMergeAuto(req, res);
+      case 'banks':
+        if (id) return handleBankById(req, res);
+        return handleBanks(req, res);
+      case 'contas-contabeis':
+        return handleContasContabeis(req, res);
+      case 'setup-tables':
+        return handleSetupTables(req, res);
+      case 'save-boleto-pattern':
+        return handleSaveBoletoPattern(req, res);
+      case 'boleto-patterns':
+        if (id) return handleDeleteBoletoPattern(req, res);
+        return handleBoletoPatterns(req, res);
+      case 'extract-boleto':
+        return handleExtractBoleto(req, res);
+      case 'stats':
+        return handleStats(req, res);
+      case 'export-backup':
+        return handleExportBackup(req, res);
+      default:
+        return res.status(404).json({ error: 'Route not found' });
+    }
+  } catch (e) {
+    const err = e || {};
+    const requestId =
+      req?.headers?.['x-vercel-id'] ||
+      req?.headers?.['x-request-id'] ||
+      req?.headers?.['x-amzn-trace-id'] ||
+      null;
+    console.error('[api] Unhandled error', {
+      route,
+      method: req?.method,
+      requestId,
+      name: err.name,
+      message: err.message,
+      code: err.code,
+      stack: err.stack,
+    });
+    return res.status(500).json({
+      ok: false,
+      error: 'ERRO_INTERNO_DO_SERVIDOR',
+      route: route || null,
+      requestId,
+      name: err.name,
+      message: err.message,
+      code: err.code,
+      node: process.version,
+    });
   }
 }

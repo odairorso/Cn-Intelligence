@@ -1436,13 +1436,9 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
   }, [selectedMonth]);
 
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
     const tipoLabel = selectedTipo === 'TODOS' ? 'Fluxo de Caixa' : selectedTipo === 'RECEITA' ? 'Relatório de Receitas' : 'Relatório de Despesas';
     const now = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    // Totais de pendências para o cabeçalho do PDF
     const pendentesCount = filteredData.filter(tx => effectiveStatus(tx) === 'PENDENTE').length;
     const vencidosCount = filteredData.filter(tx => effectiveStatus(tx) === 'VENCIDO').length;
     const pendentesValor = filteredData.filter(tx => effectiveStatus(tx) === 'PENDENTE' || effectiveStatus(tx) === 'VENCIDO')
@@ -1453,7 +1449,6 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
       const valorTotal = Number(tx.valor) + Number(tx.juros || 0);
       const status = effectiveStatus(tx);
       
-      // Cores para o PDF
       let statusColor = '#666';
       let rowBg = 'transparent';
       let statusWeight = 'normal';
@@ -1488,7 +1483,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
       </tr>`;
     }).join('');
 
-    printWindow.document.write(`<!DOCTYPE html>
+    const printHTML = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -1506,13 +1501,12 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
     .summary-box.highlight { border-color: #f59e0b; background-color: #fffbeb; }
     .summary-box.critical { border-color: #ef4444; background-color: #fff5f5; }
     .summary-box.success { border-color: #10b981; background-color: #ecfdf5; }
-    
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
     th { background: #f8fafc; padding: 10px 8px; border: 1px solid #e2e8f0; text-align: left; font-weight: bold; text-transform: uppercase; font-size: 8pt; color: #475569; }
     tr:nth-child(even) { background-color: #fcfcfc; }
     .total-row td { font-weight: bold; background: #f1f5f9 !important; border-top: 2px solid #333; }
     .footer { margin-top: 40px; font-size: 8pt; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; }
-    .unpaid-tag { background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; font-size: 8pt; font-weight: bold; }
+    @media print { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   </style>
 </head>
 <body>
@@ -1583,7 +1577,15 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
     <p>Este relatório é um documento gerencial do sistema Fluxo de Caixa CN. Gerado em ${now}.</p>
   </div>
 </body>
-</html>`);
+</html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Bloqueador de pop-ups está bloqueando. Permite pop-ups para este site, ou use:\nMenu do navegador → Imprimir → Salvar como PDF');
+      return;
+    }
+    
+    printWindow.document.write(printHTML);
     printWindow.document.close();
     setTimeout(() => printWindow.print(), 500);
   };
