@@ -1422,6 +1422,8 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
     let naoPagoCount = 0;
     let naoPagoReceitas = 0;
     let naoPagoDespesas = 0;
+    let naoPagoReceitasCount = 0;
+    let naoPagoDespesasCount = 0;
 
     for (const tx of filteredData) {
       const isRev = tx.tipo === 'RECEITA' || (tx.tipo !== 'DESPESA' && isRevenueTransaction(tx));
@@ -1436,6 +1438,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
           realizadoTotal += valorTotal;
         } else {
           naoPagoCount += 1;
+          naoPagoReceitasCount += 1;
           naoPagoReceitas += valorTotal;
         }
       } else {
@@ -1446,6 +1449,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
           realizadoTotal -= valorTotal;
         } else {
           naoPagoCount += 1;
+          naoPagoDespesasCount += 1;
           naoPagoDespesas += valorTotal;
         }
       }
@@ -1454,7 +1458,10 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
     return { 
       total, totalReceitas, totalDespesas, jurosTotal, 
       realizadoTotal, realizadoReceitas, realizadoDespesas,
-      naoPagoCount, naoPagoReceitas, naoPagoDespesas, naoPagoSaldo: naoPagoReceitas - naoPagoDespesas,
+      naoPagoCount,
+      naoPagoReceitas, naoPagoDespesas,
+      naoPagoReceitasCount, naoPagoDespesasCount,
+      naoPagoSaldo: naoPagoReceitas - naoPagoDespesas,
       count: filteredData.length 
     };
   }, [filteredData]);
@@ -1584,9 +1591,17 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
       <div class="value">${periodTotals.totalDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
     </div>
     <div class="summary-box highlight">
-      <div class="label">A Pagar (Em Aberto)</div>
+      <div class="label">Em Aberto (Total)</div>
+      <div class="value">${pendentesValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+      <div style="font-size: 8pt; color: #b45309; margin-top: 4px; font-weight: 800;">${vencidosCount + pendentesCount} ITENS EM ABERTO</div>
+      <div style="height: 8px;"></div>
+      <div class="label">A Pagar</div>
       <div class="value">${periodTotals.naoPagoDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
-      <div style="font-size: 8pt; color: #b45309; margin-top: 4px; font-weight: 800;">${periodTotals.naoPagoCount} ITENS PENDENTES</div>
+      <div style="font-size: 8pt; color: #b45309; margin-top: 4px; font-weight: 800;">${periodTotals.naoPagoDespesasCount} DESPESAS PENDENTES</div>
+      <div style="height: 8px;"></div>
+      <div class="label">A Receber</div>
+      <div class="value">${periodTotals.naoPagoReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+      <div style="font-size: 8pt; color: #1d4ed8; margin-top: 4px; font-weight: 800;">${periodTotals.naoPagoReceitasCount} RECEITAS PENDENTES</div>
     </div>
   </div>
   
@@ -1627,7 +1642,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
         <td style="padding:12px;text-align:right;font-size:14pt;color:#f59e0b;font-weight:900;">
           - ${periodTotals.naoPagoDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
         </td>
-        <td style="padding:12px;text-align:center;font-size:8pt;color:#b45309;font-weight:800;">${periodTotals.naoPagoCount} PENDÊNCIAS</td>
+        <td style="padding:12px;text-align:center;font-size:8pt;color:#b45309;font-weight:800;">${periodTotals.naoPagoDespesasCount} PENDÊNCIAS</td>
       </tr>` : ''}
     </tbody>
   </table>
