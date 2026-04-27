@@ -2,7 +2,7 @@ import pg from 'pg';
 
 // Configuração do Pool para o Supabase (compatível com IPv4 via Session Pooler)
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL || process.env.URL_DO_BANCO_DE_DADOS,
   ssl: { rejectUnauthorized: false }
 });
 
