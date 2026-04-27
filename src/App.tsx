@@ -1436,77 +1436,88 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
   }, [selectedMonth]);
 
   const handlePrint = () => {
-    const tipoLabel = selectedTipo === 'TODOS' ? 'Fluxo de Caixa' : selectedTipo === 'RECEITA' ? 'Relatório de Receitas' : 'Relatório de Despesas';
-    const now = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-    const pendentesCount = filteredData.filter(tx => effectiveStatus(tx) === 'PENDENTE').length;
-    const vencidosCount = filteredData.filter(tx => effectiveStatus(tx) === 'VENCIDO').length;
-    const pendentesValor = filteredData.filter(tx => effectiveStatus(tx) === 'PENDENTE' || effectiveStatus(tx) === 'VENCIDO')
-      .reduce((acc, tx) => acc + Number(tx.valor) + Number(tx.juros || 0), 0);
-
-    const rows = filteredData.map((tx, i) => {
-      const isRev = tx.tipo === 'RECEITA' || (tx.tipo !== 'DESPESA' && isRevenueTransaction(tx));
-      const valorTotal = Number(tx.valor) + Number(tx.juros || 0);
-      const status = effectiveStatus(tx);
-      
-      let statusColor = '#666';
-      let rowBg = 'transparent';
-      let statusWeight = 'normal';
-
-      if (status === 'PAGO') {
-        statusColor = '#10b981';
-      } else if (status === 'VENCIDO') {
-        statusColor = '#ef4444';
-        rowBg = '#fff5f5';
-        statusWeight = 'bold';
-      } else if (status === 'PENDENTE') {
-        statusColor = '#f59e0b';
-        rowBg = '#fffbeb';
-        statusWeight = 'bold';
+    try {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert('O navegador bloqueou a abertura do relatório. Por favor, permita pop-ups para este site e tente novamente.');
+        return;
       }
 
-      const tipoColor = isRev ? '#10b981' : '#ef4444';
-      const tipoText = isRev ? 'RECEITA' : 'DESPESA';
+      const tipoLabel = selectedTipo === 'TODOS' ? 'Fluxo de Caixa' : selectedTipo === 'RECEITA' ? 'Relatório de Receitas' : 'Relatório de Despesas';
+      const now = new Date().toLocaleString('pt-BR', { 
+        day: '2-digit', month: 'long', year: 'numeric', 
+        hour: '2-digit', minute: '2-digit' 
+      });
 
-      return `<tr style="background-color: ${rowBg}">
-        <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${i + 1}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:center;font-weight:bold;color:${tipoColor};font-size:9pt">${tipoText}</td>
-        <td style="padding:8px;border:1px solid #ddd;font-size:10pt"><b>${tx.fornecedor}</b></td>
-        <td style="padding:8px;border:1px solid #ddd;font-size:9pt">${tx.descricao || '-'}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.empresa || '-'}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.vencimento}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.pagamento || '-'}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:10pt">${Number(tx.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:9pt;color:#ef4444">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;color:${tipoColor};font-size:10pt">${(isRev ? '' : '-')}${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:center;font-weight:${statusWeight};color:${statusColor};font-size:9pt">${status}</td>
-      </tr>`;
-    }).join('');
+      const pendentesCount = filteredData.filter(tx => effectiveStatus(tx) === 'PENDENTE').length;
+      const vencidosCount = filteredData.filter(tx => effectiveStatus(tx) === 'VENCIDO').length;
+      const pendentesValor = filteredData.filter(tx => {
+        const s = effectiveStatus(tx);
+        return s === 'PENDENTE' || s === 'VENCIDO';
+      }).reduce((acc, tx) => acc + (Number(tx.valor) || 0) + (Number(tx.juros || 0)), 0);
 
-    const printHTML = `<!DOCTYPE html>
+      const rows = filteredData.map((tx, i) => {
+        const isRev = tx.tipo === 'RECEITA' || (tx.tipo !== 'DESPESA' && isRevenueTransaction(tx));
+        const valorTotal = (Number(tx.valor) || 0) + (Number(tx.juros || 0));
+        const status = effectiveStatus(tx);
+        
+        let statusColor = '#666';
+        let rowBg = 'transparent';
+        let statusWeight = 'normal';
+
+        if (status === 'PAGO') {
+          statusColor = '#10b981';
+        } else if (status === 'VENCIDO') {
+          statusColor = '#ef4444';
+          rowBg = '#fff5f5';
+          statusWeight = 'bold';
+        } else if (status === 'PENDENTE') {
+          statusColor = '#f59e0b';
+          rowBg = '#fffbeb';
+          statusWeight = 'bold';
+        }
+
+        const tipoColor = isRev ? '#10b981' : '#ef4444';
+        const tipoText = isRev ? 'RECEITA' : 'DESPESA';
+
+        return `<tr style="background-color: ${rowBg}">
+          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${i + 1}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-weight:bold;color:${tipoColor};font-size:9pt">${tipoText}</td>
+          <td style="padding:8px;border:1px solid #ddd;font-size:10pt"><b>${tx.fornecedor || 'NÃO INFORMADO'}</b></td>
+          <td style="padding:8px;border:1px solid #ddd;font-size:9pt">${tx.descricao || '-'}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.empresa || '-'}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.vencimento || '-'}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.pagamento || '-'}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:10pt">${(Number(tx.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:9pt;color:#ef4444">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;color:${tipoColor};font-size:10pt">${(isRev ? '' : '-')}${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-weight:${statusWeight};color:${statusColor};font-size:9pt">${status}</td>
+        </tr>`;
+      }).join('');
+
+      printWindow.document.write(`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <title>${tipoLabel} - ${monthLabel}/${selectedYear}</title>
   <style>
-    @page { margin: 1.5cm; size: A4 landscape; }
+    @page { margin: 1.2cm; size: A4 landscape; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 11pt; color: #333; line-height: 1.4; margin: 0; padding: 0; }
-    .header { border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-    .header-info h1 { margin: 0; font-size: 18pt; color: #1e293b; text-transform: uppercase; }
-    .header-info p { margin: 5px 0 0; font-size: 10pt; color: #64748b; }
-    .summary-boxes { display: flex; gap: 15px; margin-bottom: 20px; }
-    .summary-box { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }
-    .summary-box .label { font-size: 8pt; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
-    .summary-box .value { font-size: 14pt; font-weight: bold; color: #1e293b; }
+    .header { border-bottom: 3px solid #3b82f6; padding-bottom: 12px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .header-info h1 { margin: 0; font-size: 20pt; color: #1e293b; text-transform: uppercase; font-weight: 800; }
+    .header-info p { margin: 5px 0 0; font-size: 10pt; color: #64748b; font-weight: 600; }
+    .summary-boxes { display: flex; gap: 15px; margin-bottom: 25px; }
+    .summary-box { flex: 1; border: 1px solid #e2e8f0; border-radius: 10px; padding: 15px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .summary-box .label { font-size: 8pt; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
+    .summary-box .value { font-size: 15pt; font-weight: 800; color: #1e293b; }
     .summary-box.highlight { border-color: #f59e0b; background-color: #fffbeb; }
     .summary-box.critical { border-color: #ef4444; background-color: #fff5f5; }
     .summary-box.success { border-color: #10b981; background-color: #ecfdf5; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th { background: #f8fafc; padding: 10px 8px; border: 1px solid #e2e8f0; text-align: left; font-weight: bold; text-transform: uppercase; font-size: 8pt; color: #475569; }
-    tr:nth-child(even) { background-color: #fcfcfc; }
-    .total-row td { font-weight: bold; background: #f1f5f9 !important; border-top: 2px solid #333; }
-    .footer { margin-top: 40px; font-size: 8pt; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; }
-    @media print { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    th { background: #f8fafc; padding: 12px 8px; border: 1px solid #e2e8f0; text-align: left; font-weight: 800; text-transform: uppercase; font-size: 8pt; color: #475569; }
+    .total-row td { font-weight: 800; background: #f1f5f9 !important; border-top: 2px solid #334155; }
+    .footer { margin-top: 50px; font-size: 8pt; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -1515,8 +1526,8 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
       <h1>${tipoLabel}</h1>
       <p>Colégio Naviraí - Grupo CN | Período: ${monthLabel} de ${selectedYear}</p>
     </div>
-    <div style="text-align: right; font-size: 9pt; color: #64748b;">
-      Emitido em: ${now}
+    <div style="text-align: right; font-size: 9pt; color: #64748b; font-weight: 600;">
+      Gerado em: ${now}
     </div>
   </div>
 
@@ -1536,7 +1547,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
     <div class="summary-box highlight">
       <div class="label">Aguardando Pagamento</div>
       <div class="value">${pendentesValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
-      <div style="font-size: 8pt; color: #b45309; margin-top: 2px;">${vencidosCount + pendentesCount} itens não quitados</div>
+      <div style="font-size: 8pt; color: #b45309; margin-top: 4px; font-weight: 800;">${vencidosCount + pendentesCount} ITENS PENDENTES</div>
     </div>
   </div>
   
@@ -1559,35 +1570,33 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
     <tbody>
       ${rows}
       <tr class="total-row">
-        <td colspan="7" style="padding:10px;text-align:right;text-transform:uppercase;letter-spacing:1px">Saldo Final do Período</td>
-        <td style="padding:10px;text-align:right;color:#64748b;font-size:8pt">
+        <td colspan="7" style="padding:12px;text-align:right;text-transform:uppercase;letter-spacing:1px;font-size:9pt">Saldo Líquido do Período</td>
+        <td style="padding:12px;text-align:right;color:#64748b;font-size:8pt">
           (+) ${periodTotals.totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}<br/>
           (-) ${periodTotals.totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
         </td>
-        <td style="padding:10px;text-align:right;color:#ef4444">${periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '-'}</td>
-        <td style="padding:10px;text-align:right;font-size:12pt;color:${periodTotals.total >= 0 ? '#10b981' : '#ef4444'}">
+        <td style="padding:12px;text-align:right;color:#ef4444">${periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '-'}</td>
+        <td style="padding:12px;text-align:right;font-size:13pt;color:${periodTotals.total >= 0 ? '#10b981' : '#ef4444'}">
           ${periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
         </td>
-        <td style="padding:10px;text-align:center;font-size:8pt">${periodTotals.count} itens</td>
+        <td style="padding:12px;text-align:center;font-size:8pt;color:#64748b">${periodTotals.count} registros</td>
       </tr>
     </tbody>
   </table>
 
   <div class="footer">
-    <p>Este relatório é um documento gerencial do sistema Fluxo de Caixa CN. Gerado em ${now}.</p>
+    <p>Documento gerado eletronicamente pelo sistema Cn-Intelligence em ${now}.</p>
   </div>
 </body>
-</html>`;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Bloqueador de pop-ups está bloqueando. Permite pop-ups para este site, ou use:\nMenu do navegador → Imprimir → Salvar como PDF');
-      return;
+</html>`);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.print();
+      }, 1000);
+    } catch (error) {
+      console.error('Erro ao imprimir:', error);
+      alert('Erro ao gerar o relatório. Verifique os dados e tente novamente.');
     }
-    
-    printWindow.document.write(printHTML);
-    printWindow.document.close();
-    setTimeout(() => printWindow.print(), 500);
   };
 
   return (
