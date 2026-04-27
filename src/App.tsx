@@ -1826,8 +1826,8 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
                   return (
                     <tr key={tx.id} className={cn(
                       "hover:bg-white/5 transition-colors",
-                      status === 'PENDENTE' && "bg-secondary/10",
-                      status === 'VENCIDO' && "bg-tertiary/10"
+                      status === 'PENDENTE' && "bg-[#f59e0b]/5",
+                      status === 'VENCIDO' && "bg-[#ef4444]/5"
                     )}>
                       <td className="px-8 py-4 text-on-surface-variant text-xs">{i + 1}</td>
                       <td className="px-8 py-4">
@@ -1838,34 +1838,34 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
                           {isRev ? 'Receita' : 'Despesa'}
                         </span>
                       </td>
-                      <td className="px-8 py-4 font-semibold">{tx.fornecedor}</td>
+                      <td className={cn("px-8 py-4 font-semibold", isNaoPago && "text-[#f59e0b]")}>{tx.fornecedor}</td>
                       <td className="px-8 py-4 text-on-surface-variant">{tx.descricao}</td>
                       <td className="px-8 py-4">{tx.empresa}</td>
                       <td className="px-8 py-4">{tx.vencimento}</td>
                       <td className="px-8 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
                       <td className={cn(
                         "px-8 py-4 text-right",
-                        isNaoPago && "text-secondary font-semibold"
+                        isNaoPago ? "text-[#f59e0b] font-black" : "font-medium"
                       )}>
                         {Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className={cn(
                         "px-8 py-4 text-right text-xs",
-                        isNaoPago ? "text-secondary" : "text-tertiary"
+                        isNaoPago ? "text-[#f59e0b] font-black" : "text-tertiary"
                       )}>
                         {Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                       </td>
                       <td className={cn(
-                        "px-8 py-4 text-right font-bold",
-                        isNaoPago ? "text-secondary" : (isRev ? "text-primary" : "text-tertiary")
+                        "px-8 py-4 text-right font-black text-base",
+                        isNaoPago ? "text-[#f59e0b]" : (isRev ? "text-primary" : "text-tertiary")
                       )}>
                         {(isRev ? '' : '-')}{(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-8 py-4">
                         <span className={cn(
-                          "text-[10px] font-bold px-3 py-1 rounded-full border",
+                          "text-[10px] font-black px-3 py-1 rounded-full border",
                           status === 'PAGO' && "bg-primary/20 text-primary border-primary/30",
-                          status === 'PENDENTE' && "bg-secondary/20 text-secondary border-secondary/30",
+                          status === 'PENDENTE' && "bg-[#f59e0b]/20 text-[#f59e0b] border-[#f59e0b]/30",
                           status === 'VENCIDO' && "bg-tertiary/20 text-tertiary border-tertiary/30"
                         )}>
                           {status}
@@ -1881,18 +1881,18 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
                 <tr className="font-bold">
                   <td colSpan={7} className="px-8 py-6 text-right">
                     <div className="flex flex-col gap-1 items-end">
-                      <span className="text-[10px] text-on-surface-variant uppercase tracking-widest font-black">Resumo Financeiro do Período</span>
+                      <span className="text-[10px] text-on-surface-variant uppercase tracking-widest font-black">Resumo Financeiro Detalhado</span>
                       <div className="flex gap-10 mt-3">
                         <div className="text-right">
-                          <p className="text-[9px] uppercase text-on-surface-variant mb-1">Saldo em Caixa (Realizado)</p>
-                          <p className={cn("text-base", periodTotals.realizadoTotal >= 0 ? "text-primary" : "text-tertiary")}>
+                          <p className="text-[9px] uppercase text-on-surface-variant mb-1 font-black">Saldo Atual em Caixa</p>
+                          <p className={cn("text-xl font-black", periodTotals.realizadoTotal >= 0 ? "text-primary" : "text-tertiary")}>
                             {periodTotals.realizadoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </p>
                         </div>
-                        {periodTotals.naoPagoCount > 0 && (
+                        {periodTotals.naoPagoDespesas > 0 && (
                           <div className="text-right border-l border-white/10 pl-10">
-                            <p className="text-[9px] uppercase text-on-surface-variant mb-1">Contas a Pagar (Não pagas)</p>
-                            <p className="text-base text-secondary">
+                            <p className="text-[9px] uppercase text-on-surface-variant mb-1 font-black">Total a Pagar (Pendências)</p>
+                            <p className="text-xl font-black text-[#f59e0b]">
                               - {periodTotals.naoPagoDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </p>
                           </div>
@@ -1900,32 +1900,36 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
                       </div>
                     </div>
                   </td>
-                  <td colSpan={2} className="px-8 py-6 text-right bg-primary/5">
-                    <p className="text-[9px] uppercase text-on-surface-variant mb-1">Saldo Previsto (Final)</p>
+                  <td colSpan={3} className="px-8 py-6 text-right bg-white/[0.03]">
+                    <p className="text-[9px] uppercase text-on-surface-variant mb-1 font-black">Saldo Final Líquido (Previsto)</p>
                     <div className={cn(
-                      "text-2xl font-black",
-                      periodTotals.naoPagoCount > 0 ? "text-secondary" : (periodTotals.total >= 0 ? "text-primary" : "text-tertiary")
+                      "text-3xl font-black tracking-tighter",
+                      periodTotals.total >= 0 ? "text-primary" : "text-tertiary"
                     )}>
                       {periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </div>
                     {periodTotals.naoPagoCount > 0 && (
-                      <div className="mt-2 space-y-1">
-                        <p className="text-[10px] text-on-surface-variant font-semibold">
-                          A pagar: <span className="text-secondary font-bold">{periodTotals.naoPagoDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                        </p>
-                        <p className="text-[10px] text-on-surface-variant font-semibold">
-                          A receber: <span className="text-secondary font-bold">{periodTotals.naoPagoReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                        </p>
-                        <p className="text-[10px] text-on-surface-variant font-semibold">
-                          Em aberto (líquido): <span className={cn("font-bold", periodTotals.naoPagoSaldo >= 0 ? "text-secondary" : "text-tertiary")}>
+                      <div className="mt-3 space-y-1 bg-black/20 p-2 rounded-lg border border-white/5">
+                        <div className="flex justify-between text-[10px] gap-4">
+                          <span className="text-on-surface-variant font-bold uppercase">A Receber:</span>
+                          <span className="text-primary font-black">{periodTotals.naoPagoReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                        <div className="flex justify-between text-[10px] gap-4">
+                          <span className="text-on-surface-variant font-bold uppercase">A Pagar:</span>
+                          <span className="text-[#f59e0b] font-black">{periodTotals.naoPagoDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                        <div className="h-px bg-white/10 my-1"></div>
+                        <div className="flex justify-between text-[10px] gap-4">
+                          <span className="text-on-surface-variant font-bold uppercase">Saldo de Pendências:</span>
+                          <span className={cn("font-black", periodTotals.naoPagoSaldo >= 0 ? "text-primary" : "text-tertiary")}>
                             {periodTotals.naoPagoSaldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </span>
-                        </p>
+                        </div>
                       </div>
                     )}
                   </td>
-                  <td className="px-8 py-6 text-xs text-on-surface-variant text-center border-l border-white/10">
-                    {periodTotals.count}<br/>lançamentos
+                  <td className="px-8 py-6 text-xs text-on-surface-variant text-center border-l border-white/10 font-black">
+                    {periodTotals.count}<br/>REGISTROS
                   </td>
                 </tr>
               </tfoot>
