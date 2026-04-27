@@ -1361,6 +1361,22 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
   const [selectedTipo, setSelectedTipo] = useState<string>('TODOS');
   const [selectedStatus, setSelectedStatus] = useState<string>('TODOS');
 
+  const todayKey = useMemo(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return new Date(`${yyyy}-${mm}-${dd}`).getTime();
+  }, []);
+
+  const effectiveStatus = (tx: Transaction): TransactionStatus => {
+    if (tx.pagamento) return 'PAGO';
+    if (tx.status === 'VENCIDO') return 'VENCIDO';
+    const dueKey = dateSortKey(tx.vencimento);
+    if (dueKey && dueKey < todayKey) return 'VENCIDO';
+    return 'PENDENTE';
+  };
+
   useEffect(() => {
     fetchTransactions(false, selectedYear, selectedMonth);
   }, [selectedYear, selectedMonth, fetchTransactions]);
@@ -1386,19 +1402,32 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
       const matchesCompany = selectedCompany === 'TODOS' || normalizeCompanyKey(tx.empresa) === selectedCompany;
       const txTipo = tx.tipo || (isRevenueTransaction(tx) ? 'RECEITA' : 'DESPESA');
       const matchesTipo = selectedTipo === 'TODOS' || txTipo === selectedTipo;
-      const matchesStatus = selectedStatus === 'TODOS' || tx.status === selectedStatus;
+      const currentStatus = effectiveStatus(tx);
+      const matchesStatus = selectedStatus === 'TODOS' 
+        || (selectedStatus === 'NAO_PAGO' ? (currentStatus === 'PENDENTE' || currentStatus === 'VENCIDO') : currentStatus === selectedStatus);
       return matchesYear && matchesMonth && matchesCompany && matchesTipo && matchesStatus;
     });
-  }, [transactions, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus]);
+  }, [transactions, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, todayKey]);
 
   const periodTotals = useMemo(() => {
     let total = 0;
+    let totalReceitas = 0;
+    let totalDespesas = 0;
     let jurosTotal = 0;
     for (const tx of filteredData) {
-      total += Number(tx.valor) + Number(tx.juros || 0);
+      const isRev = tx.tipo === 'RECEITA' || (tx.tipo !== 'DESPESA' && isRevenueTransaction(tx));
+      const valorComJuros = Number(tx.valor) + Number(tx.juros || 0);
+      
+      if (isRev) {
+        totalReceitas += valorComJuros;
+        total += valorComJuros;
+      } else {
+        totalDespesas += valorComJuros;
+        total -= valorComJuros;
+      }
       jurosTotal += Number(tx.juros || 0);
     }
-    return { total, jurosTotal, count: filteredData.length };
+    return { total, totalReceitas, totalDespesas, jurosTotal, count: filteredData.length };
   }, [filteredData]);
 
   const monthLabel = useMemo(() => {
@@ -1411,21 +1440,51 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
     if (!printWindow) return;
 
     const tipoLabel = selectedTipo === 'TODOS' ? 'Fluxo de Caixa' : selectedTipo === 'RECEITA' ? 'Relatório de Receitas' : 'Relatório de Despesas';
-    const now = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+    const now = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    // Totais de pendências para o cabeçalho do PDF
+    const pendentesCount = filteredData.filter(tx => effectiveStatus(tx) === 'PENDENTE').length;
+    const vencidosCount = filteredData.filter(tx => effectiveStatus(tx) === 'VENCIDO').length;
+    const pendentesValor = filteredData.filter(tx => effectiveStatus(tx) === 'PENDENTE' || effectiveStatus(tx) === 'VENCIDO')
+      .reduce((acc, tx) => acc + Number(tx.valor) + Number(tx.juros || 0), 0);
 
     const rows = filteredData.map((tx, i) => {
+      const isRev = tx.tipo === 'RECEITA' || (tx.tipo !== 'DESPESA' && isRevenueTransaction(tx));
       const valorTotal = Number(tx.valor) + Number(tx.juros || 0);
-      return `<tr>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${i + 1}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc">${tx.fornecedor}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc">${tx.descricao || '-'}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${tx.empresa || '-'}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${tx.vencimento}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${tx.pagamento || '-'}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right">${Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right;font-weight:bold">${valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${tx.status}</td>
+      const status = effectiveStatus(tx);
+      
+      // Cores para o PDF
+      let statusColor = '#666';
+      let rowBg = 'transparent';
+      let statusWeight = 'normal';
+
+      if (status === 'PAGO') {
+        statusColor = '#10b981';
+      } else if (status === 'VENCIDO') {
+        statusColor = '#ef4444';
+        rowBg = '#fff5f5';
+        statusWeight = 'bold';
+      } else if (status === 'PENDENTE') {
+        statusColor = '#f59e0b';
+        rowBg = '#fffbeb';
+        statusWeight = 'bold';
+      }
+
+      const tipoColor = isRev ? '#10b981' : '#ef4444';
+      const tipoText = isRev ? 'RECEITA' : 'DESPESA';
+
+      return `<tr style="background-color: ${rowBg}">
+        <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${i + 1}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:center;font-weight:bold;color:${tipoColor};font-size:9pt">${tipoText}</td>
+        <td style="padding:8px;border:1px solid #ddd;font-size:10pt"><b>${tx.fornecedor}</b></td>
+        <td style="padding:8px;border:1px solid #ddd;font-size:9pt">${tx.descricao || '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.empresa || '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.vencimento}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.pagamento || '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:10pt">${Number(tx.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:9pt;color:#ef4444">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;color:${tipoColor};font-size:10pt">${(isRev ? '' : '-')}${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="padding:8px;border:1px solid #ddd;text-align:center;font-weight:${statusWeight};color:${statusColor};font-size:9pt">${status}</td>
       </tr>`;
     }).join('');
 
@@ -1435,28 +1494,63 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
   <meta charset="UTF-8">
   <title>${tipoLabel} - ${monthLabel}/${selectedYear}</title>
   <style>
-    @page { margin: 2cm 2.5cm; size: A4 landscape; }
-    body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; color: #000; line-height: 1.5; }
-    h1 { text-align: center; font-size: 14pt; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; }
-    .subtitle { text-align: center; font-size: 11pt; margin-bottom: 6px; color: #333; }
-    .info { text-align: center; font-size: 10pt; margin-bottom: 20px; color: #666; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10pt; }
-    th { background: #f0f0f0; padding: 8px; border: 1px solid #ccc; text-align: left; font-weight: bold; text-transform: uppercase; font-size: 9pt; }
-    .total-row td { font-weight: bold; background: #f9f9f9; }
-    .footer { margin-top: 30px; font-size: 9pt; color: #666; text-align: center; }
-    .signature { margin-top: 60px; text-align: center; }
-    .signature-line { width: 300px; border-top: 1px solid #000; margin: 0 auto; padding-top: 4px; font-size: 10pt; }
+    @page { margin: 1.5cm; size: A4 landscape; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 11pt; color: #333; line-height: 1.4; margin: 0; padding: 0; }
+    .header { border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+    .header-info h1 { margin: 0; font-size: 18pt; color: #1e293b; text-transform: uppercase; }
+    .header-info p { margin: 5px 0 0; font-size: 10pt; color: #64748b; }
+    .summary-boxes { display: flex; gap: 15px; margin-bottom: 20px; }
+    .summary-box { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }
+    .summary-box .label { font-size: 8pt; font-weight: bold; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+    .summary-box .value { font-size: 14pt; font-weight: bold; color: #1e293b; }
+    .summary-box.highlight { border-color: #f59e0b; background-color: #fffbeb; }
+    .summary-box.critical { border-color: #ef4444; background-color: #fff5f5; }
+    .summary-box.success { border-color: #10b981; background-color: #ecfdf5; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th { background: #f8fafc; padding: 10px 8px; border: 1px solid #e2e8f0; text-align: left; font-weight: bold; text-transform: uppercase; font-size: 8pt; color: #475569; }
+    tr:nth-child(even) { background-color: #fcfcfc; }
+    .total-row td { font-weight: bold; background: #f1f5f9 !important; border-top: 2px solid #333; }
+    .footer { margin-top: 40px; font-size: 8pt; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+    .unpaid-tag { background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; font-size: 8pt; font-weight: bold; }
   </style>
 </head>
 <body>
-  <h1>${tipoLabel}</h1>
-  <p class="subtitle">Colégio Naviraí - Grupo CN</p>
-  <p class="info">Período: ${monthLabel} de ${selectedYear} | Empresa: ${selectedCompany === 'TODOS' ? 'Todas' : selectedCompany} | Emitido em: ${now}</p>
+  <div class="header">
+    <div class="header-info">
+      <h1>${tipoLabel}</h1>
+      <p>Colégio Naviraí - Grupo CN | Período: ${monthLabel} de ${selectedYear}</p>
+    </div>
+    <div style="text-align: right; font-size: 9pt; color: #64748b;">
+      Emitido em: ${now}
+    </div>
+  </div>
+
+  <div class="summary-boxes">
+    <div class="summary-box">
+      <div class="label">Total Movimentado</div>
+      <div class="value">${periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+    </div>
+    <div class="summary-box success">
+      <div class="label">Receitas</div>
+      <div class="value">${periodTotals.totalReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+    </div>
+    <div class="summary-box critical">
+      <div class="label">Despesas</div>
+      <div class="value">${periodTotals.totalDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+    </div>
+    <div class="summary-box highlight">
+      <div class="label">Aguardando Pagamento</div>
+      <div class="value">${pendentesValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+      <div style="font-size: 8pt; color: #b45309; margin-top: 2px;">${vencidosCount + pendentesCount} itens não quitados</div>
+    </div>
+  </div>
   
   <table>
     <thead>
       <tr>
         <th style="width:30px;text-align:center">#</th>
+        <th style="width:70px;text-align:center">Tipo</th>
         <th>Fornecedor</th>
         <th>Descrição</th>
         <th style="text-align:center">Empresa</th>
@@ -1471,20 +1565,22 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
     <tbody>
       ${rows}
       <tr class="total-row">
-        <td colspan="6" style="padding:8px;border:1px solid #ccc;text-align:right">TOTAL GERAL</td>
-        <td style="padding:8px;border:1px solid #ccc;text-align:right">${filteredData.reduce((a, tx) => a + Number(tx.valor), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="padding:8px;border:1px solid #ccc;text-align:right">${periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
-        <td style="padding:8px;border:1px solid #ccc;text-align:right;font-weight:bold">${periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="padding:8px;border:1px solid #ccc;text-align:center">${periodTotals.count} itens</td>
+        <td colspan="7" style="padding:10px;text-align:right;text-transform:uppercase;letter-spacing:1px">Saldo Final do Período</td>
+        <td style="padding:10px;text-align:right;color:#64748b;font-size:8pt">
+          (+) ${periodTotals.totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}<br/>
+          (-) ${periodTotals.totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+        </td>
+        <td style="padding:10px;text-align:right;color:#ef4444">${periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '-'}</td>
+        <td style="padding:10px;text-align:right;font-size:12pt;color:${periodTotals.total >= 0 ? '#10b981' : '#ef4444'}">
+          ${periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        </td>
+        <td style="padding:10px;text-align:center;font-size:8pt">${periodTotals.count} itens</td>
       </tr>
     </tbody>
   </table>
 
   <div class="footer">
-    <p>Relatório gerado automaticamente pelo sistema Fluxo de Caixa CN</p>
-  </div>
-  <div class="signature">
-    <div class="signature-line">Responsável</div>
+    <p>Este relatório é um documento gerencial do sistema Fluxo de Caixa CN. Gerado em ${now}.</p>
   </div>
 </body>
 </html>`);
@@ -1556,12 +1652,15 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
           <label className="text-[10px] font-bold text-on-surface-variant uppercase">Status</label>
           <select
             className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+            style={{ backgroundColor: '#1e1e2e' }}
             value={selectedStatus}
             onChange={e => setSelectedStatus(e.target.value)}
           >
             <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
             <option value="PENDENTE" className="bg-surface text-on-surface">Pendentes</option>
+            <option value="VENCIDO" className="bg-surface text-on-surface">Vencidos</option>
             <option value="PAGO" className="bg-surface text-on-surface">Pagos</option>
+            <option value="NAO_PAGO" className="bg-surface text-on-surface">Não Pagos (Pendentes + Vencidos)</option>
           </select>
         </div>
         <div className="flex-grow"></div>
@@ -1599,26 +1698,29 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
               Nenhum lançamento encontrado.
             </p>
           ) : (
-            filteredData.map((tx) => (
-              <div key={tx.id} className="px-4 py-3 flex flex-col gap-1">
-                <div className="flex justify-between items-start gap-2">
-                  <span className="font-semibold text-sm flex-1 leading-tight">{tx.fornecedor}</span>
-                  <span className="font-bold text-sm whitespace-nowrap">
-                    {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
+            filteredData.map((tx) => {
+              const status = effectiveStatus(tx);
+              return (
+                <div key={tx.id} className="px-4 py-3 flex flex-col gap-1">
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="font-semibold text-sm flex-1 leading-tight">{tx.fornecedor}</span>
+                    <span className="font-bold text-sm whitespace-nowrap">
+                      {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-on-surface-variant">
+                    <span>{tx.descricao}</span>
+                    <span>Venc: {tx.vencimento}</span>
+                    <span className={cn(
+                      "font-bold",
+                      status === 'PAGO' && "text-primary",
+                      status === 'PENDENTE' && "text-secondary",
+                      status === 'VENCIDO' && "text-tertiary"
+                    )}>{status}</span>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-on-surface-variant">
-                  <span>{tx.descricao}</span>
-                  <span>Venc: {tx.vencimento}</span>
-                  <span className={cn(
-                    "font-bold",
-                    tx.status === 'PAGO' && "text-primary",
-                    tx.status === 'PENDENTE' && "text-secondary",
-                    tx.status === 'VENCIDO' && "text-tertiary"
-                  )}>{tx.status}</span>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -1628,6 +1730,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
                 <th className="px-8 py-4">#</th>
+                <th className="px-8 py-4">Tipo</th>
                 <th className="px-8 py-4">Fornecedor</th>
                 <th className="px-8 py-4">Descrição</th>
                 <th className="px-8 py-4">Empresa</th>
@@ -1647,40 +1750,57 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
                   </td>
                 </tr>
               ) : (
-                filteredData.map((tx, i) => (
-                  <tr key={tx.id} className="hover:bg-white/5 transition-colors">
-                    <td className="px-8 py-4 text-on-surface-variant text-xs">{i + 1}</td>
-                    <td className="px-8 py-4 font-semibold">{tx.fornecedor}</td>
-                    <td className="px-8 py-4 text-on-surface-variant">{tx.descricao}</td>
-                    <td className="px-8 py-4">{tx.empresa}</td>
-                    <td className="px-8 py-4">{tx.vencimento}</td>
-                    <td className="px-8 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
-                    <td className="px-8 py-4 text-right">{Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="px-8 py-4 text-right text-tertiary text-xs">{Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
-                    <td className="px-8 py-4 text-right font-bold text-primary">
-                      {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-8 py-4">
-                      <span className={cn(
-                        "text-[10px] font-bold px-3 py-1 rounded-full border",
-                        tx.status === 'PAGO' && "bg-primary/20 text-primary border-primary/30",
-                        tx.status === 'PENDENTE' && "bg-secondary/20 text-secondary border-secondary/30",
-                        tx.status === 'VENCIDO' && "bg-tertiary/20 text-tertiary border-tertiary/30"
-                      )}>
-                        {tx.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                filteredData.map((tx, i) => {
+                  const isRev = tx.tipo === 'RECEITA' || (tx.tipo !== 'DESPESA' && isRevenueTransaction(tx));
+                  const status = effectiveStatus(tx);
+                  return (
+                    <tr key={tx.id} className="hover:bg-white/5 transition-colors">
+                      <td className="px-8 py-4 text-on-surface-variant text-xs">{i + 1}</td>
+                      <td className="px-8 py-4">
+                        <span className={cn(
+                          "text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest",
+                          isRev ? "bg-primary/20 text-primary border-primary/30" : "bg-tertiary/20 text-tertiary border-tertiary/30"
+                        )}>
+                          {isRev ? 'Receita' : 'Despesa'}
+                        </span>
+                      </td>
+                      <td className="px-8 py-4 font-semibold">{tx.fornecedor}</td>
+                      <td className="px-8 py-4 text-on-surface-variant">{tx.descricao}</td>
+                      <td className="px-8 py-4">{tx.empresa}</td>
+                      <td className="px-8 py-4">{tx.vencimento}</td>
+                      <td className="px-8 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
+                      <td className="px-8 py-4 text-right">{Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-8 py-4 text-right text-tertiary text-xs">{Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
+                      <td className={cn("px-8 py-4 text-right font-bold", isRev ? "text-primary" : "text-tertiary")}>
+                        {(isRev ? '' : '-')}{(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-8 py-4">
+                        <span className={cn(
+                          "text-[10px] font-bold px-3 py-1 rounded-full border",
+                          status === 'PAGO' && "bg-primary/20 text-primary border-primary/30",
+                          status === 'PENDENTE' && "bg-secondary/20 text-secondary border-secondary/30",
+                          status === 'VENCIDO' && "bg-tertiary/20 text-tertiary border-tertiary/30"
+                        )}>
+                          {status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
             {filteredData.length > 0 && (
               <tfoot>
                 <tr className="border-t-2 border-white/20 font-bold">
-                  <td colSpan={6} className="px-8 py-4 text-right text-on-surface-variant uppercase text-xs tracking-widest">Total Geral</td>
-                  <td className="px-8 py-4 text-right">{filteredData.reduce((a, tx) => a + Number(tx.valor), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td colSpan={7} className="px-8 py-4 text-right text-on-surface-variant uppercase text-xs tracking-widest">Total Geral (Saldo)</td>
+                  <td className="px-8 py-4 text-right text-on-surface-variant text-xs">
+                    Rec: {periodTotals.totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}<br/>
+                    Des: {periodTotals.totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </td>
                   <td className="px-8 py-4 text-right text-tertiary">{periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
-                  <td className="px-8 py-4 text-right text-primary text-lg">{periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className={cn("px-8 py-4 text-right text-lg", periodTotals.total >= 0 ? "text-primary" : "text-tertiary")}>
+                    {periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
                   <td className="px-8 py-4 text-xs text-on-surface-variant">{periodTotals.count} itens</td>
                 </tr>
               </tfoot>
