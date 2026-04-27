@@ -195,7 +195,7 @@ async function handleTransactions(req, res) {
       return res.json(formatted);
     } catch (e) {
       console.error(e);
-      return res.status(500).json({ error: e.message, stack: e.stack });
+      return res.status(500).json({ error: e.message });
     }
   }
 
@@ -229,7 +229,7 @@ async function handleTransactions(req, res) {
       return res.status(201).json(rows[0]);
     } catch (e) {
       console.error(e);
-      return res.status(500).json({ error: e.message, stack: e.stack });
+      return res.status(500).json({ error: e.message });
     }
   }
 
@@ -1565,15 +1565,6 @@ export default async function handler(req, res) {
       return handleStats(req, res);
     case 'export-backup':
       return handleExportBackup(req, res);
-    case 'debug':
-      return res.json({
-        node: process.version,
-        env: {
-          DATABASE_URL: process.env.DATABASE_URL ? 'PRESENT' : 'MISSING',
-          URL_DO_BANCO_DE_DADOS: process.env.URL_DO_BANCO_DE_DADOS ? 'PRESENT' : 'MISSING',
-          DATABASE_URLL: process.env.DATABASE_URLL ? 'PRESENT' : 'MISSING'
-        }
-      });
     default:
       return res.status(404).json({ error: 'Route not found' });
   }
