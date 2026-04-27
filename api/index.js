@@ -1,6 +1,8 @@
 import { sql, parseDateToPg, setCors } from './_db.js';
 import { GoogleGenAI } from '@google/genai';
 
+export const config = { runtime: 'nodejs' };
+
 // --- Helpers ---
 const normalizeBoletoNumber = (value) => {
   if (value === null || value === undefined || value === '') return '';
@@ -1515,6 +1517,20 @@ export default async function handler(req, res) {
   const { route, id } = req.query;
 
   switch (route) {
+    case 'health':
+      return res.json({
+        ok: true,
+        node: process.version,
+        env: {
+          DATABASE_URL: process.env.DATABASE_URL ? 'PRESENT' : 'MISSING',
+          URL_DO_BANCO_DE_DADOS: process.env.URL_DO_BANCO_DE_DADOS ? 'PRESENT' : 'MISSING',
+          DATABASE_URLL: process.env.DATABASE_URLL ? 'PRESENT' : 'MISSING'
+        },
+        vercel: {
+          commit: process.env.VERCEL_GIT_COMMIT_SHA || null,
+          deployment: process.env.VERCEL_DEPLOYMENT_ID || null,
+        }
+      });
     case 'transactions':
       if (id) return handleTransactionById(req, res);
       return handleTransactions(req, res);
@@ -1554,7 +1570,8 @@ export default async function handler(req, res) {
         node: process.version,
         env: {
           DATABASE_URL: process.env.DATABASE_URL ? 'PRESENT' : 'MISSING',
-          URL_DO_BANCO_DE_DADOS: process.env.URL_DO_BANCO_DE_DADOS ? 'PRESENT' : 'MISSING'
+          URL_DO_BANCO_DE_DADOS: process.env.URL_DO_BANCO_DE_DADOS ? 'PRESENT' : 'MISSING',
+          DATABASE_URLL: process.env.DATABASE_URLL ? 'PRESENT' : 'MISSING'
         }
       });
     default:
