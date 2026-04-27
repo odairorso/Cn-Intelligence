@@ -12,18 +12,16 @@ class SqlQuery {
     this._isSqlQuery = true;
   }
 
-  // Permite que o objeto seja awaitado
-  async then(resolve, reject) {
-    try {
-      const { query, params } = this.build();
-      const res = await pool.query(query, params);
-      resolve(res.rows);
-    } catch (err) {
-      const { query, params } = this.build();
-      console.error('[DB Error] Query:', query);
-      console.error('[DB Error] Values:', params);
-      reject(err);
-    }
+  // Thenable implementation
+  then(resolve, reject) {
+    const { query, params } = this.build();
+    pool.query(query, params)
+      .then(res => resolve(res.rows))
+      .catch(err => {
+        console.error('[DB Error] Query:', query);
+        console.error('[DB Error] Object:', err);
+        reject(err);
+      });
   }
 
   build() {
@@ -53,7 +51,6 @@ class SqlQuery {
 
 export const sql = (strings, ...values) => {
   if (!Array.isArray(strings)) {
-    // Caso de chamada legada ou direta: sql('query', [params])
     return pool.query(strings, values).then(res => res.rows);
   }
   return new SqlQuery(strings, values);
@@ -75,17 +72,6 @@ export const parseDateToPg = (val) => {
       if (y.length === 2) y = '20' + y;
       return `${y}-${m}-${d}`;
     }
-  }
-  const digits = s.replace(/\D/g, '');
-  if (digits.length === 6) {
-    return `20${digits.substring(4, 6)}-${digits.substring(2, 4)}-${digits.substring(0, 2)}`;
-  }
-  if (digits.length === 8) {
-    const d = digits.substring(0, 2);
-    const m = digits.substring(2, 4);
-    const y = digits.substring(4, 8);
-    if (parseInt(m) <= 12 && parseInt(d) <= 31) return `${y}-${m}-${d}`;
-    return `${digits.substring(0, 4)}-${digits.substring(4, 6)}-${digits.substring(6, 8)}`;
   }
   return null;
 };
