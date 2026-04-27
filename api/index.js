@@ -240,7 +240,8 @@ async function handleStats(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   try {
     const { uid, year, period } = req.query;
-    const filterUid = uid || 'guest';
+    const filterUid = uid ? String(uid) : '';
+    const uidFilterSql = filterUid ? sql`AND uid = ${filterUid}` : sql``;
 
     // Filtro de data dinâmico
     let dateFilterSql;
@@ -267,7 +268,7 @@ async function handleStats(req, res) {
         COUNT(CASE WHEN status = 'VENCIDO' OR (status = 'PENDENTE' AND vencimento < CURRENT_DATE) THEN 1 END) as count_vencidos,
         COUNT(*) as total_count
       FROM transactions
-      WHERE uid = ${filterUid} ${dateFilterSql}`;
+      WHERE 1=1 ${uidFilterSql} ${dateFilterSql}`;
 
     // 2. Fluxo Mensal
     let fluxRows;
@@ -281,7 +282,7 @@ async function handleStats(req, res) {
           COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
         FROM transactions
-        WHERE uid = ${filterUid} 
+        WHERE 1=1 ${uidFilterSql}
           AND vencimento >= ${y + '-01-01'}
           AND vencimento <= ${y + '-12-31'}
         GROUP BY EXTRACT(MONTH FROM vencimento)
@@ -294,7 +295,7 @@ async function handleStats(req, res) {
           COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
         FROM transactions
-        WHERE uid = ${filterUid} 
+        WHERE 1=1 ${uidFilterSql}
           AND vencimento >= ${start + '-01-01'}
           AND vencimento <= ${end + '-12-31'}
         GROUP BY EXTRACT(MONTH FROM vencimento)
@@ -307,7 +308,7 @@ async function handleStats(req, res) {
           COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
         FROM transactions
-        WHERE uid = ${filterUid} 
+        WHERE 1=1 ${uidFilterSql}
           AND vencimento >= DATE_TRUNC('year', CURRENT_DATE)
           AND vencimento < DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year'
         GROUP BY EXTRACT(MONTH FROM vencimento)
@@ -320,7 +321,7 @@ async function handleStats(req, res) {
         fornecedor as name,
         COALESCE(SUM(valor + COALESCE(juros, 0)), 0) as value
       FROM transactions
-      WHERE uid = ${filterUid} ${dateFilterSql}
+      WHERE 1=1 ${uidFilterSql} ${dateFilterSql}
       GROUP BY fornecedor
       ORDER BY value DESC
       LIMIT 10`;
@@ -886,9 +887,57 @@ async function handleSetupTables(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
+    await sql`CREATE EXTENSION IF NOT EXISTS pgcrypto`;
+    await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        uid VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255),
+        display_name VARCHAR(255),
+        photo_url TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )`;
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_users_uid ON users(uid)`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS contas_contabeis (
+        id SERIAL PRIMARY KEY,
+        codigo VARCHAR(20) NOT NULL,
+        nome VARCHAR(255) NOT NULL,
+        tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('RECEITA', 'DESPESA')),
+        ativo BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )`;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS transactions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        uid VARCHAR(255) NOT NULL,
+        fornecedor VARCHAR(255) NOT NULL,
+        descricao TEXT,
+        empresa VARCHAR(100),
+        vencimento DATE NOT NULL,
+        pagamento DATE,
+        valor DECIMAL(15, 2) NOT NULL DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'PENDENTE',
+        observacao TEXT,
+        banco VARCHAR(255),
+        tipo VARCHAR(10) DEFAULT 'DESPESA',
+        juros NUMERIC DEFAULT 0,
+        numero_boleto VARCHAR(255),
+        conta_contabil_id INTEGER REFERENCES contas_contabeis(id),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )`;
+
     await sql`
       CREATE TABLE IF NOT EXISTS banks (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id UUID REFERENCES users(id) ON DELETE CASCADE,
         uid VARCHAR(255) NOT NULL,
         nome VARCHAR(255) NOT NULL,
@@ -909,14 +958,20 @@ async function handleSetupTables(req, res) {
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS conta_contabil_id INTEGER REFERENCES contas_contabeis(id)`;
 
     await sql`
-      CREATE TABLE IF NOT EXISTS contas_contabeis (
-        id SERIAL PRIMARY KEY,
-        codigo VARCHAR(20) NOT NULL,
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        uid VARCHAR(255) NOT NULL,
         nome VARCHAR(255) NOT NULL,
-        tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('RECEITA', 'DESPESA')),
-        ativo BOOLEAN DEFAULT true,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        cnpj VARCHAR(50),
+        email VARCHAR(255),
+        telefone VARCHAR(50),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       )`;
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_suppliers_uid ON suppliers(uid)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_suppliers_user_id ON suppliers(user_id)`;
 
     // Atualiza ou insere contas padrão (upsert por código)
     const defaultAccounts = [
@@ -943,11 +998,8 @@ async function handleSetupTables(req, res) {
       const exists = await sql`SELECT id FROM contas_contabeis WHERE codigo = ${codigo} LIMIT 1`;
       if (exists.length === 0) {
         await sql`INSERT INTO contas_contabeis (codigo, nome, tipo) VALUES (${codigo}, ${nome}, ${tipo})`;
-        console.log(`[setup] Conta ${codigo} - ${nome} inserida`);
       } else {
-        // Atualiza nome se diferente
         await sql`UPDATE contas_contabeis SET nome = ${nome}, tipo = ${tipo}, ativo = true WHERE codigo = ${codigo}`;
-        console.log(`[setup] Conta ${codigo} - ${nome} atualizada`);
       }
     }
 
@@ -957,11 +1009,32 @@ async function handleSetupTables(req, res) {
     await sql`CREATE INDEX IF NOT EXISTS idx_transactions_uid ON transactions(uid)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_transactions_fornecedor ON transactions(fornecedor)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_empresa ON transactions(empresa)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC)`;
 
     // Unique normalized boleto number (prevents duplicados definitivos)
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_boleto_unique
               ON transactions ((regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g')))
               WHERE numero_boleto IS NOT NULL AND numero_boleto <> ''`;
+
+    await sql`
+      CREATE OR REPLACE FUNCTION update_updated_at_column()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ language 'plpgsql'`;
+
+    await sql`DROP TRIGGER IF EXISTS update_users_updated_at ON users`;
+    await sql`CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`;
+    await sql`DROP TRIGGER IF EXISTS update_suppliers_updated_at ON suppliers`;
+    await sql`CREATE TRIGGER update_suppliers_updated_at BEFORE UPDATE ON suppliers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`;
+    await sql`DROP TRIGGER IF EXISTS update_transactions_updated_at ON transactions`;
+    await sql`CREATE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`;
+    await sql`DROP TRIGGER IF EXISTS update_banks_updated_at ON banks`;
+    await sql`CREATE TRIGGER update_banks_updated_at BEFORE UPDATE ON banks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`;
 
     return res.json({ message: 'Tables created successfully' });
   } catch (e) {
@@ -1476,6 +1549,14 @@ export default async function handler(req, res) {
       return handleStats(req, res);
     case 'export-backup':
       return handleExportBackup(req, res);
+    case 'debug':
+      return res.json({
+        node: process.version,
+        env: {
+          DATABASE_URL: process.env.DATABASE_URL ? 'PRESENT' : 'MISSING',
+          URL_DO_BANCO_DE_DADOS: process.env.URL_DO_BANCO_DE_DADOS ? 'PRESENT' : 'MISSING'
+        }
+      });
     default:
       return res.status(404).json({ error: 'Route not found' });
   }
