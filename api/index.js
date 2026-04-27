@@ -1478,6 +1478,7 @@ async function handleExportBackup(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   try {
     const [transactions, suppliers, banks, contasContabeis, boletoPatterns] = await Promise.all([
+    const [transactions, suppliers, banks, contasContabeis, boletoPatterns] = await Promise.all([
       sql`SELECT * FROM transactions ORDER BY created_at DESC`,
       sql`SELECT * FROM suppliers ORDER BY nome`,
       sql`SELECT * FROM banks ORDER BY nome`,
@@ -1509,6 +1510,32 @@ async function handleExportBackup(req, res) {
   }
 }
 
+async function handleDbCheck(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const rows = await sql`SELECT 1 AS ok`;
+    return res.json({
+      ok: true,
+      result: rows?.[0] ?? null,
+      node: process.version,
+    });
+  } catch (e) {
+    const err = e || {};
+    return res.status(500).json({
+      ok: false,
+      name: err.name,
+      message: err.message,
+      code: err.code,
+      errno: err.errno,
+      syscall: err.syscall,
+      address: err.address,
+      port: err.port,
+      cause: err.cause ? { name: err.cause.name, message: err.cause.message, code: err.cause.code } : null,
+      node: process.version,
+    });
+  }
+}
+
 // --- Main Router ---
 export default async function handler(req, res) {
   setCors(res);
@@ -1531,6 +1558,8 @@ export default async function handler(req, res) {
           deployment: process.env.VERCEL_DEPLOYMENT_ID || null,
         }
       });
+    case 'db-check':
+      return handleDbCheck(req, res);
     case 'transactions':
       if (id) return handleTransactionById(req, res);
       return handleTransactions(req, res);
