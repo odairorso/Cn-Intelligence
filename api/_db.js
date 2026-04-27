@@ -1,8 +1,16 @@
 import pg from 'pg';
 
+let connectionString = process.env.DATABASE_URL || process.env.URL_DO_BANCO_DE_DADOS || process.env.DATABASE_URLL;
+// Remove any sslmode that might conflict with our manual ssl config
+if (connectionString) {
+  connectionString = connectionString.replace(/sslmode=[^&?]+/g, 'sslmode=no-verify');
+}
+
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL || process.env.URL_DO_BANCO_DE_DADOS || process.env.DATABASE_URLL,
-  ssl: { rejectUnauthorized: false }
+  connectionString,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 class SqlQuery {

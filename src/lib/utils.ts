@@ -120,13 +120,19 @@ export const isSupplierMatch = (transactionSupplier: string, supplierName: strin
 export const isRevenueTransaction = (tx: { fornecedor?: string; descricao?: string; tipo?: string }): boolean => {
   if (tx.tipo === 'RECEITA') return true;
   if (tx.tipo === 'DESPESA') return false;
-  const descricao = normalizeSupplierName(tx.descricao ?? '');
+  const desc = normalizeSupplierName(tx.descricao ?? '');
+  const forn = normalizeSupplierName(tx.fornecedor ?? '');
   return (
-    descricao.includes('REPASSE') ||
-    descricao.includes('MENSALIDADE') ||
-    descricao.includes('EDUCBANK') ||
-    descricao.includes('KROTON') ||
-    descricao.includes('REDE FEMENINA')
+    desc.includes('REPASSE') ||
+    desc.includes('MENSALIDADE') ||
+    desc.includes('EDUCBANK') ||
+    desc.includes('KROTON') ||
+    desc.includes('REDE FEMENINA') ||
+    forn.includes('REPASSE') ||
+    forn.includes('MENSALIDADE') ||
+    forn.includes('EDUCBANK') ||
+    forn.includes('KROTON') ||
+    forn.includes('REDE FEMENINA')
   );
 };
 
