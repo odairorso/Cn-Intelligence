@@ -4885,6 +4885,9 @@ export default function App() {
               <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-surface-variant flex items-center gap-2">
                 <Calendar size={14} /> {[...new Set(transactions.map(t => t.vencimento.substring(0, 7)))].length} períodos
               </span>
+              <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-on-surface-variant flex items-center gap-2">
+                Build: {(__BUILD_SHA__ || __BUILD_TIME__).slice(0, 8)}
+              </span>
             </div>
           </div>
 
