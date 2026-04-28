@@ -1821,23 +1821,23 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
           <table className="w-full text-left">
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
-                <th className="px-8 py-4">#</th>
-                <th className="px-8 py-4">Tipo</th>
-                <th className="px-8 py-4">Fornecedor</th>
-                <th className="px-8 py-4">Descrição</th>
-                <th className="px-8 py-4">Empresa</th>
-                <th className="px-8 py-4">Vencimento</th>
-                <th className="px-8 py-4">Pagamento</th>
-                <th className="px-8 py-4 text-right">Valor</th>
-                <th className="px-8 py-4 text-right">Juros</th>
-                <th className="px-8 py-4 text-right">Total</th>
-                <th className="px-8 py-4">Status</th>
+                <th className="px-4 py-4">#</th>
+                <th className="px-4 py-4">Tipo</th>
+                <th className="px-4 py-4">Fornecedor</th>
+                <th className="px-4 py-4">Descrição</th>
+                <th className="px-4 py-4">Empresa</th>
+                <th className="px-4 py-4">Vencimento</th>
+                <th className="px-4 py-4">Pagamento</th>
+                <th className="px-4 py-4 text-right">Valor</th>
+                <th className="px-4 py-4 text-right">Juros</th>
+                <th className="px-4 py-4 text-right">Total</th>
+                <th className="px-4 py-4">Status</th>
               </tr>
             </thead>
-            <tbody className="text-sm divide-y divide-white/5">
+            <tbody className="text-xs divide-y divide-white/5">
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-8 py-12 text-center text-on-surface-variant italic">
+                  <td colSpan={10} className="px-4 py-12 text-center text-on-surface-variant italic">
                     Nenhum lançamento encontrado para os filtros selecionados.
                   </td>
                 </tr>
@@ -1852,8 +1852,8 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
                       status === 'PENDENTE' && "bg-[#f59e0b]/5",
                       status === 'VENCIDO' && "bg-[#ef4444]/5"
                     )}>
-                      <td className="px-8 py-4 text-on-surface-variant text-xs">{i + 1}</td>
-                      <td className="px-8 py-4">
+                      <td className="px-4 py-4 text-on-surface-variant text-xs">{i + 1}</td>
+                      <td className="px-4 py-4">
                         <span className={cn(
                           "text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest",
                           isRev ? "bg-primary/20 text-primary border-primary/30" : "bg-tertiary/20 text-tertiary border-tertiary/30"
@@ -1861,30 +1861,30 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
                           {isRev ? 'Receita' : 'Despesa'}
                         </span>
                       </td>
-                      <td className={cn("px-8 py-4 font-semibold", isNaoPago && "text-[#f59e0b]")}>{tx.fornecedor}</td>
-                      <td className="px-8 py-4 text-on-surface-variant">{tx.descricao}</td>
-                      <td className="px-8 py-4">{tx.empresa}</td>
-                      <td className="px-8 py-4">{tx.vencimento}</td>
-                      <td className="px-8 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
+                      <td className={cn("px-4 py-4 font-semibold", isNaoPago && "text-[#f59e0b]")}>{tx.fornecedor}</td>
+                      <td className="px-4 py-4 text-on-surface-variant">{tx.descricao}</td>
+                      <td className="px-4 py-4">{tx.empresa}</td>
+                      <td className="px-4 py-4">{tx.vencimento}</td>
+                      <td className="px-4 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
                       <td className={cn(
-                        "px-8 py-4 text-right",
+                        "px-4 py-4 text-right",
                         isNaoPago ? "text-[#f59e0b] font-black" : "font-medium"
                       )}>
                         {Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className={cn(
-                        "px-8 py-4 text-right text-xs",
+                        "px-4 py-4 text-right text-xs",
                         isNaoPago ? "text-[#f59e0b] font-black" : "text-tertiary"
                       )}>
                         {Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                       </td>
                       <td className={cn(
-                        "px-8 py-4 text-right font-black text-base",
+                        "px-4 py-4 text-right font-black text-sm",
                         isNaoPago ? "text-[#f59e0b]" : (isRev ? "text-primary" : "text-tertiary")
                       )}>
                         {(isRev ? '' : '-')}{(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      <td className="px-8 py-4">
+                      <td className="px-4 py-4">
                         <span className={cn(
                           "text-[10px] font-black px-3 py-1 rounded-full border",
                           status === 'PAGO' && "bg-primary/20 text-primary border-primary/30",
@@ -1902,7 +1902,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
             {filteredData.length > 0 && (
               <tfoot className="border-t-2 border-white/20 bg-white/[0.02]">
                 <tr className="font-bold">
-                  <td colSpan={7} className="px-8 py-6 text-right">
+                  <td colSpan={7} className="px-4 py-6 text-right">
                     <div className="flex flex-col gap-1 items-end">
                       <span className="text-[10px] text-on-surface-variant uppercase tracking-widest font-black">Resumo Financeiro Detalhado</span>
                       <div className="flex gap-10 mt-3">
@@ -1923,7 +1923,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
                       </div>
                     </div>
                   </td>
-                  <td colSpan={3} className="px-8 py-6 text-right bg-white/[0.03]">
+                  <td colSpan={3} className="px-4 py-6 text-right bg-white/[0.03]">
                     <p className="text-[9px] uppercase text-on-surface-variant mb-1 font-black">Saldo Final Líquido (Previsto)</p>
                     <div className={cn(
                       "text-3xl font-black tracking-tighter",
@@ -1951,7 +1951,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
                       </div>
                     )}
                   </td>
-                  <td className="px-8 py-6 text-xs text-on-surface-variant text-center border-l border-white/10 font-black">
+                  <td className="px-4 py-6 text-xs text-on-surface-variant text-center border-l border-white/10 font-black">
                     {periodTotals.count}<br/>REGISTROS
                   </td>
                 </tr>
