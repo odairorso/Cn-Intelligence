@@ -6,18 +6,68 @@ import { GoogleGenAI } from '@google/genai';
 
 const { Pool } = pg;
 
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:3000'];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type'],
+  credentials: true,
+};
+
 const app = express();
-app.use(cors());
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// Middleware para payloads maiores (Excel tem muitos dados)
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW = 60 * 1000;
+const RATE_LIMIT_MAX = 100;
 
-// Helper para CORS
-const setCors = (res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+const rateLimitMiddleware = (req, res, next) => {
+  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+  const now = Date.now();
+  const record = rateLimitMap.get(ip) || { count: 0, resetAt: now + RATE_LIMIT_WINDOW };
+  
+  if (now > record.resetAt) {
+    record.count = 1;
+    record.resetAt = now + RATE_LIMIT_WINDOW;
+  } else {
+    record.count++;
+  }
+  
+  if (record.count > RATE_LIMIT_MAX) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
+  
+  rateLimitMap.set(ip, record);
+  next();
+};
+
+app.use(rateLimitMiddleware);
+
+const sanitizeInput = (value) => {
+  if (typeof value !== 'string') return value;
+  return value.replace(/[<>'";&]/g, '').slice(0, 10000);
+};
+
+const sanitizeObject = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const sanitized = {};
+  for (const [key, value] of Object.entries(obj)) {
+    sanitized[key] = typeof value === 'string' ? sanitizeInput(value) : value;
+  }
+  return sanitized;
 };
 
 const pool = new Pool({
@@ -197,10 +247,12 @@ app.get('/api/transactions', async (req, res) => {
 });
 
 app.post('/api/transactions/batch', async (req, res) => {
-  const transactions = req.body;
-  if (!Array.isArray(transactions) || transactions.length === 0) {
+  const rawTransactions = req.body;
+  if (!Array.isArray(rawTransactions) || rawTransactions.length === 0) {
     return res.status(400).json({ error: 'Invalid batch data' });
   }
+
+  const transactions = rawTransactions.slice(0, 500).map(sanitizeObject);
 
   const client = await pool.connect();
   try {
@@ -237,12 +289,24 @@ app.post('/api/transactions/batch', async (req, res) => {
 });
 app.post('/api/transactions', async (req, res) => {
   try {
-    const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = req.body;
+    const rawBody = sanitizeObject(req.body);
+    const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = rawBody;
 
+    if (!fornecedor || typeof fornecedor !== 'string') {
+      return res.status(400).json({ error: 'Fornecedor é obrigatório' });
+    }
+    if (!vencimento || typeof vencimento !== 'string') {
+      return res.status(400).json({ error: 'Vencimento é obrigatório' });
+    }
+    if (valor === undefined || valor === null || isNaN(Number(valor))) {
+      return res.status(400).json({ error: 'Valor inválido' });
+    }
     
-    // Convert DD/MM/YYYY back to YYYY-MM-DD
-    const vDate = vencimento.split('/').reverse().join('-');
-    const pDate = pagamento ? pagamento.split('/').reverse().join('-') : null;
+    const vDate = parseDateToPg(vencimento);
+    if (!vDate) {
+      return res.status(400).json({ error: 'Data de vencimento inválida. Use DD/MM/YYYY' });
+    }
+    const pDate = pagamento ? parseDateToPg(pagamento) : null;
 
     const result = await pool.query(
       `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id)

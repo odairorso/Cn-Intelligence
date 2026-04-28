@@ -3,7 +3,44 @@ import { GoogleGenAI } from '@google/genai';
 
 export const config = { runtime: 'nodejs' };
 
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW = 60 * 1000;
+const RATE_LIMIT_MAX = 100;
 
+const sanitizeInput = (value) => {
+  if (typeof value !== 'string') return value;
+  return value.replace(/[<>'";&]/g, '').slice(0, 10000);
+};
+
+const sanitizeObject = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const sanitized = {};
+  for (const [key, value] of Object.entries(obj)) {
+    sanitized[key] = typeof value === 'string' ? sanitizeInput(value) : value;
+  }
+  return sanitized;
+};
+
+const checkRateLimit = (req, res) => {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || 'unknown';
+  const now = Date.now();
+  const record = rateLimitMap.get(ip) || { count: 0, resetAt: now + RATE_LIMIT_WINDOW };
+  
+  if (now > record.resetAt) {
+    record.count = 1;
+    record.resetAt = now + RATE_LIMIT_WINDOW;
+  } else {
+    record.count++;
+  }
+  
+  if (record.count > RATE_LIMIT_MAX) {
+    res.status(429).json({ error: 'Too many requests' });
+    return false;
+  }
+  
+  rateLimitMap.set(ip, record);
+  return true;
+};
 
 // --- Helpers ---
 const normalizeBoletoNumber = (value) => {
@@ -1599,6 +1636,15 @@ async function handleDbCheck(req, res) {
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  if (!checkRateLimit(req, res)) return;
+
+  if (req.method === 'POST' && req.body) {
+    req.body = sanitizeObject(req.body);
+  }
+  if (req.method === 'PUT' && req.body) {
+    req.body = sanitizeObject(req.body);
+  }
 
   const { route, id } = req.query;
 
