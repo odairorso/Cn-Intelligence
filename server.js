@@ -155,6 +155,16 @@ const isAddressLike = (value) => {
   return false;
 };
 
+const supplierFromFileName = (fileName) => {
+  let name = String(fileName || '').replace(/\.pdf$/i, '');
+  name = name.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  while (/^(BOL|BOLETO|MAT)\b/i.test(name)) {
+    name = name.replace(/^(BOL|BOLETO|MAT)\b[\s\-_:]*/i, '').trim();
+  }
+  name = name.replace(/[\s\-_:]*(\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?)$/i, '').trim();
+  return name;
+};
+
 // Banks API
 app.get('/api/banks', async (req, res) => {
   try {
@@ -657,8 +667,7 @@ Analise visualmente o PDF anexo e extraia os dados.`;
     // Fallback: extract fornecedor from filename if AI didn't find it
     if (!extracted.fornecedor || extracted.fornecedor === '' || extracted.fornecedor.toLowerCase() === 'não identificado') {
       if (fileName) {
-        let name = fileName.replace(/\.pdf$/i, '').replace(/^(BOL|BOLETO|MAT)\s*/i, '').trim();
-        extracted.fornecedor = name;
+        extracted.fornecedor = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
       }
     }
 
@@ -700,7 +709,7 @@ Analise visualmente o PDF anexo e extraia os dados.`;
     const { fileName } = req.body;
     let fornecedor = 'Fornecedor não identificado';
     if (fileName) {
-      fornecedor = fileName.replace(/\.pdf$/i, '').replace(/^(BOL|BOLETO|MAT)\s*/i, '').trim();
+      fornecedor = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
     }
     res.json({
       fornecedor,

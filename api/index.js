@@ -63,6 +63,16 @@ const isAddressLike = (value) => {
   return false;
 };
 
+const supplierFromFileName = (fileName) => {
+  let name = String(fileName || '').replace(/\.pdf$/i, '');
+  name = name.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  while (/^(BOL|BOLETO|MAT)\b/i.test(name)) {
+    name = name.replace(/^(BOL|BOLETO|MAT)\b[\s\-_:]*/i, '').trim();
+  }
+  name = name.replace(/[\s\-_:]*(\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?)$/i, '').trim();
+  return name;
+};
+
 const extractLocalBoletoNumber = (text) => {
   const source = String(text || '').toUpperCase();
   const patterns = [
@@ -1469,8 +1479,7 @@ JSON FORMAT:
 
     if (!extracted.fornecedor || extracted.fornecedor === '' || extracted.fornecedor.toLowerCase() === 'não identificado') {
       if (fileName) {
-        let name = fileName.replace(/\.pdf$/i, '').replace(/^(BOL|BOLETO|MAT)\s*/i, '').trim();
-        extracted.fornecedor = name;
+        extracted.fornecedor = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
       }
     }
 
@@ -1498,7 +1507,7 @@ JSON FORMAT:
     const { fileName } = req.body;
     let fornecedor = 'Fornecedor não identificado';
     if (fileName) {
-      fornecedor = fileName.replace(/\.pdf$/i, '').replace(/^(BOL|BOLETO|MAT)\s*/i, '').trim();
+      fornecedor = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
     }
     res.status(200).json({
       fornecedor,
