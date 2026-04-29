@@ -1682,7 +1682,9 @@ export default async function handler(req, res) {
   if (!checkRateLimit(req, res)) return;
 
   if (req.method === 'POST' && req.body) {
-    req.body = sanitizeObject(req.body);
+    if (req.query.route !== 'extract-boleto') {
+      req.body = sanitizeObject(req.body);
+    }
   }
   if (req.method === 'PUT' && req.body) {
     req.body = sanitizeObject(req.body);
