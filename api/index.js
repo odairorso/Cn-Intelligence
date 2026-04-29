@@ -1532,9 +1532,9 @@ JSON FORMAT:
   } catch (error) {
     console.error('[boleto] Error extracting boleto data:', error.message);
     const { fileName } = req.body;
-    let fornecedor = 'Fornecedor não identificado';
+    let fornecedor = 'Fornecedor não identificado [FALHA IA - TENTE NOVAMENTE]';
     if (fileName) {
-      fornecedor = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
+      fornecedor = (supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim()) + ' [FALHA IA - TENTE NOVAMENTE]';
     }
     res.status(200).json({
       fornecedor,
