@@ -208,18 +208,30 @@ export function useAppData() {
     let cancelled = false;
     setIsLoading(true);
 
-    Promise.all([
-      fetchStats(),
-      fetchTransactions(),
-      fetchSuppliers(),
-      fetchBanks(),
-      fetchContasContabeis(),
-      fetchBoletoPatterns(),
-    ]).finally(() => {
-      if (!cancelled) setIsLoading(false);
-    });
+    (async () => {
+      try {
+        await fetchTransactions();
+        await fetchSuppliers();
+        await fetchBanks();
+        await fetchContasContabeis();
+        await fetchBoletoPatterns();
+        await fetchStats();
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
 
-    api.setupTables().catch(console.error);
+    try {
+      const key = 'cn_setup_tables_last';
+      const last = Number(localStorage.getItem(key) || 0);
+      if (Date.now() - last > 24 * 60 * 60 * 1000) {
+        api.setupTables()
+          .then(() => localStorage.setItem(key, String(Date.now())))
+          .catch(console.error);
+      }
+    } catch {
+      api.setupTables().catch(console.error);
+    }
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Executa apenas uma vez no mount

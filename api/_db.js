@@ -6,8 +6,18 @@ if (connectionString) {
   connectionString = connectionString.replace(/sslmode=[^&?]+/g, 'sslmode=no-verify');
 }
 
+const poolMax = (() => {
+  const raw = process.env.PG_POOL_MAX || process.env.DB_POOL_MAX || '1';
+  const n = Number.parseInt(String(raw), 10);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 5) : 1;
+})();
+
 const pool = new pg.Pool({
   connectionString,
+  max: poolMax,
+  idleTimeoutMillis: 10_000,
+  connectionTimeoutMillis: 10_000,
+  allowExitOnIdle: true,
   ssl: {
     rejectUnauthorized: false
   }
