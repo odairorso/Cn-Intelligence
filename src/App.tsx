@@ -4115,7 +4115,7 @@ export default function App() {
       fornecedor,
       vencimento,
       valor: sanitizeBoletoValor(valor),
-      descricao: pagadorNome || '',
+      descricao: pagadorNome || supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim(),
       empresa: '',
       cnpj: '',
       numero_boleto: numeroBoleto,
@@ -4163,7 +4163,8 @@ export default function App() {
         const fallbackNumero = extractLocalBoletoNumber(text);
         const inferredFromDescricao = normalizeBoletoNumber(data.descricao || '');
         const numero = normalizeBoletoNumber(data.numero_boleto || '') || fallbackNumero || inferredFromDescricao;
-        const descricao = (data.descricao && data.descricao !== '-') ? data.descricao : '';
+        const fallbackDesc = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
+        const descricao = (data.descricao && data.descricao !== '-') ? data.descricao : fallbackDesc;
         const linhaInfo = parseLinhaDigitavel(text);
         const geminiValor = sanitizeBoletoValor(data.valor);
         const valor = (linhaInfo?.valor && (!geminiValor || geminiValor > 20000))
