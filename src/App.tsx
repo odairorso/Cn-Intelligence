@@ -3919,6 +3919,16 @@ export default function App() {
     return validDetected || 'Fornecedor não identificado';
   };
 
+  const supplierFromFileName = (fileName: string): string => {
+    let name = String(fileName || '').replace(/\.pdf$/i, '');
+    name = name.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+    while (/^(BOL|BOLETO|MAT)\b/i.test(name)) {
+      name = name.replace(/^(BOL|BOLETO|MAT)\b[\s\-_:]*/i, '').trim();
+    }
+    name = name.replace(/[\s\-_:]*(\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?)$/i, '').trim();
+    return name;
+  };
+
   const extractBoletoData = (text: string, fileName: string): PdfImportDraft => {
     const normalizedText = text.toUpperCase().replace(/\s+/g, ' ');
     let fornecedor = 'Fornecedor não identificado';
@@ -3971,7 +3981,7 @@ export default function App() {
 
     // Último recurso: usa o nome do arquivo
     if (fornecedor === 'Fornecedor não identificado') {
-      fornecedor = fileName.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ').trim();
+      fornecedor = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
     }
 
     const datePatterns = [
@@ -4167,7 +4177,7 @@ export default function App() {
       const fallback = extractBoletoData(text, fileName);
       // Se nem o fallback local extraiu dados, usa o nome do arquivo como fornecedor
       if (fallback.fornecedor === 'Fornecedor não identificado') {
-        const nameFromFile = fileName.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ').trim();
+        const nameFromFile = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
         fallback.fornecedor = nameFromFile || 'Fornecedor não identificado';
       }
       return { ...fallback, valor: sanitizeBoletoValor((fallback as any).valor), empresa: data.empresa || '', cnpj: data.cnpj || '', numero_boleto: data.numero_boleto || fallback.numero_boleto || '', tipo: 'DESPESA' };
