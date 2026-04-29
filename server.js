@@ -707,9 +707,9 @@ Analise visualmente o PDF anexo e extraia os dados.`;
     console.error('[boleto] Error extracting boleto data:', error.message);
     console.error('[boleto] Stack:', error.stack);
     const { fileName } = req.body;
-    let fornecedor = 'Fornecedor não identificado [FALHA IA - TENTE NOVAMENTE]';
+    let fornecedor = `Fornecedor não identificado [ERRO: ${error.message}]`;
     if (fileName) {
-      fornecedor = (supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim()) + ' [FALHA IA - TENTE NOVAMENTE]';
+      fornecedor = (supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim()) + ` [ERRO: ${error.message}]`;
     }
     res.json({
       fornecedor,
