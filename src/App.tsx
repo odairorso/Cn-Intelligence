@@ -75,6 +75,7 @@ type PdfImportDraft = {
   rawText: string;
   duplicate: boolean;
   conta_contabil_id?: number;
+  ai_error?: string;
 };
 
 // --- Components ---
@@ -4143,8 +4144,13 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error(`API error: ${response.status}`);
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const msg = (data && typeof data === 'object' && 'error' in data && typeof (data as any).error === 'string')
+          ? (data as any).error
+          : `API error: ${response.status}`;
+        throw new Error(msg);
+      }
 
       const beneficiario = String((data as any).beneficiario || (data as any).cedente || '').trim().replace(/\s+/g, ' ');
       const fornecedorCandidate = (!shouldRejectSupplierName(beneficiario) && beneficiario)
@@ -4189,7 +4195,7 @@ export default function App() {
     } catch (err) {
       console.error('[boleto] API error, using local fallback:', err);
       const fallback = extractBoletoData(text, fileName);
-      return { ...fallback, valor: sanitizeBoletoValor((fallback as any).valor), empresa: '', cnpj: '', numero_boleto: '', tipo: 'DESPESA' };
+      return { ...fallback, valor: sanitizeBoletoValor((fallback as any).valor), empresa: '', cnpj: '', numero_boleto: '', tipo: 'DESPESA', ai_error: String((err as any)?.message || err || '') };
     }
   };
 
@@ -4281,6 +4287,10 @@ export default function App() {
 
       setPdfExtractedRows(applyDuplicateFlags(extractedRows));
       setShowPdfImportModal(true);
+      const firstAiError = extractedRows.find((r) => (r as any).ai_error)?.ai_error;
+      if (firstAiError) {
+        showNotification(`Falha ao ler boleto por IA (usando nome do arquivo). Motivo: ${String(firstAiError).slice(0, 120)}`, 'error');
+      }
       showNotification('Boletos lidos. Revise e confirme.', 'success');
     } catch (error) {
       console.error('Error processing PDF:', error);

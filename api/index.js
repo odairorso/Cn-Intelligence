@@ -1648,6 +1648,12 @@ async function handleDbCheck(req, res) {
       server: serverInfoRows?.[0] ?? null,
       tables: tableReg,
       transactions: txInfo,
+      env: {
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY ? 'PRESENT' : 'MISSING',
+        DATABASE_URL: process.env.DATABASE_URL ? 'PRESENT' : 'MISSING',
+        URL_DO_BANCO_DE_DADOS: process.env.URL_DO_BANCO_DE_DADOS ? 'PRESENT' : 'MISSING',
+        DATABASE_URLL: process.env.DATABASE_URLL ? 'PRESENT' : 'MISSING'
+      },
       node: process.version,
     });
   } catch (e) {
