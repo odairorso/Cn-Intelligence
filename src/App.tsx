@@ -4146,7 +4146,12 @@ export default function App() {
       if (!response.ok) throw new Error(`API error: ${response.status}`);
       const data = await response.json();
 
-      const hasValidData = data.fornecedor && data.fornecedor !== 'Fornecedor não identificado' && (data.valor > 0 || data.vencimento);
+      const beneficiario = String((data as any).beneficiario || (data as any).cedente || '').trim().replace(/\s+/g, ' ');
+      const fornecedorCandidate = (!shouldRejectSupplierName(beneficiario) && beneficiario)
+        ? beneficiario
+        : (data as any).fornecedor;
+
+      const hasValidData = fornecedorCandidate && fornecedorCandidate !== 'Fornecedor não identificado' && (data.valor > 0 || data.vencimento);
 
       if (hasValidData) {
         const fallbackNumero = extractLocalBoletoNumber(text);
@@ -4160,7 +4165,7 @@ export default function App() {
           : geminiValor;
         return {
           fileName,
-          fornecedor: data.fornecedor || 'Fornecedor não identificado',
+          fornecedor: fornecedorCandidate || 'Fornecedor não identificado',
           vencimento: data.vencimento || '',
           valor,
           descricao,

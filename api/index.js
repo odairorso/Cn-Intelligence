@@ -1409,9 +1409,11 @@ REGRAS CRÍTICAS (Siga rigorosamente):
 CAMPOS ADICIONAIS:
 - cnpj: CNPJ do fornecedor (só números).
 - numero_boleto: Linha digitável ou código de barras (só números).
+- beneficiario: nome do beneficiário/cedente (quem recebe).
+- pagador: nome do pagador/sacado (quem paga).
 
 JSON FORMAT:
-{"fornecedor":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
+{"fornecedor":"","beneficiario":"","pagador":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
 
     let prompt;
     if (hasText) {
@@ -1449,6 +1451,31 @@ JSON FORMAT:
       rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
     }
     const extracted = JSON.parse(rawText || '{}');
+
+    const pickBeneficiario = () => {
+      const candidates = [
+        extracted.beneficiario,
+        extracted.cedente,
+        extracted.beneficiário,
+        extracted['beneficiario_nome'],
+        extracted['beneficiarioName'],
+      ].filter(Boolean);
+      const first = candidates.length ? String(candidates[0]).trim() : '';
+      return first;
+    };
+
+    const cleanName = (v) => String(v || '').trim().replace(/\s+/g, ' ');
+
+    const beneficiario = cleanName(pickBeneficiario());
+    if (beneficiario && !isAddressLike(beneficiario)) {
+      extracted.fornecedor = beneficiario;
+    } else if (extracted.pagador && extracted.fornecedor) {
+      const pag = cleanName(extracted.pagador).toUpperCase();
+      const forn = cleanName(extracted.fornecedor).toUpperCase();
+      if (pag && forn && pag === forn) {
+        extracted.fornecedor = '';
+      }
+    }
 
     if (extracted.vencimento) {
       const v = extracted.vencimento;
