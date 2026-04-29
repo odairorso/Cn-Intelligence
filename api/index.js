@@ -1351,7 +1351,7 @@ TEXTO: ${extractedText.slice(0, 5000)}
 Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
 
         const miniResp = await ai.models.generateContent({
-          model: 'gemini-2.0-flash',
+          model: 'gemini-2.5-flash',
           contents: miniPrompt,
           config: { responseMimeType: 'application/json', temperature: 0 },
         });
@@ -1438,7 +1438,7 @@ JSON FORMAT:
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       contents,
       config: {
         responseMimeType: 'application/json',
