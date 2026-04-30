@@ -1263,6 +1263,8 @@ async function handleExtractBoleto(req, res) {
       rawBenefName = 'CLARO';
     } else if (srcUpper.includes('VIVO') || srcUpper.includes('TELEFONICA')) {
       rawBenefName = 'VIVO';
+    } else if (srcUpper.includes('CABO DE VIDEO') || srcUpper.includes('CVC INTERNET') || srcUpper.includes('VALMIR LOPES DE SOUZA')) {
+      rawBenefName = 'CVC INTERNET / VALMIR';
     } else {
       for (const p of benefPatterns) {
         const m = srcUpper.match(p);
@@ -1394,7 +1396,8 @@ REGRAS CRÍTICAS (Siga rigorosamente):
    - É quem RECEBE o dinheiro (Ex: SANESUL, ENERGISA, CLARO, Condomínio Edifício X).
    - NUNCA use o banco emissor (Sicredi, Bradesco, Itaú, Santander, Caixa, BB, Cora, Inter, Nubank, C6, Safra, etc).
    - Se encontrar "BANCO DO BRASIL" e "SANESUL", o fornecedor é SANESUL.
-   - NUNCA use o "Pagador" ou "Sacado" as fornecedor.
+   - NUNCA use o "Pagador", "Sacado" ou "Fonte Pagadora" como fornecedor. (Ex: Se o boleto diz 'Pagador: ANHANGUERA', NÃO use ANHANGUERA).
+   - Procure o nome do BENEFICIÁRIO (quem emitiu o boleto e deve receber o dinheiro).
    - NUNCA use um endereço (Rua, Av, CEP) como nome do fornecedor.
 
 2. VALOR FINANCEIRO:

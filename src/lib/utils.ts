@@ -125,11 +125,15 @@ export const isRevenueTransaction = (tx: { fornecedor?: string; descricao?: stri
   return (
     desc.includes('REPASSE') ||
     desc.includes('MENSALIDADE') ||
+    desc.includes('RECEITA') ||
+    desc.includes('RECEBIMENTO') ||
     desc.includes('EDUCBANK') ||
     desc.includes('KROTON') ||
     desc.includes('REDE FEMENINA') ||
     forn.includes('REPASSE') ||
     forn.includes('MENSALIDADE') ||
+    forn.includes('RECEITA') ||
+    forn.includes('RECEBIMENTO') ||
     forn.includes('EDUCBANK') ||
     forn.includes('KROTON') ||
     forn.includes('REDE FEMENINA')
