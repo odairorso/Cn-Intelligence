@@ -9,6 +9,7 @@ import {
   Wallet,
   HelpCircle,
   TrendingUp,
+  TrendingDown,
   CheckCircle,
   Calendar,
   Upload,
