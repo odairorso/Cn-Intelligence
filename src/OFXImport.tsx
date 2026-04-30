@@ -167,7 +167,14 @@ interface OFXImportProps {
   banks: Bank[];
   onSuccess: () => void;
   showNotification: (msg: string, type: 'success' | 'error' | 'info') => void;
-  fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string) => void;
+  fetchTransactions: (
+    append?: boolean,
+    year?: string,
+    month?: string,
+    search?: string,
+    tipo?: string,
+    options?: { limit?: number }
+  ) => void;
 }
 
 export const OFXImportTab: React.FC<OFXImportProps> = ({
