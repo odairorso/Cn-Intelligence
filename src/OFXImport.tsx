@@ -7,7 +7,7 @@
  * 2. Siga as instruções de integração no App.tsx abaixo
  */
 
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Upload,
@@ -167,6 +167,7 @@ interface OFXImportProps {
   banks: Bank[];
   onSuccess: () => void;
   showNotification: (msg: string, type: 'success' | 'error' | 'info') => void;
+  fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string) => void;
 }
 
 export const OFXImportTab: React.FC<OFXImportProps> = ({
@@ -175,6 +176,7 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
   banks,
   onSuccess,
   showNotification,
+  fetchTransactions,
 }) => {
   const [ofxRows, setOfxRows] = useState<OFXTransaction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -185,6 +187,11 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
   const [activeSearchIdx, setActiveSearchIdx] = useState(-1);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Fetch all transactions on mount to ensure duplicate detection works correctly
+  useEffect(() => {
+    fetchTransactions(false, 'TODOS');
+  }, [fetchTransactions]);
+
   const normalizeSupplierName = (v: string) =>
     String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
@@ -194,7 +201,7 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
     const valueDateMap = new Map<string, Array<{ fornecedor: string }>>();
 
     transactions.forEach((tx) => {
-      const fitidMatch = tx.descricao?.match(/\b([A-Z0-9]{10,30})\b/);
+      const fitidMatch = tx.descricao?.match(/\[OFX:(.*?)\]/);
       if (fitidMatch) {
         fitids.add(fitidMatch[1]);
       }
@@ -239,6 +246,23 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
     },
     [fitidSet, valueDateMap]
   );
+
+  // Re-avaliar duplicatas dinamicamente caso a lista de transações atualize no fundo (resolve a race condition)
+  useEffect(() => {
+    if (ofxRows.length > 0) {
+      setOfxRows((prev) =>
+        prev.map((row) => {
+          const dup = isDuplicate(row);
+          if (row.duplicate === dup) return row; // Evita re-renders desnecessários
+          return {
+            ...row,
+            duplicate: dup,
+            selected: dup ? false : row.selected,
+          };
+        })
+      );
+    }
+  }, [isDuplicate]); // isDuplicate muda quando fitidSet ou valueDateMap mudam
 
   // ── File handler ───────────────────────────────────────────────────────
   const handleFile = useCallback(

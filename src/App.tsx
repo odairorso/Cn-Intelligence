@@ -1348,14 +1348,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
     return [...new Set(y)].filter(Boolean).sort().reverse();
   }, [transactions]);
 
-  const [selectedYear, setSelectedYear] = useState<string>(() => {
-    const y = transactions.map(tx => {
-      const dateParts = tx.vencimento.includes('-') ? tx.vencimento.split('-') : tx.vencimento.split('/');
-      return tx.vencimento.includes('-') ? dateParts[0] : dateParts[2];
-    });
-    const uniqueYears = [...new Set(y)].filter(Boolean).sort().reverse();
-    return uniqueYears[0] || new Date().getFullYear().toString();
-  });
+  const [selectedYear, setSelectedYear] = useState<string>('TODOS');
 
   const [selectedMonth, setSelectedMonth] = useState<string>('TODOS');
   const [selectedCompany, setSelectedCompany] = useState<string>('TODOS');
@@ -1968,9 +1961,10 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
 interface ReceitasTabProps {
   transactions: Transaction[];
   onNewRevenue: () => void;
+  fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string) => void;
 }
 
-const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
+const ReceitasTab = ({ transactions, onNewRevenue, fetchTransactions }: ReceitasTabProps) => {
   const revenueTransactions = useMemo(
     () => transactions.filter(tx => isRevenueTransaction(tx)),
     [transactions]
@@ -1984,14 +1978,11 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
     return [...new Set(y)].filter(Boolean).sort().reverse();
   }, [revenueTransactions]);
 
-  const [selectedYear, setSelectedYear] = useState<string>(() => {
-    const y = revenueTransactions.map(tx => {
-      const dateParts = tx.vencimento.includes('-') ? tx.vencimento.split('-') : tx.vencimento.split('/');
-      return tx.vencimento.includes('-') ? dateParts[0] : dateParts[2];
-    });
-    const uniqueYears = [...new Set(y)].filter(Boolean).sort().reverse();
-    return uniqueYears[0] || new Date().getFullYear().toString();
-  });
+  const [selectedYear, setSelectedYear] = useState<string>('TODOS');
+
+  useEffect(() => {
+    fetchTransactions(false, selectedYear, selectedMonth);
+  }, [selectedYear, selectedMonth, fetchTransactions]);
 
   const [selectedMonth, setSelectedMonth] = useState<string>('TODOS');
   const [selectedCompany, setSelectedCompany] = useState<string>('TODOS');
@@ -4238,19 +4229,15 @@ export default function App() {
 
           const hasGoodText = fullText.trim().length > 100;
 
-          // Só converte para base64 se o texto extraído for insuficiente
-          // Usa FileReader (mais rápido que loop byte a byte)
-          let pdfBase64 = '';
-          if (!hasGoodText) {
-            pdfBase64 = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => {
-                const result = reader.result as string;
-                resolve(result.split(',')[1] || '');
-              };
-              reader.readAsDataURL(file);
-            });
-          }
+          // Sempre envia o PDF em base64 para a API (para análise visual do Gemini)
+          const pdfBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const result = reader.result as string;
+              resolve(result.split(',')[1] || '');
+            };
+            reader.readAsDataURL(file);
+          });
 
           const local = extractBoletoData(fullText, file.name);
           local.fornecedor = resolveSupplierName(local.fornecedor, fullText);
@@ -5027,7 +5014,7 @@ export default function App() {
                 fetchTransactions={fetchTransactions}
               />
             )}
-            {activeTab === 'receitas' && <ReceitasTab transactions={transactions} onNewRevenue={() => { setNewTxInitialTipo('RECEITA'); setShowNewTxModal(true); }} />}
+            {activeTab === 'receitas' && <ReceitasTab transactions={transactions} onNewRevenue={() => { setNewTxInitialTipo('RECEITA'); setShowNewTxModal(true); }} fetchTransactions={fetchTransactions} />}
             {activeTab === 'bancos' && (
               <BancosTab
                 banks={banks}
@@ -5042,8 +5029,9 @@ export default function App() {
                 transactions={transactions}
                 suppliers={suppliers}
                 banks={banks}
-                onSuccess={() => { fetchTransactions(); }}
+                onSuccess={() => { fetchTransactions(false, 'TODOS'); }}
                 showNotification={showNotification}
+                fetchTransactions={fetchTransactions}
               />
             )}
             {activeTab === 'configuracoes' && (

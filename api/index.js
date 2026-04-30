@@ -1415,15 +1415,16 @@ CAMPOS ADICIONAIS:
 JSON FORMAT:
 {"fornecedor":"","beneficiario":"","pagador":"","vencimento":"","valor":0,"cnpj":"","descricao":"","empresa":"","numero_boleto":""}`;
 
-    let prompt;
+    let prompt = `${promptBase}\n\nNome do arquivo: ${fileName || 'N/A'}`;
     if (hasText) {
-      prompt = `${promptBase}\n\nTEXTO DO PDF:\n${extractedText}\n\nNome do arquivo: ${fileName || 'N/A'}`;
-    } else {
-      prompt = `${promptBase}\n\nNome do arquivo: ${fileName || 'N/A'}\nAnalise visualmente o PDF anexo.`;
+      prompt += `\n\nTEXTO EXTRAÍDO DO PDF:\n${extractedText}`;
+    }
+    if (pdfBase64) {
+      prompt += `\n\n[AVISO CRÍTICO]: O texto extraído acima pode estar com erros ou embaralhado. PRIORIZE SEMPRE A ANÁLISE VISUAL DO PDF ANEXO para encontrar o Fornecedor correto, Data de Vencimento e Valor.`;
     }
 
     let contents;
-    if (!hasText && pdfBase64) {
+    if (pdfBase64) {
       contents = [
         { text: prompt },
         {
