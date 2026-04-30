@@ -117,19 +117,12 @@ export const isSupplierMatch = (transactionSupplier: string, supplierName: strin
 
 // ─── Transaction type helpers ─────────────────────────────────────────────────
 
-export const isRevenueTransaction = (tx: { fornecedor?: string; descricao?: string; tipo?: string; valor?: number }): boolean => {
-  // Se o tipo for explicitamente RECEITA, é receita
+export const isRevenueTransaction = (tx: { fornecedor?: string; descricao?: string; tipo?: string }): boolean => {
   if (tx.tipo === 'RECEITA') return true;
-  
-  // Se o valor for maior que zero, é tecnicamente uma entrada (receita)
-  if (typeof tx.valor === 'number' && tx.valor > 0) return true;
-
-  // Caso contrário, tenta identificar por palavras-chave
+  if (tx.tipo === 'DESPESA') return false;
   const desc = normalizeSupplierName(tx.descricao ?? '');
   const forn = normalizeSupplierName(tx.fornecedor ?? '');
-  
   const keywords = ['REPASSE', 'MENSALIDADE', 'RECEITA', 'RECEBIMENTO', 'EDUCBANK', 'KROTON', 'REDE FEMENINA', 'PIX RECEBIDO', 'TRANSFERENCIA RECEBIDA'];
-  
   return keywords.some(k => desc.includes(k) || forn.includes(k));
 };
 
