@@ -1579,6 +1579,36 @@ JSON FORMAT:
   }
 }
 
+// POST /api?route=fix-receitas-tipo
+// Corrige o tipo de todos os lançamentos históricos baseado em palavras-chave
+async function handleFixReceitasTipo(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const result = await sql`
+      UPDATE transactions
+      SET tipo = 'RECEITA'
+      WHERE tipo != 'RECEITA'
+        AND (
+          descricao ILIKE '%REPASSE%'
+          OR descricao ILIKE '%RECEITA%'
+          OR descricao ILIKE '%RECEBIMENTO%'
+          OR descricao ILIKE '%MENSALIDADE RECEBIDA%'
+          OR descricao ILIKE '%PIX RECEBIDO%'
+          OR descricao ILIKE '%TRANSFERENCIA RECEBIDA%'
+          OR fornecedor ILIKE '%REPASSE%'
+          OR fornecedor ILIKE '%EDUCBANK%'
+          OR fornecedor ILIKE '%KROTON%'
+        )
+    `;
+    const count = result.count || 0;
+    console.log(`[fix-receitas-tipo] Updated ${count} transactions to RECEITA`);
+    return res.json({ ok: true, updated: count });
+  } catch (e) {
+    console.error('[fix-receitas-tipo] Error:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
 // GET /api?route=export-backup
 async function handleExportBackup(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -1774,6 +1804,8 @@ export default async function handler(req, res) {
         return handleExtractBoleto(req, res);
       case 'stats':
         return handleStats(req, res);
+      case 'fix-receitas-tipo':
+        return handleFixReceitasTipo(req, res);
       case 'export-backup':
         return handleExportBackup(req, res);
       default:
