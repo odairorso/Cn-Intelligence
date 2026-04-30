@@ -235,12 +235,16 @@ async function handleTransactions(req, res) {
         };
 
         const money = parseSearchMoney(search);
-        const s = `%${search}%`;
+        const s = `%${search.replace(/[^\d]/g, '')}%`; // Busca por dígitos puros no texto
+        const sRaw = `%${search}%`; // Busca literal
+        
         query = sql`${query} AND (
-          fornecedor ILIKE ${s}
-          OR descricao ILIKE ${s}
-          OR empresa ILIKE ${s}
-          OR CAST(valor AS TEXT) ILIKE ${s}
+          fornecedor ILIKE ${sRaw}
+          OR descricao ILIKE ${sRaw}
+          OR empresa ILIKE ${sRaw}
+          OR CAST(valor AS TEXT) ILIKE ${sRaw}
+          OR REPLACE(CAST(valor AS TEXT), '.', '') ILIKE ${s}
+          OR REPLACE(REPLACE(CAST(valor AS TEXT), '.', ''), ',', '') ILIKE ${s}
           ${money !== null ? sql`OR abs(valor - ${money}) < 0.01 OR abs((valor + coalesce(juros, 0)) - ${money}) < 0.01` : sql``}
         )`;
       } else {
