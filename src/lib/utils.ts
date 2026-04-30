@@ -117,27 +117,20 @@ export const isSupplierMatch = (transactionSupplier: string, supplierName: strin
 
 // ─── Transaction type helpers ─────────────────────────────────────────────────
 
-export const isRevenueTransaction = (tx: { fornecedor?: string; descricao?: string; tipo?: string }): boolean => {
+export const isRevenueTransaction = (tx: { fornecedor?: string; descricao?: string; tipo?: string; valor?: number }): boolean => {
+  // Se o tipo for explicitamente RECEITA, é receita
   if (tx.tipo === 'RECEITA') return true;
-  if (tx.tipo === 'DESPESA') return false;
+  
+  // Se o valor for maior que zero, é tecnicamente uma entrada (receita)
+  if (typeof tx.valor === 'number' && tx.valor > 0) return true;
+
+  // Caso contrário, tenta identificar por palavras-chave
   const desc = normalizeSupplierName(tx.descricao ?? '');
   const forn = normalizeSupplierName(tx.fornecedor ?? '');
-  return (
-    desc.includes('REPASSE') ||
-    desc.includes('MENSALIDADE') ||
-    desc.includes('RECEITA') ||
-    desc.includes('RECEBIMENTO') ||
-    desc.includes('EDUCBANK') ||
-    desc.includes('KROTON') ||
-    desc.includes('REDE FEMENINA') ||
-    forn.includes('REPASSE') ||
-    forn.includes('MENSALIDADE') ||
-    forn.includes('RECEITA') ||
-    forn.includes('RECEBIMENTO') ||
-    forn.includes('EDUCBANK') ||
-    forn.includes('KROTON') ||
-    forn.includes('REDE FEMENINA')
-  );
+  
+  const keywords = ['REPASSE', 'MENSALIDADE', 'RECEITA', 'RECEBIMENTO', 'EDUCBANK', 'KROTON', 'REDE FEMENINA', 'PIX RECEBIDO', 'TRANSFERENCIA RECEBIDA'];
+  
+  return keywords.some(k => desc.includes(k) || forn.includes(k));
 };
 
 export const matchesAccountType = (acc: ContaContabil, tipo: 'RECEITA' | 'DESPESA'): boolean => {
