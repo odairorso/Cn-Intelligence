@@ -117,13 +117,48 @@ export const isSupplierMatch = (transactionSupplier: string, supplierName: strin
 
 // ─── Transaction type helpers ─────────────────────────────────────────────────
 
-export const isRevenueTransaction = (tx: { fornecedor?: string; descricao?: string; tipo?: string }): boolean => {
-  if (tx.tipo === 'RECEITA') return true;
-  if (tx.tipo === 'DESPESA') return false;
+export const isRevenueTransaction = (tx: { fornecedor?: string; descricao?: string; tipo?: string; valor?: number }): boolean => {
+  // Se o valor for negativo, é sempre uma despesa (saída/estorno)
+  if (typeof tx.valor === 'number' && tx.valor < 0) return false;
+
+  const tipo = String(tx.tipo || '').toUpperCase();
+  if (tipo === 'RECEITA') return true;
+  if (tipo === 'DESPESA') return false;
+
   const desc = normalizeSupplierName(tx.descricao ?? '');
   const forn = normalizeSupplierName(tx.fornecedor ?? '');
-  const keywords = ['REPASSE', 'MENSALIDADE', 'RECEITA', 'RECEBIMENTO', 'EDUCBANK', 'KROTON', 'REDE FEMENINA', 'PIX RECEBIDO', 'TRANSFERENCIA RECEBIDA'];
-  return keywords.some(k => desc.includes(k) || forn.includes(k));
+
+  // Palavras-chave que indicam RECEITA de forma inequívoca
+  const revenueKeywords = [
+    'MENSALIDADE', 
+    'REPASSE', 
+    'RECEBIMENTO', 
+    'EDUCBANK', 
+    'KROTON', 
+    'REDE FEMENINA', 
+    'PIX RECEBIDO', 
+    'TRANSFERENCIA RECEBIDA',
+    'APLICACAO FINANCEIRA'
+  ];
+  
+  // Palavras-chave que indicam DESPESA (ex: impostos que contém "RECEITA" no nome)
+  const expenseKeywords = [
+    'RECEITA FEDERAL',
+    'SIMPLES NACIONAL',
+    'DARF',
+    'GPS',
+    'FGTS',
+    'PAGAMENTO',
+    'COMPRA',
+    'SERVICO',
+    'FORNECEDOR'
+  ];
+
+  // Se o fornecedor ou descrição contém palavras de despesa, é despesa
+  if (expenseKeywords.some(k => desc.includes(k) || forn.includes(k))) return false;
+
+  // Se contém palavras de receita, é receita
+  return revenueKeywords.some(k => desc.includes(k) || forn.includes(k));
 };
 
 export const matchesAccountType = (acc: ContaContabil, tipo: 'RECEITA' | 'DESPESA'): boolean => {
