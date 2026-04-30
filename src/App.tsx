@@ -1,5 +1,5 @@
 // v1.1.2 - Re-trigger build
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   LayoutDashboard,
   FileText,
@@ -457,12 +457,16 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
         </motion.div>
       </div>
 
-      {/* Top Fornecedores + Últimos Lançamentos */}
+      {/* Seção Inferior: Top Fornecedores + Receitas + Despesas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Coluna 1: Top Fornecedores */}
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }} className="glass-card p-6">
-          <div className="mb-6">
-            <h4 className="text-lg font-bold font-headline">Top Fornecedores</h4>
-            <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Por volume financeiro</p>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h4 className="text-lg font-bold font-headline">Top Fornecedores</h4>
+              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Por volume financeiro</p>
+            </div>
+            <Building2 size={20} className="text-primary/40" />
           </div>
           {topSuppliers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-on-surface-variant opacity-40">
@@ -497,70 +501,88 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
           )}
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }} className="glass-card p-6 lg:col-span-2">
+        {/* Coluna 2: Últimas Receitas */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }} className="glass-card p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h4 className="text-lg font-bold font-headline">Últimos Lançamentos</h4>
-              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Atividade recente</p>
+              <h4 className="text-lg font-bold font-headline text-success">Últimas Receitas</h4>
+              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Entradas recentes</p>
             </div>
-            <span className="text-[10px] font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">{filteredTx.length} total</span>
+            <TrendingUp size={20} className="text-success/40" />
           </div>
-          {filteredTx.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-on-surface-variant opacity-40">
-              <FileText size={48} className="mb-4" />
-              <p className="text-sm font-medium">Nenhum lançamento encontrado</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredTx.slice(0, 6).map((tx, idx) => (
-                <motion.div
-                  key={tx.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.9 + idx * 0.05 }}
-                  className="flex items-center justify-between p-4 bg-white/[0.03] rounded-xl border border-white/5 hover:bg-white/[0.06] hover:border-primary/20 transition-all group"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center",
-                      tx.status === 'PAGO' && "bg-primary/20",
-                      tx.status === 'PENDENTE' && "bg-secondary/20",
-                      tx.status === 'VENCIDO' && "bg-tertiary/20"
-                    )}>
-                      {tx.status === 'PAGO' && <CheckCircle size={18} className="text-primary" />}
-                      {tx.status === 'PENDENTE' && <Calendar size={18} className="text-secondary" />}
-                      {tx.status === 'VENCIDO' && <TrendingUp size={18} className="text-tertiary" />}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold text-on-surface group-hover:text-white transition-colors">{tx.fornecedor}</span>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50">{tx.vencimento}</span>
-                        <span className="w-1 h-1 rounded-full bg-white/20" />
-                        <span className="text-[10px] font-bold text-primary/60 uppercase">{tx.empresa}</span>
-                      </div>
-                    </div>
+          <div className="space-y-3">
+            {filteredTx.filter(tx => isRevenueTransaction(tx)).slice(0, 5).map((tx, idx) => (
+              <motion.div
+                key={tx.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.9 + idx * 0.05 }}
+                className="flex flex-col p-3 bg-success/5 rounded-xl border border-success/10 hover:bg-success/10 transition-all group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-on-surface truncate pr-2">{tx.fornecedor}</span>
+                  <span className="text-xs font-black text-success whitespace-nowrap">{formatBRL(tx.valor)}</span>
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/50">{tx.vencimento}</span>
+                    <span className="w-1 h-1 rounded-full bg-white/10" />
+                    <span className="text-[9px] font-bold text-success/60 uppercase">{tx.empresa}</span>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <span className={cn("text-sm font-black", tx.valor < 0 ? "text-tertiary" : (isRevenueTransaction(tx) ? "text-success" : "text-primary"))}>
-                        {formatBRL(tx.valor)}
-                      </span>                      <div className="mt-0.5">
-                        <span className={cn("text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest",
-                          tx.status === 'PAGO' && "bg-primary/20 text-primary",
-                          tx.status === 'PENDENTE' && "bg-secondary/20 text-secondary",
-                          tx.status === 'VENCIDO' && "bg-tertiary/20 text-tertiary"
-                        )}>{tx.status}</span>
-                      </div>
-                    </div>
-                    {tx.status !== 'PAGO' && (
-                      <button onClick={() => onMarkAsPaid(tx)} className="p-2 bg-primary/10 text-primary rounded-lg opacity-0 group-hover:opacity-100 hover:bg-primary/20 transition-all">
-                        <CheckCircle size={16} />
-                      </button>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
+                  <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-success/20 text-success uppercase tracking-tighter">{tx.status}</span>
+                </div>
+              </motion.div>
+            ))}
+            {filteredTx.filter(tx => isRevenueTransaction(tx)).length === 0 && (
+              <div className="py-10 text-center opacity-30">
+                <p className="text-xs font-medium text-on-surface-variant">Nenhuma receita recente</p>
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Coluna 3: Últimas Despesas */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }} className="glass-card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h4 className="text-lg font-bold font-headline text-primary">Últimas Despesas</h4>
+              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Saídas recentes</p>
             </div>
-          )}
+            <TrendingDown size={20} className="text-primary/40" />
+          </div>
+          <div className="space-y-3">
+            {filteredTx.filter(tx => !isRevenueTransaction(tx)).slice(0, 5).map((tx, idx) => (
+              <motion.div
+                key={tx.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 1.0 + idx * 0.05 }}
+                className="flex flex-col p-3 bg-primary/5 rounded-xl border border-primary/10 hover:bg-primary/10 transition-all group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-on-surface truncate pr-2">{tx.fornecedor}</span>
+                  <span className="text-xs font-black text-primary whitespace-nowrap">{formatBRL(tx.valor)}</span>
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/50">{tx.vencimento}</span>
+                    <span className="w-1 h-1 rounded-full bg-white/10" />
+                    <span className="text-[9px] font-bold text-primary/60 uppercase">{tx.empresa}</span>
+                  </div>
+                  <span className={cn("text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter",
+                    tx.status === 'PAGO' && "bg-primary/20 text-primary",
+                    tx.status === 'PENDENTE' && "bg-secondary/20 text-secondary",
+                    tx.status === 'VENCIDO' && "bg-tertiary/20 text-tertiary"
+                  )}>{tx.status}</span>
+                </div>
+              </motion.div>
+            ))}
+            {filteredTx.filter(tx => !isRevenueTransaction(tx)).length === 0 && (
+              <div className="py-10 text-center opacity-30">
+                <p className="text-xs font-medium text-on-surface-variant">Nenhuma despesa recente</p>
+              </div>
+            )}
+          </div>
         </motion.div>
       </div>
     </div>
@@ -2007,20 +2029,69 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
 interface ReceitasTabProps {
   transactions: Transaction[];
   onNewRevenue: () => void;
-  fetchTransactions: (
-    append?: boolean,
-    year?: string,
-    month?: string,
-    search?: string,
-    tipo?: string,
-    options?: { limit?: number }
-  ) => void;
 }
 
-const ReceitasTab = ({ transactions, onNewRevenue, fetchTransactions }: ReceitasTabProps) => {
+const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
+  const MIN_YEAR = 2024;
+  const [receitasBase, setReceitasBase] = useState<Transaction[]>([]);
+  const [isLoadingReceitas, setIsLoadingReceitas] = useState(false);
+
+  const loadReceitasBase = useCallback(async () => {
+    setIsLoadingReceitas(true);
+    try {
+      const limit = 2000;
+      let offset = 0;
+      const acc: Transaction[] = [];
+
+      for (;;) {
+        const page = await api.getTransactions('guest', limit, offset);
+        if (!Array.isArray(page) || page.length === 0) break;
+
+        const normalized = page.map((tx) => ({
+          ...tx,
+          valor: Number((tx as any).valor) || 0,
+          juros: Number((tx as any).juros || 0) || 0,
+          vencimento: toDisplayDate((tx as any).vencimento),
+          pagamento: (tx as any).pagamento ? toDisplayDate((tx as any).pagamento) : undefined,
+        })) as Transaction[];
+
+        acc.push(...normalized);
+        offset += page.length;
+
+        const last = normalized[normalized.length - 1];
+        const parts = last?.vencimento?.includes('/') ? last.vencimento.split('/') : last?.vencimento?.split('-');
+        const lastYear = last?.vencimento?.includes('/') ? parts?.[2] : parts?.[0];
+        if (lastYear && Number(lastYear) < MIN_YEAR) break;
+        if (page.length < limit) break;
+      }
+
+      const since = acc.filter((tx) => {
+        const parts = tx.vencimento.includes('/') ? tx.vencimento.split('/') : tx.vencimento.split('-');
+        const year = tx.vencimento.includes('/') ? parts[2] : parts[0];
+        const y = Number(year);
+        return !Number.isFinite(y) || y >= MIN_YEAR;
+      });
+
+      setReceitasBase(
+        since.sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento))
+      );
+    } catch (e) {
+      console.error(e);
+      setReceitasBase(
+        transactions.slice().sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento))
+      );
+    } finally {
+      setIsLoadingReceitas(false);
+    }
+  }, [transactions]);
+
+  useEffect(() => {
+    loadReceitasBase();
+  }, [loadReceitasBase]);
+
   const revenueTransactions = useMemo(
-    () => transactions.filter(tx => isRevenueTransaction(tx)),
-    [transactions]
+    () => receitasBase.filter(tx => isRevenueTransaction(tx)),
+    [receitasBase]
   );
 
   const years = useMemo(() => {
@@ -2140,6 +2211,11 @@ const ReceitasTab = ({ transactions, onNewRevenue, fetchTransactions }: Receitas
         >
           <Plus size={16} /> Nova Receita
         </button>
+        {isLoadingReceitas && (
+          <div className="text-xs text-on-surface-variant font-bold uppercase tracking-widest">
+            Carregando histórico…
+          </div>
+        )}
         <div className="text-right">
           <p className="text-[10px] font-bold text-on-surface-variant uppercase">Receitas no Período</p>
           <p className="text-xl font-bold text-success">
@@ -5064,7 +5140,7 @@ export default function App() {
                 fetchTransactions={fetchTransactions}
               />
             )}
-            {activeTab === 'receitas' && <ReceitasTab transactions={transactions} onNewRevenue={() => { setNewTxInitialTipo('RECEITA'); setShowNewTxModal(true); }} fetchTransactions={fetchTransactions} />}
+            {activeTab === 'receitas' && <ReceitasTab transactions={transactions} onNewRevenue={() => { setNewTxInitialTipo('RECEITA'); setShowNewTxModal(true); }} />}
             {activeTab === 'bancos' && (
               <BancosTab
                 banks={banks}
