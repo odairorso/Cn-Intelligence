@@ -541,10 +541,9 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <span className={cn("text-sm font-black", tx.valor < 0 ? "text-tertiary" : "text-primary")}>
+                      <span className={cn("text-sm font-black", tx.valor < 0 ? "text-tertiary" : (isRevenueTransaction(tx) ? "text-success" : "text-primary"))}>
                         {formatBRL(tx.valor)}
-                      </span>
-                      <div className="mt-0.5">
+                      </span>                      <div className="mt-0.5">
                         <span className={cn("text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest",
                           tx.status === 'PAGO' && "bg-primary/20 text-primary",
                           tx.status === 'PENDENTE' && "bg-secondary/20 text-secondary",
@@ -1912,10 +1911,10 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
                       )}>
                         {Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                       </td>
-                      <td className={cn(
-                        "px-4 py-4 text-right font-black text-sm",
-                        isNaoPago ? "text-[#f59e0b]" : (isRev ? "text-primary" : "text-tertiary")
-                      )}>
+                    <td className={cn(
+                      "px-4 py-4 text-right font-black text-sm",
+                      isNaoPago ? "text-[#f59e0b]" : (isRev ? "text-success" : "text-primary")
+                    )}>
                         {(isRev ? '' : '-')}{(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-4">
@@ -2133,7 +2132,7 @@ const ReceitasTab = ({ transactions, onNewRevenue, fetchTransactions }: Receitas
         </button>
         <div className="text-right">
           <p className="text-[10px] font-bold text-on-surface-variant uppercase">Receitas no Período</p>
-          <p className="text-xl font-bold text-primary">
+          <p className="text-xl font-bold text-success">
             {totalReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <p className="text-[11px] text-on-surface-variant mt-1">{filteredData.length} lançamentos de receita</p>
