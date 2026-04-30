@@ -24,7 +24,7 @@ const buildHttpError = async (res: Response, fallback: string) => {
 
 export const api = {
   // ─── Transactions ──────────────────────────────────────────────────────────
-  async getTransactions(_uid: string, limit?: number, offset?: number, year?: string, month?: string, search?: string): Promise<Transaction[]> {
+  async getTransactions(_uid: string, limit?: number, offset?: number, year?: string, month?: string, search?: string, tipo?: string): Promise<Transaction[]> {
     const params = new URLSearchParams();
     params.append('route', 'transactions');
     if (limit) params.append('limit', String(limit));
@@ -32,6 +32,7 @@ export const api = {
     if (year) params.append('year', year);
     if (month) params.append('month', month);
     if (search) params.append('search', search);
+    if (tipo) params.append('tipo', tipo);
 
     const res = await fetch(`${API_BASE}?${params.toString()}`, { cache: 'no-store' });
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch transactions');

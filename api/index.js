@@ -204,14 +204,15 @@ async function ensureContasTable() {
 async function handleTransactions(req, res) {
   if (req.method === 'GET') {
     try {
-      const { uid, limit, offset, year, month, search } = req.query;
+      const { uid, limit, offset, year, month, search, tipo } = req.query;
       // Se tiver busca ou filtro de ano, aumentamos o limite para garantir que o resultado seja completo
-      const defaultLimit = (year && year !== 'TODOS') || search ? 5000 : 50;
+      const defaultLimit = (year && year !== 'TODOS') || search || tipo ? 5000 : 50;
       const parsedLimit = limit ? parseInt(limit) : defaultLimit;
       const parsedOffset = offset ? parseInt(offset) : 0;
 
       let query = sql`SELECT * FROM transactions WHERE 1=1`;
       if (uid) query = sql`${query} AND uid = ${uid}`;
+      if (tipo) query = sql`${query} AND tipo = ${tipo}`;
 
       // Se houver busca, ignoramos filtros de ano/mês para encontrar em todo o histórico
       if (search) {
