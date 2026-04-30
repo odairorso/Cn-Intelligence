@@ -1132,6 +1132,25 @@ const normName = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f
 // Helper: extrai CNPJ limpo
 const cleanCnpj = (s) => String(s || '').replace(/[^0-9]/g, '');
 
+const isValidCnpj = (cnpj) => {
+  const v = String(cnpj || '').replace(/[^0-9]/g, '');
+  if (v.length !== 14) return false;
+  if (/^(\d)\1+$/.test(v)) return false;
+  const calcDigit = (base) => {
+    const weights = base.length === 12
+      ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+      : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    let sum = 0;
+    for (let i = 0; i < weights.length; i++) sum += Number(base[i]) * weights[i];
+    const mod = sum % 11;
+    return mod < 2 ? '0' : String(11 - mod);
+  };
+  const base12 = v.slice(0, 12);
+  const d1 = calcDigit(base12);
+  const d2 = calcDigit(base12 + d1);
+  return v === base12 + d1 + d2;
+};
+
 // Consulta padrão aprendido pelo CNPJ ou nome normalizado
 async function lookupPattern(cnpj, nomeNormalizado) {
   try {
@@ -1217,16 +1236,29 @@ async function handleSaveBoletoPattern(req, res) {
       )`;
 
     if (cnpjClean.length >= 11) {
-      await sql`
-        INSERT INTO boleto_patterns (cnpj, nome_normalizado, fornecedor, empresa, tipo, conta_contabil_id)
-        VALUES (${cnpjClean}, ${nomeNorm}, ${fornecedor}, ${empresa || null}, ${tipo || 'DESPESA'}, ${conta_contabil_id || null})
-        ON CONFLICT (cnpj) DO UPDATE SET
-          fornecedor = EXCLUDED.fornecedor,
-          empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
-          tipo = EXCLUDED.tipo,
-          conta_contabil_id = COALESCE(EXCLUDED.conta_contabil_id, boleto_patterns.conta_contabil_id),
-          confirmacoes = boleto_patterns.confirmacoes + 1,
-          ultima_confirmacao = NOW()`;
+      try {
+        await sql`
+          INSERT INTO boleto_patterns (cnpj, nome_normalizado, fornecedor, empresa, tipo, conta_contabil_id)
+          VALUES (${cnpjClean}, ${nomeNorm}, ${fornecedor}, ${empresa || null}, ${tipo || 'DESPESA'}, ${conta_contabil_id || null})
+          ON CONFLICT (cnpj) DO UPDATE SET
+            fornecedor = EXCLUDED.fornecedor,
+            empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
+            tipo = EXCLUDED.tipo,
+            conta_contabil_id = COALESCE(EXCLUDED.conta_contabil_id, boleto_patterns.conta_contabil_id),
+            confirmacoes = boleto_patterns.confirmacoes + 1,
+            ultima_confirmacao = NOW()`;
+      } catch {
+        await sql`
+          INSERT INTO boleto_patterns (nome_normalizado, fornecedor, empresa, tipo, conta_contabil_id)
+          VALUES (${nomeNorm}, ${fornecedor}, ${empresa || null}, ${tipo || 'DESPESA'}, ${conta_contabil_id || null})
+          ON CONFLICT (nome_normalizado) DO UPDATE SET
+            fornecedor = EXCLUDED.fornecedor,
+            empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
+            tipo = EXCLUDED.tipo,
+            conta_contabil_id = COALESCE(EXCLUDED.conta_contabil_id, boleto_patterns.conta_contabil_id),
+            confirmacoes = boleto_patterns.confirmacoes + 1,
+            ultima_confirmacao = NOW()`;
+      }
     } else {
       await sql`
         INSERT INTO boleto_patterns (nome_normalizado, fornecedor, empresa, tipo, conta_contabil_id)
@@ -1263,6 +1295,26 @@ async function handleExtractBoleto(req, res) {
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+    const generateContentWithFallback = async (contents, config) => {
+      const modelsToTry = [
+        process.env.GEMINI_MODEL,
+        'gemini-flash-latest',
+        'gemini-pro',
+      ].filter(Boolean);
+      let lastErr = null;
+      for (const model of modelsToTry) {
+        try {
+          return await ai.models.generateContent({ model, contents, config });
+        } catch (e) {
+          lastErr = e;
+          const msg = String(e?.message || '');
+          if (msg.includes('NOT_FOUND') || msg.includes('not found') || msg.includes('404')) continue;
+          throw e;
+        }
+      }
+      throw lastErr || new Error('Gemini request failed');
+    };
+
     const extractedText = text || '';
     const hasText = extractedText.length > 50;
 
@@ -1272,16 +1324,20 @@ async function handleExtractBoleto(req, res) {
     // ATENÇÃO: no boleto existem 2 CNPJs — do beneficiário e do pagador
     // O CNPJ do beneficiário aparece JUNTO ao nome do beneficiário
     // Extrai todos os CNPJs e associa ao contexto
-    const cnpjMatches = [...srcUpper.matchAll(/(\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2})/g)];
-    const allCnpjs = cnpjMatches.map(m => cleanCnpj(m[1])).filter(c => c.length >= 11);
+    const cnpjMatchesFormatted = [...srcUpper.matchAll(/\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b/g)].map(m => m[0]);
+    const cnpjMatchesDigits = [...srcUpper.matchAll(/\b\d{14}\b/g)].map(m => m[0]);
+    const allCnpjs = Array.from(new Set(
+      [...cnpjMatchesFormatted, ...cnpjMatchesDigits]
+        .map((m) => cleanCnpj(m))
+        .filter((c) => isValidCnpj(c))
+    ));
 
     // Tenta identificar o beneficiário pelo campo explícito
     const benefPatterns = [
-      /BENEFICI[AÁ]RIO[:\s]+([\w\u00C0-\u017E\s.&/,-]{3,60})(?:\s+CNPJ|\s+AG[EÊ]|\s+\d{2}\/)/i,
-      /CEDENTE[:\s]+([\w\u00C0-\u017E\s.&/,-]{3,60})(?:\s+CNPJ|\s+CPF)/i,
-      /SACADOR[^:]*:[:\s]+([\w\u00C0-\u017E\s.&/,-]{3,60})(?:\s+-\s+CNPJ|\s+CNPJ)/i,
-      // Nome seguido de CNPJ: "Empresa Ltda  18.717.282/0001-08"
-      /([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,60})\s+\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/i,
+      /BENEFICI[AÁ]RIO[:\s]+([\w\u00C0-\u017E\s.&/,-]{3,80})(?:\s+-\s+\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\s+\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\s+AG[EÊ]|\s+VENCIMENTO|\s+DATA)/i,
+      /CEDENTE[:\s]+([\w\u00C0-\u017E\s.&/,-]{3,80})(?:\s+-\s+\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\s+\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\s+CPF|\s+CNPJ|\s+VENCIMENTO|\s+DATA)/i,
+      /SACADOR[^:]*:[:\s]+([\w\u00C0-\u017E\s.&/,-]{3,80})(?:\s+-\s+\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\s+\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\s+CPF|\s+CNPJ|\s+VENCIMENTO|\s+DATA)/i,
+      /([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,80})\s+\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/i,
     ];
     let rawBenefName = '';
 
@@ -1297,10 +1353,20 @@ async function handleExtractBoleto(req, res) {
     } else if (srcUpper.includes('CABO DE VIDEO') || srcUpper.includes('CVC INTERNET') || srcUpper.includes('VALMIR LOPES DE SOUZA')) {
       rawBenefName = 'CVC INTERNET / VALMIR';
     } else {
+      const pagadorIdx = (() => {
+        const p = srcUpper.indexOf('PAGADOR');
+        const s = srcUpper.indexOf('SACADO');
+        if (p === -1) return s;
+        if (s === -1) return p;
+        return Math.min(p, s);
+      })();
+
       for (const p of benefPatterns) {
-        const m = srcUpper.match(p);
+        const m = p.exec(srcUpper);
         if (m?.[1]) {
-          const candidate = m[1].trim().replace(/\s+/g, ' ');
+          if (pagadorIdx !== -1 && typeof m.index === 'number' && m.index > pagadorIdx) continue;
+          let candidate = m[1].trim().replace(/\s+/g, ' ');
+          candidate = candidate.replace(/\s*-\s*\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}.*/i, '').trim();
           const rejectWords = ['BRADESCO', 'ITAU', 'SANTANDER', 'CAIXA', 'SICREDI', 'BANCO', 'PAGADOR', 'SACADO', 'RECIBO', 'AGENCIA', 'CODIGO', 'BENEFICI', 'ESPECIE', 'CARTEIRA', 'INSTRUCOES', 'LOCAL DE', 'INSC', 'DOM.', 'AV.', 'AVENIDA', 'RUA', 'CEP '];
           if (candidate.length >= 5 && !rejectWords.some(w => candidate.toUpperCase().includes(w))) {
             rawBenefName = candidate;
@@ -1312,7 +1378,7 @@ async function handleExtractBoleto(req, res) {
 
     // Tenta o CNPJ que aparece próximo ao nome do beneficiário
     // Pega o CNPJ que NÃO é do pagador (pagador aparece depois de "Pagador" ou "Sacado")
-    const pagadorMatch = srcUpper.match(/PAGADOR[:\s]+([\w\u00C0-\u017E\s.&/,-]{3,60})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ)/i);
+    const pagadorMatch = srcUpper.match(/(?:PAGADOR|SACADO)[:\s]+([\w\u00C0-\u017E\s.&/,-]{3,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/i);
     const pagadorNome = pagadorMatch?.[1]?.trim() || '';
     // CNPJ do beneficiário = primeiro CNPJ que não está associado ao pagador
     const rawCnpj = allCnpjs.find(c => {
@@ -1368,7 +1434,7 @@ async function handleExtractBoleto(req, res) {
       }
 
       // Extrai nome do Pagador do texto para usar como descrição (aceita acentos e caracteres especiais)
-      const pagadorRawMatch = srcUpper.match(/PAGADOR\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
+      const pagadorRawMatch = srcUpper.match(/(?:PAGADOR|SACADO)\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
       const pagadorDescricao = (pagadorRawMatch?.[1] || '').trim().replace(/\s+/g, ' ');
 
       // Se não conseguiu extrair localmente, chama Gemini só para esses campos
@@ -1383,11 +1449,10 @@ TEXTO: ${extractedText.slice(0, 5000)}
 
 Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
 
-        const miniResp = await ai.models.generateContent({
-          model: 'gemini-1.5-flash',
-          contents: miniPrompt,
-          config: { responseMimeType: 'application/json', temperature: 0 },
-        });
+        const miniResp = await generateContentWithFallback(
+          miniPrompt,
+          { responseMimeType: 'application/json', temperature: 0 }
+        );
         const mini = JSON.parse((miniResp.text || '{}').replace(/```json|```/gi, '').trim());
 
         return res.json({
@@ -1415,6 +1480,39 @@ Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
         conta_contabil_id: pattern.conta_contabil_id || null,
         numero_boleto,
         _from_pattern: true,
+      });
+    }
+
+    const localVencimento = (srcUpper.match(/VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/i)?.[1] || '').trim();
+    const localValorMatch =
+      srcUpper.match(/VALOR\s+DO\s+DOCUMENTO[:\s]+([\d.,]+)/i) ||
+      srcUpper.match(/VALOR\s*[:\s]+R\$\s*([\d.,]+)/i) ||
+      srcUpper.match(/TOTAL\s+DESTE\s+BOLETO[^0-9]*([\d.,]+)/i);
+    const localValor = (() => {
+      const s = (localValorMatch?.[1] || '').trim();
+      if (!s) return 0;
+      const r = s.replace(/[R$\s]/g, '');
+      if (r.includes('.') && r.includes(',')) {
+        if (r.indexOf('.') < r.indexOf(',')) return Number(r.replace(/\./g, '').replace(',', '.')) || 0;
+        return Number(r.replace(/,/g, '')) || 0;
+      }
+      if (r.includes(',')) return Number(r.replace(',', '.')) || 0;
+      return Number(r) || 0;
+    })();
+    const localNumeroBoleto = extractLocalBoletoNumber(srcUpper);
+    const localPagador = (srcUpper.match(/(?:PAGADOR|SACADO)\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i)?.[1] || '').trim().replace(/\s+/g, ' ');
+
+    if (hasText && rawBenefName && (localValor > 0 || localVencimento)) {
+      return res.json({
+        fornecedor: rawBenefName,
+        beneficiario: rawBenefName,
+        pagador: localPagador,
+        vencimento: localVencimento,
+        valor: localValor,
+        cnpj: rawCnpj || '',
+        descricao: `${fileName || ''}${localPagador ? ` - ${localPagador}` : ''}`.trim().replace(/^-\s*/, ''),
+        empresa: '',
+        numero_boleto: localNumeroBoleto || '',
       });
     }
 
@@ -1472,14 +1570,13 @@ JSON FORMAT:
       contents = prompt;
     }
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+    const response = await generateContentWithFallback(
       contents,
-      config: {
+      {
         responseMimeType: 'application/json',
-        temperature: 0.1,
-      },
-    });
+        temperature: 0,
+      }
+    );
 
     let rawText = response.text;
     if (rawText) {
