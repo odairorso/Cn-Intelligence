@@ -1048,6 +1048,9 @@ async function handleSetupTables(req, res) {
       )`;
 
     await sql`CREATE INDEX IF NOT EXISTS idx_suppliers_uid ON suppliers(uid)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_vencimento ON transactions(vencimento)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_tipo ON transactions(tipo)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_suppliers_user_id ON suppliers(user_id)`;
 
     // Atualiza ou insere contas padrão (upsert por código)
