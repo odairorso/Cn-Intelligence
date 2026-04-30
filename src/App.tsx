@@ -804,7 +804,10 @@ const LancamentosTab = ({
                   />
                 )}
                 <span className="font-semibold text-sm leading-tight flex-1">{tx.fornecedor}</span>
-                <span className={cn("font-bold text-sm whitespace-nowrap", tx.valor < 0 ? "text-tertiary" : "text-primary")}>
+                <span className={cn(
+                  "font-bold text-sm whitespace-nowrap",
+                  tx.valor < 0 ? "text-tertiary" : (isRevenueTransaction(tx) ? "text-success" : "text-primary")
+                )}>
                   {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
@@ -888,7 +891,10 @@ const LancamentosTab = ({
                   </td>
                   <td className="px-8 py-4 font-semibold max-w-[200px] truncate" title={tx.fornecedor}>{tx.fornecedor}</td>
                   <td className="px-8 py-4 text-on-surface-variant max-w-[250px] truncate" title={tx.descricao}>{tx.descricao}</td>
-                  <td className={cn("px-8 py-4 font-bold text-right", tx.valor < 0 ? "text-tertiary" : "text-primary")}>
+                  <td className={cn(
+                    "px-8 py-4 font-bold text-right",
+                    tx.valor < 0 ? "text-tertiary" : (isRevenueTransaction(tx) ? "text-success" : "text-primary")
+                  )}>
                     {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     {Number(tx.juros) > 0 && (
                       <p className="text-[9px] text-tertiary font-normal">(inclui {Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })} juros)</p>
@@ -1980,12 +1986,12 @@ const ReceitasTab = ({ transactions, onNewRevenue, fetchTransactions }: Receitas
 
   const [selectedYear, setSelectedYear] = useState<string>('TODOS');
 
+  const [selectedMonth, setSelectedMonth] = useState<string>('TODOS');
+  const [selectedCompany, setSelectedCompany] = useState<string>('TODOS');
+
   useEffect(() => {
     fetchTransactions(false, selectedYear, selectedMonth);
   }, [selectedYear, selectedMonth, fetchTransactions]);
-
-  const [selectedMonth, setSelectedMonth] = useState<string>('TODOS');
-  const [selectedCompany, setSelectedCompany] = useState<string>('TODOS');
 
   const companies = useMemo(() => {
     const map = new Map<string, string>();
@@ -4242,7 +4248,13 @@ export default function App() {
           const local = extractBoletoData(fullText, file.name);
           local.fornecedor = resolveSupplierName(local.fornecedor, fullText);
 
-          // A extração local serve agora apenas como fallback em caso de falha da API
+          // PROTEÇÃO: Se for Energisa e a data for Maio/2026, NÃO confia na extração local (provavelmente pegou data de leitura)
+          const isEnergisaSuspicious = local.fornecedor.includes('ENERGISA') && local.vencimento === '07/05/2026';
+          const hasLocalCore = !!local.vencimento && local.valor > 0 && local.fornecedor !== 'Fornecedor não identificado' && !isEnergisaSuspicious;
+
+          // Se a extração local funcionou perfeitamente, usa ela (conforme pedido: sempre acrescentar, nunca mudar o que já funciona)
+          if (hasLocalCore) return local;
+
           const ai = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
           ai.fornecedor = resolveSupplierName(ai.fornecedor, fullText);
 
