@@ -616,7 +616,7 @@ Analise visualmente o PDF anexo e extraia os dados.`;
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       contents,
       config: {
         responseMimeType: 'application/json',

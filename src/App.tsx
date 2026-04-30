@@ -1,3 +1,4 @@
+// v1.1.2 - Re-trigger build
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard,
@@ -574,7 +575,7 @@ interface LancamentosTabProps {
   deleteTransaction: (id: string) => void;
   setShowNewTxModal: (show: boolean) => void;
   setEditingTx: (tx: Transaction) => void;
-  onLoadMore?: (append?: boolean, year?: string, month?: string, search?: string, limit?: number) => void;
+  onLoadMore?: (append?: boolean, year?: string, month?: string, search?: string) => void;
   isLoadingMore?: boolean;
 }
 
@@ -589,18 +590,16 @@ const LancamentosTab = ({
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [page, setPage] = useState(0);
   const [selectedMap, setSelectedMap] = useState<Map<string, Transaction>>(new Map());
-  const [serverLimit, setServerLimit] = useState<number>(50);
-  const effectiveServerLimit = useMemo(() => Math.min(Math.max(Number(serverLimit) || 50, 1), 5000), [serverLimit]);
 
   // Busca no servidor ao mudar filtros (debounce para o texto)
   useEffect(() => {
     if (onLoadMore) {
       const timer = setTimeout(() => {
-        onLoadMore(false, yearFilter, monthFilter, filter, effectiveServerLimit);
+        onLoadMore(false, yearFilter, monthFilter, filter);
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [filter, yearFilter, monthFilter, effectiveServerLimit, onLoadMore]);
+  }, [filter, yearFilter, monthFilter, onLoadMore]);
 
   // Extrair meses e anos únicos para os filtros
   const availableYears = useMemo(() => {
@@ -627,10 +626,42 @@ const LancamentosTab = ({
   ];
 
   const filtered = useMemo(() => {
-    const searchLower = filter.toLowerCase();
+    const searchRaw = String(filter || '').trim();
+    const searchLower = searchRaw.toLowerCase();
+    const parseMoneySearch = (input: string): number | null => {
+      const raw = String(input || '').trim();
+      if (!raw) return null;
+      const cleaned = raw.replace(/[^\d,.\-]/g, '');
+      if (!cleaned) return null;
+      let n: number;
+      if (cleaned.includes(',') && cleaned.includes('.')) {
+        const lastComma = cleaned.lastIndexOf(',');
+        const lastDot = cleaned.lastIndexOf('.');
+        if (lastComma > lastDot) n = Number(cleaned.replace(/\./g, '').replace(',', '.'));
+        else n = Number(cleaned.replace(/,/g, ''));
+      } else if (cleaned.includes(',')) {
+        n = Number(cleaned.replace(/\./g, '').replace(',', '.'));
+      } else {
+        n = Number(cleaned);
+      }
+      return Number.isFinite(n) ? n : null;
+    };
+    const moneySearch = parseMoneySearch(searchRaw);
+
     return transactions.filter(tx => {
-      const matchesSearch = tx.fornecedor.toLowerCase().includes(searchLower) ||
-        (tx.descricao && tx.descricao.toLowerCase().includes(searchLower));
+      const matchesTextSearch = !searchLower ||
+        tx.fornecedor.toLowerCase().includes(searchLower) ||
+        (tx.descricao && tx.descricao.toLowerCase().includes(searchLower)) ||
+        (tx.empresa && tx.empresa.toLowerCase().includes(searchLower));
+
+      const txValor = Number(tx.valor) || 0;
+      const txJuros = Number(tx.juros || 0) || 0;
+      const txTotal = txValor + txJuros;
+      const matchesMoneySearch = moneySearch === null ||
+        Math.abs(txValor - moneySearch) < 0.01 ||
+        Math.abs(txTotal - moneySearch) < 0.01;
+
+      const matchesSearch = matchesTextSearch && matchesMoneySearch;
       const matchesStatus = statusFilter === 'TODOS' || tx.status === statusFilter;
 
       let matchesMonth = true;
@@ -713,7 +744,7 @@ const LancamentosTab = ({
             <Search size={18} className="text-on-surface-variant" />
             <input
               type="text"
-              placeholder="Buscar fornecedor ou descrição..."
+              placeholder="Buscar fornecedor, descrição, empresa ou valor (ex: 750,00)..."
               className="bg-transparent border-none text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-0 p-0 outline-none w-full ml-3"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
@@ -753,19 +784,6 @@ const LancamentosTab = ({
               <option key={y} value={y || ''} className="bg-surface text-on-surface">{y}</option>
             ))}
           </select>
-
-          <div className="bg-surface border border-white/10 text-on-surface text-sm rounded-sm px-4 py-2.5 outline-none focus-within:border-primary hover:bg-surface-variant/20 transition-all flex items-center gap-3">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant whitespace-nowrap">Buscar no banco</span>
-            <input
-              type="number"
-              min={1}
-              max={5000}
-              value={Number.isFinite(serverLimit) ? serverLimit : 50}
-              onChange={(e) => setServerLimit(Number(e.target.value))}
-              className="w-20 bg-transparent border-none text-sm text-on-surface focus:ring-0 p-0 outline-none text-right"
-              title="Quantidade de registros para puxar do banco (máx 5000)"
-            />
-          </div>
 
           <button
             onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
@@ -996,7 +1014,7 @@ const LancamentosTab = ({
       {/* Carregar mais do Banco de Dados */}
       <div className="flex justify-center pt-4 border-t border-white/5">
         <button
-          onClick={() => onLoadMore?.(true, yearFilter, monthFilter, filter, effectiveServerLimit)}
+          onClick={() => onLoadMore?.(true, yearFilter, monthFilter, filter)}
           disabled={isLoadingMore}
           className="flex items-center gap-2 px-6 py-3 bg-primary/10 text-primary rounded-xl text-sm font-bold hover:bg-primary/20 transition-all disabled:opacity-50"
         >
@@ -1006,7 +1024,7 @@ const LancamentosTab = ({
             </>
           ) : (
             <>
-              <RefreshCw size={18} /> Carregar mais ({effectiveServerLimit})
+              <RefreshCw size={18} /> Carregar mais registros do Banco de Dados
             </>
           )}
         </button>
@@ -5015,7 +5033,7 @@ export default function App() {
                 deleteTransaction={deleteTransaction}
                 setShowNewTxModal={setShowNewTxModal}
                 setEditingTx={setEditingTx}
-                onLoadMore={(append, year, month, search, limit) => fetchTransactions(append, year, month, search, limit)}
+                onLoadMore={(append, year, month, search) => fetchTransactions(append, year, month, search)}
                 isLoadingMore={isLoadingMore}
               />
             )}

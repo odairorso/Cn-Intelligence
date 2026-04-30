@@ -215,11 +215,37 @@ async function handleTransactions(req, res) {
 
       // Se houver busca, ignoramos filtros de ano/mês para encontrar em todo o histórico
       if (search) {
-        // Busca flexível: remove acentos básicos para melhorar a busca manual
+        const parseSearchMoney = (input) => {
+          const raw = String(input || '').trim();
+          if (!raw) return null;
+          const cleaned = raw.replace(/[^\d,.\-]/g, '');
+          if (!cleaned) return null;
+          let n;
+          if (cleaned.includes(',') && cleaned.includes('.')) {
+            const lastComma = cleaned.lastIndexOf(',');
+            const lastDot = cleaned.lastIndexOf('.');
+            if (lastComma > lastDot) n = Number(cleaned.replace(/\./g, '').replace(',', '.'));
+            else n = Number(cleaned.replace(/,/g, ''));
+          } else if (cleaned.includes(',')) {
+            n = Number(cleaned.replace(/\./g, '').replace(',', '.'));
+          } else {
+            n = Number(cleaned);
+          }
+          return Number.isFinite(n) ? n : null;
+        };
+
+        const money = parseSearchMoney(search);
         const s = `%${search}%`;
-        query = sql`${query} AND (fornecedor ILIKE ${s} OR descricao ILIKE ${s} OR empresa ILIKE ${s})`;
-      }
- else {
+        query = money === null
+          ? sql`${query} AND (fornecedor ILIKE ${s} OR descricao ILIKE ${s} OR empresa ILIKE ${s})`
+          : sql`${query} AND (
+              fornecedor ILIKE ${s}
+              OR descricao ILIKE ${s}
+              OR empresa ILIKE ${s}
+              OR abs(valor - ${money}) < 0.01
+              OR abs((valor + coalesce(juros, 0)) - ${money}) < 0.01
+            )`;
+      } else {
         // Filtros de período só se aplicam se NÃO houver busca ativa
         if (year && year !== 'TODOS') {
           const start = `${year}-01-01`;
@@ -1353,7 +1379,7 @@ TEXTO: ${extractedText.slice(0, 5000)}
 Responda APENAS JSON: {"vencimento":"","valor":0,"numero_boleto":""}`;
 
         const miniResp = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-1.5-flash',
           contents: miniPrompt,
           config: { responseMimeType: 'application/json', temperature: 0 },
         });
@@ -1442,7 +1468,7 @@ JSON FORMAT:
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       contents,
       config: {
         responseMimeType: 'application/json',
