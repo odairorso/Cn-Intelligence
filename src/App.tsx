@@ -2037,7 +2037,8 @@ const ReceitasTab = ({ transactions, onNewRevenue, fetchTransactions }: Receitas
   const [selectedCompany, setSelectedCompany] = useState<string>('TODOS');
 
   useEffect(() => {
-    fetchTransactions(false, selectedYear, selectedMonth, undefined, undefined, { limit: 5000 });
+    // Busca 10.000 registros para garantir todo o histórico na aba de receitas
+    fetchTransactions(false, selectedYear, selectedMonth, undefined, undefined, { limit: 10000 });
   }, [selectedYear, selectedMonth, fetchTransactions]);
 
   const companies = useMemo(() => {
