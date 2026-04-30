@@ -236,15 +236,13 @@ async function handleTransactions(req, res) {
 
         const money = parseSearchMoney(search);
         const s = `%${search}%`;
-        query = money === null
-          ? sql`${query} AND (fornecedor ILIKE ${s} OR descricao ILIKE ${s} OR empresa ILIKE ${s})`
-          : sql`${query} AND (
-              fornecedor ILIKE ${s}
-              OR descricao ILIKE ${s}
-              OR empresa ILIKE ${s}
-              OR abs(valor - ${money}) < 0.01
-              OR abs((valor + coalesce(juros, 0)) - ${money}) < 0.01
-            )`;
+        query = sql`${query} AND (
+          fornecedor ILIKE ${s}
+          OR descricao ILIKE ${s}
+          OR empresa ILIKE ${s}
+          OR CAST(valor AS TEXT) ILIKE ${s}
+          ${money !== null ? sql`OR abs(valor - ${money}) < 0.01 OR abs((valor + coalesce(juros, 0)) - ${money}) < 0.01` : sql``}
+        )`;
       } else {
         // Filtros de período só se aplicam se NÃO houver busca ativa
         if (year && year !== 'TODOS') {
@@ -1048,6 +1046,9 @@ async function handleSetupTables(req, res) {
       )`;
 
     await sql`CREATE INDEX IF NOT EXISTS idx_suppliers_uid ON suppliers(uid)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_vencimento ON transactions(vencimento)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_tipo ON transactions(tipo)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_suppliers_user_id ON suppliers(user_id)`;
 
     // Atualiza ou insere contas padrão (upsert por código)
