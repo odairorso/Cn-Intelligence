@@ -4242,12 +4242,7 @@ export default function App() {
           const local = extractBoletoData(fullText, file.name);
           local.fornecedor = resolveSupplierName(local.fornecedor, fullText);
 
-          // PROTEÇÃO: Se for Energisa e a data for Maio/2026, NÃO confia na extração local (provavelmente pegou data de leitura)
-          const isEnergisaSuspicious = local.fornecedor.includes('ENERGISA') && local.vencimento === '07/05/2026';
-          const hasLocalCore = !!local.vencimento && local.valor > 0 && local.fornecedor !== 'Fornecedor não identificado' && !isEnergisaSuspicious;
-
-          if (hasLocalCore) return local;
-
+          // A extração local serve agora apenas como fallback em caso de falha da API
           const ai = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
           ai.fornecedor = resolveSupplierName(ai.fornecedor, fullText);
 
