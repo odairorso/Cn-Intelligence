@@ -1375,7 +1375,14 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
 
 interface RelatoriosTabProps {
   transactions: Transaction[];
-  fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string) => void;
+  fetchTransactions: (
+    append?: boolean,
+    year?: string,
+    month?: string,
+    search?: string,
+    tipo?: string,
+    options?: { limit?: number }
+  ) => void;
 }
 
 const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) => {
@@ -2000,7 +2007,14 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
 interface ReceitasTabProps {
   transactions: Transaction[];
   onNewRevenue: () => void;
-  fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string, tipo?: string) => void;
+  fetchTransactions: (
+    append?: boolean,
+    year?: string,
+    month?: string,
+    search?: string,
+    tipo?: string,
+    options?: { limit?: number }
+  ) => void;
 }
 
 const ReceitasTab = ({ transactions, onNewRevenue, fetchTransactions }: ReceitasTabProps) => {
@@ -2023,7 +2037,7 @@ const ReceitasTab = ({ transactions, onNewRevenue, fetchTransactions }: Receitas
   const [selectedCompany, setSelectedCompany] = useState<string>('TODOS');
 
   useEffect(() => {
-    fetchTransactions(false, selectedYear, selectedMonth, undefined, 'RECEITA');
+    fetchTransactions(false, selectedYear, selectedMonth, undefined, undefined, { limit: 5000 });
   }, [selectedYear, selectedMonth, fetchTransactions]);
 
   const companies = useMemo(() => {
