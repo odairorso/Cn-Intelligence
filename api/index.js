@@ -205,10 +205,9 @@ async function handleTransactions(req, res) {
   if (req.method === 'GET') {
     try {
       const { uid, limit, offset, year, month, search, tipo } = req.query;
-      // Se tiver busca ou filtro de ano, aumentamos o limite para garantir que o resultado seja completo
-      const defaultLimit = (year && year !== 'TODOS') || search || tipo ? 5000 : 50;
-      const parsedLimit = limit ? parseInt(limit) : defaultLimit;
-      const parsedOffset = offset ? parseInt(offset) : 0;
+      // Aumentamos o limite padrão para 5000 para garantir que o histórico seja carregado
+      const defaultLimit = 5000;
+      const parsedLimit = limit ? parseInt(limit) : defaultLimit;      const parsedOffset = offset ? parseInt(offset) : 0;
 
       let query = sql`SELECT * FROM transactions WHERE 1=1`;
       if (uid) query = sql`${query} AND uid = ${uid}`;
