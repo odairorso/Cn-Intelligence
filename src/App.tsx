@@ -574,7 +574,7 @@ interface LancamentosTabProps {
   deleteTransaction: (id: string) => void;
   setShowNewTxModal: (show: boolean) => void;
   setEditingTx: (tx: Transaction) => void;
-  onLoadMore?: (append?: boolean, year?: string, month?: string, search?: string) => void;
+  onLoadMore?: (append?: boolean, year?: string, month?: string, search?: string, limit?: number) => void;
   isLoadingMore?: boolean;
 }
 
@@ -589,16 +589,18 @@ const LancamentosTab = ({
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [page, setPage] = useState(0);
   const [selectedMap, setSelectedMap] = useState<Map<string, Transaction>>(new Map());
+  const [serverLimit, setServerLimit] = useState<number>(50);
+  const effectiveServerLimit = useMemo(() => Math.min(Math.max(Number(serverLimit) || 50, 1), 5000), [serverLimit]);
 
   // Busca no servidor ao mudar filtros (debounce para o texto)
   useEffect(() => {
     if (onLoadMore) {
       const timer = setTimeout(() => {
-        onLoadMore(false, yearFilter, monthFilter, filter);
+        onLoadMore(false, yearFilter, monthFilter, filter, effectiveServerLimit);
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [filter, yearFilter, monthFilter, onLoadMore]);
+  }, [filter, yearFilter, monthFilter, effectiveServerLimit, onLoadMore]);
 
   // Extrair meses e anos únicos para os filtros
   const availableYears = useMemo(() => {
@@ -751,6 +753,19 @@ const LancamentosTab = ({
               <option key={y} value={y || ''} className="bg-surface text-on-surface">{y}</option>
             ))}
           </select>
+
+          <div className="bg-surface border border-white/10 text-on-surface text-sm rounded-sm px-4 py-2.5 outline-none focus-within:border-primary hover:bg-surface-variant/20 transition-all flex items-center gap-3">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant whitespace-nowrap">Buscar no banco</span>
+            <input
+              type="number"
+              min={1}
+              max={5000}
+              value={Number.isFinite(serverLimit) ? serverLimit : 50}
+              onChange={(e) => setServerLimit(Number(e.target.value))}
+              className="w-20 bg-transparent border-none text-sm text-on-surface focus:ring-0 p-0 outline-none text-right"
+              title="Quantidade de registros para puxar do banco (máx 5000)"
+            />
+          </div>
 
           <button
             onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
@@ -981,7 +996,7 @@ const LancamentosTab = ({
       {/* Carregar mais do Banco de Dados */}
       <div className="flex justify-center pt-4 border-t border-white/5">
         <button
-          onClick={onLoadMore}
+          onClick={() => onLoadMore?.(true, yearFilter, monthFilter, filter, effectiveServerLimit)}
           disabled={isLoadingMore}
           className="flex items-center gap-2 px-6 py-3 bg-primary/10 text-primary rounded-xl text-sm font-bold hover:bg-primary/20 transition-all disabled:opacity-50"
         >
@@ -991,7 +1006,7 @@ const LancamentosTab = ({
             </>
           ) : (
             <>
-              <RefreshCw size={18} /> Carregar mais registros do Banco de Dados
+              <RefreshCw size={18} /> Carregar mais ({effectiveServerLimit})
             </>
           )}
         </button>
@@ -5000,7 +5015,7 @@ export default function App() {
                 deleteTransaction={deleteTransaction}
                 setShowNewTxModal={setShowNewTxModal}
                 setEditingTx={setEditingTx}
-                onLoadMore={(append, year, month, search) => fetchTransactions(append, year, month, search)}
+                onLoadMore={(append, year, month, search, limit) => fetchTransactions(append, year, month, search, limit)}
                 isLoadingMore={isLoadingMore}
               />
             )}
