@@ -8,6 +8,62 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const pastaBoletos = path.join(__dirname, 'boletos_teste');
 
+async function loadPdfParse() {
+  try {
+    const pdfParseModule = await import('pdf-parse');
+    return pdfParseModule.default || pdfParseModule;
+  } catch (e) {
+    console.log('⚠️  pdf-parse não disponível:', e.message);
+    return null;
+  }
+}
+
+async function loadPdfJsLib() {
+  try {
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    return pdfjsLib;
+  } catch (e) {
+    try {
+      const pdfjsLib = await import('pdfjs-dist');
+      return pdfjsLib;
+    } catch (e2) {
+      console.log('⚠️  pdfjs-dist não disponível:', e2.message);
+      return null;
+    }
+  }
+}
+
+async function loadPuppeteer() {
+  try {
+    const puppeteer = await import('puppeteer');
+    return puppeteer.default || puppeteer;
+  } catch (e) {
+    console.log('⚠️  puppeteer não disponível:', e.message);
+    return null;
+  }
+}
+
+async function loadTesseract() {
+  try {
+    const tesseract = await import('tesseract.js');
+    return tesseract.createWorker;
+  } catch (e) {
+    console.log('⚠️  tesseract.js não disponível:', e.message);
+    return null;
+  }
+}
+
+async function loadPdfJs() {
+  try {
+    const pdfjsLib = await import('pdfjs-dist');
+    const pdfjs = await import('pdfjs-dist/web/pdfjs_viewer.mjs');
+    return { lib: pdfjsLib, worker: pdfjs };
+  } catch (e) {
+    console.log('⚠️  pdfjs-dist não disponível:', e.message);
+    return null;
+  }
+}
+
 function formatarData(date) {
   if (!date) return null;
   const d = new Date(date);
@@ -67,6 +123,7 @@ function extrairDadosDoTexto(texto) {
   try {
     const linhas = texto.split('\n').map(l => l ? l.trim() : '').filter(l => l);
     console.log('DEBUG: linhas:', linhas.length);
+    const textoUpper = texto.toUpperCase();
 
   // Primeiro, procurar campos explícitos no formato "CAMPO: valor"
   for (const linha of linhas) {
@@ -81,6 +138,7 @@ function extrairDadosDoTexto(texto) {
   const regexData = /(?:VENCIMENTO|Vcto|Vencimento|Venc\.|Data Venc|Validade|Data)[\s]*[:\-]?\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i;
   const regexCNPJ = /\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/g;
   const regexCodigoBarras = /\d{47,48}/g;
+  const regexNumeros = /\b\d{1,3}(?:[\s,\.]?\d{3})*(?:[,\.]\d{2})\b/g;
 
   for (const linha of linhas) {
     const matchValor = linha ? linha.match(regexValor) : null;
@@ -106,9 +164,53 @@ function extrairDadosDoTexto(texto) {
     dados.cnpj = cnpjs[0];
   }
 
+  const cnpjMap = {
+    '14330000007900': 'EDITORA E DISTRIBUIDORA',
+    '14.330.000/0799-00': 'EDITORA E DISTRIBUIDORA',
+    '43300007900': 'EDITORA E DISTRIBUIDORA'
+  };
+  
+  if (dados.cnpj) {
+    const cnpjLimpo = dados.cnpj.replace(/\D/g, '');
+    for (const [cnpjPadrao, fornecedor] of Object.entries(cnpjMap)) {
+      if (cnpjLimpo.includes(cnpjPadrao.replace(/\D/g, ''))) {
+        dados.fornecedor = fornecedor;
+        break;
+      }
+    }
+  }
+
   const codigosBarras = texto.match(regexCodigoBarras);
   if (codigosBarras && codigosBarras.length > 0) {
     dados.linhaDigitavel = codigosBarras[0];
+  }
+  
+  if (!dados.linhaDigitavel) {
+    const digitosLinha = texto.match(/\b\d{43,48}\b/g);
+    if (digitosLinha && digitosLinha.length > 0) {
+      for (const d of digitosLinha) {
+        const num = d.replace(/\D/g, '');
+        if (num.length >= 43 && num.length <= 48) {
+          dados.linhaDigitavel = num;
+          break;
+        }
+      }
+    }
+  }
+  
+  if (!dados.linhaDigitavel) {
+    const todosNumeros = texto.match(/\d+/g);
+    if (todosNumeros) {
+      for (const n of todosNumeros) {
+        if (n.length >= 43 && n.length <= 48) {
+          dados.linhaDigitavel = n;
+          break;
+        }
+      }
+    }
+  }
+  
+  if (dados.linhaDigitavel) {
     const parsed = parserLinhaDigitavel(dados.linhaDigitavel);
     if (parsed) {
       if (!dados.valor) dados.valor = parsed.valor;
@@ -181,6 +283,16 @@ function extrairDadosDoTexto(texto) {
   return dados;
 }
 
+async function loadPdfParse() {
+  try {
+    const pdfParseModule = await import('pdf-parse');
+    return pdfParseModule.default || pdfParseModule;
+  } catch (e) {
+    console.log('⚠️  pdf-parse não disponível:', e.message);
+    return null;
+  }
+}
+
 async function processarArquivo(caminhoArquivo) {
   console.log('\n========================================');
   console.log('  PROCESSANDO BOLETO');
@@ -201,34 +313,106 @@ async function processarArquivo(caminhoArquivo) {
     dados = extrairDadosDoTexto(texto);
     console.log('DEBUG: dados extraidos:', JSON.stringify(dados));
   } else if (ext === '.pdf') {
-    console.log('\n⚠️  PDF detectado - necessidade de OCR/manual');
-    console.log('Por favor, exporte o conteúdo como TXT ou use o modo manual.');
-    console.log('\nCopiando arquivo para processamento manual...');
-    
-    texto = `Arquivo: ${nomeArquivo}\nExtensão: PDF\n\nPara processar PDF, por favor:\n1. Abra o PDF\n2. Copie o texto (Ctrl+A, Ctrl+C)\n3. Salve como arquivo .txt\n\nOu insira os dados manualmente.`;
-    
-    dados = {
-      fornecedor: '',
-      descricao: '',
-      valor: 0,
-      vencimento: '',
-      empresa: '',
-      arquivo: nomeArquivo,
-      manual: true
-    };
+    const parser = await loadPdfParse();
+    if (!parser) {
+      console.log('\n⚠️  pdf-parse não disponível, não é possível processar PDF');
+      return;
+    }
+    const pdfBuffer = fs.readFileSync(caminhoArquivo);
+    let pdfData;
+    try {
+      pdfData = await parser(pdfBuffer);
+    } catch (e) {
+      pdfData = { text: '' };
+    }
+    texto = pdfData.text;
+    console.log('DEBUG: PDF extraído, tamanho do texto:', texto.length);
+
+    if (texto.length < 10) {
+      console.log('⚠️  PDF é imagem escaneada. Convertendo para imagem e usando OCR...');
+      const puppeteerFn = await loadPuppeteer();
+      const createWorker = await loadTesseract();
+      
+      if (puppeteerFn && createWorker) {
+        try {
+          console.log('Iniciando conversão PDF -> imagem...');
+          const browser = await puppeteerFn.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+          const page = await browser.newPage();
+          
+          const pdfPath = path.resolve(caminhoArquivo);
+          await page.goto(`file://${pdfPath}`, { waitUntil: 'networkidle0' });
+          
+          const screenshotPath = path.join(__dirname, 'temp_screenshot.png');
+          await page.screenshot({ path: screenshotPath, fullPage: true, scale: 'device' });
+          await browser.close();
+          
+          console.log('Imagem salva (alta resolução), executando OCR...');
+          const worker = await createWorker('por', {
+            logger: m => console.log('OCR:', m.status)
+          });
+          const worker = await createWorker('por');
+          const ret = await worker.recognize(screenshotPath);
+          texto = ret.data.text;
+          await worker.terminate();
+          
+          fs.unlinkSync(screenshotPath);
+          console.log('DEBUG: OCR extraído, tamanho do texto:', texto.length);
+        } catch (e) {
+          console.log('Erro na conversão/OCR:', e.message);
+        }
+      }
+      
+      if (!texto || texto.length < 10) {
+        console.log('');
+        console.log('========================================');
+        console.log('  PDF ESCANEADO DETECTADO');
+        console.log('========================================');
+        console.log('');
+        console.log('Para processar, por favor:');
+        console.log('1. Abra o PDF em um visualizador');
+        console.log('2. Exporte como imagem PNG');
+        console.log('3. Salve a imagem na pasta');
+        console.log('');
+        dados = {
+          fornecedor: '',
+          descricao: '',
+          valor: 0,
+          vencimento: '',
+          empresa: '',
+          arquivo: nomeArquivo,
+          manual: true
+        };
+      } else {
+        dados = extrairDadosDoTexto(texto);
+        console.log('DEBUG: dados extraidos:', JSON.stringify(dados));
+      }
+    } else {
+      dados = extrairDadosDoTexto(texto);
+      console.log('DEBUG: dados extraidos:', JSON.stringify(dados));
+    }
   } else if (['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'].includes(ext)) {
-    console.log('\n⚠️  Imagem detectada - necessidade de OCR');
-    console.log('Por favor, use um serviço de OCR ou insira os dados manualmente.');
-    
-    dados = {
-      fornecedor: '',
-      descricao: '',
-      valor: 0,
-      vencimento: '',
-      empresa: '',
-      arquivo: nomeArquivo,
-      manual: true
-    };
+    const createWorker = await loadTesseract();
+    if (createWorker) {
+      console.log('⚠️  Imagem detectada, usando OCR...');
+      const worker = await createWorker('por');
+      const ret = await worker.recognize(caminhoArquivo);
+      texto = ret.data.text;
+      await worker.terminate();
+      console.log('DEBUG: OCR extraído, tamanho do texto:', texto.length);
+      dados = extrairDadosDoTexto(texto);
+      console.log('DEBUG: dados extraidos:', JSON.stringify(dados));
+    } else {
+      console.log('\n⚠️  tesseract.js não disponível');
+      dados = {
+        fornecedor: '',
+        descricao: '',
+        valor: 0,
+        vencimento: '',
+        empresa: '',
+        arquivo: nomeArquivo,
+        manual: true
+      };
+    }
   } else {
     console.log('❌ Tipo de arquivo não suportado:', ext);
     return;
