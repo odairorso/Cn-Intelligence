@@ -1412,8 +1412,8 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
   };
 
   useEffect(() => {
-    fetchTransactions(false, selectedYear, selectedMonth);
-  }, [selectedYear, selectedMonth, fetchTransactions]);
+    fetchTransactions(false, selectedYear, selectedMonth, undefined, selectedTipo);
+  }, [selectedYear, selectedMonth, selectedTipo, fetchTransactions]);
 
   const companies = useMemo(() => {
     const map = new Map<string, string>();
@@ -1890,7 +1890,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
                       <td className="px-4 py-4">
                         <span className={cn(
                           "text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest",
-                          isRev ? "bg-primary/20 text-primary border-primary/30" : "bg-tertiary/20 text-tertiary border-tertiary/30"
+                          isRev ? "bg-success/20 text-success border-success/30" : "bg-primary/20 text-primary border-primary/30"
                         )}>
                           {isRev ? 'Receita' : 'Despesa'}
                         </span>
@@ -2001,7 +2001,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
 interface ReceitasTabProps {
   transactions: Transaction[];
   onNewRevenue: () => void;
-  fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string) => void;
+  fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string, tipo?: string) => void;
 }
 
 const ReceitasTab = ({ transactions, onNewRevenue, fetchTransactions }: ReceitasTabProps) => {
@@ -2024,7 +2024,7 @@ const ReceitasTab = ({ transactions, onNewRevenue, fetchTransactions }: Receitas
   const [selectedCompany, setSelectedCompany] = useState<string>('TODOS');
 
   useEffect(() => {
-    fetchTransactions(false, selectedYear, selectedMonth);
+    fetchTransactions(false, selectedYear, selectedMonth, undefined, 'RECEITA');
   }, [selectedYear, selectedMonth, fetchTransactions]);
 
   const companies = useMemo(() => {
