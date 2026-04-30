@@ -114,7 +114,7 @@ export function useAppData() {
 
       const limit =
         options?.limit ??
-        ((year && year !== 'TODOS') || (month && month !== 'TODOS') || search || tipo ? 5000 : 5000);
+        ((year && year !== 'TODOS') || (month && month !== 'TODOS') || search || tipo ? 1000 : 50);
       const offset = append ? transactionsLengthRef.current : 0;
 
       const data = await api.getTransactions('guest', limit, offset, year, month, search, tipo);
@@ -219,12 +219,32 @@ export function useAppData() {
 
     (async () => {
       try {
-        await fetchTransactions();
-        await fetchSuppliers();
-        await fetchBanks();
-        await fetchContasContabeis();
-        await fetchBoletoPatterns();
-        await fetchStats();
+        const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+          let timeoutId: number | undefined;
+          const timeout = new Promise<never>((_, reject) => {
+            timeoutId = window.setTimeout(() => reject(new Error('TIMEOUT')), ms);
+          });
+          try {
+            return await Promise.race([promise, timeout]);
+          } finally {
+            if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+          }
+        };
+
+        await Promise.all([
+          withTimeout(fetchTransactions(), 20000),
+          withTimeout(fetchStats(), 20000),
+        ]);
+
+        fetchSuppliers().catch(() => {});
+        fetchBanks().catch(() => {});
+        fetchContasContabeis().catch(() => {});
+        fetchBoletoPatterns().catch(() => {});
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e || '');
+        if (msg === 'TIMEOUT') {
+          showNotification('A API está demorando para responder. Verifique sua internet e tente novamente.', 'error');
+        }
       } finally {
         if (!cancelled) setIsLoading(false);
       }
