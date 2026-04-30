@@ -657,11 +657,12 @@ const LancamentosTab = ({
       const txValor = Number(tx.valor) || 0;
       const txJuros = Number(tx.juros || 0) || 0;
       const txTotal = txValor + txJuros;
-      const matchesMoneySearch = moneySearch === null ||
+      const matchesMoneySearch = moneySearch !== null && (
         Math.abs(txValor - moneySearch) < 0.01 ||
-        Math.abs(txTotal - moneySearch) < 0.01;
+        Math.abs(txTotal - moneySearch) < 0.01
+      );
 
-      const matchesSearch = matchesTextSearch && matchesMoneySearch;
+      const matchesSearch = matchesTextSearch || matchesMoneySearch;
       const matchesStatus = statusFilter === 'TODOS' || tx.status === statusFilter;
 
       let matchesMonth = true;
