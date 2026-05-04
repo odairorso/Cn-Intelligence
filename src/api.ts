@@ -39,7 +39,7 @@ export const api = {
     return res.json();
   },
 
-  async getStats(_uid: string, year?: string, period?: string): Promise<{
+  async getStats(_uid: string, year?: string, period?: string, empresa?: string, tipo?: string, status?: string, search?: string): Promise<{
     kpis: {
       total_receitas: number;
       total_despesas: number;
@@ -62,6 +62,10 @@ export const api = {
     params.append('route', 'stats');
     if (year) params.append('year', year);
     if (period) params.append('period', period);
+    if (empresa) params.append('empresa', empresa);
+    if (tipo) params.append('tipo', tipo);
+    if (status) params.append('status', status);
+    if (search) params.append('search', search);
 
     const res = await fetch(`${API_BASE}?${params.toString()}`, { cache: 'no-store' });
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch stats');
