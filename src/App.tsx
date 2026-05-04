@@ -1406,9 +1406,11 @@ interface RelatoriosTabProps {
     tipo?: string,
     options?: { limit?: number }
   ) => void;
+  globalStats: any;
+  fetchStats: (year?: string, period?: string, empresa?: string, tipo?: string, status?: string) => Promise<void>;
 }
 
-const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) => {
+const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStats }: RelatoriosTabProps) => {
   const years = useMemo(() => {
     const y = transactions.map(tx => {
       const dateParts = tx.vencimento.includes('-') ? tx.vencimento.split('-') : tx.vencimento.split('/');
@@ -1442,7 +1444,8 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
 
   useEffect(() => {
     fetchTransactions(false, selectedYear, selectedMonth, undefined, selectedTipo);
-  }, [selectedYear, selectedMonth, selectedTipo, fetchTransactions]);
+    fetchStats(selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus);
+  }, [selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, fetchTransactions, fetchStats]);
 
   const companies = useMemo(() => {
     const map = new Map<string, string>();
@@ -1473,6 +1476,28 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
   }, [transactions, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, todayKey]);
 
   const periodTotals = useMemo(() => {
+    // Se tivermos os dados reais do servidor, usamos eles!
+    if (globalStats?.kpis && (selectedYear !== 'TODOS' || selectedMonth !== 'TODOS' || selectedCompany !== 'TODOS' || selectedTipo !== 'TODOS' || selectedStatus !== 'TODOS')) {
+      const k = globalStats.kpis;
+      return {
+        total: Number(k.total_receitas) - Number(k.total_despesas),
+        totalReceitas: Number(k.total_receitas),
+        totalDespesas: Number(k.total_despesas),
+        jurosTotal: 0, // O servidor já inclui juros no total_despesas
+        realizadoTotal: 0, // Precisaríamos de mais campos no server para separar realizado/previsto aqui
+        realizadoReceitas: 0,
+        realizadoDespesas: 0,
+        naoPagoCount: Number(k.count_pendentes) + Number(k.count_vencidos),
+        naoPagoReceitas: 0,
+        naoPagoDespesas: 0,
+        naoPagoReceitasCount: 0,
+        naoPagoDespesasCount: 0,
+        naoPagoSaldo: 0,
+        count: Number(k.total_count)
+      };
+    }
+
+    // Fallback para cálculo local (apenas para o que já está carregado)
     let total = 0; // Previsto (Accrual)
     let totalReceitas = 0;
     let totalDespesas = 0;
@@ -1527,7 +1552,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions }: RelatoriosTabProps) 
       naoPagoSaldo: naoPagoReceitas - naoPagoDespesas,
       count: filteredData.length 
     };
-  }, [filteredData]);
+  }, [filteredData, globalStats, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus]);
 
   const monthLabel = useMemo(() => {
     const months: Record<string, string> = { '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril', '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto', '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro' };
@@ -5139,6 +5164,8 @@ export default function App() {
               <RelatoriosTab
                 transactions={transactions}
                 fetchTransactions={fetchTransactions}
+                globalStats={globalStats}
+                fetchStats={fetchStats}
               />
             )}
             {activeTab === 'receitas' && <ReceitasTab transactions={transactions} onNewRevenue={() => { setNewTxInitialTipo('RECEITA'); setShowNewTxModal(true); }} />}

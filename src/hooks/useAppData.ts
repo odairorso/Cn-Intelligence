@@ -92,9 +92,9 @@ export function useAppData() {
 
   // ─── Fetchers ─────────────────────────────────────────────────────────────
 
-  const fetchStats = useCallback(async (year?: string, period?: string) => {
+  const fetchStats = useCallback(async (year?: string, period?: string, empresa?: string, tipo?: string, status?: string, search?: string) => {
     try {
-      const stats = await api.getStats('guest', year, period);
+      const stats = await api.getStats('guest', year, period, empresa, tipo, status, search);
       setGlobalStats(stats);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
@@ -114,7 +114,7 @@ export function useAppData() {
 
       const limit =
         options?.limit ??
-        ((year && year !== 'TODOS') || (month && month !== 'TODOS') || search || tipo ? 1000 : 50);
+        ((year && year !== 'TODOS') || (month && month !== 'TODOS') || search || tipo ? 200 : 50);
       const offset = append ? transactionsLengthRef.current : 0;
 
       const data = await api.getTransactions('guest', limit, offset, year, month, search, tipo);

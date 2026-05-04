@@ -205,8 +205,8 @@ async function handleTransactions(req, res) {
   if (req.method === 'GET') {
     try {
       const { uid, limit, offset, year, month, search, tipo } = req.query;
-      // Aumentamos o limite padrão para 5000 para garantir que o histórico seja carregado
-      const defaultLimit = 5000;
+      // Reduzimos o limite padrão de 5000 para 100 para economizar banda (Egress)
+      const defaultLimit = 100;
       const parsedLimit = limit ? parseInt(limit) : defaultLimit;      const parsedOffset = offset ? parseInt(offset) : 0;
 
       let query = sql`SELECT * FROM transactions WHERE 1=1`;
@@ -318,9 +318,22 @@ async function handleTransactions(req, res) {
 async function handleStats(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   try {
-    const { uid, year, period } = req.query;
+    const { uid, year, period, empresa, tipo, status } = req.query;
     const filterUid = uid ? String(uid) : '';
     const uidFilterSql = filterUid ? sql`AND uid = ${filterUid}` : sql``;
+
+    // Novos filtros
+    const empresaFilterSql = empresa && empresa !== 'TODOS' ? sql`AND upper(empresa) = upper(${empresa})` : sql``;
+    const tipoFilterSql = tipo && tipo !== 'TODOS' ? sql`AND tipo = ${tipo}` : sql``;
+    const statusFilterSql = status && status !== 'TODOS' 
+      ? (status === 'NAO_PAGO' ? sql`AND (status = 'PENDENTE' OR status = 'VENCIDO')` : sql`AND status = ${status}`)
+      : sql``;
+
+    let searchFilterSql = sql``;
+    if (search) {
+      const sRaw = `%${search}%`;
+      searchFilterSql = sql`AND (fornecedor ILIKE ${sRaw} OR descricao ILIKE ${sRaw} OR empresa ILIKE ${sRaw})`;
+    }
 
     // Filtro de data dinâmico
     let dateFilterSql;
@@ -343,11 +356,11 @@ async function handleStats(req, res) {
         COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as total_receitas,
         COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as total_despesas,
         COUNT(CASE WHEN status = 'PAGO' THEN 1 END) as count_pagos,
-        COUNT(CASE WHEN status = 'PENDENTE' AND (vencimento >= CURRENT_DATE OR vencimento IS NULL) THEN 1 END) as count_pendentes,
+        COUNT(CASE WHEN (status = 'PENDENTE' OR status = 'VENCIDO') AND (vencimento >= CURRENT_DATE OR vencimento IS NULL) THEN 1 END) as count_pendentes,
         COUNT(CASE WHEN status = 'VENCIDO' OR (status = 'PENDENTE' AND vencimento < CURRENT_DATE) THEN 1 END) as count_vencidos,
         COUNT(*) as total_count
       FROM transactions
-      WHERE 1=1 ${uidFilterSql} ${dateFilterSql}`;
+      WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}`;
 
     // 2. Fluxo Mensal
     let fluxRows;
@@ -361,7 +374,7 @@ async function handleStats(req, res) {
           COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
         FROM transactions
-        WHERE 1=1 ${uidFilterSql}
+        WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
           AND vencimento >= ${y + '-01-01'}
           AND vencimento <= ${y + '-12-31'}
         GROUP BY EXTRACT(MONTH FROM vencimento)
@@ -374,7 +387,7 @@ async function handleStats(req, res) {
           COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
         FROM transactions
-        WHERE 1=1 ${uidFilterSql}
+        WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
           AND vencimento >= ${start + '-01-01'}
           AND vencimento <= ${end + '-12-31'}
         GROUP BY EXTRACT(MONTH FROM vencimento)
@@ -387,7 +400,7 @@ async function handleStats(req, res) {
           COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo != 'RECEITA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
         FROM transactions
-        WHERE 1=1 ${uidFilterSql}
+        WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
           AND vencimento >= DATE_TRUNC('year', CURRENT_DATE)
           AND vencimento < DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year'
         GROUP BY EXTRACT(MONTH FROM vencimento)
@@ -400,7 +413,7 @@ async function handleStats(req, res) {
         fornecedor as name,
         COALESCE(SUM(valor + COALESCE(juros, 0)), 0) as value
       FROM transactions
-      WHERE 1=1 ${uidFilterSql} ${dateFilterSql}
+      WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
       GROUP BY fornecedor
       ORDER BY value DESC
       LIMIT 10`;
