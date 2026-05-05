@@ -5,7 +5,7 @@ export const config = { runtime: 'nodejs' };
 
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW = 60 * 1000;
-const RATE_LIMIT_MAX = 100;
+const RATE_LIMIT_MAX = 60;
 
 const sanitizeInput = (value) => {
   if (typeof value !== 'string') return value;
