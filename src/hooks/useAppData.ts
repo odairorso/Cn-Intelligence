@@ -266,13 +266,14 @@ export function useAppData() {
   }, []); // Executa apenas uma vez no mount
 
   // ─── Auto-merge suppliers (max 1x a cada 6h) ─────────────────────────────
+  /*
   useEffect(() => {
     if (!suppliers.length) return;
     const key = 'cn_auto_merge_suppliers_last';
     try {
       const last = Number(localStorage.getItem(key) || 0);
       if (Date.now() - last < 6 * 60 * 60 * 1000) return;
-    } catch { /* ignore */ }
+    } catch { // ignore // }
     let cancelled = false;
     (async () => {
       try {
@@ -288,6 +289,7 @@ export function useAppData() {
     })();
     return () => { cancelled = true; };
   }, [suppliers.length, fetchSuppliers]);
+  */
 
   // ─── Persist company options ──────────────────────────────────────────────
   useEffect(() => {
