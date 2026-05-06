@@ -1415,7 +1415,7 @@ interface RelatoriosTabProps {
     month?: string,
     search?: string,
     tipo?: string,
-    options?: { limit?: number }
+    options?: { limit?: number; empresa?: string; status?: string }
   ) => void;
   globalStats: any;
   fetchStats: (year?: string, period?: string, empresa?: string, tipo?: string, status?: string) => Promise<void>;
@@ -1427,7 +1427,10 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
       const dateParts = tx.vencimento.includes('-') ? tx.vencimento.split('-') : tx.vencimento.split('/');
       return tx.vencimento.includes('-') ? dateParts[0] : dateParts[2];
     });
-    return [...new Set(y)].filter(Boolean).sort().reverse();
+    const set = new Set<string>(y.filter(Boolean));
+    const currentYear = new Date().getFullYear();
+    for (let yr = currentYear; yr >= 2020; yr -= 1) set.add(String(yr));
+    return Array.from(set).sort().reverse();
   }, [transactions]);
 
   const [selectedYear, setSelectedYear] = useState<string>('TODOS');
@@ -1454,18 +1457,30 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
   };
 
   useEffect(() => {
-    fetchTransactions(false, selectedYear, selectedMonth, undefined, selectedTipo);
+    fetchTransactions(
+      false,
+      selectedYear,
+      selectedMonth,
+      undefined,
+      selectedTipo === 'TODOS' ? undefined : selectedTipo,
+      {
+        limit: 5000,
+        empresa: selectedCompany === 'TODOS' ? undefined : selectedCompany,
+      }
+    );
     fetchStats(selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus);
   }, [selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, fetchTransactions, fetchStats]);
 
   const companies = useMemo(() => {
     const map = new Map<string, string>();
     for (const tx of transactions) {
-      const companyKey = normalizeCompanyKey(tx.empresa);
-      if (!map.has(companyKey)) map.set(companyKey, companyKey);
+      const raw = String(tx.empresa || '').trim();
+      if (!raw) continue;
+      const companyKey = normalizeCompanyKey(raw);
+      if (!map.has(companyKey)) map.set(companyKey, raw);
     }
     return Array.from(map.entries())
-      .map(([value, label]) => ({ value, label }))
+      .map(([, raw]) => ({ value: raw, label: raw }))
       .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
   }, [transactions]);
 
@@ -1476,7 +1491,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
       const month = tx.vencimento.includes('/') ? parts[1] : parts[1];
       const matchesYear = selectedYear === 'TODOS' || year === selectedYear;
       const matchesMonth = selectedMonth === 'TODOS' || month === selectedMonth;
-      const matchesCompany = selectedCompany === 'TODOS' || normalizeCompanyKey(tx.empresa) === selectedCompany;
+      const matchesCompany = selectedCompany === 'TODOS' || normalizeCompanyKey(tx.empresa) === normalizeCompanyKey(selectedCompany);
       const txTipo = tx.tipo || (isRevenueTransaction(tx) ? 'RECEITA' : 'DESPESA');
       const matchesTipo = selectedTipo === 'TODOS' || txTipo === selectedTipo;
       const currentStatus = effectiveStatus(tx);
