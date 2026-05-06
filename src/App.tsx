@@ -53,7 +53,7 @@ import { useAppData } from './hooks/useAppData';
 import {
   cn, toInputDate, toDisplayDate, dateSortKey,
   normalizeSupplierName, normalizeCompanyKey,
-  isSupplierMatch, isRevenueTransaction, matchesAccountType, formatBRL, todayInputDate,
+  isSupplierMatch, isRevenueTransaction, matchesAccountType, formatBRL, todayInputDate, parseMoneyToNumber,
 } from './lib/utils';
 import { DEFAULT_COMPANIES, DEFAULT_ACCOUNTS, PAGE_SIZE, MONTH_LABELS } from './lib/constants';
 import { AnimatedNumber } from './components/AnimatedNumber';
@@ -3498,7 +3498,7 @@ const TransferModal = ({ banks, companyOptions, onClose, onSubmit }: TransferMod
     }
     onSubmit({
       ...formData,
-      value: Number(String(formData.value).replace(/\./g, '').replace(',', '.'))
+      value: parseMoneyToNumber(formData.value)
     });
   };
 
