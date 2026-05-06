@@ -318,7 +318,7 @@ async function handleTransactions(req, res) {
 async function handleStats(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   try {
-    const { uid, year, period, empresa, tipo, status } = req.query;
+    const { uid, year, period, empresa, tipo, status, search } = req.query;
     const filterUid = uid ? String(uid) : '';
     const uidFilterSql = filterUid ? sql`AND uid = ${filterUid}` : sql``;
 
@@ -442,6 +442,7 @@ async function handleTransactionsBatch(req, res) {
   }
 
   try {
+    console.log(`[batch] Processing ${transactions.length} transactions`);
     let created = 0;
     let blocked = 0;
     let errors = [];
