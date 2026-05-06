@@ -14,9 +14,12 @@ const sanitizeInput = (value) => {
 
 const sanitizeObject = (obj) => {
   if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map((item) => sanitizeObject(item));
   const sanitized = {};
   for (const [key, value] of Object.entries(obj)) {
-    sanitized[key] = typeof value === 'string' ? sanitizeInput(value) : value;
+    if (typeof value === 'string') sanitized[key] = sanitizeInput(value);
+    else if (value && typeof value === 'object') sanitized[key] = sanitizeObject(value);
+    else sanitized[key] = value;
   }
   return sanitized;
 };
@@ -440,7 +443,7 @@ async function handleTransactionsBatch(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const transactions = req.body;
-  console.log('[batch] Received:', JSON.stringify(transactions?.slice(0, 2), null, 2));
+  console.log('[batch] Received:', JSON.stringify(Array.isArray(transactions) ? transactions.slice(0, 2) : transactions, null, 2));
 
   if (!Array.isArray(transactions) || transactions.length === 0) {
     console.log('[batch] Invalid: not an array or empty');
