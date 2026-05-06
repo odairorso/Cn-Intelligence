@@ -618,14 +618,20 @@ const LancamentosTab = ({
   const [selectedMap, setSelectedMap] = useState<Map<string, Transaction>>(new Map());
 
   // Busca no servidor ao mudar filtros (debounce para o texto)
+  // Usa ref para evitar busca no mount inicial (já feita pelo useAppData)
+  const isFirstRender = useRef(true);
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     if (onLoadMore) {
       const timer = setTimeout(() => {
         onLoadMore(false, yearFilter, monthFilter, filter);
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [filter, yearFilter, monthFilter, onLoadMore]);
+  }, [filter, yearFilter, monthFilter]);
 
   // Extrair meses e anos únicos para os filtros
   const availableYears = useMemo(() => {
