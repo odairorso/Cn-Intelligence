@@ -3499,7 +3499,7 @@ const TransferModal = ({ banks, companyOptions, onClose, onSubmit }: TransferMod
     }
     onSubmit({
       ...formData,
-      value: parseFloat(formData.value)
+      value: Number(String(formData.value).replace(/\./g, '').replace(',', '.'))
     });
   };
 
@@ -4523,33 +4523,37 @@ export default function App() {
         : { text, fileName, pdfBase64 };
 
       const data = await api.extractBoleto(payload.text, payload.fileName, (payload as any).pdfBase64);
+      const dataAny = data as any;
 
-      const beneficiario = String((data as any).beneficiario || (data as any).cedente || '').trim().replace(/\s+/g, ' ');
+      const beneficiario = String(dataAny.beneficiario || dataAny.cedente || '').trim().replace(/\s+/g, ' ');
       const fornecedorCandidate = (!shouldRejectSupplierName(beneficiario) && beneficiario)
         ? beneficiario
-        : (data as any).fornecedor;
+        : dataAny.fornecedor;
 
-      const hasValidData = fornecedorCandidate && fornecedorCandidate !== 'Fornecedor não identificado' && (data.valor > 0 || data.vencimento);
+      const hasValidData =
+        fornecedorCandidate &&
+        fornecedorCandidate !== 'Fornecedor não identificado' &&
+        (sanitizeBoletoValor(dataAny.valor) > 0 || Boolean(dataAny.vencimento));
 
       if (hasValidData) {
         const fallbackNumero = extractLocalBoletoNumber(text);
-        const inferredFromDescricao = normalizeBoletoNumber(data.descricao || '');
-        const numero = normalizeBoletoNumber(data.numero_boleto || '') || fallbackNumero || inferredFromDescricao;
+        const inferredFromDescricao = normalizeBoletoNumber(dataAny.descricao || '');
+        const numero = normalizeBoletoNumber(dataAny.numero_boleto || '') || fallbackNumero || inferredFromDescricao;
         const fallbackDesc = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
-        const descricao = (data.descricao && data.descricao !== '-') ? data.descricao : fallbackDesc;
+        const descricao = (dataAny.descricao && dataAny.descricao !== '-') ? dataAny.descricao : fallbackDesc;
         const linhaInfo = parseLinhaDigitavel(text);
-        const geminiValor = sanitizeBoletoValor(data.valor);
+        const geminiValor = sanitizeBoletoValor(dataAny.valor);
         const valor = (linhaInfo?.valor && (!geminiValor || geminiValor > 20000))
           ? sanitizeBoletoValor(linhaInfo.valor)
           : geminiValor;
         return {
           fileName,
           fornecedor: fornecedorCandidate || 'Fornecedor não identificado',
-          vencimento: data.vencimento || '',
+          vencimento: String(dataAny.vencimento || ''),
           valor,
           descricao,
-          empresa: data.empresa || '',
-          cnpj: data.cnpj || '',
+          empresa: String(dataAny.empresa || ''),
+          cnpj: String(dataAny.cnpj || ''),
           numero_boleto: numero,
           tipo: 'DESPESA',
           rawText: text.slice(0, 500),
@@ -4564,7 +4568,14 @@ export default function App() {
         const nameFromFile = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
         fallback.fornecedor = nameFromFile || 'Fornecedor não identificado';
       }
-      return { ...fallback, valor: sanitizeBoletoValor((fallback as any).valor), empresa: data.empresa || '', cnpj: data.cnpj || '', numero_boleto: data.numero_boleto || fallback.numero_boleto || '', tipo: 'DESPESA' };
+      return {
+        ...fallback,
+        valor: sanitizeBoletoValor((fallback as any).valor),
+        empresa: String((dataAny as any)?.empresa || ''),
+        cnpj: String((dataAny as any)?.cnpj || ''),
+        numero_boleto: String((dataAny as any)?.numero_boleto || fallback.numero_boleto || ''),
+        tipo: 'DESPESA'
+      };
     } catch (err) {
       console.error('[boleto] API error, using local fallback:', err);
       const fallback = extractBoletoData(text, fileName);
