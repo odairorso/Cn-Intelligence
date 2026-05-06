@@ -3742,6 +3742,33 @@ export default function App() {
 
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [newCompanyName, setNewCompanyName] = useState('');
+  const [editingCompany, setEditingCompany] = useState<string | null>(null);
+  const [editingCompanyName, setEditingCompanyName] = useState('');
+  const [newContaContabil, setNewContaContabil] = useState({ codigo: '', nome: '', tipo: 'DESPESA' });
+  const [searchContaContabil, setSearchContaContabil] = useState('');
+  const [brandLogo, setBrandLogo] = useState<string>(() => {
+    try { return localStorage.getItem('cn_brand_logo') || ''; } catch { return ''; }
+  });
+
+  const [showNewTxModal, setShowNewTxModal] = useState(false);
+  const [newTxInitialTipo, setNewTxInitialTipo] = useState<'DESPESA' | 'RECEITA'>('DESPESA');
+  const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
+  const [showNewBankModal, setShowNewBankModal] = useState(false);
+  const [editingBank, setEditingBank] = useState<Bank | null>(null);
+  const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [showPayModal, setShowPayModal] = useState<{ id: string; valor: number } | null>(null);
+  const [showPayBatchModal, setShowPayBatchModal] = useState<Transaction[] | null>(null);
+  const [showPdfImportModal, setShowPdfImportModal] = useState(false);
+  const [pdfExtractedRows, setPdfExtractedRows] = useState<PdfImportDraft[]>([]);
+  const [isProcessingPdf, setIsProcessingPdf] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  const currentBrandLogo = brandLogo || defaultBrandLogo;
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -3763,7 +3790,7 @@ export default function App() {
         >
           <div className="flex flex-col items-center gap-6">
             <div className="w-24 h-24 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-lg shadow-primary/5">
-              <img src={brandLogo || defaultBrandLogo} alt="Logo" className="h-16 w-16 object-contain" />
+              <img src={currentBrandLogo} alt="Logo" className="h-16 w-16 object-contain" />
             </div>
             <div className="space-y-2">
               <h1 className="text-3xl font-black tracking-tighter premium-gradient-text font-headline">Portal CN</h1>
@@ -3800,34 +3827,6 @@ export default function App() {
       </div>
     );
   }
-
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
-  const [newCompanyName, setNewCompanyName] = useState('');
-  const [editingCompany, setEditingCompany] = useState<string | null>(null);
-  const [editingCompanyName, setEditingCompanyName] = useState('');
-  const [newContaContabil, setNewContaContabil] = useState({ codigo: '', nome: '', tipo: 'DESPESA' });
-  const [searchContaContabil, setSearchContaContabil] = useState('');
-  const [brandLogo, setBrandLogo] = useState<string>(() => {
-    try { return localStorage.getItem('cn_brand_logo') || ''; } catch { return ''; }
-  });
-
-  const [showNewTxModal, setShowNewTxModal] = useState(false);
-  const [newTxInitialTipo, setNewTxInitialTipo] = useState<'DESPESA' | 'RECEITA'>('DESPESA');
-  const [showNewSupplierModal, setShowNewSupplierModal] = useState(false);
-  const [showNewBankModal, setShowNewBankModal] = useState(false);
-  const [editingBank, setEditingBank] = useState<Bank | null>(null);
-  const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
-  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-  const [showPayModal, setShowPayModal] = useState<{ id: string; valor: number } | null>(null);
-  const [showPayBatchModal, setShowPayBatchModal] = useState<Transaction[] | null>(null);
-  const [showPdfImportModal, setShowPdfImportModal] = useState(false);
-  const [pdfExtractedRows, setPdfExtractedRows] = useState<PdfImportDraft[]>([]);
-  const [isProcessingPdf, setIsProcessingPdf] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
-
-  const currentBrandLogo = brandLogo || defaultBrandLogo;
 
   const addContaContabil = async () => {
     if (!newContaContabil.codigo || !newContaContabil.nome) {
