@@ -158,11 +158,15 @@ const DashboardTab = ({ transactions, onMarkAsPaid, globalStats, fetchStats }: D
     return Array.from(set).sort((a, b) => a - b);
   }, [transactions]);
 
-  useEffect(() => {
-    if (periodoFilter !== 'TODOS') return;
-    if (anos.includes(2024) && anos.includes(2025) && anos.includes(2026)) setPeriodoFilter('2024-2026');
-    else if (anos.includes(2024) && anos.includes(2025)) setPeriodoFilter('2024-2025');
-  }, [anos, periodoFilter]);
+  /* 
+  Removido para evitar re-consultas automáticas que consomem banda.
+  O usuário deve selecionar o período manualmente se desejar.
+  */
+  // useEffect(() => {
+  //   if (periodoFilter !== 'TODOS') return;
+  //   if (anos.includes(2024) && anos.includes(2025) && anos.includes(2026)) setPeriodoFilter('2024-2026');
+  //   else if (anos.includes(2024) && anos.includes(2025)) setPeriodoFilter('2024-2025');
+  // }, [anos, periodoFilter]);
 
   const periodos = useMemo(() => {
     const list = ['TODOS'];
@@ -3727,14 +3731,75 @@ const NewSupplierModal = ({ setShowNewSupplierModal, onSuccess }: NewSupplierMod
 
 export default function App() {
   const {
-    transactions, globalStats, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, isLoadingMore, boletoPatterns,
+    transactions, globalStats, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, isLoadingMore, boletoPatterns, isAuthorized,
     fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns, fetchStats,
-    showNotification, markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
+    showNotification, login, logout, markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
     deleteSupplier, syncSuppliers,
     deleteBank,
     addCompanyOption, removeCompanyOption, updateCompanyOption,
     deleteBoletoPattern,
   } = useAppData();
+
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState(false);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (login(password)) {
+      setLoginError(false);
+    } else {
+      setLoginError(true);
+      showNotification('Senha incorreta!', 'error');
+    }
+  };
+
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-6">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="glass-card p-10 w-full max-w-md border border-white/10 shadow-2xl text-center"
+        >
+          <div className="flex flex-col items-center gap-6">
+            <div className="w-24 h-24 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-lg shadow-primary/5">
+              <img src={brandLogo || defaultBrandLogo} alt="Logo" className="h-16 w-16 object-contain" />
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-3xl font-black tracking-tighter premium-gradient-text font-headline">Portal CN</h1>
+              <p className="text-xs text-on-surface-variant/60 font-bold uppercase tracking-widest">Acesso Restrito</p>
+            </div>
+
+            <form onSubmit={handleLogin} className="w-full space-y-4">
+              <div className="relative">
+                <input
+                  type="password"
+                  placeholder="Digite a senha de acesso"
+                  className={cn(
+                    "w-full bg-surface-variant/20 border rounded-xl px-4 py-4 text-center text-lg font-bold outline-none transition-all",
+                    loginError ? "border-tertiary shadow-[0_0_15px_rgba(239,68,68,0.2)]" : "border-white/10 focus:border-primary"
+                  )}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-primary text-background py-4 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/20"
+              >
+                Entrar no Sistema
+              </button>
+            </form>
+
+            <p className="text-[10px] text-on-surface-variant/40">
+              © 2025 Grupo CN Intelligence. Todos os direitos reservados.
+            </p>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [newCompanyName, setNewCompanyName] = useState('');
@@ -3836,10 +3901,7 @@ export default function App() {
   const handleExportBackup = async () => {
     try {
       showNotification('Gerando backup... Aguarde.', 'info');
-      const response = await fetch('/api?route=export-backup');
-      if (!response.ok) throw new Error('Falha ao gerar backup');
-
-      const blob = await response.blob();
+      const blob = await api.exportBackup();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -4281,18 +4343,7 @@ export default function App() {
         ? { text, fileName }
         : { text, fileName, pdfBase64 };
 
-      const response = await fetch('/api?route=extract-boleto', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const msg = (data && typeof data === 'object' && 'error' in data && typeof (data as any).error === 'string')
-          ? (data as any).error
-          : `API error: ${response.status}`;
-        throw new Error(msg);
-      }
+      const data = await api.extractBoleto(payload.text, payload.fileName, (payload as any).pdfBase64);
 
       const beneficiario = String((data as any).beneficiario || (data as any).cedente || '').trim().replace(/\s+/g, ' ');
       const fornecedorCandidate = (!shouldRejectSupplierName(beneficiario) && beneficiario)
@@ -4986,6 +5037,13 @@ export default function App() {
             banks={banks}
             onNavigate={setActiveTab}
           />
+          <button 
+            onClick={logout}
+            className="p-2 text-on-surface-variant hover:bg-tertiary/10 hover:text-tertiary rounded-full transition-colors hidden sm:block"
+            title="Sair do Sistema"
+          >
+            <X size={20} />
+          </button>
           <button className="p-2 text-on-surface-variant hover:bg-white/5 rounded-full transition-colors hidden sm:block">
             <Bell size={20} />
           </button>

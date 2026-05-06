@@ -40,6 +40,13 @@ export function useAppData() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [notification, setNotification] = useState<Notification | null>(null);
+  const [isAuthorized, setIsAuthorized] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('cn_authorized') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const transactionsLengthRef = useRef(0);
   const [boletoPatterns, setBoletoPatterns] = useState<Array<{
     id: number;
@@ -93,13 +100,14 @@ export function useAppData() {
   // ─── Fetchers ─────────────────────────────────────────────────────────────
 
   const fetchStats = useCallback(async (year?: string, period?: string, empresa?: string, tipo?: string, status?: string, search?: string) => {
+    if (!isAuthorized) return;
     try {
       const stats = await api.getStats('guest', year, period, empresa, tipo, status, search);
       setGlobalStats(stats);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }
-  }, []);
+  }, [isAuthorized]);
 
   const fetchTransactions = useCallback(async (
     append = false,
@@ -109,6 +117,7 @@ export function useAppData() {
     tipo?: string,
     options?: { limit?: number }
   ) => {
+    if (!isAuthorized) return;
     try {
       if (append) setIsLoadingMore(true);
 
@@ -150,34 +159,35 @@ export function useAppData() {
       if (append) setIsLoadingMore(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAuthorized]);
 
   const fetchSuppliers = useCallback(async () => {
+    if (!isAuthorized) return;
     try {
       const data = await api.getSuppliers('guest');
       setSuppliers(data);
     } catch (error) {
       console.error('Failed to fetch suppliers:', error);
     }
-  }, []);
+  }, [isAuthorized]);
 
   const fetchBanks = useCallback(async () => {
+    if (!isAuthorized) return;
     try {
       const data = await api.getBanks('guest');
       setBanks(data);
     } catch (error) {
       console.error('Failed to fetch banks:', error);
     }
-  }, []);
+  }, [isAuthorized]);
 
   const fetchContasContabeis = useCallback(async () => {
+    if (!isAuthorized) return;
     try {
       let data = await api.getContasContabeis();
       if (!Array.isArray(data) || data.length === 0) {
-        try {
-          await api.setupTables();
-          data = await api.getContasContabeis();
-        } catch { /* ignore */ }
+        // Removido setupTables automático aqui para economizar banda.
+        // Se as contas não carregarem, o sistema usa o padrão local.
       }
       if (Array.isArray(data) && data.length > 0) {
         setContasContabeis(data);
@@ -190,16 +200,17 @@ export function useAppData() {
       setContasContabeis(DEFAULT_ACCOUNTS);
       showNotification('API indisponível. Carregamos plano de contas padrão local.', 'info');
     }
-  }, [showNotification]);
+  }, [showNotification, isAuthorized]);
 
   const fetchBoletoPatterns = useCallback(async () => {
+    if (!isAuthorized) return;
     try {
       const data = await api.getBoletoPatterns();
       setBoletoPatterns(data);
     } catch (error) {
       console.error('Failed to fetch boleto patterns:', error);
     }
-  }, []);
+  }, [isAuthorized]);
 
   const deleteBoletoPattern = useCallback(async (id: number) => {
     try {
@@ -212,8 +223,13 @@ export function useAppData() {
     }
   }, [showNotification, fetchBoletoPatterns]);
 
-  // ─── Initial load — em paralelo (executa apenas uma vez no mount) ───
+  // ─── Initial load — em paralelo (executa apenas quando autorizado) ───
   useEffect(() => {
+    if (!isAuthorized) {
+      setIsLoading(false); // Se não autorizado, para o loading inicial para mostrar tela de login
+      return;
+    }
+
     let cancelled = false;
     setIsLoading(true);
 
@@ -250,20 +266,12 @@ export function useAppData() {
       }
     })();
 
-    try {
-      const key = 'cn_setup_tables_last';
-      const last = Number(localStorage.getItem(key) || 0);
-      if (Date.now() - last > 24 * 60 * 60 * 1000) {
-        api.setupTables()
-          .then(() => localStorage.setItem(key, String(Date.now())))
-          .catch(console.error);
-      }
-    } catch {
-      api.setupTables().catch(console.error);
-    }
+    /* 
+    setupTables movido para execução manual ou via script para economizar banda no Pooler.
+    */
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Executa apenas uma vez no mount
+  }, [isAuthorized]); // Executa quando isAuthorized muda para true
 
   // ─── Auto-merge suppliers (max 1x a cada 6h) ─────────────────────────────
   /*
@@ -469,13 +477,28 @@ export function useAppData() {
     return true;
   }, [companyOptions, showNotification]);
 
+  const login = useCallback((password: string) => {
+    // Senha simples para bloquear bots. Você pode mudar aqui.
+    if (password === 'CN2024') {
+      setIsAuthorized(true);
+      localStorage.setItem('cn_authorized', 'true');
+      return true;
+    }
+    return false;
+  }, []);
+
+  const logout = useCallback(() => {
+    setIsAuthorized(false);
+    localStorage.removeItem('cn_authorized');
+  }, []);
+
   return {
     // State
-    transactions, globalStats, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, isLoadingMore, boletoPatterns,
+    transactions, globalStats, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, isLoadingMore, boletoPatterns, isAuthorized,
     // Fetchers
     fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns, fetchStats,
     // Actions
-    showNotification,
+    showNotification, login, logout,
     markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
     deleteSupplier, syncSuppliers,
     deleteBank,
