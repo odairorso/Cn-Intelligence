@@ -9,6 +9,14 @@ export function cn(...inputs: ClassValue[]) {
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
+export const todayInputDate = (): string => {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 /** Converte qualquer formato de data para YYYY-MM-DD (input[type=date]) */
 export const toInputDate = (value?: string | null): string => {
   if (!value) return '';
