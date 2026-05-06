@@ -282,6 +282,11 @@ async function handleTransactions(req, res) {
       const vDate = parseDateToPg(vencimento);
       const pDate = parseDateToPg(pagamento);
       const normalizedNumber = normalizeBoletoNumber(numero_boleto);
+      const valorNumber = Number(valor);
+      if (!Number.isFinite(valorNumber)) {
+        return res.status(400).json({ error: 'Valor inválido' });
+      }
+      const tipoSafe = typeof tipo === 'string' && tipo.trim() ? tipo.trim() : 'DESPESA';
       const duplicateRows = normalizedNumber
         ? await sql`
             SELECT id FROM transactions
@@ -291,7 +296,7 @@ async function handleTransactions(req, res) {
             SELECT id FROM transactions
             WHERE upper(coalesce(fornecedor, '')) = upper(${fornecedor})
               AND vencimento = ${vDate}
-              AND abs(valor - ${valor}) < 0.0001
+              AND abs(valor - ${valorNumber}) < 0.0001
               AND upper(coalesce(descricao, '')) = upper(${descricao || ''})
               AND upper(coalesce(empresa, '')) = upper(${empresa || ''})
             LIMIT 1`;
@@ -301,7 +306,7 @@ async function handleTransactions(req, res) {
       const rows = await sql`
         INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id)
         VALUES (${uid || 'guest'}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'},
-                ${vDate}, ${pDate}, ${valor}, ${status || 'PENDENTE'}, ${banco || null}, ${tipo || 'DESPESA'}, ${normalizedNumber || null}, ${conta_contabil_id || null})
+                ${vDate}, ${pDate}, ${valorNumber}, ${status || 'PENDENTE'}, ${banco || null}, ${tipoSafe}, ${normalizedNumber || null}, ${conta_contabil_id || null})
         RETURNING *`;
       return res.status(201).json(rows[0]);
     } catch (e) {
@@ -453,7 +458,8 @@ async function handleTransactionsBatch(req, res) {
       const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = tx;
 
       // Validate required fields
-      if (!fornecedor || !vencimento || valor === undefined || valor === null) {
+      const valorNumber = Number(valor);
+      if (!fornecedor || !vencimento || valor === undefined || valor === null || !Number.isFinite(valorNumber)) {
         console.log(`[batch] Skipping row ${i}: missing required fields`, { fornecedor, vencimento, valor });
         errors.push({ index: i, error: 'Missing required fields' });
         continue;
@@ -462,31 +468,39 @@ async function handleTransactionsBatch(req, res) {
       const vDate = parseDateToPg(vencimento) || new Date().toISOString().split('T')[0];
       const pDate = parseDateToPg(pagamento);
       const normalizedNumber = normalizeBoletoNumber(numero_boleto);
+      const tipoSafe = typeof tipo === 'string' && tipo.trim() ? tipo.trim() : 'DESPESA';
 
       const descKey = String(descricao || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       const empKey = String(empresa || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       const localKey = normalizedNumber
         ? `BOLETO:${normalizedNumber}`
-        : `BASE:${String(fornecedor || '').toUpperCase()}|${vDate}|${Number(valor || 0).toFixed(2)}|${descKey}|${empKey}`;
+        : `BASE:${String(fornecedor || '').toUpperCase()}|${vDate}|${Number(valorNumber || 0).toFixed(2)}|${descKey}|${empKey}`;
 
       if (seenKeys.has(localKey)) {
         blocked++;
         continue;
       }
 
-      const duplicateRows = normalizedNumber
-        ? await sql`
-            SELECT id FROM transactions
-            WHERE regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') = ${normalizedNumber}
-            LIMIT 1`
-        : await sql`
-            SELECT id FROM transactions
-            WHERE upper(coalesce(fornecedor, '')) = upper(${fornecedor})
-              AND vencimento = ${vDate}
-              AND abs(valor - ${valor}) < 0.0001
-              AND upper(coalesce(descricao, '')) = upper(${descricao || ''})
-              AND upper(coalesce(empresa, '')) = upper(${empresa || ''})
-            LIMIT 1`;
+      let duplicateRows = [];
+      try {
+        duplicateRows = normalizedNumber
+          ? await sql`
+              SELECT id FROM transactions
+              WHERE regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') = ${normalizedNumber}
+              LIMIT 1`
+          : await sql`
+              SELECT id FROM transactions
+              WHERE upper(coalesce(fornecedor, '')) = upper(${fornecedor})
+                AND vencimento = ${vDate}
+                AND abs(valor - ${valorNumber}) < 0.0001
+                AND upper(coalesce(descricao, '')) = upper(${descricao || ''})
+                AND upper(coalesce(empresa, '')) = upper(${empresa || ''})
+              LIMIT 1`;
+      } catch (dupError) {
+        console.error(`[batch] Row ${i} duplicate-check error:`, dupError?.message || dupError);
+        errors.push({ index: i, error: dupError?.message || 'Duplicate check failed' });
+        continue;
+      }
 
       if (duplicateRows.length) {
         blocked++;
@@ -497,7 +511,7 @@ async function handleTransactionsBatch(req, res) {
         await sql`
           INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id)
           VALUES (${uid || 'guest'}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'},
-                  ${vDate}, ${pDate}, ${valor}, ${status || 'PENDENTE'}, ${banco || null}, ${tipo || 'DESPESA'}, ${normalizedNumber || null}, ${conta_contabil_id || null})`;
+                  ${vDate}, ${pDate}, ${valorNumber}, ${status || 'PENDENTE'}, ${banco || null}, ${tipoSafe}, ${normalizedNumber || null}, ${conta_contabil_id || null})`;
         created++;
       } catch (rowError) {
         console.error(`[batch] Row ${i} error:`, rowError.message);
@@ -1025,7 +1039,7 @@ async function handleSetupTables(req, res) {
         status VARCHAR(20) DEFAULT 'PENDENTE',
         observacao TEXT,
         banco VARCHAR(255),
-        tipo VARCHAR(10) DEFAULT 'DESPESA',
+        tipo VARCHAR(20) DEFAULT 'DESPESA',
         juros NUMERIC DEFAULT 0,
         numero_boleto VARCHAR(255),
         conta_contabil_id INTEGER REFERENCES contas_contabeis(id),
@@ -1050,7 +1064,8 @@ async function handleSetupTables(req, res) {
     await sql`ALTER TABLE banks ADD COLUMN IF NOT EXISTS agencia VARCHAR(100)`;
     await sql`ALTER TABLE banks ADD COLUMN IF NOT EXISTS conta VARCHAR(100)`;
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS banco VARCHAR(255)`;
-    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS tipo VARCHAR(10) DEFAULT 'DESPESA'`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) DEFAULT 'DESPESA'`;
+    await sql`ALTER TABLE transactions ALTER COLUMN tipo TYPE VARCHAR(20)`;
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS juros NUMERIC DEFAULT 0`;
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS numero_boleto VARCHAR(255)`;
     await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS conta_contabil_id INTEGER REFERENCES contas_contabeis(id)`;
