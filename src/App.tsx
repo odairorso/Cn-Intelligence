@@ -1074,9 +1074,10 @@ interface FornecedoresTabProps {
   setShowNewSupplierModal: (show: boolean) => void;
   syncSuppliers: () => void;
   onSelectSupplier: (s: Supplier) => void;
+  onEditSupplier: (s: Supplier) => void;
 }
 
-const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSupplierModal, syncSuppliers, onSelectSupplier }: FornecedoresTabProps) => {
+const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSupplierModal, syncSuppliers, onSelectSupplier, onEditSupplier }: FornecedoresTabProps) => {
   const [searchSupplier, setSearchSupplier] = useState('');
   const [mergeTarget, setMergeTarget] = useState<string>('');
   const [mergeAliases, setMergeAliases] = useState<string[]>([]);
@@ -1282,12 +1283,22 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
         {filteredSuppliers.map(s => (
           <div key={s.id || normalizeSupplierName(s.nome)} className="glass-card p-6 flex flex-col gap-4 relative group cursor-pointer hover:border-primary/40" onClick={() => onSelectSupplier(s)}>
             {s.id && !String(s.id).startsWith('virtual-') && (
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteSupplier(s.id); }}
-                className="absolute top-4 right-4 p-2 text-tertiary opacity-0 group-hover:opacity-100 transition-opacity hover:bg-tertiary/10 rounded-sm"
-              >
-                <Trash2 size={16} />
-              </button>
+              <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEditSupplier(s); }}
+                  className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-sm"
+                  title="Editar"
+                >
+                  <Edit size={16} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteSupplier(s.id); }}
+                  className="p-2 text-tertiary hover:bg-tertiary/10 rounded-sm"
+                  title="Excluir"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             )}
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-sm bg-primary/20 flex items-center justify-center text-primary font-bold text-xl border border-primary/10">
@@ -3660,7 +3671,7 @@ const TransferModal = ({ banks, companyOptions, onClose, onSubmit }: TransferMod
   );
 };
 
-const SupplierDetailModal = ({ supplier, transactions, onClose }: { supplier: Supplier, transactions: Transaction[], onClose: () => void }) => {
+const SupplierDetailModal = ({ supplier, transactions, onClose, onEdit }: { supplier: Supplier, transactions: Transaction[], onClose: () => void, onEdit: (s: Supplier) => void }) => {
   const txDateToNumber = (value: string) => {
     if (!value) return 0;
     if (value.includes('/')) {
@@ -3705,9 +3716,20 @@ const SupplierDetailModal = ({ supplier, transactions, onClose }: { supplier: Su
               <p className="text-xs font-bold text-on-surface-variant/60 tracking-[0.2em] mt-1">{supplier.cnpj || 'CNPJ NÃO INFORMADO'}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-sm transition-colors text-on-surface-variant">
-            <X size={24} />
-          </button>
+          <div className="flex items-center gap-2">
+            {supplier.id && !String(supplier.id).startsWith('virtual-') && (
+              <button
+                onClick={() => onEdit(supplier)}
+                className="p-2 hover:bg-primary/10 rounded-sm transition-colors text-on-surface-variant hover:text-primary"
+                title="Editar"
+              >
+                <Edit size={20} />
+              </button>
+            )}
+            <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-sm transition-colors text-on-surface-variant" title="Fechar">
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
         {/* KPIs Internos */}
@@ -3922,6 +3944,103 @@ const NewSupplierModal = ({ setShowNewSupplierModal, onSuccess }: NewSupplierMod
   );
 };
 
+interface EditSupplierModalProps {
+  supplier: Supplier;
+  onClose: () => void;
+  onSave: (id: string, data: Partial<Supplier>) => Promise<void>;
+}
+
+const EditSupplierModal = ({ supplier, onClose, onSave }: EditSupplierModalProps) => {
+  const [formData, setFormData] = useState({
+    nome: supplier.nome || '',
+    cnpj: supplier.cnpj || '',
+    email: supplier.email || '',
+    telefone: supplier.telefone || '',
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supplier.id) return;
+    await onSave(supplier.id, {
+      nome: formData.nome,
+      cnpj: formData.cnpj,
+      email: formData.email,
+      telefone: formData.telefone,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="glass-card p-8 w-full max-w-2xl border border-white/10 shadow-2xl overflow-y-auto max-h-[90vh]"
+      >
+        <h3 className="text-xl font-bold font-headline mb-6">Editar Fornecedor</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Nome do Fornecedor</label>
+              <input
+                type="text"
+                required
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all"
+                value={formData.nome}
+                onChange={e => setFormData({ ...formData, nome: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">CNPJ</label>
+              <input
+                type="text"
+                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                value={formData.cnpj}
+                onChange={e => setFormData({ ...formData, cnpj: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">E-mail</label>
+              <input
+                type="email"
+                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                value={formData.email}
+                onChange={e => setFormData({ ...formData, email: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Telefone</label>
+              <input
+                type="text"
+                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                value={formData.telefone}
+                onChange={e => setFormData({ ...formData, telefone: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:opacity-90 shadow-lg shadow-primary/10 transition-all"
+            >
+              Salvar Fornecedor
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+};
+
 // --- Main App ---
 
 export default function App() {
@@ -3929,7 +4048,7 @@ export default function App() {
     transactions, globalStats, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, isLoadingMore, boletoPatterns, isAuthorized,
     fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns, fetchStats,
     showNotification, login, logout, markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
-    deleteSupplier, syncSuppliers,
+    deleteSupplier, syncSuppliers, updateSupplier,
     deleteBank,
     addCompanyOption, removeCompanyOption, updateCompanyOption,
     deleteBoletoPattern,
@@ -3953,6 +4072,7 @@ export default function App() {
   const [showNewBankModal, setShowNewBankModal] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
   const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [showPayModal, setShowPayModal] = useState<{ id: string; valor: number } | null>(null);
   const [showPayBatchModal, setShowPayBatchModal] = useState<Transaction[] | null>(null);
@@ -5472,6 +5592,7 @@ export default function App() {
                 setShowNewSupplierModal={setShowNewSupplierModal}
                 syncSuppliers={syncSuppliers}
                 onSelectSupplier={setDetailSupplier}
+                onEditSupplier={setEditingSupplier}
               />
             )}
 
@@ -5993,6 +6114,22 @@ export default function App() {
             supplier={detailSupplier}
             transactions={transactions}
             onClose={() => setDetailSupplier(null)}
+            onEdit={(s) => setEditingSupplier(s)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {editingSupplier && (
+          <EditSupplierModal
+            supplier={editingSupplier}
+            onClose={() => setEditingSupplier(null)}
+            onSave={async (id, data) => {
+              await updateSupplier(id, data);
+              fetchSuppliers();
+              fetchStats();
+              setDetailSupplier((prev) => (prev && prev.id === id ? { ...prev, ...data } as Supplier : prev));
+            }}
           />
         )}
       </AnimatePresence>
