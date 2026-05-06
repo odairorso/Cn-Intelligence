@@ -279,6 +279,7 @@ async function handleTransactions(req, res) {
   if (req.method === 'POST') {
     try {
       const { uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = req.body;
+      try { await sql`ALTER TABLE transactions ALTER COLUMN tipo TYPE VARCHAR(20)`; } catch {}
       const vDate = parseDateToPg(vencimento);
       const pDate = parseDateToPg(pagamento);
       const normalizedNumber = normalizeBoletoNumber(numero_boleto);
@@ -452,6 +453,7 @@ async function handleTransactionsBatch(req, res) {
     let blocked = 0;
     let errors = [];
     const seenKeys = new Set();
+    try { await sql`ALTER TABLE transactions ALTER COLUMN tipo TYPE VARCHAR(20)`; } catch {}
 
     for (let i = 0; i < transactions.length; i++) {
       const tx = transactions[i];
