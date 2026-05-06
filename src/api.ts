@@ -37,7 +37,17 @@ export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
 
 export const api = {
   // ─── Transactions ──────────────────────────────────────────────────────────
-  async getTransactions(_uid: string, limit?: number, offset?: number, year?: string, month?: string, search?: string, tipo?: string): Promise<Transaction[]> {
+  async getTransactions(
+    _uid: string,
+    limit?: number,
+    offset?: number,
+    year?: string,
+    month?: string,
+    search?: string,
+    tipo?: string,
+    empresa?: string,
+    status?: string
+  ): Promise<Transaction[]> {
     const params = new URLSearchParams();
     params.append('route', 'transactions');
     if (limit) params.append('limit', String(limit));
@@ -46,6 +56,8 @@ export const api = {
     if (month) params.append('month', month);
     if (search) params.append('search', search);
     if (tipo) params.append('tipo', tipo);
+    if (empresa) params.append('empresa', empresa);
+    if (status) params.append('status', status);
 
     const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch transactions');

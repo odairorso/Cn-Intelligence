@@ -207,14 +207,19 @@ async function ensureContasTable() {
 async function handleTransactions(req, res) {
   if (req.method === 'GET') {
     try {
-      const { uid, limit, offset, year, month, search, tipo } = req.query;
+      const { uid, limit, offset, year, month, search, tipo, empresa, status } = req.query;
       // Reduzimos o limite padrão de 5000 para 100 para economizar banda (Egress)
       const defaultLimit = 100;
       const parsedLimit = limit ? parseInt(limit) : defaultLimit;      const parsedOffset = offset ? parseInt(offset) : 0;
 
       let query = sql`SELECT * FROM transactions WHERE 1=1`;
       if (uid) query = sql`${query} AND uid = ${uid}`;
-      if (tipo) query = sql`${query} AND tipo = ${tipo}`;
+      if (tipo && tipo !== 'TODOS') query = sql`${query} AND tipo = ${tipo}`;
+      if (empresa && empresa !== 'TODOS') query = sql`${query} AND upper(empresa) = upper(${empresa})`;
+      if (status && status !== 'TODOS') {
+        if (status === 'NAO_PAGO') query = sql`${query} AND (status = 'PENDENTE' OR status = 'VENCIDO')`;
+        else query = sql`${query} AND status = ${status}`;
+      }
 
       // Se houver busca, ignoramos filtros de ano/mês para encontrar em todo o histórico
       if (search) {

@@ -115,18 +115,33 @@ export function useAppData() {
     month?: string,
     search?: string,
     tipo?: string,
-    options?: { limit?: number }
+    options?: { limit?: number; empresa?: string; status?: string }
   ) => {
     if (!isAuthorized) return;
     try {
       if (append) setIsLoadingMore(true);
 
+      const normalizedYear = year && year !== 'TODOS' ? year : undefined;
+      const normalizedMonth = month && month !== 'TODOS' ? month : undefined;
+      const normalizedTipo = tipo && tipo !== 'TODOS' ? tipo : undefined;
+      const normalizedEmpresa = options?.empresa && options.empresa !== 'TODOS' ? options.empresa : undefined;
+      const normalizedStatus = options?.status && options.status !== 'TODOS' ? options.status : undefined;
       const limit =
         options?.limit ??
-        ((year && year !== 'TODOS') || (month && month !== 'TODOS') || search || tipo ? 200 : 50);
+        (normalizedYear || normalizedMonth || search || normalizedTipo || normalizedEmpresa || normalizedStatus ? 200 : 50);
       const offset = append ? transactionsLengthRef.current : 0;
 
-      const data = await api.getTransactions('guest', limit, offset, year, month, search, tipo);
+      const data = await api.getTransactions(
+        'guest',
+        limit,
+        offset,
+        normalizedYear,
+        normalizedMonth,
+        search,
+        normalizedTipo,
+        normalizedEmpresa,
+        normalizedStatus
+      );
       const normalized = data.map((tx) => {
         const raw = tx as any;
         return {
