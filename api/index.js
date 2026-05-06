@@ -1917,6 +1917,10 @@ async function logSecurity(req, res, reason) {
 export default async function handler(req, res) {
   const startTime = Date.now();
   setCors(res);
+
+  if (req.method === 'GET' && req.query.route && req.query.route !== 'health') {
+    res.setHeader('Cache-Control', 'public, max-age=5, s-maxage=60, stale-while-revalidate=300');
+  }
   
   // Intercept res.json to calculate response size for logging
   const originalJson = res.json;
