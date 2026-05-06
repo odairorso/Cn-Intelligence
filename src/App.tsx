@@ -53,7 +53,7 @@ import { useAppData } from './hooks/useAppData';
 import {
   cn, toInputDate, toDisplayDate, dateSortKey,
   normalizeSupplierName, normalizeCompanyKey,
-  isSupplierMatch, isRevenueTransaction, matchesAccountType, formatBRL,
+  isSupplierMatch, isRevenueTransaction, matchesAccountType, formatBRL, todayInputDate,
 } from './lib/utils';
 import { DEFAULT_COMPANIES, DEFAULT_ACCOUNTS, PAGE_SIZE, MONTH_LABELS } from './lib/constants';
 import { AnimatedNumber } from './components/AnimatedNumber';
@@ -2710,15 +2710,14 @@ interface SelectBankModalProps {
 
 const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, onConfirm }: SelectBankModalProps) => {
   const [selectedBank, setSelectedBank] = useState('');
-  const todayIso = new Date().toISOString().split('T')[0];
-  const [paymentDate, setPaymentDate] = useState(todayIso);
+  const [paymentDate, setPaymentDate] = useState(initialDate || todayInputDate());
   const [dateError, setDateError] = useState('');
   const paymentDateRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    setPaymentDate(todayIso);
+    setPaymentDate(initialDate || todayInputDate());
     setDateError('');
-  }, [transactionId]);
+  }, [transactionId, initialDate]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
@@ -2814,7 +2813,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
     fornecedor: '',
     descricao: '',
     empresa: companyOptions[0] || 'CN',
-    vencimento: new Date().toISOString().split('T')[0],
+    vencimento: todayInputDate(),
     pagamento: '',
     valor: '',
     parcelas: '1',
@@ -2850,7 +2849,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
       const newTxList = Array.from({ length: parcelas }, (_, i) => {
         const vencimentoParcela = addMonthsToInputDate(formData.vencimento, i);
         const pagamentoParcela = formData.status === 'PAGO'
-          ? (formData.pagamento ? addMonthsToInputDate(formData.pagamento, i) : new Date().toISOString().split('T')[0])
+          ? (formData.pagamento ? addMonthsToInputDate(formData.pagamento, i) : todayInputDate())
           : '';
 
         return {
@@ -3486,7 +3485,7 @@ const TransferModal = ({ banks, companyOptions, onClose, onSubmit }: TransferMod
     originCompany: 'CN',
     destCompany: 'CEI',
     value: '',
-    date: new Date().toISOString().split('T')[0],
+    date: todayInputDate(),
     description: 'Transferência entre contas'
   });
 
