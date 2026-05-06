@@ -172,6 +172,16 @@ export const api = {
     if (!res.ok) throw new Error('Failed to create suppliers batch');
   },
 
+  async updateSupplier(id: string, data: Partial<Supplier>): Promise<Supplier> {
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers&id=${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw await buildHttpError(res, 'Failed to update supplier');
+    return res.json();
+  },
+
   async deleteSupplier(id: string): Promise<void> {
     const res = await fetchWithSecurity(`${API_BASE}?route=suppliers&id=${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete supplier');

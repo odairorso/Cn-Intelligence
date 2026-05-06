@@ -839,6 +839,49 @@ async function handleSuppliersMergeAuto(req, res) {
 async function handleSupplierById(req, res) {
   const { id } = req.query;
 
+  if (req.method === 'PUT') {
+    try {
+      const existing = await sql`SELECT * FROM suppliers WHERE id = ${id} LIMIT 1`;
+      if (existing.length === 0) {
+        return res.status(404).json({ error: 'Fornecedor não encontrado' });
+      }
+
+      const current = existing[0];
+      const body = req.body || {};
+
+      const nomeNext = typeof body.nome === 'string' && body.nome.trim() ? body.nome.trim() : current.nome;
+      const cnpjNext = typeof body.cnpj === 'string' && body.cnpj.trim() ? body.cnpj.trim() : null;
+      const emailNext = typeof body.email === 'string' && body.email.trim() ? body.email.trim() : null;
+      const telefoneNext = typeof body.telefone === 'string' && body.telefone.trim() ? body.telefone.trim() : null;
+
+      const rows = await sql`
+        UPDATE suppliers
+        SET nome = ${nomeNext},
+            cnpj = ${cnpjNext},
+            email = ${emailNext},
+            telefone = ${telefoneNext}
+        WHERE id = ${id}
+        RETURNING *`;
+
+      if (nomeNext && String(current.nome || '') !== nomeNext) {
+        const prevNorm = normSupplier(current.nome);
+        if (prevNorm) {
+          await sql`
+            UPDATE transactions
+            SET fornecedor = ${nomeNext}
+            WHERE upper(regexp_replace(coalesce(fornecedor, ''), '[^A-Za-z0-9]+', ' ', 'g')) = ${prevNorm}
+               OR fornecedor = ${current.nome}
+          `;
+        }
+      }
+
+      return res.json(rows[0]);
+    } catch (e) {
+      console.error(e);
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   if (req.method === 'DELETE') {
     try {
       await sql`DELETE FROM suppliers WHERE id = ${id}`;

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api';
 import { Transaction, Supplier, Bank, ContaContabil, TransactionStatus } from '../types';
-import { toDisplayDate, dateSortKey } from '../lib/utils';
+import { toDisplayDate, dateSortKey, normalizeSupplierName } from '../lib/utils';
 import { DEFAULT_COMPANIES, DEFAULT_ACCOUNTS } from '../lib/constants';
 
 export type NotificationType = 'success' | 'error' | 'info';
@@ -421,6 +421,34 @@ export function useAppData() {
     }
   }, [showNotification, fetchSuppliers]);
 
+  const updateSupplier = useCallback(async (id: string, data: Partial<Supplier>) => {
+    const prev = suppliers.find((s) => s.id === id);
+    try {
+      const updated = await api.updateSupplier(id, data);
+      setSuppliers((list) => list.map((s) => (s.id === id ? updated : s)));
+
+      const prevName = String(prev?.nome || '').trim();
+      const nextName = String(updated?.nome || '').trim();
+      if (prevName && nextName && prevName !== nextName) {
+        const prevKey = normalizeSupplierName(prevName);
+        setTransactions((list) =>
+          list.map((tx) => {
+            const txKey = normalizeSupplierName(tx.fornecedor);
+            if (!txKey || txKey !== prevKey) return tx;
+            return { ...tx, fornecedor: nextName };
+          })
+        );
+      }
+
+      showNotification('Fornecedor atualizado!', 'success');
+      return updated;
+    } catch (error) {
+      console.error('Failed to update supplier:', error);
+      showNotification('Erro ao atualizar fornecedor.', 'error');
+      throw error;
+    }
+  }, [showNotification, suppliers]);
+
   const syncSuppliers = useCallback(async () => {
     const transactionSuppliers = new Set<string>(transactions.map(tx => tx.fornecedor));
     const existingNames = new Set<string>(suppliers.map(s => s.nome));
@@ -516,6 +544,7 @@ export function useAppData() {
     showNotification, login, logout,
     markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
     deleteSupplier, syncSuppliers,
+    updateSupplier,
     deleteBank,
     addCompanyOption, removeCompanyOption, updateCompanyOption,
     setCompanyOptions,
