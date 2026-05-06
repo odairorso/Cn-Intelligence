@@ -1726,6 +1726,16 @@ async function handleFixReceitasTipo(req, res) {
 // GET /api?route=export-backup
 async function handleExportBackup(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  
+  // Proteção extra para exportação total
+  const backupToken = req.headers['x-cn-backup-token'];
+  const EXPECTED_BACKUP_TOKEN = process.env.BACKUP_TOKEN || 'CN-BACKUP-SECRET-2024';
+  if (backupToken !== EXPECTED_BACKUP_TOKEN) {
+    res.status(403);
+    await logSecurity(req, res, "Tentativa de exportação de backup sem token específico");
+    return res.json({ error: "Acesso negado para exportação de dados." });
+  }
+
   try {
     const [transactions, suppliers, banks, contasContabeis, boletoPatterns] = await Promise.all([
       sql`SELECT * FROM transactions ORDER BY created_at DESC`,
@@ -1849,12 +1859,70 @@ async function handleDbCheck(req, res) {
   }
 }
 
+// --- Logging Helpers ---
+async function logRequest(req, res, startTime, responseSize = 0) {
+  const duration = Date.now() - startTime;
+  const requestId = req.headers["x-vercel-id"] || req.headers["x-request-id"] || "local";
+  try {
+    await sql`
+      INSERT INTO api_logs (route, method, status_code, duration_ms, response_size_bytes, request_id)
+      VALUES (${req.query.route || "unknown"}, ${req.method}, ${res.statusCode}, ${duration}, ${responseSize}, ${requestId})
+    `;
+  } catch (e) {
+    console.error("[logRequest] Error:", e.message);
+  }
+}
+
+async function logSecurity(req, res, reason) {
+  const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
+  const userAgent = req.headers["user-agent"] || "unknown";
+  const requestId = req.headers["x-vercel-id"] || req.headers["x-request-id"] || "local";
+  try {
+    await sql`
+      INSERT INTO security_audit (ip, user_agent, route, status_code, reason, request_id)
+      VALUES (${ip}, ${userAgent}, ${req.query.route || "unknown"}, ${res.statusCode}, ${reason}, ${requestId})
+    `;
+  } catch (e) {
+    console.error("[logSecurity] Error:", e.message);
+  }
+}
+
 // --- Main Router ---
 export default async function handler(req, res) {
+  const startTime = Date.now();
   setCors(res);
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  
+  // Intercept res.json to calculate response size for logging
+  const originalJson = res.json;
+  let responseSize = 0;
+  res.json = function(body) {
+    const content = JSON.stringify(body);
+    responseSize = Buffer.byteLength(content);
+    const result = originalJson.call(this, body);
+    logRequest(req, res, startTime, responseSize);
+    return result;
+  };
 
-  if (!checkRateLimit(req, res)) return;
+  // Trava de segurança para bloquear robôs e scrapers
+  // PRIORIDADE: O usuário deve configurar SECURITY_TOKEN nas variáveis de ambiente da Vercel.
+  const securityToken = req.headers["x-cn-security"];
+  const EXPECTED_TOKEN = process.env.SECURITY_TOKEN || "CN-INT-2024-SECURE-HARDENED-V1";
+  
+  if (securityToken !== EXPECTED_TOKEN && req.query.route !== "health") {
+    res.status(403);
+    await logSecurity(req, res, "Token de segurança inválido ou ausente");
+    return res.json({ error: "Acesso negado. Acesso não autorizado detectado e registrado." });
+  }
+
+  if (req.method === "OPTIONS") {
+    res.status(200);
+    return res.end();
+  }
+
+  if (!checkRateLimit(req, res)) {
+    await logSecurity(req, res, "Rate limit atingido");
+    return;
+  }
 
   if (req.method === 'POST' && req.body) {
     if (req.query.route !== 'extract-boleto') {
