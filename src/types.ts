@@ -25,7 +25,7 @@ export interface Transaction {
   valor: number;
   status: TransactionStatus;
   banco?: string;
-  tipo?: string;
+  tipo?: 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA';
   juros?: number;
   numero_boleto?: string;
   conta_contabil_id?: number;
