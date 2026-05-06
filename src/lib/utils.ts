@@ -17,6 +17,49 @@ export const todayInputDate = (): string => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+export const parseMoneyToNumber = (value: unknown): number => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const raw = String(value ?? '').trim();
+  if (!raw) return 0;
+
+  const cleaned = raw.replace(/[R$\s]/g, '');
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+
+  const hasComma = lastComma !== -1;
+  const hasDot = lastDot !== -1;
+
+  if (hasComma && hasDot) {
+    const decimalIsComma = lastComma > lastDot;
+    const decimalSep = decimalIsComma ? ',' : '.';
+    const thousandSep = decimalIsComma ? '.' : ',';
+    const withoutThousands = cleaned.split(thousandSep).join('');
+    const normalized = withoutThousands.split(decimalSep).join('.');
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  if (hasComma) {
+    const normalized = cleaned.split('.').join('').split(',').join('.');
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  if (hasDot) {
+    const parts = cleaned.split('.');
+    if (parts.length === 2 && parts[1].length > 0 && parts[1].length <= 2) {
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : 0;
+    }
+    const normalized = parts.join('');
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+};
+
 /** Converte qualquer formato de data para YYYY-MM-DD (input[type=date]) */
 export const toInputDate = (value?: string | null): string => {
   if (!value) return '';
