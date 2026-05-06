@@ -47,7 +47,7 @@ export const api = {
     if (search) params.append('search', search);
     if (tipo) params.append('tipo', tipo);
 
-    const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`, { cache: 'no-store' });
+    const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch transactions');
     return res.json();
   },
@@ -80,7 +80,7 @@ export const api = {
     if (status) params.append('status', status);
     if (search) params.append('search', search);
 
-    const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`, { cache: 'no-store' });
+    const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch stats');
     return res.json();
   },
@@ -136,7 +136,7 @@ export const api = {
 
   // ─── Suppliers ─────────────────────────────────────────────────────────────
   async getSuppliers(_uid: string): Promise<Supplier[]> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers`, { cache: 'no-store' });
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch suppliers');
     return res.json();
   },
@@ -183,7 +183,7 @@ export const api = {
 
   // ─── Banks ─────────────────────────────────────────────────────────────────
   async getBanks(_uid: string): Promise<Bank[]> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=banks`, { cache: 'no-store' });
+    const res = await fetchWithSecurity(`${API_BASE}?route=banks`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch banks');
     return res.json();
   },
@@ -215,7 +215,7 @@ export const api = {
 
   // ─── Contas Contábeis ──────────────────────────────────────────────────────
   async getContasContabeis(): Promise<ContaContabil[]> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=contas-contabeis`, { cache: 'no-store' });
+    const res = await fetchWithSecurity(`${API_BASE}?route=contas-contabeis`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch contas contabeis');
     return res.json();
   },
@@ -301,7 +301,7 @@ export const api = {
     tipo: string;
     confirmacoes: number;
   }>> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=boleto-patterns`, { cache: 'no-store' });
+    const res = await fetchWithSecurity(`${API_BASE}?route=boleto-patterns`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch patterns');
     return res.json();
   },
