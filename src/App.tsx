@@ -5133,6 +5133,100 @@ export default function App() {
           return;
         }
 
+        const colsPresent = new Set<string>();
+        for (const r of allDataMatrix.slice(0, 5)) {
+          Object.keys(r || {}).forEach((k) => colsPresent.add(String(k || '').toUpperCase()));
+        }
+
+        const readJsonStorage = (key: string) => {
+          try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return null;
+            return JSON.parse(raw);
+          } catch {
+            return null;
+          }
+        };
+
+        const writeJsonStorage = (key: string, value: any) => {
+          try {
+            localStorage.setItem(key, JSON.stringify(value));
+          } catch {
+            return;
+          }
+        };
+
+        const isOdairSupplierFile =
+          colsPresent.has('CODFORNEC') &&
+          colsPresent.has('NOME') &&
+          !colsPresent.has('VENCIMENTO') &&
+          !colsPresent.has('VALOR') &&
+          !colsPresent.has('PAGAMENTO');
+
+        const isOdairEmpresaFile =
+          colsPresent.has('CODEMP') &&
+          colsPresent.has('NOME') &&
+          colsPresent.has('CGC') &&
+          !colsPresent.has('VENCIMENTO') &&
+          !colsPresent.has('VALOR');
+
+        if (isOdairEmpresaFile) {
+          const first = allDataMatrix.find((r) => String(r?.NOME || '').trim());
+          const nomeEmpresa = String(first?.FANTASIA || first?.RAZAOSOCIAL || first?.NOME || '').trim();
+          if (nomeEmpresa) writeJsonStorage('cn_odair_default_empresa', { empresa: nomeEmpresa });
+          showNotification(nomeEmpresa ? `Empresa padrão salva: ${nomeEmpresa}` : 'Arquivo de empresa lido.', 'success');
+          return;
+        }
+
+        if (isOdairSupplierFile) {
+          const existingMap = (readJsonStorage('cn_odair_fornecedor_map') || {}) as Record<string, string>;
+          const codeMap: Record<string, string> = { ...existingMap };
+
+          let supBatch: Omit<Supplier, 'id'>[] = [];
+          let imported = 0;
+
+          for (const row of allDataMatrix) {
+            const nome = String(row?.NOME || row?.RAZAOSOCIAL || '').trim();
+            if (!nome) continue;
+            const already = suppliers.some((s) => isSupplierMatch(nome, s.nome));
+            const cod = String(row?.CODFORNEC ?? '').trim();
+            if (cod) codeMap[cod] = nome;
+            if (already) continue;
+
+            supBatch.push({
+              uid: 'guest',
+              nome,
+              email: String(row?.EMAIL || '').trim(),
+              telefone: String(row?.FONE || row?.CELULAR || '').trim(),
+              cnpj: String(row?.CGC || row?.CNPJ_NFAVULSA || '').trim(),
+            });
+            imported++;
+
+            if (supBatch.length >= 250) {
+              try {
+                await api.createSuppliersBatch(supBatch);
+              } catch (err) {
+                console.error('Erro no lote de fornecedores', err);
+              } finally {
+                supBatch = [];
+              }
+            }
+          }
+
+          if (supBatch.length) {
+            try {
+              await api.createSuppliersBatch(supBatch);
+            } catch (err) {
+              console.error('Erro no lote final de fornecedores', err);
+            }
+          }
+
+          writeJsonStorage('cn_odair_fornecedor_map', codeMap);
+          await fetchSuppliers(true);
+          showNotification(`${imported} fornecedores importados.`, 'success');
+          return;
+        }
+
         const getRowValue = (row: any, keys: string[]) => {
           for (const key of keys) {
             const foundKey = Object.keys(row).find(rk => rk === key.toUpperCase());
@@ -5214,6 +5308,12 @@ export default function App() {
             }
 
             const str = String(val).trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+            const [y, m, d] = str.split('-');
+            const year = Number(y);
+            if (!Number.isFinite(year) || year < 1990 || year > 2035) return undefined;
+            return `${String(Number(d)).padStart(2, '0')}/${String(Number(m)).padStart(2, '0')}/${y}`;
+          }
             if (str.includes('/')) {
               const parts = str.split('/');
               if (parts.length === 3) {
@@ -5232,12 +5332,39 @@ export default function App() {
 
           const fornecedorNome = String(rawFornecedor).trim();
 
-          const rawVencimento = getRowValue(row, ['VENCIMENTO', 'DATA VENCIMENTO', 'VENC']);
+          const rawVencimento =
+            getRowValue(row, ['VENCIMENTO', 'DATA VENCIMENTO', 'VENC']) ??
+            getRowValue(row, ['DATA', 'EMISSAO', 'DATAEMISSAO', 'DATANOTA', 'CONC_DATA']);
           const rawPagamento = getRowValue(row, ['DATA PAGAMENTO', 'PAGAMENTO', 'DATA PAGO', 'PAGO EM']);
 
           const vencimentoDate = formatDate(rawVencimento);
-          const pagamentoDate = rawPagamento ? formatDate(rawPagamento) : undefined;
+          const pagamentoDateRaw = rawPagamento ? formatDate(rawPagamento) : undefined;
           if (!vencimentoDate) continue;
+
+          const isMovimento = colsPresent.has('CODCONTA') || colsPresent.has('CODCAIXA') || colsPresent.has('CONC_OPERACAO') || colsPresent.has('CREDITO') || colsPresent.has('DEBITO');
+          const pagamentoDate = pagamentoDateRaw || (isMovimento ? vencimentoDate : undefined);
+
+          let tipo: Transaction['tipo'] | undefined = undefined;
+          const concOp = String(getRowValue(row, ['CONC_OPERACAO', 'OPERACAO', 'OPERAÇÃO', 'TIPO_LANC']) || '').trim();
+          const creditoRaw = getRowValue(row, ['CREDITO']);
+          const debitoRaw = getRowValue(row, ['DEBITO']);
+          const creditoVal = typeof creditoRaw === 'number' ? creditoRaw : parseValor(creditoRaw);
+          const debitoVal = typeof debitoRaw === 'number' ? debitoRaw : parseValor(debitoRaw);
+          let finalValor = sanitizedValor;
+
+          if ((!rawValor || finalValor === 0) && (creditoVal > 0 || debitoVal > 0)) {
+            if (creditoVal > 0) {
+              finalValor = creditoVal;
+              tipo = 'RECEITA';
+            } else {
+              finalValor = debitoVal;
+              tipo = 'DESPESA';
+            }
+          } else if (concOp === '+') {
+            tipo = 'RECEITA';
+          } else if (concOp === '-') {
+            tipo = 'DESPESA';
+          }
 
           const rawStatus = String(getRowValue(row, ['STATUS', 'SITUAÇÃO', 'SITUACAO', 'PAGO', 'SIT 2']) || '').toUpperCase();
           let status: TransactionStatus = 'PENDENTE';
@@ -5253,33 +5380,56 @@ export default function App() {
 
           const rawBanco = getRowValue(row, ['BANCO', 'CONTA', 'INSTITUIÇÃO', 'INSTITUICAO']);
 
+          const fornecedorFromCode = (() => {
+            const cod = String(getRowValue(row, ['CODFORNEC', 'CODFOR']) ?? '').trim();
+            if (!cod) return '';
+            const map = (readJsonStorage('cn_odair_fornecedor_map') || {}) as Record<string, string>;
+            return String(map[cod] || '').trim();
+          })();
+
+          const fornecedorNomeFinal = String(
+            String(rawFornecedor || '').trim() ||
+            fornecedorFromCode ||
+            'Diversos'
+          ).trim();
+
+          const defaultEmpresa = (() => {
+            const stored = readJsonStorage('cn_odair_default_empresa') as any;
+            return String(stored?.empresa || '').trim();
+          })();
+
+          const bancoFinal =
+            (rawBanco ? String(rawBanco) : '') ||
+            (colsPresent.has('CODCONTA') ? `Conta ${String(getRowValue(row, ['CODCONTA']) || '').trim()}` : '');
+
           txBatch.push({
             uid: 'guest',
-            fornecedor: fornecedorNome,
-            descricao: String(rawDescricao || '-'),
-            empresa: String(rawEmpresa || 'Geral'),
+            fornecedor: fornecedorNomeFinal,
+            descricao: String(rawDescricao || getRowValue(row, ['OBS']) || '-'),
+            empresa: String(rawEmpresa || defaultEmpresa || 'Geral'),
             vencimento: vencimentoDate,
             pagamento: pagamentoDate || undefined,
-            valor: sanitizedValor,
+            valor: finalValor,
             status: status,
-            banco: rawBanco ? String(rawBanco) : undefined
+            banco: bancoFinal ? String(bancoFinal) : undefined,
+            tipo
           });
 
           totalImported++;
-          totalFinanceiro += sanitizedValor;
+          totalFinanceiro += finalValor;
 
           // Handle supplier
-          if (!localSuppliers.has(fornecedorNome) && fornecedorNome !== 'Desconhecido') {
+          if (!localSuppliers.has(fornecedorNomeFinal) && fornecedorNomeFinal !== 'Desconhecido') {
             supBatch.push({
               uid: 'guest',
-              nome: fornecedorNome,
+              nome: fornecedorNomeFinal,
 
 
               email: '',
               telefone: '',
               cnpj: ''
             });
-            localSuppliers.add(fornecedorNome);
+            localSuppliers.add(fornecedorNomeFinal);
           }
 
           // Lotes menores (250) e usar await com try-catch individual por lote para evitar queda
