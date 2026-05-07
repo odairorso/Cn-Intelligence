@@ -5099,7 +5099,14 @@ export default function App() {
 
           // Verifica se a primeira linha contém colunas padrão
           const firstRowUpper = sheetMatrix[0].map(h => String(h || '').trim().toUpperCase());
-          const hasStandardHeader = firstRowUpper.some(h => KNOWN_COLS.includes(h));
+          const hasMovementHeader =
+            firstRowUpper.includes('CODCONTA') ||
+            firstRowUpper.includes('CODCAIXA') ||
+            firstRowUpper.includes('CODMOV') ||
+            firstRowUpper.includes('IDCODMOVCAIXA') ||
+            firstRowUpper.includes('CREDITO') ||
+            firstRowUpper.includes('DEBITO');
+          const hasStandardHeader = firstRowUpper.some(h => KNOWN_COLS.includes(h)) || hasMovementHeader;
 
           if (hasStandardHeader) {
             // Fluxo normal: primeira linha = cabeçalho
@@ -5269,6 +5276,12 @@ export default function App() {
         };
 
         const localSuppliers = new Set(suppliers.map(s => s.nome));
+        const fileIsMovimento =
+          colsPresent.has('CODCONTA') ||
+          colsPresent.has('CODCAIXA') ||
+          colsPresent.has('CONC_OPERACAO') ||
+          colsPresent.has('CREDITO') ||
+          colsPresent.has('DEBITO');
 
         let txBatch: Omit<Transaction, 'id'>[] = [];
         let supBatch: Omit<Supplier, 'id'>[] = [];
@@ -5276,14 +5289,30 @@ export default function App() {
         let totalFinanceiro = 0;
 
         for (const row of allDataMatrix) {
-          const rawFornecedor = getRowValue(row, ['FORNECEDOR', 'FORNECEDORES', 'FORNECEDOR_NOME', 'NOME', 'FAVORECIDO', 'CLIENTE']);
-          if (!rawFornecedor || String(rawFornecedor).toUpperCase().includes('TOTAL')) continue;
+          const fornecedorFromCode = (() => {
+            const cod = String(getRowValue(row, ['CODFORNEC', 'CODFOR']) ?? '').trim();
+            if (!cod) return '';
+            const map = (readJsonStorage('cn_odair_fornecedor_map') || {}) as Record<string, string>;
+            return String(map[cod] || '').trim();
+          })();
 
-          const rawValor = getRowValue(row, ['VALOR', 'VALOR TOTAL', 'TOTAL', 'VALOR_TOTAL', 'QUANTIA', 'PREÇO', 'PRECO', 'SAIDA', 'SAÍDA', 'PAGAMENTO']);
+          const rawFornecedor = getRowValue(row, ['FORNECEDOR', 'FORNECEDORES', 'FORNECEDOR_NOME', 'NOME', 'FAVORECIDO', 'CLIENTE']);
+          const fornecedorNome = String(rawFornecedor || '').trim();
+
+          if (!fornecedorNome && !fornecedorFromCode && !fileIsMovimento) continue;
+          if (fornecedorNome && fornecedorNome.toUpperCase().includes('TOTAL')) continue;
+          if (fornecedorNome && (fornecedorNome.toUpperCase() === 'FORNECEDOR' || fornecedorNome.toUpperCase() === 'CLIENTE') && !fornecedorFromCode) continue;
+
+          const rawValor = getRowValue(row, ['VALOR', 'VALOROPERACAO', 'VALOR TOTAL', 'TOTAL', 'VALOR_TOTAL', 'QUANTIA', 'PREÇO', 'PRECO', 'SAIDA', 'SAÍDA', 'PAGAMENTO']);
           const sanitizedValor = parseValor(rawValor);
 
-          if (sanitizedValor === 0 && !rawValor) continue;
-          if (String(rawFornecedor).toUpperCase() === 'FORNECEDOR' || String(rawFornecedor).toUpperCase() === 'CLIENTE') continue;
+          const creditoRaw = getRowValue(row, ['CREDITO']);
+          const debitoRaw = getRowValue(row, ['DEBITO']);
+          const creditoVal = typeof creditoRaw === 'number' ? creditoRaw : parseValor(creditoRaw);
+          const debitoVal = typeof debitoRaw === 'number' ? debitoRaw : parseValor(debitoRaw);
+
+          if (!fileIsMovimento && sanitizedValor === 0 && !rawValor) continue;
+          if (fileIsMovimento && sanitizedValor === 0 && !rawValor && !(creditoVal > 0 || debitoVal > 0)) continue;
 
           const formatDate = (val: any) => {
             if (!val) return undefined;
@@ -5329,9 +5358,6 @@ export default function App() {
             return undefined;
           };
 
-
-          const fornecedorNome = String(rawFornecedor).trim();
-
           const rawVencimento =
             getRowValue(row, ['VENCIMENTO', 'DATA VENCIMENTO', 'VENC']) ??
             getRowValue(row, ['DATA', 'EMISSAO', 'DATAEMISSAO', 'DATANOTA', 'CONC_DATA']);
@@ -5341,15 +5367,10 @@ export default function App() {
           const pagamentoDateRaw = rawPagamento ? formatDate(rawPagamento) : undefined;
           if (!vencimentoDate) continue;
 
-          const isMovimento = colsPresent.has('CODCONTA') || colsPresent.has('CODCAIXA') || colsPresent.has('CONC_OPERACAO') || colsPresent.has('CREDITO') || colsPresent.has('DEBITO');
-          const pagamentoDate = pagamentoDateRaw || (isMovimento ? vencimentoDate : undefined);
+          const pagamentoDate = pagamentoDateRaw || (fileIsMovimento ? vencimentoDate : undefined);
 
           let tipo: Transaction['tipo'] | undefined = undefined;
           const concOp = String(getRowValue(row, ['CONC_OPERACAO', 'OPERACAO', 'OPERAÇÃO', 'TIPO_LANC']) || '').trim();
-          const creditoRaw = getRowValue(row, ['CREDITO']);
-          const debitoRaw = getRowValue(row, ['DEBITO']);
-          const creditoVal = typeof creditoRaw === 'number' ? creditoRaw : parseValor(creditoRaw);
-          const debitoVal = typeof debitoRaw === 'number' ? debitoRaw : parseValor(debitoRaw);
           let finalValor = sanitizedValor;
 
           if ((!rawValor || finalValor === 0) && (creditoVal > 0 || debitoVal > 0)) {
@@ -5379,13 +5400,6 @@ export default function App() {
           const rawEmpresa = getRowValue(row, ['EMPRESA', 'UNIDADE', 'LOJA', 'OBS 2', 'GRUPO']);
 
           const rawBanco = getRowValue(row, ['BANCO', 'CONTA', 'INSTITUIÇÃO', 'INSTITUICAO']);
-
-          const fornecedorFromCode = (() => {
-            const cod = String(getRowValue(row, ['CODFORNEC', 'CODFOR']) ?? '').trim();
-            if (!cod) return '';
-            const map = (readJsonStorage('cn_odair_fornecedor_map') || {}) as Record<string, string>;
-            return String(map[cod] || '').trim();
-          })();
 
           const fornecedorNomeFinal = String(
             String(rawFornecedor || '').trim() ||
