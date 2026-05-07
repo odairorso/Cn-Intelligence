@@ -188,10 +188,10 @@ export function useAppData() {
     }
   }, [isAuthorized]);
 
-  const fetchBanks = useCallback(async () => {
+  const fetchBanks = useCallback(async (fresh = false) => {
     if (!isAuthorized) return;
     try {
-      const data = await api.getBanks('guest');
+      const data = await api.getBanks('guest', fresh);
       setBanks(data);
     } catch (error) {
       console.error('Failed to fetch banks:', error);

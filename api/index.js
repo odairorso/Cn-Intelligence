@@ -574,6 +574,48 @@ async function handleTransactionsBatchUpdate(req, res) {
   }
 }
 
+// POST /api?route=transactions-dedupe-movimentos
+async function handleTransactionsDedupeMovimentos(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const daysRaw = req.query?.days;
+    const parsed = daysRaw ? parseInt(String(daysRaw)) : 2;
+    const days = Number.isFinite(parsed) && parsed >= 1 && parsed <= 30 ? parsed : 2;
+
+    const rows = await sql`
+      WITH ranked AS (
+        SELECT
+          id,
+          ROW_NUMBER() OVER (
+            PARTITION BY
+              COALESCE(fornecedor, ''),
+              upper(COALESCE(empresa, '')),
+              vencimento,
+              valor,
+              COALESCE(status, ''),
+              COALESCE(banco, ''),
+              upper(COALESCE(descricao, ''))
+            ORDER BY created_at ASC, id ASC
+          ) AS rn
+        FROM transactions
+        WHERE banco ILIKE 'Conta %'
+          AND created_at >= (NOW() - (${days} * INTERVAL '1 day'))
+      ),
+      del AS (
+        DELETE FROM transactions t
+        USING ranked r
+        WHERE t.id = r.id AND r.rn > 1
+        RETURNING t.id
+      )
+      SELECT COUNT(*)::int AS deleted FROM del`;
+
+    return res.json({ ok: true, deleted: Number(rows?.[0]?.deleted || 0), window_days: days });
+  } catch (e) {
+    console.error('[dedupe-movimentos] Error:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}
+
 // PUT/DELETE /api?route=transactions&id=xxx
 async function handleTransactionById(req, res) {
   const { id } = req.query;
@@ -2067,6 +2109,8 @@ export default async function handler(req, res) {
         return handleTransactionsBatch(req, res);
       case 'transactions-batch-update':
         return handleTransactionsBatchUpdate(req, res);
+      case 'transactions-dedupe-movimentos':
+        return handleTransactionsDedupeMovimentos(req, res);
       case 'suppliers':
         if (id) return handleSupplierById(req, res);
         return handleSuppliers(req, res);
