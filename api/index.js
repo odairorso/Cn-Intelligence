@@ -642,9 +642,21 @@ async function handleSuppliers(req, res) {
   if (req.method === 'POST') {
     try {
       const { uid, nome, cnpj, email, telefone } = req.body;
+      const nomeTrim = String(nome || '').trim();
+      if (!nomeTrim) return res.status(400).json({ error: 'Nome do fornecedor é obrigatório' });
+
+      const normalized = normSupplier(nomeTrim);
+      const existing = await sql`
+        SELECT * FROM suppliers
+        WHERE upper(regexp_replace(coalesce(nome, ''), '[^A-Za-z0-9]+', ' ', 'g')) = ${normalized}
+        LIMIT 1`;
+      if (existing.length) {
+        return res.status(200).json(existing[0]);
+      }
+
       const rows = await sql`
         INSERT INTO suppliers (uid, nome, cnpj, email, telefone)
-        VALUES (${uid || 'guest'}, ${nome}, ${cnpj || null}, ${email || null}, ${telefone || null})
+        VALUES (${uid || 'guest'}, ${nomeTrim}, ${cnpj || null}, ${email || null}, ${telefone || null})
         RETURNING *`;
       return res.status(201).json(rows[0]);
     } catch (e) {
@@ -668,9 +680,17 @@ async function handleSuppliersBatch(req, res) {
   try {
     for (const sup of suppliers) {
       const { uid, nome, cnpj, email, telefone } = sup;
+      const nomeTrim = String(nome || '').trim();
+      if (!nomeTrim) continue;
+      const normalized = normSupplier(nomeTrim);
+      const exists = await sql`
+        SELECT id FROM suppliers
+        WHERE upper(regexp_replace(coalesce(nome, ''), '[^A-Za-z0-9]+', ' ', 'g')) = ${normalized}
+        LIMIT 1`;
+      if (exists.length) continue;
       await sql`
         INSERT INTO suppliers (uid, nome, cnpj, email, telefone)
-        VALUES (${uid || 'guest'}, ${nome}, ${cnpj || null}, ${email || null}, ${telefone || null})
+        VALUES (${uid || 'guest'}, ${nomeTrim}, ${cnpj || null}, ${email || null}, ${telefone || null})
         ON CONFLICT DO NOTHING`;
     }
     return res.status(201).json({ message: 'Batch created successfully', count: suppliers.length });
@@ -1967,7 +1987,11 @@ export default async function handler(req, res) {
   setCors(res);
 
   if (req.method === 'GET' && req.query.route && req.query.route !== 'health') {
-    res.setHeader('Cache-Control', 'public, max-age=5, s-maxage=60, stale-while-revalidate=300');
+    if (String(req.query.fresh || '') === '1') {
+      res.setHeader('Cache-Control', 'no-store');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=5, s-maxage=60, stale-while-revalidate=300');
+    }
   }
   
   // Intercept res.json to calculate response size for logging

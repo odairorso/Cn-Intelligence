@@ -147,8 +147,11 @@ export const api = {
   },
 
   // ─── Suppliers ─────────────────────────────────────────────────────────────
-  async getSuppliers(_uid: string): Promise<Supplier[]> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers`);
+  async getSuppliers(_uid: string, fresh?: boolean): Promise<Supplier[]> {
+    const params = new URLSearchParams();
+    params.append('route', 'suppliers');
+    if (fresh) params.append('fresh', '1');
+    const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch suppliers');
     return res.json();
   },
