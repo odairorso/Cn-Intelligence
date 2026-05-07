@@ -2887,15 +2887,38 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
   const [searchSupplier, setSearchSupplier] = useState('');
 
   const filteredSuppliers = useMemo(() => {
-    return suppliers.filter(s =>
-      s.nome.toLowerCase().includes(searchSupplier.toLowerCase())
-    ).slice(0, 100); // Limit to 100 for performance
+    const q = normalizeSupplierName(searchSupplier);
+    const byKey = new Map<string, Supplier>();
+    for (const s of suppliers) {
+      const key = normalizeSupplierName(s.nome);
+      if (!key) continue;
+      if (q && !key.includes(q)) continue;
+      if (!byKey.has(key)) byKey.set(key, s);
+    }
+    return Array.from(byKey.values())
+      .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'))
+      .slice(0, 100);
   }, [suppliers, searchSupplier]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
+      const fornecedorRaw = String(formData.fornecedor || '').trim();
+      const fornecedorKey = normalizeSupplierName(fornecedorRaw);
+      let fornecedorFinal = fornecedorRaw;
+      if (fornecedorKey && fornecedorKey.length >= 3) {
+        const exact = suppliers.find((s) => normalizeSupplierName(s.nome) === fornecedorKey);
+        if (exact?.nome) {
+          fornecedorFinal = exact.nome;
+        } else {
+          const candidates = suppliers.filter((s) => normalizeSupplierName(s.nome).includes(fornecedorKey));
+          if (candidates.length === 1 && candidates[0]?.nome) {
+            fornecedorFinal = candidates[0].nome;
+          }
+        }
+      }
+
       const parcelas = Math.max(1, Number(formData.parcelas) || 1);
       const addMonthsToInputDate = (baseDate: string, monthsToAdd: number) => {
         const [year, month, day] = baseDate.split('-').map(Number);
@@ -2913,7 +2936,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
 
         return {
           uid: 'guest',
-          fornecedor: formData.fornecedor,
+          fornecedor: fornecedorFinal,
           descricao: parcelas > 1 ? `${formData.descricao} (${i + 1}/${parcelas})` : formData.descricao,
           empresa: formData.empresa,
           vencimento: toDisplayDate(vencimentoParcela),
@@ -4925,7 +4948,7 @@ export default function App() {
       setShowPdfImportModal(false);
       setPdfExtractedRows([]);
       await fetchTransactions();
-      await fetchSuppliers();
+      await fetchSuppliers(true);
       showNotification(`${nonDuplicateRows.length} boleto(s) importado(s). ${blockedCount} bloqueado(s) por duplicidade.`, 'success');
     } catch (error: any) {
       console.error('Error creating transaction from PDF:', error);
@@ -5207,7 +5230,7 @@ export default function App() {
 
         showNotification(`${totalImported} lançamentos processados na importação!`, 'success');
         fetchTransactions();
-        fetchSuppliers();
+        fetchSuppliers(true);
       } catch (err) {
         console.error('Erro ao processar arquivo:', err);
         showNotification('Erro ao processar o arquivo. Verifique o formato.', 'error');
@@ -5242,7 +5265,7 @@ export default function App() {
       await api.resetDatabase();
       showNotification('Sistema resetado com sucesso!', 'success');
       fetchTransactions();
-      fetchSuppliers();
+      fetchSuppliers(true);
     } catch (error) {
       console.error('Failed to reset system:', error);
       showNotification('Erro ao resetar o sistema.', 'error');
@@ -6159,7 +6182,7 @@ export default function App() {
             onClose={() => setEditingSupplier(null)}
             onSave={async (id, data) => {
               await updateSupplier(id, data);
-              fetchSuppliers();
+              fetchSuppliers(true);
               fetchStats();
               setDetailSupplier((prev) => (prev && prev.id === id ? { ...prev, ...data } as Supplier : prev));
             }}
@@ -6357,7 +6380,7 @@ export default function App() {
         <NewSupplierModal
           setShowNewSupplierModal={setShowNewSupplierModal}
           onSuccess={() => {
-            fetchSuppliers();
+            fetchSuppliers(true);
             showNotification('Fornecedor cadastrado com sucesso!', 'success');
           }}
         />

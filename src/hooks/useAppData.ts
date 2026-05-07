@@ -176,10 +176,10 @@ export function useAppData() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthorized]);
 
-  const fetchSuppliers = useCallback(async () => {
+  const fetchSuppliers = useCallback(async (fresh = false) => {
     if (!isAuthorized) return;
     try {
-      const data = await api.getSuppliers('guest');
+      const data = await api.getSuppliers('guest', fresh);
       setSuppliers(data);
     } catch (error) {
       console.error('Failed to fetch suppliers:', error);
