@@ -115,7 +115,7 @@ export function useAppData() {
     month?: string,
     search?: string,
     tipo?: string,
-    options?: { limit?: number; empresa?: string; status?: string }
+    options?: { limit?: number; empresa?: string; status?: string; conta_contabil_id?: number }
   ) => {
     if (!isAuthorized) return;
     try {
@@ -126,9 +126,10 @@ export function useAppData() {
       const normalizedTipo = tipo && tipo !== 'TODOS' ? tipo : undefined;
       const normalizedEmpresa = options?.empresa && options.empresa !== 'TODOS' ? options.empresa : undefined;
       const normalizedStatus = options?.status && options.status !== 'TODOS' ? options.status : undefined;
+      const normalizedContaContabilId = typeof options?.conta_contabil_id === 'number' ? options.conta_contabil_id : undefined;
       const limit =
         options?.limit ??
-        (normalizedYear || normalizedMonth || search || normalizedTipo || normalizedEmpresa || normalizedStatus ? 200 : 50);
+        (normalizedYear || normalizedMonth || search || normalizedTipo || normalizedEmpresa || normalizedStatus || normalizedContaContabilId ? 200 : 50);
       const offset = append ? transactionsLengthRef.current : 0;
 
       const data = await api.getTransactions(
@@ -140,7 +141,8 @@ export function useAppData() {
         search,
         normalizedTipo,
         normalizedEmpresa,
-        normalizedStatus
+        normalizedStatus,
+        normalizedContaContabilId
       );
       const normalized = data.map((tx) => {
         const raw = tx as any;
