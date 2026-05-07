@@ -5282,6 +5282,8 @@ export default function App() {
           colsPresent.has('CONC_OPERACAO') ||
           colsPresent.has('CREDITO') ||
           colsPresent.has('DEBITO');
+        const txBatchSize = fileIsMovimento && allDataMatrix.length > 2000 ? 50 : 250;
+        const supBatchSize = 250;
 
         let txBatch: Omit<Transaction, 'id'>[] = [];
         let supBatch: Omit<Supplier, 'id'>[] = [];
@@ -5446,8 +5448,8 @@ export default function App() {
             localSuppliers.add(fornecedorNomeFinal);
           }
 
-          // Lotes menores (250) e usar await com try-catch individual por lote para evitar queda
-          if (txBatch.length >= 250) {
+          // Lotes menores e usar await com try-catch individual por lote para evitar queda
+          if (txBatch.length >= txBatchSize) {
             try {
               console.log(`Enviando lote de ${txBatch.length} transações...`);
               await api.createTransactionsBatch(txBatch);
@@ -5457,7 +5459,7 @@ export default function App() {
               txBatch = [];
             }
           }
-          if (supBatch.length >= 250) {
+          if (supBatch.length >= supBatchSize) {
             try {
               await api.createSuppliersBatch(supBatch);
               supBatch = [];
