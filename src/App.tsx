@@ -1459,13 +1459,14 @@ interface RelatoriosTabProps {
     month?: string,
     search?: string,
     tipo?: string,
-    options?: { limit?: number; empresa?: string; status?: string }
+    options?: { limit?: number; empresa?: string; status?: string; conta_contabil_id?: number }
   ) => void;
   globalStats: any;
   fetchStats: (year?: string, period?: string, empresa?: string, tipo?: string, status?: string) => Promise<void>;
+  contasContabeis: ContaContabil[];
 }
 
-const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStats }: RelatoriosTabProps) => {
+const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStats, contasContabeis }: RelatoriosTabProps) => {
   const years = useMemo(() => {
     const y = transactions.map(tx => {
       const dateParts = tx.vencimento.includes('-') ? tx.vencimento.split('-') : tx.vencimento.split('/');
@@ -1483,6 +1484,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
   const [selectedCompany, setSelectedCompany] = useState<string>('TODOS');
   const [selectedTipo, setSelectedTipo] = useState<string>('TODOS');
   const [selectedStatus, setSelectedStatus] = useState<string>('TODOS');
+  const [selectedContaContabil, setSelectedContaContabil] = useState<string>('TODOS');
 
   const todayKey = useMemo(() => {
     const d = new Date();
@@ -1501,6 +1503,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
   };
 
   useEffect(() => {
+    const contaId = selectedContaContabil === 'TODOS' ? undefined : Number(selectedContaContabil);
     fetchTransactions(
       false,
       selectedYear,
@@ -1510,10 +1513,12 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
       {
         limit: 5000,
         empresa: selectedCompany === 'TODOS' ? undefined : selectedCompany,
+        status: selectedStatus === 'TODOS' ? undefined : selectedStatus,
+        conta_contabil_id: Number.isFinite(contaId as any) ? (contaId as number) : undefined,
       }
     );
     fetchStats(selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus);
-  }, [selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, fetchTransactions, fetchStats]);
+  }, [selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, fetchTransactions, fetchStats]);
 
   const companies = useMemo(() => {
     const map = new Map<string, string>();
@@ -1541,13 +1546,15 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
       const currentStatus = effectiveStatus(tx);
       const matchesStatus = selectedStatus === 'TODOS' 
         || (selectedStatus === 'NAO_PAGO' ? (currentStatus === 'PENDENTE' || currentStatus === 'VENCIDO') : currentStatus === selectedStatus);
-      return matchesYear && matchesMonth && matchesCompany && matchesTipo && matchesStatus;
+      const contaId = selectedContaContabil === 'TODOS' ? null : Number(selectedContaContabil);
+      const matchesConta = selectedContaContabil === 'TODOS' || (Number.isFinite(contaId as any) && Number(tx.conta_contabil_id) === contaId);
+      return matchesYear && matchesMonth && matchesCompany && matchesTipo && matchesStatus && matchesConta;
     });
-  }, [transactions, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, todayKey]);
+  }, [transactions, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, todayKey]);
 
   const periodTotals = useMemo(() => {
     // Se tivermos os dados reais do servidor, usamos eles!
-    if (globalStats?.kpis && (selectedYear !== 'TODOS' || selectedMonth !== 'TODOS' || selectedCompany !== 'TODOS' || selectedTipo !== 'TODOS' || selectedStatus !== 'TODOS')) {
+    if (globalStats?.kpis && selectedContaContabil === 'TODOS' && (selectedYear !== 'TODOS' || selectedMonth !== 'TODOS' || selectedCompany !== 'TODOS' || selectedTipo !== 'TODOS' || selectedStatus !== 'TODOS')) {
       const k = globalStats.kpis;
       return {
         total: Number(k.total_receitas) - Number(k.total_despesas),
@@ -1622,7 +1629,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
       naoPagoSaldo: naoPagoReceitas - naoPagoDespesas,
       count: filteredData.length 
     };
-  }, [filteredData, globalStats, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus]);
+  }, [filteredData, globalStats, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil]);
 
   const monthLabel = useMemo(() => {
     const months: Record<string, string> = { '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril', '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto', '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro' };
@@ -1898,6 +1905,25 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
             <option value="VENCIDO" className="bg-surface text-on-surface">Vencidos</option>
             <option value="PAGO" className="bg-surface text-on-surface">Pagos</option>
             <option value="NAO_PAGO" className="bg-surface text-on-surface">Não Pagos (Pendentes + Vencidos)</option>
+          </select>
+        </div>
+        <div className="space-y-1 min-w-[240px]">
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase">Conta Contábil</label>
+          <select
+            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+            style={{ backgroundColor: '#1e1e2e' }}
+            value={selectedContaContabil}
+            onChange={e => setSelectedContaContabil(e.target.value)}
+          >
+            <option value="TODOS" className="bg-surface text-on-surface">Todas</option>
+            {contasContabeis
+              .filter((c) => c.ativo !== false)
+              .sort((a, b) => String(a.codigo || '').localeCompare(String(b.codigo || ''), 'pt-BR'))
+              .map((c) => (
+                <option key={c.id} value={String(c.id)} className="bg-surface text-on-surface">
+                  {c.codigo} - {c.nome}
+                </option>
+              ))}
           </select>
         </div>
         <div className="flex-grow"></div>
@@ -2886,6 +2912,31 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
   const [showContaDropdown, setShowContaDropdown] = useState(false);
   const [searchSupplier, setSearchSupplier] = useState('');
 
+  const getDefaultContaKey = (empresa: string, tipo: string) =>
+    `cn_default_conta_contabil:${normalizeCompanyKey(empresa)}:${String(tipo || '').toUpperCase()}`;
+
+  useEffect(() => {
+    const allowed = contasContabeis.filter((c) => c.ativo !== false).filter((c) => matchesAccountType(c, formData.tipo));
+    const hasSelected = typeof formData.conta_contabil_id === 'number' && allowed.some((c) => c.id === formData.conta_contabil_id);
+
+    const key = getDefaultContaKey(formData.empresa, formData.tipo);
+    const stored = (() => {
+      try { return localStorage.getItem(key); } catch { return null; }
+    })();
+    const storedId = stored ? Number(stored) : NaN;
+    const storedValid = Number.isFinite(storedId) && allowed.some((c) => c.id === storedId);
+
+    if (hasSelected) return;
+    if (storedValid) {
+      setFormData((prev) => ({ ...prev, conta_contabil_id: storedId }));
+      return;
+    }
+
+    if (typeof formData.conta_contabil_id === 'number' && !hasSelected) {
+      setFormData((prev) => ({ ...prev, conta_contabil_id: undefined }));
+    }
+  }, [formData.empresa, formData.tipo, contasContabeis]);
+
   const filteredSuppliers = useMemo(() => {
     const q = normalizeSupplierName(searchSupplier);
     const byKey = new Map<string, Supplier>();
@@ -3106,7 +3157,8 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                       Selecione a conta
                     </div>
                     {contasContabeis
-                      .filter(c => c.tipo === formData.tipo)
+                      .filter(c => c.ativo !== false)
+                      .filter(c => matchesAccountType(c, formData.tipo))
                       .filter(c => {
                         const q = searchConta.toLowerCase();
                         if (!q) return true;
@@ -3119,6 +3171,9 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                           style={{ backgroundColor: formData.conta_contabil_id === c.id ? 'rgba(59, 130, 246, 0.2)' : 'transparent' }}
                           onClick={() => {
                             setFormData({ ...formData, conta_contabil_id: c.id });
+                            try {
+                              localStorage.setItem(getDefaultContaKey(formData.empresa, formData.tipo), String(c.id));
+                            } catch {}
                             setShowContaDropdown(false);
                             setSearchConta('');
                           }}
@@ -3283,11 +3338,43 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
   const [searchConta, setSearchConta] = useState('');
   const [showContaDropdown, setShowContaDropdown] = useState(false);
   const [searchSupplier, setSearchSupplier] = useState('');
+  const getDefaultContaKey = (empresa: string, tipo: string) =>
+    `cn_default_conta_contabil:${normalizeCompanyKey(empresa)}:${String(tipo || '').toUpperCase()}`;
+
+  useEffect(() => {
+    const tipo = String(formData.tipo || 'DESPESA') as 'RECEITA' | 'DESPESA';
+    const allowed = contasContabeis.filter((c) => c.ativo !== false).filter((c) => matchesAccountType(c, tipo));
+    const hasSelected = typeof formData.conta_contabil_id === 'number' && allowed.some((c) => c.id === formData.conta_contabil_id);
+
+    const key = getDefaultContaKey(formData.empresa, tipo);
+    const stored = (() => {
+      try { return localStorage.getItem(key); } catch { return null; }
+    })();
+    const storedId = stored ? Number(stored) : NaN;
+    const storedValid = Number.isFinite(storedId) && allowed.some((c) => c.id === storedId);
+
+    if (hasSelected) return;
+    if (storedValid) {
+      setFormData((prev) => ({ ...prev, conta_contabil_id: storedId }));
+      return;
+    }
+    if (typeof formData.conta_contabil_id === 'number' && !hasSelected) {
+      setFormData((prev) => ({ ...prev, conta_contabil_id: undefined }));
+    }
+  }, [formData.empresa, formData.tipo, contasContabeis]);
 
   const filteredSuppliers = useMemo(() => {
-    return suppliers.filter(s =>
-      s.nome.toLowerCase().includes(searchSupplier.toLowerCase())
-    ).slice(0, 100); // Limit to 100 for performance
+    const q = normalizeSupplierName(searchSupplier);
+    const byKey = new Map<string, Supplier>();
+    for (const s of suppliers) {
+      const key = normalizeSupplierName(s.nome);
+      if (!key) continue;
+      if (q && !key.includes(q)) continue;
+      if (!byKey.has(key)) byKey.set(key, s);
+    }
+    return Array.from(byKey.values())
+      .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'))
+      .slice(0, 100);
   }, [suppliers, searchSupplier]);
 
   useEffect(() => {
@@ -3434,6 +3521,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                         Selecione a conta
                       </div>
                       {contasContabeis
+                        .filter(c => c.ativo !== false)
                         .filter(c => matchesAccountType(c, formData.tipo))
                         .filter(c => {
                           const q = searchConta.toLowerCase();
@@ -3447,6 +3535,9 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                             style={{ backgroundColor: formData.conta_contabil_id === c.id ? 'rgba(59, 130, 246, 0.2)' : 'transparent' }}
                             onClick={() => {
                               setFormData({ ...formData, conta_contabil_id: c.id });
+                              try {
+                                localStorage.setItem(getDefaultContaKey(formData.empresa, formData.tipo), String(c.id));
+                              } catch {}
                               setShowContaDropdown(false);
                               setSearchConta('');
                             }}
@@ -5658,6 +5749,7 @@ export default function App() {
                 fetchTransactions={fetchTransactions}
                 globalStats={globalStats}
                 fetchStats={fetchStats}
+                contasContabeis={contasContabeis}
               />
             )}
             {activeTab === 'receitas' && <ReceitasTab transactions={transactions} onNewRevenue={() => { setNewTxInitialTipo('RECEITA'); setShowNewTxModal(true); }} />}

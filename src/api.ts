@@ -46,7 +46,8 @@ export const api = {
     search?: string,
     tipo?: string,
     empresa?: string,
-    status?: string
+    status?: string,
+    conta_contabil_id?: number
   ): Promise<Transaction[]> {
     const params = new URLSearchParams();
     params.append('route', 'transactions');
@@ -58,6 +59,7 @@ export const api = {
     if (tipo) params.append('tipo', tipo);
     if (empresa) params.append('empresa', empresa);
     if (status) params.append('status', status);
+    if (typeof conta_contabil_id === 'number') params.append('conta_contabil_id', String(conta_contabil_id));
 
     const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch transactions');
