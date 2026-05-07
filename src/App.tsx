@@ -4243,6 +4243,13 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    if (!isAuthorized) return;
+    if (!showNewTxModal) return;
+    if (banks.length > 0) return;
+    fetchBanks(true);
+  }, [showNewTxModal, isAuthorized, banks.length, fetchBanks]);
+
 
   const addContaContabil = async () => {
     if (!newContaContabil.codigo || !newContaContabil.nome) {
@@ -5066,10 +5073,40 @@ export default function App() {
         // Colunas consideradas "cabeçalho padrão"
         const KNOWN_COLS = ['FORNECEDOR', 'FORNECEDORES', 'NOME', 'FAVORECIDO', 'CLIENTE', 'VALOR', 'VENCIMENTO', 'DATA', 'PAGAMENTO', 'SITUAÇÃO', 'SITUACAO'];
 
-        // Heurística de mapeamento posicional para abas sem cabeçalho padrão
+        // Heurística de mapeamento posicional para abas/CSVs sem cabeçalho
         const isDateSerial = (v: any) => typeof v === 'number' && v > 40000 && v < 70000;
+        const isYmdDate = (v: any) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(String(v).trim());
+        const hasValue = (v: any) => v !== undefined && v !== null && String(v).trim() !== '';
         const buildPositionalRow = (row: any[], sheetName: string): any => {
           const r: any = { _aba_origem: sheetName };
+
+          // MOVBANCO.csv (Odair) - sem cabeçalho:
+          // CODCONTA,CODMOV,CODTIPMOV,DATA,VALOR,OBS,DOCUMENTO,CODFORNEC,...
+          if (isYmdDate(row?.[3]) && hasValue(row?.[4])) {
+            r['CODCONTA'] = row?.[0];
+            r['CODMOV'] = row?.[1];
+            r['CODTIPMOV'] = row?.[2];
+            r['DATA'] = row?.[3];
+            r['VALOR'] = row?.[4];
+            r['OBS'] = row?.[5];
+            r['DOCUMENTO'] = row?.[6];
+            r['CODFORNEC'] = row?.[7];
+            return r;
+          }
+
+          // MOVCAIXA.csv (Odair) - sem cabeçalho:
+          // CODCAIXA,IDCODMOVCAIXA,DATA,OBS,OPERACAO,CREDITO,DEBITO,...
+          if (isYmdDate(row?.[2]) && (hasValue(row?.[5]) || hasValue(row?.[6]))) {
+            r['CODCAIXA'] = row?.[0];
+            r['IDCODMOVCAIXA'] = row?.[1];
+            r['DATA'] = row?.[2];
+            r['OBS'] = row?.[3];
+            r['OPERACAO'] = row?.[4];
+            r['CREDITO'] = row?.[5];
+            r['DEBITO'] = row?.[6];
+            return r;
+          }
+
           const strings = row.map((v, i) => ({ v, i })).filter(x => typeof x.v === 'string' && String(x.v).trim() !== '');
           const dates = row.map((v, i) => ({ v, i })).filter(x => isDateSerial(x.v));
           const nums = row.map((v, i) => ({ v, i })).filter(x => typeof x.v === 'number' && !isDateSerial(x.v) && x.v > 0);
@@ -5079,7 +5116,6 @@ export default function App() {
           if (dates[1]) r['DATA PAGAMENTO'] = dates[1].v;
           if (nums[0]) r['VALOR'] = nums[0].v;
           if (strings[2]) r['EMPRESA'] = strings[2].v;
-          // último string pode ser status
           const last = strings[strings.length - 1];
           if (last && last !== strings[0] && last !== strings[1] && last !== strings[2]) r['SITUAÇÃO'] = last.v;
           return r;
@@ -6648,7 +6684,7 @@ export default function App() {
         <NewBankModal
           setShowNewBankModal={setShowNewBankModal}
           onSuccess={() => {
-            fetchBanks();
+            fetchBanks(true);
             showNotification('Banco cadastrado com sucesso!', 'success');
           }}
         />
@@ -6659,7 +6695,7 @@ export default function App() {
           bank={editingBank}
           onClose={() => setEditingBank(null)}
           onSuccess={() => {
-            fetchBanks();
+            fetchBanks(true);
             showNotification('Banco atualizado com sucesso!', 'success');
           }}
         />

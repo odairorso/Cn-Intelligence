@@ -209,8 +209,11 @@ export const api = {
   },
 
   // ─── Banks ─────────────────────────────────────────────────────────────────
-  async getBanks(_uid: string): Promise<Bank[]> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=banks`);
+  async getBanks(_uid: string, fresh?: boolean): Promise<Bank[]> {
+    const params = new URLSearchParams();
+    params.append('route', 'banks');
+    if (fresh) params.append('fresh', '1');
+    const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`, fresh ? { cache: 'no-store' } : {});
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch banks');
     return res.json();
   },
