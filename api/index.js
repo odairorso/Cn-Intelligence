@@ -1307,17 +1307,16 @@ const isValidCnpj = (cnpj) => {
 // Consulta padrão aprendido pelo CNPJ ou nome normalizado
 async function lookupPattern(cnpj, nomeNormalizado) {
   try {
-    if (cnpj && cnpj.length >= 11) {
-      const r = await sql`SELECT * FROM boleto_patterns WHERE cnpj = ${cnpj} LIMIT 1`;
+    const cnpjClean = cleanCnpj(cnpj);
+    if (isValidCnpj(cnpjClean)) {
+      const r = await sql`SELECT * FROM boleto_patterns WHERE cnpj = ${cnpjClean} LIMIT 1`;
       if (r.length) return r[0];
     }
     if (nomeNormalizado && nomeNormalizado.length >= 5) {
-      // Busca por similaridade — nome contém ou é contido
       const r = await sql`
         SELECT * FROM boleto_patterns 
-        WHERE ${nomeNormalizado} LIKE '%' || nome_normalizado || '%'
-           OR nome_normalizado LIKE '%' || ${nomeNormalizado} || '%'
-        ORDER BY confirmacoes DESC LIMIT 1`;
+        WHERE nome_normalizado = ${nomeNormalizado}
+        LIMIT 1`;
       if (r.length) return r[0];
     }
   } catch { /* tabela pode não existir ainda */ }
@@ -1388,16 +1387,15 @@ async function handleSaveBoletoPattern(req, res) {
         UNIQUE(nome_normalizado)
       )`;
 
-    if (cnpjClean.length >= 11) {
+    if (isValidCnpj(cnpjClean)) {
       try {
         await sql`
           INSERT INTO boleto_patterns (cnpj, nome_normalizado, fornecedor, empresa, tipo, conta_contabil_id)
           VALUES (${cnpjClean}, ${nomeNorm}, ${fornecedor}, ${empresa || null}, ${tipo || 'DESPESA'}, ${conta_contabil_id || null})
           ON CONFLICT (cnpj) DO UPDATE SET
-            fornecedor = EXCLUDED.fornecedor,
-            empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
-            tipo = EXCLUDED.tipo,
-            conta_contabil_id = COALESCE(EXCLUDED.conta_contabil_id, boleto_patterns.conta_contabil_id),
+            empresa = COALESCE(boleto_patterns.empresa, EXCLUDED.empresa),
+            tipo = COALESCE(boleto_patterns.tipo, EXCLUDED.tipo),
+            conta_contabil_id = COALESCE(boleto_patterns.conta_contabil_id, EXCLUDED.conta_contabil_id),
             confirmacoes = boleto_patterns.confirmacoes + 1,
             ultima_confirmacao = NOW()`;
       } catch {
@@ -1405,10 +1403,9 @@ async function handleSaveBoletoPattern(req, res) {
           INSERT INTO boleto_patterns (nome_normalizado, fornecedor, empresa, tipo, conta_contabil_id)
           VALUES (${nomeNorm}, ${fornecedor}, ${empresa || null}, ${tipo || 'DESPESA'}, ${conta_contabil_id || null})
           ON CONFLICT (nome_normalizado) DO UPDATE SET
-            fornecedor = EXCLUDED.fornecedor,
-            empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
-            tipo = EXCLUDED.tipo,
-            conta_contabil_id = COALESCE(EXCLUDED.conta_contabil_id, boleto_patterns.conta_contabil_id),
+            empresa = COALESCE(boleto_patterns.empresa, EXCLUDED.empresa),
+            tipo = COALESCE(boleto_patterns.tipo, EXCLUDED.tipo),
+            conta_contabil_id = COALESCE(boleto_patterns.conta_contabil_id, EXCLUDED.conta_contabil_id),
             confirmacoes = boleto_patterns.confirmacoes + 1,
             ultima_confirmacao = NOW()`;
       }
@@ -1417,10 +1414,9 @@ async function handleSaveBoletoPattern(req, res) {
         INSERT INTO boleto_patterns (nome_normalizado, fornecedor, empresa, tipo, conta_contabil_id)
         VALUES (${nomeNorm}, ${fornecedor}, ${empresa || null}, ${tipo || 'DESPESA'}, ${conta_contabil_id || null})
         ON CONFLICT (nome_normalizado) DO UPDATE SET
-          fornecedor = EXCLUDED.fornecedor,
-          empresa = COALESCE(EXCLUDED.empresa, boleto_patterns.empresa),
-          tipo = EXCLUDED.tipo,
-          conta_contabil_id = COALESCE(EXCLUDED.conta_contabil_id, boleto_patterns.conta_contabil_id),
+          empresa = COALESCE(boleto_patterns.empresa, EXCLUDED.empresa),
+          tipo = COALESCE(boleto_patterns.tipo, EXCLUDED.tipo),
+          conta_contabil_id = COALESCE(boleto_patterns.conta_contabil_id, EXCLUDED.conta_contabil_id),
           confirmacoes = boleto_patterns.confirmacoes + 1,
           ultima_confirmacao = NOW()`;
     }
