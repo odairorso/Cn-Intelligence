@@ -4826,6 +4826,9 @@ export default function App() {
         ? beneficiario
         : dataAny.fornecedor;
 
+      const pagadorCandidate = String(dataAny.pagador || '').trim().replace(/\s+/g, ' ');
+      const hasValidPagador = pagadorCandidate.length >= 5 && /[A-Z\u00C0-\u017E]/i.test(pagadorCandidate);
+
       const hasValidData =
         fornecedorCandidate &&
         fornecedorCandidate !== 'Fornecedor não identificado' &&
@@ -4836,7 +4839,7 @@ export default function App() {
         const inferredFromDescricao = normalizeBoletoNumber(dataAny.descricao || '');
         const numero = normalizeBoletoNumber(dataAny.numero_boleto || '') || fallbackNumero || inferredFromDescricao;
         const fallbackDesc = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
-        const descricao = (dataAny.descricao && dataAny.descricao !== '-') ? dataAny.descricao : fallbackDesc;
+        const descricao = hasValidPagador ? pagadorCandidate : ((dataAny.descricao && dataAny.descricao !== '-') ? dataAny.descricao : fallbackDesc);
         const linhaInfo = parseLinhaDigitavel(text);
         const geminiValor = sanitizeBoletoValor(dataAny.valor);
         const valor = (linhaInfo?.valor && (!geminiValor || geminiValor > 20000))
