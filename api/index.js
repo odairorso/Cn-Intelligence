@@ -170,6 +170,15 @@ async function ensureContasTable() {
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`;
 
+  await sql`
+    DELETE FROM contas_contabeis a
+    USING contas_contabeis b
+    WHERE a.codigo = b.codigo
+      AND a.id > b.id
+  `;
+
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_contas_contabeis_codigo_unique ON contas_contabeis (codigo)`;
+
   // Atualiza ou insere contas padrão (upsert por código)
   const defaultAccounts = [
     ['3.1', 'Folha de Pagamento', 'DESPESA'],
@@ -189,6 +198,7 @@ async function ensureContasTable() {
     ['4.4', 'Permutas / Convênios', 'RECEITA'],
     ['4.5', 'Aplicação Bancária', 'RECEITA'],
     ['4.6', 'Outras Receitas', 'RECEITA'],
+    ['4.7', 'Dia das Mães', 'RECEITA'],
   ];
 
   for (const [codigo, nome, tipo] of defaultAccounts) {
@@ -199,6 +209,14 @@ async function ensureContasTable() {
       await sql`UPDATE contas_contabeis SET nome = ${nome}, tipo = ${tipo}, ativo = true WHERE codigo = ${codigo}`;
     }
   }
+
+  await sql`
+    SELECT setval(
+      pg_get_serial_sequence('contas_contabeis', 'id'),
+      COALESCE((SELECT MAX(id) FROM contas_contabeis), 1),
+      true
+    )
+  `;
 }
 
 // --- Handlers ---
@@ -1034,6 +1052,7 @@ async function handleContasContabeis(req, res) {
   // GET
   if (req.method === 'GET') {
     try {
+      await ensureContasTable();
       const { ativo } = req.query;
       let rows;
       if (ativo === 'false') {
@@ -1065,6 +1084,10 @@ async function handleContasContabeis(req, res) {
       const rows = await sql`
         INSERT INTO contas_contabeis (codigo, nome, tipo)
         VALUES (${codigo}, ${nome}, ${tipo})
+        ON CONFLICT (codigo) DO UPDATE SET
+          nome = EXCLUDED.nome,
+          tipo = EXCLUDED.tipo,
+          ativo = true
         RETURNING *`;
       return res.status(201).json(rows[0]);
     } catch (e) {
