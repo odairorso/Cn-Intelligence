@@ -1266,7 +1266,6 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
                   onClick={async () => {
                     const target = mergeTarget && g.names.includes(mergeTarget) ? mergeTarget : g.names[0];
                     const toMerge = mergeAliases.filter((n) => n !== target && g.names.includes(n));
-                    if (toMerge.length === 0) return;
                     try {
                       await mergeSuppliers(target, toMerge);
                       setMergeAliases([]);
