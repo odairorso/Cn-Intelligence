@@ -170,12 +170,36 @@ async function ensureContasTable() {
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`;
 
-  await sql`
-    DELETE FROM contas_contabeis a
-    USING contas_contabeis b
-    WHERE a.codigo = b.codigo
-      AND a.id > b.id
+  const txExists = await sql`SELECT to_regclass('public.transactions') as t`;
+  const hasTransactionsTable = Boolean(txExists?.[0]?.t);
+
+  const dupes = await sql`
+    WITH keep AS (
+      SELECT codigo, MIN(id) AS keep_id
+      FROM contas_contabeis
+      GROUP BY codigo
+      HAVING COUNT(*) > 1
+    )
+    SELECT c.codigo, c.id AS drop_id, k.keep_id
+    FROM contas_contabeis c
+    JOIN keep k ON k.codigo = c.codigo
+    WHERE c.id <> k.keep_id
   `;
+
+  if (dupes.length) {
+    if (hasTransactionsTable) {
+      for (const d of dupes) {
+        await sql`
+          UPDATE transactions
+          SET conta_contabil_id = ${d.keep_id}
+          WHERE conta_contabil_id = ${d.drop_id}
+        `;
+      }
+    }
+    for (const d of dupes) {
+      await sql`DELETE FROM contas_contabeis WHERE id = ${d.drop_id}`;
+    }
+  }
 
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_contas_contabeis_codigo_unique ON contas_contabeis (codigo)`;
 
