@@ -1073,11 +1073,13 @@ interface FornecedoresTabProps {
   deleteSupplier: (id: string) => void;
   setShowNewSupplierModal: (show: boolean) => void;
   syncSuppliers: () => void;
+  mergeSuppliers: (target: string, aliases: string[]) => Promise<{ updated: number; removed: number }>;
+  mergeSuppliersAuto: () => Promise<{ updated: number; removed: number }>;
   onSelectSupplier: (s: Supplier) => void;
   onEditSupplier: (s: Supplier) => void;
 }
 
-const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSupplierModal, syncSuppliers, onSelectSupplier, onEditSupplier }: FornecedoresTabProps) => {
+const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSupplierModal, syncSuppliers, mergeSuppliers, mergeSuppliersAuto, onSelectSupplier, onEditSupplier }: FornecedoresTabProps) => {
   const [searchSupplier, setSearchSupplier] = useState('');
   const [mergeTarget, setMergeTarget] = useState<string>('');
   const [mergeAliases, setMergeAliases] = useState<string[]>([]);
@@ -1087,6 +1089,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
   const [manualMergeTargetSearch, setManualMergeTargetSearch] = useState('');
   const [manualMergeAliasSearch, setManualMergeAliasSearch] = useState('');
   const [merging, setMerging] = useState(false);
+  const [autoMerging, setAutoMerging] = useState(false);
 
   // Pre-calculate transaction count per supplier (optimized O(n) instead of O(n*m))
   const supplierTransactionCount = useMemo(() => {
@@ -1185,17 +1188,21 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
           </button>
           <button
             onClick={async () => {
+              if (autoMerging) return;
               try {
-                await api.mergeSuppliersAuto();
-                window.location.reload();
+                setAutoMerging(true);
+                await mergeSuppliersAuto();
+                await syncSuppliers();
               } catch (e) {
                 console.error('Auto merge error', e);
+              } finally {
+                setAutoMerging(false);
               }
             }}
             className="bg-primary/10 text-primary px-4 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-primary/20 transition-colors"
             title="Unificar variações automaticamente"
           >
-            <Merge size={14} /> Unificar Auto
+            <Merge size={14} /> {autoMerging ? 'Unificando...' : 'Unificar Auto'}
           </button>
           <button
             onClick={() => { setManualMergeTarget(''); setManualMergeAlias(''); setManualMergeTargetSearch(''); setManualMergeAliasSearch(''); setShowMergeModal(true); }}
@@ -1261,7 +1268,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
                     const toMerge = mergeAliases.filter((n) => n !== target && g.names.includes(n));
                     if (toMerge.length === 0) return;
                     try {
-                      await api.mergeSuppliers(target, toMerge);
+                      await mergeSuppliers(target, toMerge);
                       setMergeAliases([]);
                       setMergeTarget('');
                       await syncSuppliers();
@@ -1426,12 +1433,11 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
                   if (!manualMergeTarget || !manualMergeAlias) return;
                   setMerging(true);
                   try {
-                    await api.mergeSuppliers(manualMergeTarget, [manualMergeAlias]);
+                    await mergeSuppliers(manualMergeTarget, [manualMergeAlias]);
                     setShowMergeModal(false);
                     setManualMergeTargetSearch('');
                     setManualMergeAliasSearch('');
                     await syncSuppliers();
-                    window.location.reload();
                   } catch (e) {
                     console.error(e);
                   } finally {
@@ -4195,7 +4201,7 @@ export default function App() {
     transactions, globalStats, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, isLoadingMore, boletoPatterns, isAuthorized,
     fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns, fetchStats,
     showNotification, login, logout, markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
-    deleteSupplier, syncSuppliers, updateSupplier,
+    deleteSupplier, syncSuppliers, mergeSuppliers, mergeSuppliersAuto, updateSupplier,
     deleteBank,
     addCompanyOption, removeCompanyOption, updateCompanyOption,
     deleteBoletoPattern,
@@ -5953,6 +5959,8 @@ export default function App() {
                 deleteSupplier={deleteSupplier}
                 setShowNewSupplierModal={setShowNewSupplierModal}
                 syncSuppliers={syncSuppliers}
+                mergeSuppliers={mergeSuppliers}
+                mergeSuppliersAuto={mergeSuppliersAuto}
                 onSelectSupplier={setDetailSupplier}
                 onEditSupplier={setEditingSupplier}
               />

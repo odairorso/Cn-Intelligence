@@ -471,7 +471,7 @@ export function useAppData() {
       try {
         await api.createSuppliersBatch(newSuppliers as any);
         showNotification(`${newSuppliers.length} novos fornecedores sincronizados!`, 'success');
-        fetchSuppliers();
+        fetchSuppliers(true);
       } catch (error) {
         console.error('Failed to sync suppliers batch:', error);
         showNotification('Erro ao sincronizar fornecedores.', 'error');
@@ -480,6 +480,55 @@ export function useAppData() {
       showNotification('Todos os fornecedores já estão cadastrados.', 'info');
     }
   }, [transactions, suppliers, showNotification, fetchSuppliers]);
+
+  const mergeSuppliers = useCallback(async (target: string, aliases: string[]) => {
+    try {
+      const canonical = String(target || '').trim();
+      const list = Array.isArray(aliases) ? aliases.map((x) => String(x || '').trim()).filter(Boolean) : [];
+      if (!canonical || list.length === 0) {
+        showNotification('Selecione o nome final e pelo menos 1 fornecedor para unificar.', 'error');
+        return { updated: 0, removed: 0 };
+      }
+
+      const result = await api.mergeSuppliers(canonical, list);
+
+      const aliasKeys = new Set(list.map((n) => normalizeSupplierName(n)).filter(Boolean));
+      const canonicalKey = normalizeSupplierName(canonical);
+
+      setTransactions((prev) =>
+        prev.map((tx) => {
+          const k = normalizeSupplierName(tx.fornecedor);
+          if (!k) return tx;
+          if (k === canonicalKey) return tx;
+          if (!aliasKeys.has(k)) return tx;
+          return { ...tx, fornecedor: canonical };
+        })
+      );
+
+      await fetchSuppliers(true);
+      showNotification(`Unificado! ${result.updated || 0} lançamento(s) ajustado(s).`, 'success');
+      return result;
+    } catch (error) {
+      console.error('Failed to merge suppliers:', error);
+      const msg = error instanceof Error ? error.message : String(error || '');
+      showNotification(msg ? `Erro ao unificar: ${msg}` : 'Erro ao unificar fornecedores.', 'error');
+      throw error;
+    }
+  }, [showNotification, fetchSuppliers]);
+
+  const mergeSuppliersAuto = useCallback(async () => {
+    try {
+      const result = await api.mergeSuppliersAuto();
+      await fetchSuppliers(true);
+      showNotification(`Unificação automática concluída. Removidos: ${result.removed || 0}.`, 'success');
+      return result;
+    } catch (error) {
+      console.error('Auto-merge suppliers failed:', error);
+      const msg = error instanceof Error ? error.message : String(error || '');
+      showNotification(msg ? `Erro na unificação automática: ${msg}` : 'Erro na unificação automática.', 'error');
+      throw error;
+    }
+  }, [showNotification, fetchSuppliers]);
 
   // ─── Bank actions ─────────────────────────────────────────────────────────
   const deleteBank = useCallback(async (id: string) => {
@@ -546,6 +595,7 @@ export function useAppData() {
     showNotification, login, logout,
     markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
     deleteSupplier, syncSuppliers,
+    mergeSuppliers, mergeSuppliersAuto,
     updateSupplier,
     deleteBank,
     addCompanyOption, removeCompanyOption, updateCompanyOption,
