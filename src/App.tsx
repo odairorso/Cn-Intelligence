@@ -4540,6 +4540,11 @@ export default function App() {
     const normalizedDetected = normalizeSupplierName(validDetected);
     const normalizedSource = normalizeSupplierName(sourceText);
 
+    if (validDetected && normalizedDetected) {
+      const exact = suppliers.find((s) => normalizeSupplierName(s.nome) === normalizedDetected);
+      if (exact) return exact.nome;
+    }
+
     if (normalizedDetected.includes('ENERGISA') || normalizedSource.includes('ENERGISA')) {
       const energisaMatch = suppliers
         .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
@@ -4567,17 +4572,20 @@ export default function App() {
       return validDetected || 'INVIOLAVEL';
     }
 
-    if (normalizedDetected.includes('EDITORA') || normalizedSource.includes('EDITORA')) {
-      const editoraMatch = suppliers
+    if (validDetected) {
+      const best = suppliers
         .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
-        .filter((x) => x.key.includes('EDITORA'))
+        .filter((x) => x.key && (x.key.includes(normalizedDetected) || normalizedDetected.includes(x.key)))
         .sort((a, b) => b.key.length - a.key.length)[0];
-      if (editoraMatch) return editoraMatch.supplier.nome;
+      if (best && normalizedDetected.length >= 6) return best.supplier.nome;
     }
 
-    if (validDetected) {
-      const direct = suppliers.find((s) => isSupplierMatch(validDetected, s.nome));
-      if (direct) return direct.nome;
+    if ((normalizedDetected === 'EDITORA' || !validDetected) && normalizedSource.includes('EDITORA')) {
+      const editoraCandidates = suppliers
+        .map((s) => ({ supplier: s, key: normalizeSupplierName(s.nome) }))
+        .filter((x) => x.key.includes('EDITORA'))
+        .sort((a, b) => b.key.length - a.key.length);
+      if (editoraCandidates.length === 1) return editoraCandidates[0].supplier.nome;
     }
 
     if (!validDetected || validDetected === 'Fornecedor não identificado') {
@@ -4909,16 +4917,6 @@ export default function App() {
 
           const hasGoodText = fullText.trim().length > 100;
 
-          // Sempre envia o PDF em base64 para a API (para análise visual do Gemini)
-          const pdfBase64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const result = reader.result as string;
-              resolve(result.split(',')[1] || '');
-            };
-            reader.readAsDataURL(file);
-          });
-
           const local = extractBoletoData(fullText, file.name);
           local.fornecedor = resolveSupplierName(local.fornecedor, fullText);
 
@@ -4928,6 +4926,18 @@ export default function App() {
 
           // Se a extração local funcionou perfeitamente, usa ela (conforme pedido: sempre acrescentar, nunca mudar o que já funciona)
           if (hasLocalCore) return local;
+
+          // Só converte PDF para base64 quando o texto extraído é ruim (melhora muito a velocidade)
+          const pdfBase64 = hasGoodText
+            ? undefined
+            : await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const result = reader.result as string;
+                  resolve(result.split(',')[1] || '');
+                };
+                reader.readAsDataURL(file);
+              });
 
           const ai = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
           ai.fornecedor = resolveSupplierName(ai.fornecedor, fullText);
@@ -5020,7 +5030,7 @@ export default function App() {
           nome: row.fornecedor,
           email: '',
           telefone: '',
-          cnpj: '',
+          cnpj: row.cnpj || '',
         }));
 
       if (newSuppliers.length) {
