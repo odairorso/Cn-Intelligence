@@ -203,6 +203,14 @@ async function ensureContasTable() {
 
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_contas_contabeis_codigo_unique ON contas_contabeis (codigo)`;
 
+  await sql`
+    SELECT setval(
+      pg_get_serial_sequence('contas_contabeis', 'id'),
+      COALESCE((SELECT MAX(id) FROM contas_contabeis), 0) + 1,
+      false
+    )
+  `;
+
   // Atualiza ou insere contas padrão (upsert por código)
   const defaultAccounts = [
     ['3.1', 'Folha de Pagamento', 'DESPESA'],
@@ -233,14 +241,6 @@ async function ensureContasTable() {
       await sql`UPDATE contas_contabeis SET nome = ${nome}, tipo = ${tipo}, ativo = true WHERE codigo = ${codigo}`;
     }
   }
-
-  await sql`
-    SELECT setval(
-      pg_get_serial_sequence('contas_contabeis', 'id'),
-      COALESCE((SELECT MAX(id) FROM contas_contabeis), 1),
-      true
-    )
-  `;
 }
 
 // --- Handlers ---
