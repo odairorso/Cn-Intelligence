@@ -51,6 +51,7 @@ export const api = {
   ): Promise<Transaction[]> {
     const params = new URLSearchParams();
     params.append('route', 'transactions');
+    params.append('uid', _uid || 'guest');
     if (limit) params.append('limit', String(limit));
     if (offset) params.append('offset', String(offset));
     if (year) params.append('year', year);
@@ -87,6 +88,7 @@ export const api = {
   }> {
     const params = new URLSearchParams();
     params.append('route', 'stats');
+    params.append('uid', _uid || 'guest');
     if (year) params.append('year', year);
     if (period) params.append('period', period);
     if (empresa) params.append('empresa', empresa);
@@ -152,6 +154,7 @@ export const api = {
   async getSuppliers(_uid: string, fresh?: boolean): Promise<Supplier[]> {
     const params = new URLSearchParams();
     params.append('route', 'suppliers');
+    params.append('uid', _uid || 'guest');
     if (fresh) params.append('fresh', '1');
     const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch suppliers');
@@ -212,6 +215,7 @@ export const api = {
   async getBanks(_uid: string, fresh?: boolean): Promise<Bank[]> {
     const params = new URLSearchParams();
     params.append('route', 'banks');
+    params.append('uid', _uid || 'guest');
     if (fresh) params.append('fresh', '1');
     const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`, fresh ? { cache: 'no-store' } : {});
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch banks');

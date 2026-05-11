@@ -58,6 +58,7 @@ import {
 import { DEFAULT_COMPANIES, DEFAULT_ACCOUNTS, PAGE_SIZE, MONTH_LABELS } from './lib/constants';
 import { AnimatedNumber } from './components/AnimatedNumber';
 import { GlobalSearch } from './components/GlobalSearch';
+import { AuthGuard } from './components/AuthGuard';
 
 const defaultBrandLogo = new URL('../Logo Cn/WhatsApp Image 2021-02-10 at 10.34.53.jpeg', import.meta.url).href;
 
@@ -5652,7 +5653,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <AuthGuard isAuthorized={isAuthorized} onLogin={login}>
+      <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="bg-surface/80 backdrop-blur-md border-b border-white/5 flex justify-between items-center w-full px-4 md:px-8 py-5 fixed top-0 z-50">
         <div className="flex items-center gap-4 md:gap-8">
@@ -5740,53 +5742,6 @@ export default function App() {
           </button>
         </div>
       </header>
-
-      {/* Trava de Segurança — Rendereizada apenas se não autorizado */}
-      {!isAuthorized && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-background p-6">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass-card p-10 w-full max-w-md border border-white/10 shadow-2xl text-center"
-          >
-            <div className="flex flex-col items-center gap-6">
-              <div className="w-24 h-24 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-lg shadow-primary/5">
-                <img src={currentBrandLogo} alt="Logo" className="h-16 w-16 object-contain" />
-              </div>
-              <div className="space-y-2">
-                <h1 className="text-3xl font-black tracking-tighter premium-gradient-text font-headline">Portal CN</h1>
-                <p className="text-xs text-on-surface-variant/60 font-bold uppercase tracking-widest">Acesso Restrito</p>
-              </div>
-
-              <form onSubmit={handleLogin} className="w-full space-y-4">
-                <div className="relative">
-                  <input
-                    type="password"
-                    placeholder="Digite a senha de acesso"
-                    className={cn(
-                      "w-full bg-surface-variant/20 border rounded-xl px-4 py-4 text-center text-lg font-bold outline-none transition-all",
-                      loginError ? "border-tertiary shadow-[0_0_15px_rgba(239,68,68,0.2)]" : "border-white/10 focus:border-primary"
-                    )}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoFocus
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full bg-primary text-background py-4 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/20"
-                >
-                  Entrar no Sistema
-                </button>
-              </form>
-
-              <p className="text-[10px] text-on-surface-variant/40">
-                © 2025 Grupo CN Intelligence. Todos os direitos reservados.
-              </p>
-            </div>
-          </motion.div>
-        </div>
-      )}
 
       {/* Mobile Navigation (Bottom Bar) */}
       <nav className="lg:hidden fixed bottom-6 left-6 right-6 bg-surface/90 backdrop-blur-xl border border-white/10 z-50 flex justify-around items-center py-4 px-4 rounded-sm shadow-2xl">
@@ -6806,5 +6761,6 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+    </AuthGuard>
   );
 }

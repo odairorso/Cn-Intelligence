@@ -250,6 +250,10 @@ async function handleTransactions(req, res) {
   if (req.method === 'GET') {
     try {
       const { uid, limit, offset, year, month, search, tipo, empresa, status, conta_contabil_id } = req.query;
+      
+      if (!uid || uid === 'undefined' || uid === 'null') {
+        return res.status(401).json({ error: 'Identificação de usuário (UID) obrigatória para esta operação.' });
+      }
       // Reduzimos o limite padrão de 5000 para 100 para economizar banda (Egress)
       const defaultLimit = 100;
       const parsedLimit = limit ? parseInt(limit) : defaultLimit;      const parsedOffset = offset ? parseInt(offset) : 0;
@@ -379,8 +383,13 @@ async function handleStats(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   try {
     const { uid, year, period, empresa, tipo, status, search } = req.query;
-    const filterUid = uid ? String(uid) : '';
-    const uidFilterSql = filterUid ? sql`AND uid = ${filterUid}` : sql``;
+    
+    if (!uid || uid === 'undefined' || uid === 'null') {
+      return res.status(401).json({ error: 'Identificação de usuário (UID) obrigatória para esta operação.' });
+    }
+
+    const filterUid = String(uid);
+    const uidFilterSql = sql`AND uid = ${filterUid}`;
 
     // Novos filtros
     const empresaFilterSql = empresa && empresa !== 'TODOS' ? sql`AND upper(empresa) = upper(${empresa})` : sql``;
