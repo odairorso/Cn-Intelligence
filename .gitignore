@@ -9,3 +9,4 @@ coverage/
 *.traineddata
 boletos_teste/BOLETO CASSIA.pdf
 boletos_teste/BOLETO NATHALIA.pdf
+supabase_config.txt

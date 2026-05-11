@@ -1,2 +1,2 @@
-SUPABASE_URL=https://hgepvvfpbkyngteywjke.supabase.co
-SUPABASE_ANON_KEY=sb_publishable_woVua7Hyb6Y5Mu_23KzHrA__B4Wzl6W
+SUPABASE_URL=https://pfrxigqbslzaflddxxww.supabase.co
+SUPABASE_ANON_KEY=sb_publishable_3WmpIcNwuS1P_n0xWfMsfA_t_oYdmdO
