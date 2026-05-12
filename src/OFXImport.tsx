@@ -358,7 +358,7 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
     setLoading(true);
     try {
       const txList = toImport.map((row) => ({
-        uid: 'guest',
+        uid: apiAuth.getUid(),
         fornecedor: row.fornecedor,
         descricao: `${row.descricao} [OFX:${row.fitid}]`,
         empresa: row.empresa,

@@ -40,13 +40,8 @@ const getUid = (): string | null => {
   }
 };
 
-const getDataUid = (): string => {
-  try {
-    return getUid() || localStorage.getItem('cn_data_uid') || 'guest';
-  } catch {
-    return getUid() || 'guest';
-  }
-};
+// UID para uso em inserts (banco de dados) — obsoleto, mantido apenas para compatibilidade
+// O backend agora extrai o UID do JWT automaticamente via middleware
 
 const buildHttpError = async (res: Response, fallback: string) => {
   const contentType = res.headers.get('content-type') || '';
@@ -151,10 +146,10 @@ export const api = {
     status?: string,
     conta_contabil_id?: number
   ): Promise<Transaction[]> {
-    const uid = getDataUid();
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     const params = new URLSearchParams();
     params.append('route', 'transactions');
-    params.append('uid', uid || 'guest');
+    // UID extraído automaticamente pelo backend via JWT — não enviar no query
     if (limit) params.append('limit', String(limit));
     if (offset) params.append('offset', String(offset));
     if (year) params.append('year', year);
@@ -189,10 +184,9 @@ export const api = {
       value: number;
     }>;
   }> {
-    const uid = getDataUid();
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     const params = new URLSearchParams();
     params.append('route', 'stats');
-    params.append('uid', uid || 'guest');
     if (year) params.append('year', year);
     if (period) params.append('period', period);
     if (empresa) params.append('empresa', empresa);
@@ -206,8 +200,8 @@ export const api = {
   },
 
   async createTransaction(data: Omit<Transaction, 'id'>): Promise<Transaction> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=transactions&uid=${encodeURIComponent(uid)}`, {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=transactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -223,8 +217,8 @@ export const api = {
   },
 
   async createTransactionsBatch(data: Omit<Transaction, 'id'>[]): Promise<void> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=transactions-batch&uid=${encodeURIComponent(uid)}`, {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=transactions-batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -233,8 +227,8 @@ export const api = {
   },
 
   async updateTransactionsBatch(ids: string[], banco: string, dataPagamento?: string): Promise<void> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=transactions-batch-update&uid=${encodeURIComponent(uid)}`, {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=transactions-batch-update`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids, banco, dataPagamento }),
@@ -243,8 +237,8 @@ export const api = {
   },
 
   async updateTransaction(id: string, data: Partial<Transaction>): Promise<Transaction> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=transactions&id=${id}&uid=${encodeURIComponent(uid)}`, {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=transactions&id=${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -254,17 +248,16 @@ export const api = {
   },
 
   async deleteTransaction(id: string): Promise<void> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=transactions&id=${id}&uid=${encodeURIComponent(uid)}`, { method: 'DELETE' });
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=transactions&id=${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete transaction');
   },
 
   // ─── Suppliers ─────────────────────────────────────────────────────────────
   async getSuppliers(fresh?: boolean): Promise<Supplier[]> {
-    const uid = getDataUid();
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     const params = new URLSearchParams();
     params.append('route', 'suppliers');
-    params.append('uid', uid);
     if (fresh) params.append('fresh', '1');
     const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch suppliers');
@@ -272,8 +265,8 @@ export const api = {
   },
 
   async createSupplier(data: Omit<Supplier, 'id'>): Promise<Supplier> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers&uid=${encodeURIComponent(uid)}`, {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -283,8 +276,8 @@ export const api = {
   },
 
   async createSuppliersBatch(data: Omit<Supplier, 'id'>[]): Promise<void> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers-batch&uid=${encodeURIComponent(uid)}`, {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers-batch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -293,8 +286,8 @@ export const api = {
   },
 
   async updateSupplier(id: string, data: Partial<Supplier>): Promise<Supplier> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers&id=${id}&uid=${encodeURIComponent(uid)}`, {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers&id=${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -304,14 +297,14 @@ export const api = {
   },
 
   async deleteSupplier(id: string): Promise<void> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers&id=${id}&uid=${encodeURIComponent(uid)}`, { method: 'DELETE' });
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers&id=${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete supplier');
   },
 
   async mergeSuppliers(target: string, aliases: string[]): Promise<{ updated: number; removed: number }> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers-merge&uid=${encodeURIComponent(uid)}`, {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers-merge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ target, aliases }),
@@ -321,18 +314,17 @@ export const api = {
   },
 
   async mergeSuppliersAuto(): Promise<{ updated: number; removed: number }> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers-merge-auto&uid=${encodeURIComponent(uid)}`, { method: 'POST' });
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers-merge-auto`, { method: 'POST' });
     if (!res.ok) throw new Error('Failed to auto-merge suppliers');
     return res.json();
   },
 
   // ─── Banks ─────────────────────────────────────────────────────────────────
   async getBanks(fresh?: boolean): Promise<Bank[]> {
-    const uid = getDataUid();
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     const params = new URLSearchParams();
     params.append('route', 'banks');
-    params.append('uid', uid);
     if (fresh) params.append('fresh', '1');
     const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`, fresh ? { cache: 'no-store' } : {});
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch banks');
@@ -340,8 +332,8 @@ export const api = {
   },
 
   async createBank(data: Omit<Bank, 'id'>): Promise<Bank> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=banks&uid=${encodeURIComponent(uid)}`, {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=banks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -351,8 +343,8 @@ export const api = {
   },
 
   async updateBank(id: string, data: Partial<Bank>): Promise<Bank> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=banks&id=${id}&uid=${encodeURIComponent(uid)}`, {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=banks&id=${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -362,19 +354,21 @@ export const api = {
   },
 
   async deleteBank(id: string): Promise<void> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=banks&id=${id}&uid=${encodeURIComponent(uid)}`, { method: 'DELETE' });
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=banks&id=${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete bank');
   },
 
   // ─── Contas Contábeis ──────────────────────────────────────────────────────
   async getContasContabeis(): Promise<ContaContabil[]> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     const res = await fetchWithSecurity(`${API_BASE}?route=contas-contabeis`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch contas contabeis');
     return res.json();
   },
 
   async createContaContabil(data: { codigo: string; nome: string; tipo: 'RECEITA' | 'DESPESA' }): Promise<ContaContabil> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     const res = await fetchWithSecurity(`${API_BASE}?route=contas-contabeis`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -385,6 +379,7 @@ export const api = {
   },
 
   async updateContaContabil(id: number, data: Partial<ContaContabil>): Promise<ContaContabil> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     const res = await fetchWithSecurity(`${API_BASE}?route=contas-contabeis&id=${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -396,13 +391,14 @@ export const api = {
 
   // ─── Utilities ─────────────────────────────────────────────────────────────
   async setupTables(): Promise<void> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     const res = await fetchWithSecurity(`${API_BASE}?route=setup-tables`, { method: 'POST' });
     if (!res.ok) throw await buildHttpError(res, 'Failed to setup tables');
   },
 
   async extractBoleto(text?: string, fileName?: string, pdfBase64?: string): Promise<Record<string, unknown>> {
-    // Extração de boleto não exige autenticação (upload direto)
-    const res = await fetch(`${API_BASE}?route=extract-boleto`, {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=extract-boleto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, fileName, pdfBase64 }),
@@ -420,9 +416,9 @@ export const api = {
     tipo?: string;
     conta_contabil_id?: number;
   }): Promise<void> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     try {
-      const uid = getDataUid();
-      await fetchWithSecurity(`${API_BASE}?route=save-boleto-pattern&uid=${encodeURIComponent(uid)}`, {
+      await fetchWithSecurity(`${API_BASE}?route=save-boleto-pattern`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -440,25 +436,26 @@ export const api = {
     tipo: string;
     confirmacoes: number;
   }>> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=boleto-patterns&uid=${encodeURIComponent(uid)}`);
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=boleto-patterns`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch patterns');
     return res.json();
   },
 
   async deleteBoletoPattern(id: number): Promise<void> {
-    const uid = getDataUid();
-    const res = await fetchWithSecurity(`${API_BASE}?route=boleto-patterns&id=${id}&uid=${encodeURIComponent(uid)}`, { method: 'DELETE' });
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=boleto-patterns&id=${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete pattern');
   },
 
   async exportBackup(): Promise<Blob> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     const res = await fetchWithSecurity(`${API_BASE}?route=export-backup`, {
       headers: {
         'x-cn-backup-token': import.meta.env.VITE_CN_BACKUP_TOKEN || ''
       }
     });
-    if (!res.ok) throw await buildHttpError(res, 'Failed to export backup');
+    if (!res.ok) throw new Error('Failed to export backup');
     return res.blob();
   },
 };
