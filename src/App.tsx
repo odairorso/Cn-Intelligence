@@ -2008,20 +2008,20 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
 
         {/* Desktop: table */}
         <div className="overflow-x-auto hidden md:block w-full custom-scrollbar pb-2">
-          <table className="w-full text-left min-w-[1400px]">
+          <table className="w-full text-left min-w-[1600px]">
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
-                <th className="px-4 py-4 whitespace-nowrap">#</th>
-                <th className="px-4 py-4 whitespace-nowrap">Tipo</th>
-                <th className="px-4 py-4">Fornecedor</th>
-                <th className="px-4 py-4">Descrição</th>
-                <th className="px-4 py-4">Empresa</th>
-                <th className="px-4 py-4">Vencimento</th>
-                <th className="px-4 py-4">Pagamento</th>
-                <th className="px-4 py-4 text-right whitespace-nowrap">Valor</th>
-                <th className="px-4 py-4 text-right whitespace-nowrap">Juros</th>
-                <th className="px-4 py-4 text-right whitespace-nowrap">Total</th>
-                <th className="px-4 py-4 whitespace-nowrap">Status</th>
+                <th className="px-3 py-4 whitespace-nowrap">#</th>
+                <th className="px-3 py-4 whitespace-nowrap">Tipo</th>
+                <th className="px-3 py-4">Fornecedor</th>
+                <th className="px-3 py-4 max-w-[250px]">Descrição</th>
+                <th className="px-3 py-4">Empresa</th>
+                <th className="px-3 py-4">Vencimento</th>
+                <th className="px-3 py-4">Pagamento</th>
+                <th className="px-3 py-4 text-right whitespace-nowrap">Valor</th>
+                <th className="px-3 py-4 text-right whitespace-nowrap">Juros</th>
+                <th className="px-3 py-4 text-right whitespace-nowrap">Total</th>
+                <th className="px-3 py-4 whitespace-nowrap">Status</th>
               </tr>
             </thead>
             <tbody className="text-xs divide-y divide-white/5">
@@ -2042,8 +2042,8 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
                       status === 'PENDENTE' && "bg-[#f59e0b]/5",
                       status === 'VENCIDO' && "bg-[#ef4444]/5"
                     )}>
-                      <td className="px-4 py-4 text-on-surface-variant text-xs">{i + 1}</td>
-                      <td className="px-4 py-4">
+                      <td className="px-3 py-4 text-on-surface-variant text-xs">{i + 1}</td>
+                      <td className="px-3 py-4">
                         <span className={cn(
                           "text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest",
                           isRev ? "bg-success/20 text-success border-success/30" : "bg-primary/20 text-primary border-primary/30"
@@ -2051,30 +2051,30 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
                           {isRev ? 'Receita' : 'Despesa'}
                         </span>
                       </td>
-                      <td className={cn("px-4 py-4 font-semibold", isNaoPago && "text-[#f59e0b]")}>{tx.fornecedor}</td>
-                      <td className="px-4 py-4 text-on-surface-variant">{tx.descricao}</td>
-                      <td className="px-4 py-4 whitespace-nowrap">{tx.empresa}</td>
-                      <td className="px-4 py-4 whitespace-nowrap">{tx.vencimento}</td>
-                      <td className="px-4 py-4 text-on-surface-variant whitespace-nowrap">{tx.pagamento || '-'}</td>
+                      <td className={cn("px-3 py-4 font-semibold truncate max-w-[200px]", isNaoPago && "text-[#f59e0b]")} title={tx.fornecedor}>{tx.fornecedor}</td>
+                      <td className="px-3 py-4 text-on-surface-variant truncate max-w-[250px]" title={tx.descricao}>{tx.descricao}</td>
+                      <td className="px-3 py-4 whitespace-nowrap">{tx.empresa}</td>
+                      <td className="px-3 py-4 whitespace-nowrap">{tx.vencimento}</td>
+                      <td className="px-3 py-4 text-on-surface-variant whitespace-nowrap">{tx.pagamento || '-'}</td>
                       <td className={cn(
-                        "px-4 py-4 text-right whitespace-nowrap",
+                        "px-3 py-4 text-right whitespace-nowrap",
                         isNaoPago ? "text-[#f59e0b] font-black" : "font-medium"
                       )}>
                         {Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className={cn(
-                        "px-4 py-4 text-right text-xs whitespace-nowrap",
+                        "px-3 py-4 text-right text-xs whitespace-nowrap",
                         isNaoPago ? "text-[#f59e0b] font-black" : "text-tertiary"
                       )}>
                         {Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                       </td>
                     <td className={cn(
-                      "px-4 py-4 text-right font-black text-sm whitespace-nowrap",
+                      "px-3 py-4 text-right font-black text-sm whitespace-nowrap",
                       isNaoPago ? "text-[#f59e0b]" : (isRev ? "text-success" : "text-primary")
                     )}>
                         {(isRev ? '' : '-')}{(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
+                      <td className="px-3 py-4 whitespace-nowrap">
                         <span className={cn(
                           "text-[10px] font-black px-3 py-1 rounded-full border",
                           status === 'PAGO' && "bg-primary/20 text-primary border-primary/30",
@@ -4206,6 +4206,12 @@ export default function App() {
     addCompanyOption, removeCompanyOption, updateCompanyOption,
     deleteBoletoPattern,
   } = useAppData();
+  const safeCompanyOptions = Array.isArray(companyOptions) ? companyOptions : [];
+  const safeContasContabeis = Array.isArray(contasContabeis) ? contasContabeis : [];
+  const safeBoletoPatterns = Array.isArray(boletoPatterns) ? boletoPatterns : [];
+  const safeSuppliers = Array.isArray(suppliers) ? suppliers : [];
+  const safeBanks = Array.isArray(banks) ? banks : [];
+  const safeTransactions = Array.isArray(transactions) ? transactions : [];
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [newCompanyName, setNewCompanyName] = useState('');
   const [editingCompany, setEditingCompany] = useState<string | null>(null);
@@ -4923,17 +4929,15 @@ export default function App() {
           // Se a extração local funcionou perfeitamente, usa ela (conforme pedido: sempre acrescentar, nunca mudar o que já funciona)
           if (hasLocalCore) return local;
 
-          // Só converte PDF para base64 quando o texto extraído é ruim (melhora muito a velocidade)
-          const pdfBase64 = hasGoodText
-            ? undefined
-            : await new Promise<string>((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  const result = reader.result as string;
-                  resolve(result.split(',')[1] || '');
-                };
-                reader.readAsDataURL(file);
-              });
+          // Sempre converte PDF para base64 para que o Gemini possa usar visão computacional (muito mais preciso)
+          const pdfBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const result = reader.result as string;
+              resolve(result.split(',')[1] || '');
+            };
+            reader.readAsDataURL(file);
+          });
 
           const ai = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
           ai.fornecedor = resolveSupplierName(ai.fornecedor, fullText);
@@ -6018,7 +6022,7 @@ export default function App() {
                         </button>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {companyOptions.map((company) => (
+                        {safeCompanyOptions.map((company) => (
                           <span key={company} className="inline-flex items-center gap-2 bg-surface-variant/20 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold">
                             {editingCompany === company ? (
                               <>
@@ -6147,7 +6151,7 @@ export default function App() {
                         <div>
                           <p className="text-[11px] font-bold uppercase text-on-surface-variant mb-2">Despesas</p>
                           <div className="space-y-1 max-h-64 overflow-auto pr-1">
-                            {contasContabeis.filter(c => matchesAccountType(c, 'DESPESA')).map((c) => (
+                            {safeContasContabeis.filter(c => matchesAccountType(c, 'DESPESA')).map((c) => (
                               <div key={c.id} className="flex items-center justify-between border border-white/10 rounded-lg px-3 py-2">
                                 <span className="text-xs">{c.nome}</span>
                                 <label className="text-[10px] flex items-center gap-2">
@@ -6172,7 +6176,7 @@ export default function App() {
                         <div>
                           <p className="text-[11px] font-bold uppercase text-on-surface-variant mb-2">Receitas</p>
                           <div className="space-y-1 max-h-64 overflow-auto pr-1">
-                            {contasContabeis.filter(c => matchesAccountType(c, 'RECEITA')).map((c) => (
+                            {safeContasContabeis.filter(c => matchesAccountType(c, 'RECEITA')).map((c) => (
                               <div key={c.id} className="flex items-center justify-between border border-white/10 rounded-lg px-3 py-2">
                                 <span className="text-xs">{c.nome}</span>
                                 <label className="text-[10px] flex items-center gap-2">
@@ -6264,7 +6268,7 @@ export default function App() {
                       </div>
 
                       <div className="max-h-60 overflow-y-auto space-y-2">
-                        {contasContabeis
+                        {safeContasContabeis
                           .filter(c => {
                             const q = (searchContaContabil || '').toLowerCase();
                             if (!q) return true;
@@ -6286,13 +6290,15 @@ export default function App() {
                               </button>
                             </div>
                           ))}
-                        {contasContabeis.length === 0 && (
+                        {safeContasContabeis.length === 0 && (
                           <p className="text-center text-xs text-on-surface-variant py-4">Nenhuma conta contábil cadastrada.</p>
                         )}
-                      </div>
                     </div>
                   </div>
                 </div>
+              </div>
+
+
 
                 <div className="pt-8 border-t border-white/5">
                   <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Padrões de Boletos</h4>
@@ -6308,10 +6314,10 @@ export default function App() {
                         Atualizar Lista
                       </button>
                       <div className="max-h-60 overflow-y-auto space-y-2">
-                        {boletoPatterns.length === 0 ? (
+                        {safeBoletoPatterns.length === 0 ? (
                           <p className="text-center text-xs text-on-surface-variant py-4">Nenhum padrão aprendido ainda.</p>
                         ) : (
-                          boletoPatterns.map((pattern) => (
+                          safeBoletoPatterns.map((pattern) => (
                             <div key={pattern.id} className="flex items-center justify-between bg-surface-variant/10 border border-white/5 rounded-lg px-3 py-2">
                               <div className="flex flex-col">
                                 <span className="text-sm font-bold">{pattern.fornecedor}</span>
@@ -6483,7 +6489,7 @@ export default function App() {
                           style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}
                         >
                           <option value="" style={{ backgroundColor: '#1e1e2e' }}>Selecione</option>
-                          {companyOptions.map((company) => (
+                          {safeCompanyOptions.map((company) => (
                             <option key={company} value={company} style={{ backgroundColor: '#1e1e2e' }}>{company}</option>
                           ))}
                         </select>
@@ -6497,7 +6503,7 @@ export default function App() {
                           style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}
                         >
                           <option value="" style={{ backgroundColor: '#1e1e2e' }}>Selecione a conta</option>
-                          {contasContabeis
+                          {safeContasContabeis
                             .filter((conta) => matchesAccountType(conta, (row.tipo || 'DESPESA') as 'RECEITA' | 'DESPESA'))
                             .map((conta) => (
                               <option key={conta.id} value={conta.id} style={{ backgroundColor: '#1e1e2e' }}>
@@ -6515,7 +6521,7 @@ export default function App() {
                   </div>
                 ))}
                 <datalist id="supplier-suggestions">
-                  {[...new Set([...suppliers.map(s => s.nome), ...transactions.map(t => t.fornecedor)])].sort().map((nome) => (
+                  {[...new Set([...safeSuppliers.map(s => s.nome), ...safeTransactions.map(t => t.fornecedor)])].sort().map((nome) => (
                     <option key={nome} value={nome} />
                   ))}
                 </datalist>
@@ -6545,10 +6551,10 @@ export default function App() {
 
       {showNewTxModal && (
         <NewTxModal
-          suppliers={suppliers}
-          banks={banks}
-          contasContabeis={contasContabeis}
-          companyOptions={companyOptions}
+          suppliers={safeSuppliers}
+          banks={safeBanks}
+          contasContabeis={safeContasContabeis}
+          companyOptions={safeCompanyOptions}
           setShowNewTxModal={setShowNewTxModal}
           onSuccess={() => {
             fetchTransactions();
@@ -6593,7 +6599,7 @@ export default function App() {
         <SelectBankModal
           transactionId={showPayModal.id}
           valor={showPayModal.valor}
-          banks={banks}
+          banks={safeBanks}
           initialDate={toInputDate(showPayModal.vencimento)}
           onClose={() => setShowPayModal(null)}
           onConfirm={(banco, dataPagamento) => {
@@ -6607,7 +6613,7 @@ export default function App() {
         <SelectBankModal
           transactionId="batch"
           valor={showPayBatchModal.reduce((sum, tx) => sum + tx.valor, 0)}
-          banks={banks}
+          banks={safeBanks}
           initialDate={showPayBatchModal.length > 0 ? toInputDate(showPayBatchModal[0].vencimento) : undefined}
           onClose={() => setShowPayBatchModal(null)}
           onConfirm={(banco, dataPagamento) => {
@@ -6619,8 +6625,8 @@ export default function App() {
 
       {showTransferModal && (
         <TransferModal
-          banks={banks}
-          companyOptions={companyOptions}
+          banks={safeBanks}
+          companyOptions={safeCompanyOptions}
           onClose={() => setShowTransferModal(false)}
           onSubmit={handleTransferSubmit}
         />
@@ -6629,10 +6635,10 @@ export default function App() {
       {editingTx && (
         <EditTxModal
           transaction={editingTx}
-          suppliers={suppliers}
-          banks={banks}
-          contasContabeis={contasContabeis}
-          companyOptions={companyOptions}
+          suppliers={safeSuppliers}
+          banks={safeBanks}
+          contasContabeis={safeContasContabeis}
+          companyOptions={safeCompanyOptions}
           onClose={() => setEditingTx(null)}
           onSave={updateTransaction}
         />
