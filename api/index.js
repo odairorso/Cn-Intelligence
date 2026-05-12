@@ -1,3 +1,4 @@
+// --- Inicialização super rápida sem dependências externas ---
 import { setCors } from './_db.js';
 import { checkRateLimit, sanitizeObject } from './_utils.js';
 
@@ -23,20 +24,6 @@ const verifyToken = (req) => {
   } catch { return null; }
 };
 
-// --- Handlers que precisam de importação ---
-import { 
-  handleTransactions, handleTransactionById, handleTransactionsBatch, 
-  handleTransactionsBatchUpdate, handleTransactionsDedupeMovimentos, handleFixReceitasTipo 
-} from './_handlers/transactions.js';
-import { 
-  handleSuppliers, handleSupplierById, handleSuppliersBatch, 
-  handleSuppliersMerge, handleSuppliersMergeAuto 
-} from './_handlers/suppliers.js';
-import { handleBanks, handleBankById, handleContasContabeis } from './_handlers/banks.js';
-import { handleStats } from './_handlers/stats.js';
-import { handleExtractBoleto, handleBoletoPatterns, handleSaveBoletoPattern, handleDeleteBoletoPattern } from './_handlers/boleto.js';
-import { handleSetupTables, handleExportBackup, handleDbCheck, logRequest } from './_handlers/admin.js';
-
 export default async function handler(req, res) {
   const startTime = Date.now();
   
@@ -49,7 +36,7 @@ export default async function handler(req, res) {
 
   const { route, id } = req.query;
 
-  // ── Lógica de Login Direta (Resolução do erro 500) ──────────────────
+  // ── Lógica de Login Isolada e Imediata ──────────────────
   if (route === 'login' || route === 'auth-login') {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
     const { password } = req.body || {};
@@ -82,30 +69,34 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Carregamento Dinâmico (Lazy Load) - Impede que erros em um arquivo quebrem toda a API
     switch (route) {
-      case 'db-check': return handleDbCheck(req, res);
-      case 'stats': return handleStats(req, res);
-      case 'transactions': return id ? handleTransactionById(req, res) : handleTransactions(req, res);
-      case 'transactions-batch': return handleTransactionsBatch(req, res);
-      case 'transactions-batch-update': return handleTransactionsBatchUpdate(req, res);
-      case 'transactions-dedupe-movimentos': return handleTransactionsDedupeMovimentos(req, res);
-      case 'suppliers': return id ? handleSupplierById(req, res) : handleSuppliers(req, res);
-      case 'suppliers-batch': return handleSuppliersBatch(req, res);
-      case 'suppliers-merge': return handleSuppliersMerge(req, res);
-      case 'suppliers-merge-auto': return handleSuppliersMergeAuto(req, res);
-      case 'banks': return id ? handleBankById(req, res) : handleBanks(req, res);
-      case 'contas-contabeis': return handleContasContabeis(req, res);
-      case 'extract-boleto': return handleExtractBoleto(req, res);
-      case 'save-boleto-pattern': return handleSaveBoletoPattern(req, res);
-      case 'boleto-patterns': return id ? handleDeleteBoletoPattern(req, res) : handleBoletoPatterns(req, res);
-      case 'setup-tables': return handleSetupTables(req, res);
-      case 'export-backup': return handleExportBackup(req, res);
-      case 'fix-receitas-tipo': return handleFixReceitasTipo(req, res);
+      case 'db-check': { const m = await import('./_handlers/admin.js'); return m.handleDbCheck(req, res); }
+      case 'stats': { const m = await import('./_handlers/stats.js'); return m.handleStats(req, res); }
+      case 'transactions': { const m = await import('./_handlers/transactions.js'); return id ? m.handleTransactionById(req, res) : m.handleTransactions(req, res); }
+      case 'transactions-batch': { const m = await import('./_handlers/transactions.js'); return m.handleTransactionsBatch(req, res); }
+      case 'transactions-batch-update': { const m = await import('./_handlers/transactions.js'); return m.handleTransactionsBatchUpdate(req, res); }
+      case 'transactions-dedupe-movimentos': { const m = await import('./_handlers/transactions.js'); return m.handleTransactionsDedupeMovimentos(req, res); }
+      case 'suppliers': { const m = await import('./_handlers/suppliers.js'); return id ? m.handleSupplierById(req, res) : m.handleSuppliers(req, res); }
+      case 'suppliers-batch': { const m = await import('./_handlers/suppliers.js'); return m.handleSuppliersBatch(req, res); }
+      case 'suppliers-merge': { const m = await import('./_handlers/suppliers.js'); return m.handleSuppliersMerge(req, res); }
+      case 'suppliers-merge-auto': { const m = await import('./_handlers/suppliers.js'); return m.handleSuppliersMergeAuto(req, res); }
+      case 'banks': { const m = await import('./_handlers/banks.js'); return id ? m.handleBankById(req, res) : m.handleBanks(req, res); }
+      case 'contas-contabeis': { const m = await import('./_handlers/banks.js'); return m.handleContasContabeis(req, res); }
+      case 'extract-boleto': { const m = await import('./_handlers/boleto.js'); return m.handleExtractBoleto(req, res); }
+      case 'save-boleto-pattern': { const m = await import('./_handlers/boleto.js'); return m.handleSaveBoletoPattern(req, res); }
+      case 'boleto-patterns': { const m = await import('./_handlers/boleto.js'); return id ? m.handleDeleteBoletoPattern(req, res) : m.handleBoletoPatterns(req, res); }
+      case 'setup-tables': { const m = await import('./_handlers/admin.js'); return m.handleSetupTables(req, res); }
+      case 'export-backup': { const m = await import('./_handlers/admin.js'); return m.handleExportBackup(req, res); }
+      case 'fix-receitas-tipo': { const m = await import('./_handlers/transactions.js'); return m.handleFixReceitasTipo(req, res); }
       default: return res.status(404).json({ error: 'Route not found' });
     }
   } catch (e) {
     return res.status(500).json({ error: 'Erro no servidor', details: e.message });
   } finally {
-    if (route !== 'health') await logRequest(req, res, startTime);
+    if (route !== 'health') {
+      const { logRequest } = await import('./_handlers/admin.js');
+      await logRequest(req, res, startTime);
+    }
   }
 }
