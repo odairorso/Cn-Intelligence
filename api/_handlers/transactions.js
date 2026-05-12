@@ -96,7 +96,7 @@ export async function handleTransactions(req, res) {
       if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
       // Validação Zod
-      const result = TransactionSchema.safeParse({ uid, ...req.body });
+      const result = TransactionSchema.safeParse({ ...(req.body || {}), uid });
       if (!result.success) {
         return res.status(400).json({ error: 'Dados inválidos', details: result.error.flatten().fieldErrors });
       }
@@ -241,7 +241,7 @@ export async function handleTransactionsBatch(req, res) {
 
   try {
     // Validação do batch com Zod
-    const batchResult = TransactionBatchSchema.safeParse(transactions.map(tx => ({ uid, ...tx })));
+    const batchResult = TransactionBatchSchema.safeParse(transactions.map(tx => ({ ...(tx || {}), uid })));
     if (!batchResult.success) {
       return res.status(400).json({ error: 'Dados do batch inválidos', details: batchResult.error.flatten() });
     }

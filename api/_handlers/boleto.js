@@ -122,7 +122,7 @@ export async function handleSaveBoletoPattern(req, res) {
   try {
     if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
-    const result = SaveBoletoPatternSchema.safeParse({ uid, ...req.body });
+    const result = SaveBoletoPatternSchema.safeParse({ ...(req.body || {}), uid });
     if (!result.success) {
       return res.status(400).json({ error: 'Dados inválidos', details: result.error.flatten().fieldErrors });
     }

@@ -40,6 +40,14 @@ const getUid = (): string | null => {
   }
 };
 
+const getDataUid = (): string => {
+  try {
+    return localStorage.getItem('cn_data_uid') || 'guest';
+  } catch {
+    return 'guest';
+  }
+};
+
 const buildHttpError = async (res: Response, fallback: string) => {
   const contentType = res.headers.get('content-type') || '';
   try {
@@ -143,7 +151,7 @@ export const api = {
     status?: string,
     conta_contabil_id?: number
   ): Promise<Transaction[]> {
-    const uid = getUid();
+    const uid = getDataUid();
     const params = new URLSearchParams();
     params.append('route', 'transactions');
     params.append('uid', uid || 'guest');
@@ -181,7 +189,7 @@ export const api = {
       value: number;
     }>;
   }> {
-    const uid = getUid();
+    const uid = getDataUid();
     const params = new URLSearchParams();
     params.append('route', 'stats');
     params.append('uid', uid || 'guest');
@@ -198,7 +206,8 @@ export const api = {
   },
 
   async createTransaction(data: Omit<Transaction, 'id'>): Promise<Transaction> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=transactions`, {
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=transactions&uid=${encodeURIComponent(uid)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -214,7 +223,8 @@ export const api = {
   },
 
   async createTransactionsBatch(data: Omit<Transaction, 'id'>[]): Promise<void> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=transactions-batch`, {
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=transactions-batch&uid=${encodeURIComponent(uid)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -223,7 +233,8 @@ export const api = {
   },
 
   async updateTransactionsBatch(ids: string[], banco: string, dataPagamento?: string): Promise<void> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=transactions-batch-update`, {
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=transactions-batch-update&uid=${encodeURIComponent(uid)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids, banco, dataPagamento }),
@@ -232,7 +243,8 @@ export const api = {
   },
 
   async updateTransaction(id: string, data: Partial<Transaction>): Promise<Transaction> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=transactions&id=${id}`, {
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=transactions&id=${id}&uid=${encodeURIComponent(uid)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -242,14 +254,17 @@ export const api = {
   },
 
   async deleteTransaction(id: string): Promise<void> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=transactions&id=${id}`, { method: 'DELETE' });
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=transactions&id=${id}&uid=${encodeURIComponent(uid)}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete transaction');
   },
 
   // ─── Suppliers ─────────────────────────────────────────────────────────────
   async getSuppliers(fresh?: boolean): Promise<Supplier[]> {
+    const uid = getDataUid();
     const params = new URLSearchParams();
     params.append('route', 'suppliers');
+    params.append('uid', uid);
     if (fresh) params.append('fresh', '1');
     const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch suppliers');
@@ -257,7 +272,8 @@ export const api = {
   },
 
   async createSupplier(data: Omit<Supplier, 'id'>): Promise<Supplier> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers`, {
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers&uid=${encodeURIComponent(uid)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -267,7 +283,8 @@ export const api = {
   },
 
   async createSuppliersBatch(data: Omit<Supplier, 'id'>[]): Promise<void> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers-batch`, {
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers-batch&uid=${encodeURIComponent(uid)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -276,7 +293,8 @@ export const api = {
   },
 
   async updateSupplier(id: string, data: Partial<Supplier>): Promise<Supplier> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers&id=${id}`, {
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers&id=${id}&uid=${encodeURIComponent(uid)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -286,12 +304,14 @@ export const api = {
   },
 
   async deleteSupplier(id: string): Promise<void> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers&id=${id}`, { method: 'DELETE' });
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers&id=${id}&uid=${encodeURIComponent(uid)}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete supplier');
   },
 
   async mergeSuppliers(target: string, aliases: string[]): Promise<{ updated: number; removed: number }> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers-merge`, {
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers-merge&uid=${encodeURIComponent(uid)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ target, aliases }),
@@ -301,15 +321,18 @@ export const api = {
   },
 
   async mergeSuppliersAuto(): Promise<{ updated: number; removed: number }> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers-merge-auto`, { method: 'POST' });
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=suppliers-merge-auto&uid=${encodeURIComponent(uid)}`, { method: 'POST' });
     if (!res.ok) throw new Error('Failed to auto-merge suppliers');
     return res.json();
   },
 
   // ─── Banks ─────────────────────────────────────────────────────────────────
   async getBanks(fresh?: boolean): Promise<Bank[]> {
+    const uid = getDataUid();
     const params = new URLSearchParams();
     params.append('route', 'banks');
+    params.append('uid', uid);
     if (fresh) params.append('fresh', '1');
     const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`, fresh ? { cache: 'no-store' } : {});
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch banks');
@@ -317,7 +340,8 @@ export const api = {
   },
 
   async createBank(data: Omit<Bank, 'id'>): Promise<Bank> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=banks`, {
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=banks&uid=${encodeURIComponent(uid)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -327,7 +351,8 @@ export const api = {
   },
 
   async updateBank(id: string, data: Partial<Bank>): Promise<Bank> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=banks&id=${id}`, {
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=banks&id=${id}&uid=${encodeURIComponent(uid)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -337,7 +362,8 @@ export const api = {
   },
 
   async deleteBank(id: string): Promise<void> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=banks&id=${id}`, { method: 'DELETE' });
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=banks&id=${id}&uid=${encodeURIComponent(uid)}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete bank');
   },
 
@@ -395,7 +421,8 @@ export const api = {
     conta_contabil_id?: number;
   }): Promise<void> {
     try {
-      await fetchWithSecurity(`${API_BASE}?route=save-boleto-pattern`, {
+      const uid = getDataUid();
+      await fetchWithSecurity(`${API_BASE}?route=save-boleto-pattern&uid=${encodeURIComponent(uid)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -413,13 +440,15 @@ export const api = {
     tipo: string;
     confirmacoes: number;
   }>> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=boleto-patterns`);
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=boleto-patterns&uid=${encodeURIComponent(uid)}`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch patterns');
     return res.json();
   },
 
   async deleteBoletoPattern(id: number): Promise<void> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=boleto-patterns&id=${id}`, { method: 'DELETE' });
+    const uid = getDataUid();
+    const res = await fetchWithSecurity(`${API_BASE}?route=boleto-patterns&id=${id}&uid=${encodeURIComponent(uid)}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete pattern');
   },
 
