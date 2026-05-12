@@ -4616,24 +4616,45 @@ export default function App() {
     const normalizedText = text.toUpperCase().replace(/\s+/g, ' ');
     const normalizedTextKey = normalizeSupplierName(normalizedText);
     
-    // Regra prioritária para Porto Seguro e Bradesco (muito comuns para este usuário)
+    // Regras prioritárias para fornecedores extremamente comuns (Energisa, Sanesul, Porto Seguro, Bradesco)
     const hasPorto = /PORTO\s*SEGURO/i.test(normalizedText);
     const hasBradesco = /BRADESCO/i.test(normalizedText) && /SEGUROS/i.test(normalizedText);
+    const hasEnergisa = /ENERGISA/i.test(normalizedText);
+    const hasSanesul = /SANESUL/i.test(normalizedText);
 
-    if (hasPorto || hasBradesco) {
-      const detectedName = hasPorto ? 'PORTO SEGURO' : 'BRADESCO SEGUROS';
+    if (hasPorto || hasBradesco || hasEnergisa || hasSanesul) {
+      let detectedName = 'Fornecedor não identificado';
+      if (hasPorto) detectedName = 'PORTO SEGURO';
+      else if (hasBradesco) detectedName = 'BRADESCO SEGUROS';
+      else if (hasEnergisa) detectedName = 'ENERGISA';
+      else if (hasSanesul) detectedName = 'SANESUL';
       
-      // Tenta buscar data e valor especificamente para esses boletos se estiverem no texto
-      const localVenc = normalizedText.match(/(\d{2}\/\d{2}\/\d{4})/)?.[1] || '';
-      const localValorMatch = normalizedText.match(/R\$\s*([\d.,]+)/i);
-      const localValor = localValorMatch ? parseMoneyToNumber(localValorMatch[1]) : 0;
+      // Busca data (procura por "VENCIMENTO" ou similar por perto)
+      let localVenc = '';
+      const vencMatch = normalizedText.match(/(?:VENCIMENTO|VENCE|PAGAR\s*AT[EÉ])[:\s]*(\d{2}\/\d{2}\/\d{4})/i);
+      if (vencMatch) {
+        localVenc = vencMatch[1];
+      } else {
+        const allDates = normalizedText.match(/(\d{2}\/\d{2}\/\d{4})/g);
+        if (allDates && allDates.length > 0) {
+          // Geralmente o vencimento é a última data em boletos de energia/seguro
+          localVenc = allDates[allDates.length - 1];
+        }
+      }
+
+      // Busca valor (procura por "TOTAL" ou "PAGAR")
+      let localValor = 0;
+      const valorMatch = normalizedText.match(/(?:TOTAL|PAGAR|VALOR|COBRADO)[:\s]*R?\$?[:\s]*([\d.,]+)/i);
+      if (valorMatch) {
+        localValor = parseMoneyToNumber(valorMatch[1]);
+      }
 
       return {
         fileName,
         fornecedor: detectedName,
         vencimento: localVenc, 
         valor: sanitizeBoletoValor(localValor),
-        descricao: detectedName === 'PORTO SEGURO' ? 'Seguro Porto Seguro' : 'Seguro Bradesco',
+        descricao: `${detectedName} - Importado Automático`,
         empresa: '',
         cnpj: '',
         numero_boleto: extractLocalBoletoNumber(normalizedText),
