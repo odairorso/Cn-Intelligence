@@ -1,114 +1,174 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { api } from '../api';
-import { Transaction, Supplier, Bank, ContaContabil, TransactionStatus } from '../types';
-import { toDisplayDate, dateSortKey, normalizeSupplierName } from '../lib/utils';
-import { DEFAULT_COMPANIES, DEFAULT_ACCOUNTS } from '../lib/constants';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { api, apiAuth } from '../api';
+import type { Transaction, Supplier, Bank, ContaContabil } from '../types';
 
-export type NotificationType = 'success' | 'error' | 'info';
+// --------------------------------------------------------------
+// Estado global da aplicação
+// --------------------------------------------------------------
+interface AppDataState {
+  // Transações
+  transactions: Transaction[];
+  allTransactions: Transaction[];
+  transactionPage: number;
+  hasMoreTransactions: boolean;
+  loadingTransactions: boolean;
 
-export interface Notification {
-  message: string;
-  type: NotificationType;
-}
+  // Fornecedores
+  suppliers: Supplier[];
 
-export interface GlobalStats {
-  kpis: {
-    total_receitas: number;
-    total_despesas: number;
-    count_pagos: number;
-    count_pendentes: number;
-    count_vencidos: number;
-    total_count: number;
+  // Bancos
+  banks: Bank[];
+
+  // Contas contábeis
+  contasContabeis: ContaContabil[];
+
+  // Stats
+  globalStats: any;
+
+  // Filtros ativos
+  activeFilters: {
+    year: string;
+    month: string;
+    search: string;
+    tipo: string;
+    empresa: string;
+    status: string;
+    conta_contabil_id: number | undefined;
   };
-  monthlyFlux: Array<{
-    month_num: number;
-    receitas: number;
-    despesas: number;
-  }>;
-  topSuppliers: Array<{
-    name: string;
-    value: number;
-  }>;
+
+  // Autenticação
+  isAuthorized: boolean;
+  userEmail: string | null;
+  displayName: string | null;
+  balance: number;
 }
 
-export function useAppData() {
+interface AppDataProviderProps {
+  children: React.ReactNode;
+}
+
+const AppDataContext = createContext<{
+  state: AppDataState;
+  actions: {
+    // Auth
+    login: (email: string, senha: string) => Promise<void>;
+    logout: () => void;
+
+    // Transações
+    fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string, tipo?: string, options?: any) => Promise<void>;
+    addTransaction: (tx: Partial<Transaction>) => Promise<void>;
+    updateTransaction: (id: string, data: Partial<Transaction>) => Promise<void>;
+    deleteTransaction: (id: string) => Promise<void>;
+    loadMoreTransactions: () => Promise<void>;
+    markAsPaid: (tx: Transaction, banco?: string) => Promise<void>;
+    markAsPaidBatch: (txs: Transaction[]) => Promise<void>;
+    importOFX: (ofxData: any[]) => Promise<void>;
+    fixReceitasTipo: () => Promise<number>;
+    dedupeMovimentos: () => Promise<number>;
+    searchTransactions: (query: string) => Promise<void>;
+
+    // Fornecedores
+    fetchSuppliers: (force?: boolean) => Promise<void>;
+    addSupplier: (sup: Partial<Supplier>) => Promise<void>;
+    updateSupplier: (id: string, data: Partial<Supplier>) => Promise<void>;
+    deleteSupplier: (id: string) => Promise<void>;
+    mergeSuppliers: (target: string, aliases: string[]) => Promise<{ updated: number; removed: number }>;
+    mergeSuppliersAuto: () => Promise<{ updated: number; removed: number }>;
+    syncSuppliers: () => Promise<void>;
+
+    // Bancos
+    fetchBanks: (force?: boolean) => Promise<void>;
+    addBank: (bank: Partial<Bank>) => Promise<void>;
+    updateBank: (id: string, data: Partial<Bank>) => Promise<void>;
+    deleteBank: (id: string) => Promise<void>;
+
+    // Contas contábeis
+    fetchContasContabeis: () => Promise<void>;
+
+    // Stats
+    fetchStats: (year?: string, period?: string, empresa?: string, tipo?: string, status?: string) => Promise<void>;
+
+    // Setup
+    setupTables: () => Promise<void>;
+  };
+} | null>(null);
+
+// --------------------------------------------------------------
+// Provider
+// --------------------------------------------------------------
+export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) => {
+  // Estado
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [transactionPage, setTransactionPage] = useState(0);
+  const [hasMoreTransactions, setHasMoreTransactions] = useState(true);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
+
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [contasContabeis, setContasContabeis] = useState<ContaContabil[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [notification, setNotification] = useState<Notification | null>(null);
-  const [isAuthorized, setIsAuthorized] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('cn_authorized') === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const transactionsLengthRef = useRef(0);
-  const [boletoPatterns, setBoletoPatterns] = useState<Array<{
-    id: number;
-    cnpj: string;
-    nome_normalizado: string;
-    fornecedor: string;
-    descricao: string;
-    empresa: string;
-    tipo: string;
-    confirmacoes: number;
-  }>>([]);
-  const [companyOptions, setCompanyOptions] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem('cn_company_options');
-      if (!raw) return DEFAULT_COMPANIES;
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return DEFAULT_COMPANIES;
-      const normalized = Array.from(new Set(
-        parsed.map((item: unknown) => String(item || '').trim().toUpperCase()).filter(Boolean)
-      ));
-      return normalized.length ? normalized : DEFAULT_COMPANIES;
-    } catch {
-      return DEFAULT_COMPANIES;
-    }
+  const [globalStats, setGlobalStats] = useState<any>(null);
+
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [balance, setBalance] = useState(0);
+
+  const [activeFilters, setActiveFilters] = useState({
+    year: 'TODOS',
+    month: 'TODOS',
+    search: '',
+    tipo: 'TODOS',
+    empresa: 'TODOS',
+    status: 'TODOS',
+    conta_contabil_id: undefined as number | undefined,
   });
 
-  // ─── Notification ─────────────────────────────────────────────────────────
-  const showNotification = useCallback((message: string, type: NotificationType = 'info') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
+  const fetchLock = useRef(false);
+
+  // Verificar autenticação no mount
+  useEffect(() => {
+    if (apiAuth.isAuthenticated()) {
+      setIsAuthorized(true);
+      // Decodificar info do usuário do token
+      const uid = apiAuth.getUid();
+      if (uid) {
+        try {
+          const payload = JSON.parse(atob((uid as string).split('.')[1]));
+          setUserEmail(payload.email || null);
+          setDisplayName(payload.display_name || payload.email || null);
+        } catch { /* ignore */ }
+      }
+    }
   }, []);
 
-  const coerceMoney = (value: unknown): number => {
-    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-    const raw = String(value ?? '').trim();
-    if (!raw) return 0;
-    const cleaned = raw.replace(/[^\d,.\-]/g, '');
-    if (!cleaned) return 0;
-    if (cleaned.includes(',') && cleaned.includes('.')) {
-      const n = Number(cleaned.replace(/\./g, '').replace(',', '.'));
-      return Number.isFinite(n) ? n : 0;
+  // ────────────────────────────────────────────────────────────
+  // Auth actions
+  // ────────────────────────────────────────────────────────────
+  const login = async (email: string, senha: string) => {
+    const data = await apiAuth.login(email, senha);
+    if (data.token) {
+      setIsAuthorized(true);
+      setUserEmail(data.user?.email || null);
+      setDisplayName(data.user?.display_name || data.user?.email || null);
     }
-    if (cleaned.includes(',')) {
-      const n = Number(cleaned.replace(',', '.'));
-      return Number.isFinite(n) ? n : 0;
-    }
-    const n = Number(cleaned);
-    return Number.isFinite(n) ? n : 0;
   };
 
-  // ─── Fetchers ─────────────────────────────────────────────────────────────
+  const logout = () => {
+    apiAuth.logout();
+    setIsAuthorized(false);
+    setUserEmail(null);
+    setDisplayName(null);
+    setTransactions([]);
+    setAllTransactions([]);
+    setSuppliers([]);
+    setBanks([]);
+    setGlobalStats(null);
+  };
 
-  const fetchStats = useCallback(async (year?: string, period?: string, empresa?: string, tipo?: string, status?: string, search?: string) => {
-    if (!isAuthorized) return;
-    try {
-      const stats = await api.getStats('guest', year, period, empresa, tipo, status, search);
-      setGlobalStats(stats);
-    } catch (error) {
-      console.error('Failed to fetch stats:', error);
-    }
-  }, [isAuthorized]);
-
+  // ────────────────────────────────────────────────────────────
+  // Transactions
+  // ────────────────────────────────────────────────────────────
   const fetchTransactions = useCallback(async (
     append = false,
     year?: string,
@@ -117,502 +177,395 @@ export function useAppData() {
     tipo?: string,
     options?: { limit?: number; empresa?: string; status?: string; conta_contabil_id?: number }
   ) => {
-    if (!isAuthorized) return;
-    try {
-      if (append) setIsLoadingMore(true);
+    if (fetchLock.current) return;
+    fetchLock.current = true;
 
-      const normalizedYear = year && year !== 'TODOS' ? year : undefined;
-      const normalizedMonth = month && month !== 'TODOS' ? month : undefined;
-      const normalizedTipo = tipo && tipo !== 'TODOS' ? tipo : undefined;
-      const normalizedEmpresa = options?.empresa && options.empresa !== 'TODOS' ? options.empresa : undefined;
-      const normalizedStatus = options?.status && options.status !== 'TODOS' ? options.status : undefined;
-      const normalizedContaContabilId = typeof options?.conta_contabil_id === 'number' ? options.conta_contabil_id : undefined;
-      const limit =
-        options?.limit ??
-        (normalizedYear || normalizedMonth || search || normalizedTipo || normalizedEmpresa || normalizedStatus || normalizedContaContabilId ? 200 : 50);
-      const offset = append ? transactionsLengthRef.current : 0;
+    try {
+      setLoadingTransactions(true);
+
+      const limit = options?.limit || 100;
+      const offset = append ? transactions.length : 0;
 
       const data = await api.getTransactions(
-        'guest',
         limit,
         offset,
-        normalizedYear,
-        normalizedMonth,
-        search,
-        normalizedTipo,
-        normalizedEmpresa,
-        normalizedStatus,
-        normalizedContaContabilId
+        year || activeFilters.year,
+        month || activeFilters.month,
+        search || activeFilters.search,
+        tipo || activeFilters.tipo,
+        options?.empresa || activeFilters.empresa,
+        options?.status || activeFilters.status,
+        options?.conta_contabil_id ?? activeFilters.conta_contabil_id
       );
-      const normalized = data.map((tx) => {
-        const raw = tx as any;
-        return {
-          ...tx,
-          valor: coerceMoney(raw.valor),
-          juros: coerceMoney(raw.juros),
-          vencimento: toDisplayDate(tx.vencimento),
-          pagamento: tx.pagamento ? toDisplayDate(tx.pagamento) : undefined,
-        } as Transaction;
-      });
+
+      const newTxs = Array.isArray(data) ? data : [];
 
       if (append) {
-        setTransactions(prev => {
-          const next = [
-            ...prev,
-            ...normalized
-          ].sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento));
-          transactionsLengthRef.current = next.length;
-          return next;
-        });
+        setTransactions((prev) => [...prev, ...newTxs]);
+        setHasMoreTransactions(newTxs.length >= limit);
+        setTransactionPage((prev) => prev + 1);
       } else {
-        transactionsLengthRef.current = normalized.length;
-        setTransactions(
-          normalized.sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento))
-        );
+        setTransactions(newTxs);
+        setAllTransactions(newTxs);
+        setTransactionPage(0);
+        setHasMoreTransactions(newTxs.length >= limit);
       }
-    } catch (error) {
-      console.error('Failed to fetch transactions:', error);
+    } catch (err: any) {
+      console.error('[fetchTransactions]', err.message);
+      if (!append) setTransactions([]);
     } finally {
-      if (append) setIsLoadingMore(false);
+      setLoadingTransactions(false);
+      fetchLock.current = false;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthorized]);
+  }, [transactions, activeFilters]);
 
-  const fetchSuppliers = useCallback(async (fresh = false) => {
-    if (!isAuthorized) return;
-    try {
-      const data = await api.getSuppliers('guest', fresh);
-      setSuppliers(data);
-    } catch (error) {
-      console.error('Failed to fetch suppliers:', error);
-    }
-  }, [isAuthorized]);
+  const loadMoreTransactions = useCallback(async () => {
+    await fetchTransactions(true);
+  }, [fetchTransactions]);
 
-  const fetchBanks = useCallback(async (fresh = false) => {
-    if (!isAuthorized) return;
-    try {
-      const data = await api.getBanks('guest', fresh);
-      setBanks(data);
-    } catch (error) {
-      console.error('Failed to fetch banks:', error);
-    }
-  }, [isAuthorized]);
+  const addTransaction = useCallback(async (tx: Partial<Transaction>) => {
+    const data = await api.createTransaction(tx as any);
+    setTransactions((prev) => [data, ...prev]);
+    setAllTransactions((prev) => [data, ...prev]);
+  }, []);
 
-  const fetchContasContabeis = useCallback(async () => {
-    if (!isAuthorized) return;
-    try {
-      let data = await api.getContasContabeis();
-      if (!Array.isArray(data) || data.length === 0) {
-        // Removido setupTables automático aqui para economizar banda.
-        // Se as contas não carregarem, o sistema usa o padrão local.
-      }
-      if (Array.isArray(data) && data.length > 0) {
-        setContasContabeis(data);
-      } else {
-        setContasContabeis(DEFAULT_ACCOUNTS);
-        showNotification('Usando plano de contas padrão local (API indisponível).', 'info');
-      }
-    } catch (error) {
-      console.error('Failed to fetch contas contabeis:', error);
-      setContasContabeis(DEFAULT_ACCOUNTS);
-      showNotification('API indisponível. Carregamos plano de contas padrão local.', 'info');
-    }
-  }, [showNotification, isAuthorized]);
-
-  const fetchBoletoPatterns = useCallback(async () => {
-    if (!isAuthorized) return;
-    try {
-      const data = await api.getBoletoPatterns();
-      setBoletoPatterns(data);
-    } catch (error) {
-      console.error('Failed to fetch boleto patterns:', error);
-    }
-  }, [isAuthorized]);
-
-  const deleteBoletoPattern = useCallback(async (id: number) => {
-    try {
-      await api.deleteBoletoPattern(id);
-      showNotification('Padrão de boleto excluído.', 'info');
-      fetchBoletoPatterns();
-    } catch (error) {
-      console.error('Failed to delete boleto pattern:', error);
-      showNotification('Erro ao excluir padrão.', 'error');
-    }
-  }, [showNotification, fetchBoletoPatterns]);
-
-  // ─── Initial load — em paralelo (executa apenas quando autorizado) ───
-  useEffect(() => {
-    if (!isAuthorized) {
-      setIsLoading(false); // Se não autorizado, para o loading inicial para mostrar tela de login
-      return;
-    }
-
-    let cancelled = false;
-    setIsLoading(true);
-
-    (async () => {
-      try {
-        const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
-          let timeoutId: number | undefined;
-          const timeout = new Promise<never>((_, reject) => {
-            timeoutId = window.setTimeout(() => reject(new Error('TIMEOUT')), ms);
-          });
-          try {
-            return await Promise.race([promise, timeout]);
-          } finally {
-            if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-          }
-        };
-
-        await Promise.all([
-          withTimeout(fetchTransactions(), 20000),
-          withTimeout(fetchStats(), 20000),
-        ]);
-
-        fetchSuppliers().catch(() => {});
-        fetchBanks().catch(() => {});
-        fetchContasContabeis().catch(() => {});
-        fetchBoletoPatterns().catch(() => {});
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e || '');
-        if (msg === 'TIMEOUT') {
-          showNotification('A API está demorando para responder. Verifique sua internet e tente novamente.', 'error');
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    })();
-
-    /* 
-    setupTables movido para execução manual ou via script para economizar banda no Pooler.
-    */
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthorized]); // Executa quando isAuthorized muda para true
-
-  // ─── Auto-merge suppliers (max 1x a cada 6h) ─────────────────────────────
-  /*
-  useEffect(() => {
-    if (!suppliers.length) return;
-    const key = 'cn_auto_merge_suppliers_last';
-    try {
-      const last = Number(localStorage.getItem(key) || 0);
-      if (Date.now() - last < 6 * 60 * 60 * 1000) return;
-    } catch { // ignore // }
-    let cancelled = false;
-    (async () => {
-      try {
-        await api.mergeSuppliersAuto();
-        if (cancelled) return;
-        await fetchSuppliers();
-        if (cancelled) return;
-        // Não chama fetchTransactions aqui para evitar loop de reinicialização
-        localStorage.setItem(key, String(Date.now()));
-      } catch (e) {
-        console.error('Auto-merge suppliers failed:', e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [suppliers.length, fetchSuppliers]);
-  */
-
-  // ─── Persist company options ──────────────────────────────────────────────
-  useEffect(() => {
-    try {
-      localStorage.setItem('cn_company_options', JSON.stringify(companyOptions));
-    } catch { /* ignore */ }
-  }, [companyOptions]);
-
-  // ─── Transaction actions ──────────────────────────────────────────────────
-  const markAsPaid = useCallback(async (id: string, banco: string, dataPagamento?: string) => {
-    // dataPagamento vem do modal como YYYY-MM-DD
-    const displayDate = dataPagamento ? toDisplayDate(dataPagamento) : '';
-
-    setTransactions(prev =>
-      prev.map(tx => tx.id === id ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: displayDate, banco } : tx)
+  const updateTransaction = useCallback(async (id: string, data: Partial<Transaction>) => {
+    const updated = await api.updateTransaction(id, data as any);
+    setTransactions((prev) =>
+      prev.map((tx) => (tx.id === id ? { ...tx, ...updated } : tx))
     );
-    showNotification('Lançamento marcado como pago!', 'success');
-    
-    // Enviamos a data original (YYYY-MM-DD) para a API
-    api.updateTransaction(id, { status: 'PAGO', pagamento: dataPagamento, banco }).then(() => {
-      fetchStats();
-    }).catch(err => {
-      console.error('Failed to mark as paid:', err);
-      fetchTransactions();
-    });
-  }, [showNotification, fetchTransactions, fetchStats]);
-
-  const markAsPaidBatch = useCallback(async (ids: string[], banco: string, dataPagamento?: string) => {
-    // dataPagamento vem do modal como YYYY-MM-DD
-    const displayDate = dataPagamento ? toDisplayDate(dataPagamento) : '';
-
-    setTransactions(prev =>
-      prev.map(tx => ids.includes(tx.id) ? { ...tx, status: 'PAGO' as TransactionStatus, pagamento: displayDate, banco } : tx)
+    setAllTransactions((prev) =>
+      prev.map((tx) => (tx.id === id ? { ...tx, ...updated } : tx))
     );
-    showNotification(`${ids.length} lançamento(s) marcado(s) como pago!`, 'success');
-    
-    const payload = { status: 'PAGO' as TransactionStatus, pagamento: dataPagamento, banco };
-    const chunkSize = 25;
-    const chunks: string[][] = [];
-    for (let i = 0; i < ids.length; i += chunkSize) chunks.push(ids.slice(i, i + chunkSize));
-
-    let failed = 0;
-    try {
-      for (const chunk of chunks) {
-        const results = await Promise.allSettled(chunk.map(id => api.updateTransaction(id, payload)));
-        failed += results.filter(r => r.status === 'rejected').length;
-      }
-
-      if (failed > 0) {
-        showNotification(`Falha ao registrar ${failed} de ${ids.length} pagamentos.`, 'error');
-        fetchTransactions();
-        return;
-      }
-
-      fetchStats();
-      fetchTransactions();
-    } catch (err) {
-      console.error('Failed to mark batch as paid:', err);
-      fetchTransactions();
-    }
-  }, [showNotification, fetchTransactions, fetchStats]);
-
-  const updateTransaction = useCallback(async (updatedTx: Transaction) => {
-    const { id, ...data } = updatedTx;
-    if (!id) return;
-    try {
-      const saved = await api.updateTransaction(id, data);
-      const normalizedSaved = {
-        ...saved,
-        vencimento: toDisplayDate(saved.vencimento),
-        pagamento: saved.pagamento ? toDisplayDate(saved.pagamento) : undefined,
-      } as Transaction;
-      setTransactions(prev =>
-        prev
-          .map(tx => tx.id === id ? { ...tx, ...normalizedSaved } as Transaction : tx)
-          .sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento))
-      );
-      showNotification('Lançamento atualizado!', 'success');
-      fetchStats();
-    } catch (err) {
-      console.error('Failed to update transaction:', err);
-      showNotification('Erro ao atualizar lançamento.', 'error');
-      fetchTransactions();
-    }
-  }, [showNotification, fetchTransactions, fetchStats]);
+  }, []);
 
   const deleteTransaction = useCallback(async (id: string) => {
-    setTransactions(prev => prev.filter(tx => tx.id !== id));
-    showNotification('Lançamento excluído.', 'info');
-    api.deleteTransaction(id).then(() => {
-      fetchStats();
-    }).catch(err => {
-      console.error('Failed to delete transaction:', err);
-      fetchTransactions();
-    });
-  }, [showNotification, fetchTransactions, fetchStats]);
+    await api.deleteTransaction(id);
+    setTransactions((prev) => prev.filter((tx) => tx.id !== id));
+    setAllTransactions((prev) => prev.filter((tx) => tx.id !== id));
+  }, []);
 
-  // ─── Supplier actions ─────────────────────────────────────────────────────
-  const deleteSupplier = useCallback(async (id: string) => {
-    try {
-      await api.deleteSupplier(id);
-      showNotification('Fornecedor excluído.', 'info');
-      fetchSuppliers();
-    } catch (error) {
-      console.error('Failed to delete supplier:', error);
+  const markAsPaid = useCallback(async (tx: Transaction, banco?: string) => {
+    const hoje = new Date().toISOString().split('T')[0];
+    // Obter saldo do banco selecionado
+    const bankMatch = banks.find((b) => b.nome === banco);
+    const newSaldo = bankMatch ? Number(bankMatch.saldo) + Number(tx.valor) + Number(tx.juros || 0) : undefined;
+
+    const updated = await api.updateTransaction(tx.id as string, {
+      status: 'PAGO',
+      pagamento: hoje,
+      banco: banco || tx.banco || 'Caixa',
+      ...(newSaldo !== undefined && bankMatch ? {} : {}),
+    });
+    setTransactions((prev) =>
+      prev.map((t) => (t.id === tx.id ? { ...t, ...updated } : t))
+    );
+    setAllTransactions((prev) =>
+      prev.map((t) => (t.id === tx.id ? { ...t, ...updated } : t))
+    );
+
+    // Atualizar saldo do banco localmente
+    if (bankMatch && newSaldo !== undefined) {
+      setBanks((prev) =>
+        prev.map((b) => (b.nome === banco ? { ...b, saldo: newSaldo } : b))
+      );
     }
-  }, [showNotification, fetchSuppliers]);
+  }, [banks]);
+
+  const markAsPaidBatch = useCallback(async (txs: Transaction[]) => {
+    const hoje = new Date().toISOString().split('T')[0];
+    if (txs.length === 0) return;
+
+    const banco = txs[0]?.banco || 'Caixa';
+    const ids = txs.map((t) => t.id as string);
+
+    await api.updateTransactionsBatch(ids, banco, hoje);
+
+    // Atualizar localmente
+    setTransactions((prev) =>
+      prev.map((t) =>
+        ids.includes(t.id as string)
+          ? { ...t, status: 'PAGO', pagamento: hoje, banco }
+          : t
+      )
+    );
+    setAllTransactions((prev) =>
+      prev.map((t) =>
+        ids.includes(t.id as string)
+          ? { ...t, status: 'PAGO', pagamento: hoje, banco }
+          : t
+      )
+    );
+  }, []);
+
+  const importOFX = useCallback(async (ofxData: any[]) => {
+    if (!ofxData || ofxData.length === 0) return;
+
+    const novo = ofxData.filter((tx) => tx.novo);
+    const batchData = novo.map((tx) => ({
+      uid: apiAuth.getUid() || 'guest',
+      fornecedor: tx.fornecedor || tx.payee || 'Desconhecido',
+      descricao: tx.descricao || tx.memo || '-',
+      empresa: tx.empresa || 'Geral',
+      vencimento: tx.vencimento || new Date().toISOString().split('T')[0],
+      pagamento: tx.pagamento || undefined,
+      valor: Number(tx.valor) || 0,
+      tipo: tx.tipo || (Number(tx.valor) >= 0 ? 'RECEITA' : 'DESPESA'),
+      status: tx.status || (tx.pagamento ? 'PAGO' : 'PENDENTE'),
+      banco: tx.banco || 'Caixa',
+      numero_boleto: tx.numero_boleto || tx.nosso_numero || undefined,
+      conta_contabil_id: tx.conta_contabil_id || undefined,
+    }));
+
+    if (batchData.length === 0) return;
+
+    try {
+      await api.createTransactionsBatch(batchData);
+    } catch (err: any) {
+      console.error('[importOFX]', err.message);
+    }
+
+    await fetchTransactions();
+  }, [fetchTransactions]);
+
+  const fixReceitasTipo = useCallback(async () => {
+    try {
+      // Chamada direta via fetch porque o endpoint pode não existir no novo backend
+      const res = await fetch('/api?route=fix-receitas-tipo', { method: 'POST' });
+      const data = await res.json();
+      return data.updated || 0;
+    } catch {
+      return 0;
+    }
+  }, []);
+
+  const dedupeMovimentos = useCallback(async () => {
+    try {
+      const res = await fetch('/api?route=transactions-dedupe-movimentos', { method: 'DELETE' });
+      const data = await res.json();
+      return data.count || 0;
+    } catch {
+      return 0;
+    }
+  }, []);
+
+  const searchTransactions = useCallback(async (query: string) => {
+    await fetchTransactions(false, undefined, undefined, query);
+  }, [fetchTransactions]);
+
+  // ────────────────────────────────────────────────────────────
+  // Fornecedores
+  // ────────────────────────────────────────────────────────────
+  const fetchSuppliers = useCallback(async (force = false) => {
+    try {
+      const data = await api.getSuppliers(force);
+      setSuppliers(data);
+    } catch (err: any) {
+      console.error('[fetchSuppliers]', err.message);
+    }
+  }, []);
+
+  const addSupplier = useCallback(async (sup: Partial<Supplier>) => {
+    const data = await api.createSupplier(sup as any);
+    setSuppliers((prev) => [...prev, data]);
+  }, []);
 
   const updateSupplier = useCallback(async (id: string, data: Partial<Supplier>) => {
-    const prev = suppliers.find((s) => s.id === id);
-    try {
-      const updated = await api.updateSupplier(id, data);
-      setSuppliers((list) => list.map((s) => (s.id === id ? updated : s)));
+    const updated = await api.updateSupplier(id, data as any);
+    setSuppliers((prev) =>
+      prev.map((s) => (s.id === Number(id) ? { ...s, ...updated } : s))
+    );
+  }, []);
 
-      const prevName = String(prev?.nome || '').trim();
-      const nextName = String(updated?.nome || '').trim();
-      if (prevName && nextName && prevName !== nextName) {
-        const prevKey = normalizeSupplierName(prevName);
-        setTransactions((list) =>
-          list.map((tx) => {
-            const txKey = normalizeSupplierName(tx.fornecedor);
-            if (!txKey || txKey !== prevKey) return tx;
-            return { ...tx, fornecedor: nextName };
-          })
-        );
-      }
-
-      showNotification('Fornecedor atualizado!', 'success');
-      return updated;
-    } catch (error) {
-      console.error('Failed to update supplier:', error);
-      showNotification('Erro ao atualizar fornecedor.', 'error');
-      throw error;
-    }
-  }, [showNotification, suppliers]);
-
-  const syncSuppliers = useCallback(async () => {
-    const transactionSuppliers = new Set<string>(transactions.map(tx => tx.fornecedor));
-    const existingNames = new Set<string>(suppliers.map(s => s.nome));
-
-    // Coletar todos os fornecedores novos primeiro
-    const newSuppliers = Array.from(transactionSuppliers)
-      .filter(nome => !existingNames.has(nome) && nome !== 'Desconhecido')
-      .map(nome => ({
-        uid: 'guest',
-        nome,
-        email: '',
-        telefone: '',
-        cnpj: ''
-      }));
-
-    if (newSuppliers.length > 0) {
-      // Enviar todos de uma vez (batch) ao invés de um por um
-      try {
-        await api.createSuppliersBatch(newSuppliers as any);
-        showNotification(`${newSuppliers.length} novos fornecedores sincronizados!`, 'success');
-        fetchSuppliers(true);
-      } catch (error) {
-        console.error('Failed to sync suppliers batch:', error);
-        showNotification('Erro ao sincronizar fornecedores.', 'error');
-      }
-    } else {
-      showNotification('Todos os fornecedores já estão cadastrados.', 'info');
-    }
-  }, [transactions, suppliers, showNotification, fetchSuppliers]);
+  const deleteSupplier = useCallback(async (id: string) => {
+    await api.deleteSupplier(id);
+    setSuppliers((prev) => prev.filter((s) => String(s.id) !== id));
+  }, []);
 
   const mergeSuppliers = useCallback(async (target: string, aliases: string[]) => {
-    try {
-      const canonical = String(target || '').trim();
-      const list = Array.isArray(aliases) ? aliases.map((x) => String(x || '').trim()).filter(Boolean) : [];
-      if (!canonical || list.length === 0) {
-        showNotification('Selecione o nome final e pelo menos 1 fornecedor para unificar.', 'error');
-        return { updated: 0, removed: 0 };
-      }
-
-      const result = await api.mergeSuppliers(canonical, list);
-
-      const aliasKeys = new Set(list.map((n) => normalizeSupplierName(n)).filter(Boolean));
-      const canonicalKey = normalizeSupplierName(canonical);
-
-      setTransactions((prev) =>
-        prev.map((tx) => {
-          const k = normalizeSupplierName(tx.fornecedor);
-          if (!k) return tx;
-          if (k === canonicalKey) return tx;
-          if (!aliasKeys.has(k)) return tx;
-          return { ...tx, fornecedor: canonical };
-        })
-      );
-
-      await fetchSuppliers(true);
-      showNotification(`Unificado! ${result.updated || 0} lançamento(s) ajustado(s).`, 'success');
-      return result;
-    } catch (error) {
-      console.error('Failed to merge suppliers:', error);
-      const msg = error instanceof Error ? error.message : String(error || '');
-      showNotification(msg ? `Erro ao unificar: ${msg}` : 'Erro ao unificar fornecedores.', 'error');
-      throw error;
-    }
-  }, [showNotification, fetchSuppliers]);
+    const result = await api.mergeSuppliers(target, aliases);
+    await fetchSuppliers(true);
+    return result;
+  }, [fetchSuppliers]);
 
   const mergeSuppliersAuto = useCallback(async () => {
-    try {
-      const result = await api.mergeSuppliersAuto();
-      await fetchSuppliers(true);
-      showNotification(`Unificação automática concluída. Removidos: ${result.removed || 0}.`, 'success');
-      return result;
-    } catch (error) {
-      console.error('Auto-merge suppliers failed:', error);
-      const msg = error instanceof Error ? error.message : String(error || '');
-      showNotification(msg ? `Erro na unificação automática: ${msg}` : 'Erro na unificação automática.', 'error');
-      throw error;
-    }
-  }, [showNotification, fetchSuppliers]);
+    const result = await api.mergeSuppliersAuto();
+    await fetchSuppliers(true);
+    return result;
+  }, [fetchSuppliers]);
 
-  // ─── Bank actions ─────────────────────────────────────────────────────────
+  const syncSuppliers = useCallback(async () => {
+    await fetchSuppliers(true);
+    await fetchTransactions();
+  }, [fetchSuppliers, fetchTransactions]);
+
+  // ────────────────────────────────────────────────────────────
+  // Bancos
+  // ────────────────────────────────────────────────────────────
+  const fetchBanks = useCallback(async (force = false) => {
+    try {
+      const data = await api.getBanks(force);
+      setBanks(data);
+
+      // Calcular saldo baseado nas transações
+      if (data.length > 0) {
+        const totalBalance = data.reduce((acc, b) => acc + (Number(b.saldo) || 0), 0);
+        setBalance(totalBalance);
+      }
+    } catch (err: any) {
+      console.error('[fetchBanks]', err.message);
+    }
+  }, []);
+
+  const addBank = useCallback(async (bank: Partial<Bank>) => {
+    const data = await api.createBank(bank as any);
+    setBanks((prev) => [...prev, data]);
+  }, []);
+
+  const updateBank = useCallback(async (id: string, data: Partial<Bank>) => {
+    const updated = await api.updateBank(id, data as any);
+    setBanks((prev) =>
+      prev.map((b) => (b.id === Number(id) ? { ...b, ...updated } : b))
+    );
+  }, []);
+
   const deleteBank = useCallback(async (id: string) => {
+    await api.deleteBank(id);
+    setBanks((prev) => prev.filter((b) => String(b.id) !== id));
+  }, []);
+
+  // ────────────────────────────────────────────────────────────
+  // Contas contábeis
+  // ────────────────────────────────────────────────────────────
+  const fetchContasContabeis = useCallback(async () => {
     try {
-      await api.deleteBank(id);
-      showNotification('Banco excluído.', 'info');
-      fetchBanks();
-    } catch (error) {
-      console.error('Failed to delete bank:', error);
-    }
-  }, [showNotification, fetchBanks]);
-
-  // ─── Company options ──────────────────────────────────────────────────────
-  const normalizeCompanyName = (name: string) => String(name || '').trim().toUpperCase();
-
-  const addCompanyOption = useCallback((name: string) => {
-    const normalized = normalizeCompanyName(name);
-    if (!normalized) { showNotification('Informe um nome de empresa válido.', 'error'); return; }
-    if (companyOptions.includes(normalized)) { showNotification('Essa empresa já existe.', 'info'); return; }
-    setCompanyOptions(prev => [...prev, normalized]);
-    showNotification(`Empresa ${normalized} adicionada.`, 'success');
-  }, [companyOptions, showNotification]);
-
-  const removeCompanyOption = useCallback((name: string) => {
-    const normalized = normalizeCompanyName(name);
-    const next = companyOptions.filter(item => item !== normalized);
-    if (!next.length) { showNotification('Mantenha pelo menos uma empresa na lista.', 'error'); return; }
-    setCompanyOptions(next);
-    showNotification(`Empresa ${normalized} removida.`, 'info');
-  }, [companyOptions, showNotification]);
-
-  const updateCompanyOption = useCallback((original: string, newName: string) => {
-    const normalized = normalizeCompanyName(newName);
-    if (!normalized) { showNotification('Informe um nome de empresa válido.', 'error'); return false; }
-    if (normalized !== original && companyOptions.includes(normalized)) {
-      showNotification('Já existe uma empresa com esse nome.', 'error'); return false;
-    }
-    setCompanyOptions(prev => prev.map(item => item === original ? normalized : item));
-    showNotification('Empresa atualizada com sucesso.', 'success');
-    return true;
-  }, [companyOptions, showNotification]);
-
-  const login = useCallback(async (password: string): Promise<boolean> => {
-    try {
-      const res = await fetch('/api?route=login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-      if (!res.ok) return false;
-      const data = await res.json();
-      if (!data.token) return false;
-      // Guarda token e uid com segurança
-      localStorage.setItem('cn_jwt', data.token);
-      localStorage.setItem('cn_uid', data.uid);
-      localStorage.setItem('cn_authorized', 'true');
-      setIsAuthorized(true);
-      return true;
-    } catch {
-      return false;
+      const data = await api.getContasContabeis();
+      setContasContabeis(data);
+    } catch (err: any) {
+      console.error('[fetchContasContabeis]', err.message);
     }
   }, []);
 
-  const logout = useCallback(() => {
-    setIsAuthorized(false);
-    localStorage.removeItem('cn_authorized');
-    localStorage.removeItem('cn_jwt');
-    localStorage.removeItem('cn_uid');
+  // ────────────────────────────────────────────────────────────
+  // Stats
+  // ────────────────────────────────────────────────────────────
+  const fetchStats = useCallback(async (
+    year?: string,
+    period?: string,
+    empresa?: string,
+    tipo?: string,
+    status?: string
+  ) => {
+    try {
+      const data = await api.getStats(
+        year || activeFilters.year,
+        period,
+        empresa || activeFilters.empresa,
+        tipo || activeFilters.tipo,
+        status || activeFilters.status,
+        activeFilters.search
+      );
+      setGlobalStats(data);
+    } catch (err: any) {
+      console.error('[fetchStats]', err.message);
+    }
+  }, [activeFilters]);
+
+  // ────────────────────────────────────────────────────────────
+  // Setup
+  // ────────────────────────────────────────────────────────────
+  const setupTables = useCallback(async () => {
+    try {
+      await api.setupTables();
+    } catch (err: any) {
+      console.error('[setupTables]', err.message);
+      throw err;
+    }
   }, []);
 
-  return {
-    // State
-    transactions, globalStats, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, isLoadingMore, boletoPatterns, isAuthorized,
-    // Fetchers
-    fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns, fetchStats,
-    // Actions
-    showNotification, login, logout,
-    markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
-    deleteSupplier, syncSuppliers,
-    mergeSuppliers, mergeSuppliersAuto,
-    updateSupplier,
-    deleteBank,
-    addCompanyOption, removeCompanyOption, updateCompanyOption,
-    setCompanyOptions,
-    deleteBoletoPattern,
+  // ────────────────────────────────────────────────────────────
+  // Carregamento inicial (auth-gated)
+  // ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isAuthorized) return;
+
+    const load = async () => {
+      await Promise.all([
+        fetchSuppliers(),
+        fetchBanks(),
+        fetchContasContabeis(),
+        fetchTransactions(),
+        fetchStats(),
+      ]);
+    };
+    load();
+  }, [isAuthorized]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ────────────────────────────────────────────────────────────
+  // Context value
+  // ────────────────────────────────────────────────────────────
+  const contextValue = {
+    state: {
+      transactions,
+      allTransactions,
+      transactionPage,
+      hasMoreTransactions,
+      loadingTransactions,
+      suppliers,
+      banks,
+      contasContabeis,
+      globalStats,
+      activeFilters,
+      isAuthorized,
+      userEmail,
+      displayName,
+      balance,
+    },
+    actions: {
+      login,
+      logout,
+      fetchTransactions,
+      addTransaction,
+      updateTransaction,
+      deleteTransaction,
+      loadMoreTransactions,
+      markAsPaid,
+      markAsPaidBatch,
+      importOFX,
+      fixReceitasTipo,
+      dedupeMovimentos,
+      searchTransactions,
+      fetchSuppliers,
+      addSupplier,
+      updateSupplier,
+      deleteSupplier,
+      mergeSuppliers,
+      mergeSuppliersAuto,
+      syncSuppliers,
+      fetchBanks,
+      addBank,
+      updateBank,
+      deleteBank,
+      fetchContasContabeis,
+      fetchStats,
+      setupTables,
+    },
   };
-}
+
+  return (
+    <AppDataContext.Provider value={contextValue}>
+      {children}
+    </AppDataContext.Provider>
+  );
+};
+
+// ──────────────────────────────────────────────────────────────
+// Hook
+// ──────────────────────────────────────────────────────────────
+export const useAppData = () => {
+  const context = useContext(AppDataContext);
+  if (!context) {
+    throw new Error('useAppData must be used within an AppDataProvider');
+  }
+  return context;
+};
