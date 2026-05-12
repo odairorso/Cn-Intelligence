@@ -47,13 +47,13 @@ export async function handleExtractBoleto(req, res) {
       });
     }
 
-    const ai = new GoogleGenAI(process.env.GEMINI_API_KEY);
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const generateContentWithFallback = async (contents, config) => {
       const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', process.env.GEMINI_MODEL].filter(Boolean);
       let lastErr = null;
       for (const modelName of modelsToTry) {
         try {
-          const model = ai.getGenerativeModel({ model: modelName });
+          const model = ai.getGenerativeModel(modelName);
           return await model.generateContent(contents);
         } catch (e) {
           lastErr = e;

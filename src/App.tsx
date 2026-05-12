@@ -5613,7 +5613,7 @@ export default function App() {
     if (banks.filter(b => b.ativo).length > 0) {
       setShowPayModal({ id: tx.id, valor: tx.valor });
     } else {
-      markAsPaid(tx.id, '');
+      markAsPaid(String(tx.id), '');
     }
   };
 
