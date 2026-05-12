@@ -116,19 +116,22 @@ export async function handleExtractBoleto(req, res) {
     RETORNE APENAS JSON:
     {"fornecedor":"","vencimento":"","valor":0,"cnpj":"","numero_boleto":"","descricao":""}`;
 
-    const contents = [];
+    const parts = [];
     if (pdfBase64) {
-      contents.push({
+      parts.push({
         inlineData: {
           data: pdfBase64,
           mimeType: 'application/pdf'
         }
       });
     }
-    contents.push({ text: prompt + (extractedText ? `\n\nTexto extraído (OCR):\n${extractedText.slice(0, 3000)}` : '') });
+    parts.push({ text: prompt + (extractedText ? `\n\nTexto extraído (OCR):\n${extractedText.slice(0, 3000)}` : '') });
+
+    const contents = [{ role: 'user', parts }];
 
     const resultGemini = await generateContentWithFallback(contents);
-    const responseText = resultGemini.text.replace(/```json|```/gi, '').trim();
+    const responseText = (resultGemini.text || resultGemini.response?.text?.() || '').replace(/```json|```/gi, '').trim();
+    if (!responseText) throw new Error('A IA retornou uma resposta vazia.');
     const extracted = JSON.parse(responseText);
 
     // Limpeza rigorosa no fornecedor
