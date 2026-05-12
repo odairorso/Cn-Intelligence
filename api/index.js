@@ -69,7 +69,9 @@ export default async function handler(req, res) {
     req.authUid = req.query.uid || 'odair';
   } else {
     // Se o token é válido, o UID do token manda. Ignora o uid da query para segurança.
-    req.authUid = decoded.uid || 'odair';
+    // Fallback de 'guest' para 'odair' para recuperar acesso imediato se o token for antigo.
+    const uid = decoded.uid || 'odair';
+    req.authUid = uid === 'guest' ? 'odair' : uid;
   }
 
   // ── Sanitização ──────────────────────────────────────
