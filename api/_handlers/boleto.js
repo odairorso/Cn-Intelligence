@@ -101,20 +101,17 @@ export async function handleExtractBoleto(req, res) {
     }
 
     // --- Chamada à IA (Gemini) ---
-    const prompt = `Extraia os dados deste boleto bancário (arquivo: ${fileName}).
+    const prompt = `Analise este boleto bancário (arquivo: ${fileName}).
     
-    INSTRUÇÕES CRÍTICAS:
-    1. FORNECEDOR: Identifique o beneficiário (quem recebe o dinheiro). 
-       - IGNORE o Pagador/Sacado (ex: NÃO use Elaine Cristina Camacho Cavalcante).
-       - USE o Cedente/Beneficiário (ex: Porto Seguro, Energisa, Sanesul).
-       - Remova IDs, números de contrato, endereços ou CPFs do nome.
+    REGRAS DE EXTRAÇÃO (MUITO IMPORTANTE):
+    1. FORNECEDOR (BENEFICIÁRIO): Identifique quem recebe o dinheiro.
+       - NÃO USE o Pagador/Sacado (Ex: ignore nomes como ELAINE CRISTINA CAMACHO CAVALCANTE).
+       - USE o Cedente/Beneficiário/Emissor (Ex: Porto Seguro, Energisa, Sanesul, Claro).
     2. VENCIMENTO: Data no formato DD/MM/AAAA.
-    3. VALOR: Valor total a pagar (numérico).
-    4. CNPJ: Apenas números do beneficiário.
+    3. VALOR: Valor total (numérico).
+    4. CNPJ: CNPJ do Beneficiário (quem recebe).
     5. NÚMERO DO BOLETO: Linha digitável ou código de barras.
-    
-    RETORNE APENAS JSON:
-    {"fornecedor":"","vencimento":"","valor":0,"cnpj":"","numero_boleto":"","descricao":""}`;
+    6. DESCRIÇÃO: Uma breve descrição baseada no conteúdo (ex: "Seguro Auto", "Conta de Energia").`;
 
     const parts = [];
     if (pdfBase64) {
@@ -125,13 +122,32 @@ export async function handleExtractBoleto(req, res) {
         }
       });
     }
-    parts.push({ text: prompt + (extractedText ? `\n\nTexto extraído (OCR):\n${extractedText.slice(0, 3000)}` : '') });
+    parts.push({ text: prompt + (extractedText ? `\n\nTexto extraído (OCR):\n${extractedText.slice(0, 5000)}` : '') });
 
     const contents = [{ role: 'user', parts }];
 
-    const resultGemini = await generateContentWithFallback(contents);
-    const responseText = (resultGemini.text || resultGemini.response?.text?.() || '').replace(/```json|```/gi, '').trim();
-    if (!responseText) throw new Error('A IA retornou uma resposta vazia.');
+    const resultGemini = await ai.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: contents,
+      config: {
+        response_mime_type: 'application/json',
+        response_schema: {
+          type: 'object',
+          properties: {
+            fornecedor: { type: 'string' },
+            vencimento: { type: 'string' },
+            valor: { type: 'number' },
+            cnpj: { type: 'string' },
+            numero_boleto: { type: 'string' },
+            descricao: { type: 'string' }
+          },
+          required: ['fornecedor', 'vencimento', 'valor']
+        }
+      }
+    });
+
+    const responseText = resultGemini.text || resultGemini.response?.text?.() || '';
+    if (!responseText) throw new Error('Falha na resposta da IA');
     const extracted = JSON.parse(responseText);
 
     // Limpeza rigorosa no fornecedor
