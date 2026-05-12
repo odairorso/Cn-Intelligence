@@ -50,7 +50,7 @@ type AppDataActions = {
   deleteTransaction: (id: string) => Promise<void>;
   loadMoreTransactions: () => Promise<void>;
   markAsPaid: (tx: Transaction, banco?: string) => Promise<void>;
-  markAsPaidBatch: (txs: Transaction[]) => Promise<void>;
+  markAsPaidBatch: (ids: string[], banco?: string, dataPagamento?: string) => Promise<void>;
   importOFX: (ofxData: any[]) => Promise<void>;
   fixReceitasTipo: () => Promise<number>;
   dedupeMovimentos: () => Promise<number>;
@@ -325,7 +325,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
 
   const updateTransaction = useCallback(async (id: string, data: Partial<Transaction>) => {
     const updated = await api.updateTransaction(id, data);
-    setTransactions((prev) => prev.map((t) => (t.id === Number(id) ? { ...t, ...updated } : t)));
+    setTransactions((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, ...updated } : t)));
     showNotification('Lançamento atualizado!', 'success');
   }, [showNotification]);
 
@@ -348,12 +348,12 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     showNotification('Marcado como pago!', 'success');
   }, [fetchTransactions, showNotification]);
 
-  const markAsPaidBatch = useCallback(async (txs: Transaction[]) => {
+  const markAsPaidBatch = useCallback(async (ids: string[], banco?: string, dataPagamento?: string) => {
+    if (!Array.isArray(ids) || ids.length === 0) return;
     const today = new Date().toISOString().split('T')[0];
-    const ids = txs.map((t) => String(t.id));
-    await api.updateTransactionsBatch(ids, txs[0]?.banco || '', today);
+    await api.updateTransactionsBatch(ids.map(String), banco || '', dataPagamento || today);
     await fetchTransactions();
-    showNotification(`${txs.length} lançamento(s) marcados como pagos!`, 'success');
+    showNotification(`${ids.length} lançamento(s) marcados como pagos!`, 'success');
   }, [fetchTransactions, showNotification]);
 
   // --------------------------------------------------------------
