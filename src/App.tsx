@@ -2007,12 +2007,12 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
         </div>
 
         {/* Desktop: table */}
-        <div className="overflow-x-auto hidden md:block">
-          <table className="w-full text-left">
+        <div className="overflow-x-auto hidden md:block w-full custom-scrollbar pb-2">
+          <table className="w-full text-left min-w-[1100px]">
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
-                <th className="px-4 py-4">#</th>
-                <th className="px-4 py-4">Tipo</th>
+                <th className="px-4 py-4 whitespace-nowrap">#</th>
+                <th className="px-4 py-4 whitespace-nowrap">Tipo</th>
                 <th className="px-4 py-4">Fornecedor</th>
                 <th className="px-4 py-4">Descrição</th>
                 <th className="px-4 py-4">Empresa</th>
@@ -2409,16 +2409,16 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
+        <div className="overflow-x-auto custom-scrollbar pb-2">
+          <table className="w-full text-left min-w-[900px]">
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
-                <th className="px-8 py-4">Fornecedor</th>
-                <th className="px-8 py-4">Descrição</th>
-                <th className="px-8 py-4">Empresa</th>
-                <th className="px-8 py-4">Vencimento</th>
-                <th className="px-8 py-4">Pagamento</th>
-                <th className="px-8 py-4">Valor</th>
+                <th className="px-8 py-4 whitespace-nowrap">Fornecedor</th>
+                <th className="px-8 py-4 whitespace-nowrap">Descrição</th>
+                <th className="px-8 py-4 whitespace-nowrap">Empresa</th>
+                <th className="px-8 py-4 whitespace-nowrap">Vencimento</th>
+                <th className="px-8 py-4 whitespace-nowrap">Pagamento</th>
+                <th className="px-8 py-4 whitespace-nowrap">Valor</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-white/5">
