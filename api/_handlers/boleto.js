@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI as GoogleGenAI } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { sql } from '../_db.js';
 import {
   normName,
