@@ -4616,14 +4616,24 @@ export default function App() {
     const normalizedText = text.toUpperCase().replace(/\s+/g, ' ');
     const normalizedTextKey = normalizeSupplierName(normalizedText);
     
-    // Regra prioritária para Porto Seguro (muito comum para este usuário)
-    if (normalizedText.includes('PORTO SEGURO')) {
+    // Regra prioritária para Porto Seguro e Bradesco (muito comuns para este usuário)
+    const hasPorto = /PORTO\s*SEGURO/i.test(normalizedText);
+    const hasBradesco = /BRADESCO/i.test(normalizedText) && /SEGUROS/i.test(normalizedText);
+
+    if (hasPorto || hasBradesco) {
+      const detectedName = hasPorto ? 'PORTO SEGURO' : 'BRADESCO SEGUROS';
+      
+      // Tenta buscar data e valor especificamente para esses boletos se estiverem no texto
+      const localVenc = normalizedText.match(/(\d{2}\/\d{2}\/\d{4})/)?.[1] || '';
+      const localValorMatch = normalizedText.match(/R\$\s*([\d.,]+)/i);
+      const localValor = localValorMatch ? parseMoneyToNumber(localValorMatch[1]) : 0;
+
       return {
         fileName,
-        fornecedor: 'PORTO SEGURO',
-        vencimento: '', 
-        valor: 0,
-        descricao: 'Seguro Porto Seguro',
+        fornecedor: detectedName,
+        vencimento: localVenc, 
+        valor: sanitizeBoletoValor(localValor),
+        descricao: detectedName === 'PORTO SEGURO' ? 'Seguro Porto Seguro' : 'Seguro Bradesco',
         empresa: '',
         cnpj: '',
         numero_boleto: extractLocalBoletoNumber(normalizedText),
