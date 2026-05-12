@@ -2008,20 +2008,20 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
 
         {/* Desktop: table */}
         <div className="overflow-x-auto hidden md:block w-full custom-scrollbar pb-2">
-          <table className="w-full text-left min-w-[1600px]">
+          <table className="w-full text-left border-collapse" style={{ minWidth: '1800px', tableLayout: 'fixed' }}>
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
-                <th className="px-3 py-4 whitespace-nowrap">#</th>
-                <th className="px-3 py-4 whitespace-nowrap">Tipo</th>
-                <th className="px-3 py-4">Fornecedor</th>
-                <th className="px-3 py-4 max-w-[250px]">Descrição</th>
-                <th className="px-3 py-4">Empresa</th>
-                <th className="px-3 py-4">Vencimento</th>
-                <th className="px-3 py-4">Pagamento</th>
-                <th className="px-3 py-4 text-right whitespace-nowrap">Valor</th>
-                <th className="px-3 py-4 text-right whitespace-nowrap">Juros</th>
-                <th className="px-3 py-4 text-right whitespace-nowrap">Total</th>
-                <th className="px-3 py-4 whitespace-nowrap">Status</th>
+                <th className="px-3 py-4 whitespace-nowrap" style={{ width: '50px' }}>#</th>
+                <th className="px-3 py-4 whitespace-nowrap" style={{ width: '90px' }}>Tipo</th>
+                <th className="px-3 py-4" style={{ width: '250px' }}>Fornecedor</th>
+                <th className="px-3 py-4" style={{ width: '350px' }}>Descrição</th>
+                <th className="px-3 py-4" style={{ width: '130px' }}>Empresa</th>
+                <th className="px-3 py-4" style={{ width: '120px' }}>Vencimento</th>
+                <th className="px-3 py-4" style={{ width: '120px' }}>Pagamento</th>
+                <th className="px-3 py-4 text-right whitespace-nowrap" style={{ width: '140px' }}>Valor</th>
+                <th className="px-3 py-4 text-right whitespace-nowrap" style={{ width: '100px' }}>Juros</th>
+                <th className="px-3 py-4 text-right whitespace-nowrap" style={{ width: '150px' }}>Total</th>
+                <th className="px-3 py-4 whitespace-nowrap" style={{ width: '130px' }}>Status</th>
               </tr>
             </thead>
             <tbody className="text-xs divide-y divide-white/5">
@@ -4811,11 +4811,8 @@ export default function App() {
 
     try {
 
-      // Se tem texto suficiente, não manda o base64 — reduz payload em ~10x
-      const hasGoodText = text.trim().length > 100;
-      const payload = hasGoodText
-        ? { text, fileName }
-        : { text, fileName, pdfBase64 };
+      // Sempre envia o PDF em base64 para o Gemini (visão computacional é muito mais precisa)
+      const payload = { text, fileName, pdfBase64 };
 
       const data = await api.extractBoleto(payload.text, payload.fileName, (payload as any).pdfBase64);
       const dataAny = data as any;
@@ -4929,7 +4926,7 @@ export default function App() {
           // Se a extração local funcionou perfeitamente, usa ela (conforme pedido: sempre acrescentar, nunca mudar o que já funciona)
           if (hasLocalCore) return local;
 
-          // Sempre converte PDF para base64 para que o Gemini possa usar visão computacional (muito mais preciso)
+          // Converte PDF para base64 para o Gemini
           const pdfBase64 = await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onload = () => {
