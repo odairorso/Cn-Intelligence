@@ -3400,8 +3400,8 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
     const { id, ...rest } = {
       ...transaction,
       ...formData,
-      vencimento: toDisplayDate(formData.vencimento),
-      pagamento: formData.status === 'PAGO' && formData.pagamento ? toDisplayDate(formData.pagamento) : null,
+      vencimento: toInputDate(formData.vencimento),
+      pagamento: formData.status === 'PAGO' && formData.pagamento ? toInputDate(formData.pagamento) : null,
       valor: parseFloat(formData.valor)
     };
     onSave(String(id), rest);
@@ -5643,7 +5643,7 @@ export default function App() {
 
   const handleMarkAsPaidClick = (tx: Transaction) => {
     if (banks.filter(b => b.ativo).length > 0) {
-      setShowPayModal({ id: tx.id, valor: tx.valor });
+      setShowPayModal({ id: tx.id, valor: tx.valor, vencimento: tx.vencimento });
     } else {
       markAsPaid(String(tx.id), '');
     }
