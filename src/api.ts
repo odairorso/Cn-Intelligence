@@ -26,13 +26,22 @@ const buildHttpError = async (res: Response, fallback: string) => {
  * Wrapper para fetch que adiciona cabeçalhos de segurança para bloquear robôs
  */
 export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
-  const headers = {
-    ...(options.headers || {}),
-    // Token de segurança reforçado para impedir bypass de bots
-    // RECOMENDAÇÃO: Em produção, este valor deve ser configurado via variáveis de ambiente da Vercel.
-    'x-cn-security': 'CN-INT-2024-SECURE-HARDENED-V1'
+  const token = localStorage.getItem('cn_jwt');
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string> || {}),
+    // Token legado mantido para compatibilidade durante transição
+    'x-cn-security': 'CN-INT-2024-SECURE-HARDENED-V1',
   };
+  // Se JWT disponível, envia como Bearer token (mais seguro)
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   return fetch(url, { ...options, headers });
+};
+
+// Retorna o UID do usuário logado (do token JWT ou fallback)
+export const getCurrentUid = (): string => {
+  return localStorage.getItem('cn_uid') || 'guest';
 };
 
 export const api = {

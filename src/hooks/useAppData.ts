@@ -571,19 +571,32 @@ export function useAppData() {
     return true;
   }, [companyOptions, showNotification]);
 
-  const login = useCallback((password: string) => {
-    // Senha simples para bloquear bots. Você pode mudar aqui.
-    if (password === 'CN2024') {
-      setIsAuthorized(true);
+  const login = useCallback(async (password: string): Promise<boolean> => {
+    try {
+      const res = await fetch('/api?route=login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (!data.token) return false;
+      // Guarda token e uid com segurança
+      localStorage.setItem('cn_jwt', data.token);
+      localStorage.setItem('cn_uid', data.uid);
       localStorage.setItem('cn_authorized', 'true');
+      setIsAuthorized(true);
       return true;
+    } catch {
+      return false;
     }
-    return false;
   }, []);
 
   const logout = useCallback(() => {
     setIsAuthorized(false);
     localStorage.removeItem('cn_authorized');
+    localStorage.removeItem('cn_jwt');
+    localStorage.removeItem('cn_uid');
   }, []);
 
   return {
