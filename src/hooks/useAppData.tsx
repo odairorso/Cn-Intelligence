@@ -567,5 +567,5 @@ export const useAppData = () => {
   if (!context) {
     throw new Error('useAppData must be used within an AppDataProvider');
   }
-  return context;
+  return { ...context.state, ...context.actions };
 };
