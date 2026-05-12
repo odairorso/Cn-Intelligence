@@ -2,13 +2,19 @@
 import { setCors } from './_db.js';
 import { checkRateLimit, sanitizeObject } from './_utils.js';
 
-// --- Helpers de Autenticação embutidos para evitar erros de importação ---
+// --- Configurações de Autenticação ---
+const APP_PASSWORD = process.env.APP_PASSWORD;
+const APP_UID = process.env.APP_UID || 'odair';
+const APP_EMAIL = process.env.APP_EMAIL || 'user@cn.com';
+
+if (!APP_PASSWORD) {
+  console.warn('[AUTH] AVISO: APP_PASSWORD não definida em variáveis de ambiente. Autenticação desabilitada!');
+}
+
 const generateSimpleToken = (payload) => {
-  const data = Buffer.from(JSON.stringify({ 
-    ...payload, 
-    exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) 
-  })).toString('base64');
-  return `header.${data}.signature`;
+  const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64');
+  const data = Buffer.from(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) })).toString('base64');
+  return `${header}.${data}.signature`;
 };
 
 const verifyToken = (req) => {
@@ -24,54 +30,79 @@ const verifyToken = (req) => {
   } catch { return null; }
 };
 
+// --- Rotas que NÃO devem ser logadas (saúde, internas) ---
+const SKIP_LOG_ROUTES = new Set(['health']);
+
 export default async function handler(req, res) {
   const startTime = Date.now();
-  
-  // CORS Simples Seguro
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-cn-security');
-  
-  if (req.method === "OPTIONS") return res.status(200).end();
+
+  // CORS Centralizado via _db.js
+  setCors(res);
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { route, id } = req.query;
 
   // ── Lógica de Login Isolada e Imediata ──────────────────
   if (route === 'login' || route === 'auth-login') {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    
-    // Vercel às vezes entrega o body como string. Vamos forçar a leitura correta.
+
     let bodyData = req.body || {};
     if (typeof bodyData === 'string') {
       try { bodyData = JSON.parse(bodyData); } catch (e) {}
     }
-    
-    const password = bodyData.password;
-    const APP_PASSWORD = process.env.APP_PASSWORD || "Turce.334180";
-    const APP_UID = process.env.APP_UID || "odair";
 
-    if (password === APP_PASSWORD || password === "Turce.334180") {
-      const token = generateSimpleToken({ uid: APP_UID });
-      return res.json({ token, user: { uid: APP_UID } });
+    const { password, email } = bodyData;
+
+    if (!APP_PASSWORD) {
+      return res.status(503).json({ error: 'Servidor: autenticação não configurada. Defina APP_PASSWORD nas variáveis de ambiente.' });
     }
-    return res.status(401).json({ error: "Senha incorreta" });
+
+    if (password === APP_PASSWORD) {
+      const token = generateSimpleToken({ uid: APP_UID, email: email || null });
+      try {
+        await logSecurity(req, res, `Login bem-sucedido: ${email || APP_UID}`);
+      } catch {}
+      return res.json({ token, user: { uid: APP_UID, email: email || null } });
+    }
+
+    try {
+      await logSecurity(req, res, `Tentativa de login falhou: ${email || 'unknown'}`);
+    } catch {}
+
+    await new Promise((r) => setTimeout(r, 1000));
+    return res.status(401).json({ error: 'Senha incorreta' });
   }
 
-  // ── Verificação de Token ──────────────────────────────────────────
+  // ── Verificação de Token (OBRIGATÓRIA para todas as rotas exceto login) ──
   const decoded = verifyToken(req);
+
   if (!decoded) {
-    const securityToken = req.headers["x-cn-security"];
-    const EXPECTED = process.env.SECURITY_TOKEN || "CN-INT-2024-SECURE-HARDENED-V1";
-    if (securityToken !== EXPECTED) {
-      return res.status(401).json({ error: "Sessão expirada. Faça login novamente." });
+    // Sem JWT válido — verificar fallback de security token (APENAS para rotas públicas)
+    const publicRoutes = new Set(['health']);
+    if (!publicRoutes.has(route)) {
+      const securityToken = req.headers['x-cn-security'];
+      const EXPECTED = process.env.SECURITY_TOKEN || 'CN-INT-2024-SECURE-HARDENED-V1';
+      if (securityToken !== EXPECTED) {
+        return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
+      }
     }
-    // Apenas para rotas sem token (se houver alguma), usa o uid da query ou fallback
-    req.authUid = req.query.uid || 'odair';
+    // Security token válido: usar APP_UID como fallback (NUNCA aceitar uid de query param)
+    req.authUid = APP_UID;
   } else {
-    // Se o token é válido, o UID do token manda. Ignora o uid da query para segurança.
-    // Fallback de 'guest' para 'odair' para recuperar acesso imediato se o token for antigo.
-    const uid = decoded.uid || 'odair';
-    req.authUid = uid === 'guest' ? 'odair' : uid;
+    const uid = decoded.uid || APP_UID;
+    req.authUid = uid === 'guest' ? APP_UID : uid;
+  }
+
+  // BLOQUEAR qualquer tentativa de injeção de uid via query param
+  if (req.query.uid && req.query.uid !== req.authUid) {
+    await logSecurity(req, res, `Tentativa de injeção de UID: query.uid=${req.query.uid} vs authUid=${req.authUid}`);
+    return res.status(403).json({ error: 'UID não corresponde ao usuário autenticado.' });
+  }
+
+  // ── Preparação do Body (JSON) ──────────────────────────
+  if (req.body && typeof req.body === 'string' && req.headers['content-type']?.includes('application/json')) {
+    try { req.body = JSON.parse(req.body); } catch (e) { /* ignore parse error */ }
   }
 
   // ── Sanitização ──────────────────────────────────────
@@ -80,7 +111,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Carregamento Dinâmico (Lazy Load) - Impede que erros em um arquivo quebrem toda a API
+    // Rate limiting (após auth para não bloquear login)
+    if (!checkRateLimit(req, res)) return;
+
+    // Carregamento Dinâmico (Lazy Load)
     switch (route) {
       case 'db-check': { const m = await import('./_handlers/admin.js'); return m.handleDbCheck(req, res); }
       case 'stats': { const m = await import('./_handlers/stats.js'); return m.handleStats(req, res); }
@@ -105,9 +139,19 @@ export default async function handler(req, res) {
   } catch (e) {
     return res.status(500).json({ error: 'Erro no servidor', details: e.message });
   } finally {
-    if (route !== 'health') {
-      const { logRequest } = await import('./_handlers/admin.js');
-      await logRequest(req, res, startTime);
+    if (!SKIP_LOG_ROUTES.has(route)) {
+      try {
+        const { logRequest } = await import('./_handlers/admin.js');
+        await logRequest(req, res, startTime);
+      } catch (logErr) {
+        console.error('[logRequest] erro:', logErr.message);
+      }
     }
   }
+}
+
+// Import inline para evitar circular dependency
+async function logSecurity(req, res, event) {
+  const { logSecurity: _logSecurity } = await import('./_utils.js');
+  return _logSecurity(req, res, event);
 }

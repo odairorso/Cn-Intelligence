@@ -2007,7 +2007,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
         </div>
 
         {/* Desktop: table */}
-        <div className="overflow-x-auto hidden md:block w-full custom-scrollbar pb-2">
+        <div className="overflow-x-auto hidden md:block w-full custom-scrollbar pb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-full text-left border-collapse" style={{ minWidth: '1800px', tableLayout: 'fixed' }}>
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
@@ -4874,7 +4874,12 @@ export default function App() {
     } catch (err) {
       console.error('[boleto] API error, using local fallback:', err);
       const fallback = extractBoletoData(text, fileName);
-      return { ...fallback, valor: sanitizeBoletoValor((fallback as any).valor), empresa: '', cnpj: '', numero_boleto: '', tipo: 'DESPESA', ai_error: String((err as any)?.message || err || '') };
+      const errorMsg = String((err as any)?.message || err || 'Erro desconhecido na API');
+      
+      // Notifica o usuário sobre a falha da IA
+      showNotification(`IA falhou: ${errorMsg}. Usando dados extraídos localmente.`, 'error');
+      
+      return { ...fallback, valor: sanitizeBoletoValor((fallback as any).valor), empresa: '', cnpj: '', numero_boleto: '', tipo: 'DESPESA', ai_error: errorMsg };
     }
   };
 
