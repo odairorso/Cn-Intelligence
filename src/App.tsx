@@ -4680,7 +4680,10 @@ export default function App() {
 
     // Último recurso: usa o nome do arquivo
     if (fornecedor === 'Fornecedor não identificado') {
-      fornecedor = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
+      const fromFile = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
+      if (fromFile && !looksLikePersonName(fromFile)) {
+        fornecedor = fromFile;
+      }
     }
 
     const datePatterns = [
@@ -4929,7 +4932,7 @@ export default function App() {
             } catch {
               pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true } as any).promise;
             }
-            const maxPages = Math.min(2, pdf.numPages || 0);
+            const maxPages = Math.min(5, pdf.numPages || 0);
             for (let i = 1; i <= maxPages; i++) {
               const page = await pdf.getPage(i);
               const textContent = await page.getTextContent();

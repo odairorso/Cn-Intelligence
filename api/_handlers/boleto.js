@@ -40,7 +40,12 @@ export async function handleExtractBoleto(req, res) {
 
     const { text, fileName, pdfBase64 } = result.data;
 
-    if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(503).json({
+        error: 'IA não configurada no servidor (GEMINI_API_KEY ausente).',
+        code: 'AI_NOT_CONFIGURED'
+      });
+    }
 
     const ai = new GoogleGenAI(process.env.GEMINI_API_KEY);
     const generateContentWithFallback = async (contents, config) => {

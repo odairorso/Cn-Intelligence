@@ -403,7 +403,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, fileName, pdfBase64 }),
     });
-    if (!res.ok) throw new Error('Failed to extract boleto data');
+    if (!res.ok) throw await buildHttpError(res, 'Falha ao extrair boleto');
     return res.json();
   },
 
