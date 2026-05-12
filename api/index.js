@@ -65,9 +65,11 @@ export default async function handler(req, res) {
     if (securityToken !== EXPECTED) {
       return res.status(401).json({ error: "Sessão expirada. Faça login novamente." });
     }
-    req.authUid = req.query.uid || 'guest';
+    // Apenas para rotas sem token (se houver alguma), usa o uid da query ou fallback
+    req.authUid = req.query.uid || 'odair';
   } else {
-    req.authUid = req.query.uid || decoded.uid;
+    // Se o token é válido, o UID do token manda. Ignora o uid da query para segurança.
+    req.authUid = decoded.uid || 'odair';
   }
 
   // ── Sanitização ──────────────────────────────────────
