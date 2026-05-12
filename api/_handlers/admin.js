@@ -43,9 +43,8 @@ export async function handleExportBackup(req, res) {
   }
 
   if (backupToken !== BACKUP_TOKEN) {
-    res.status(403);
     await logSecurity(req, res, "Tentativa de backup sem token válido");
-    return res.json({ error: "Acesso negado" });
+    return res.status(403).json({ error: "Acesso negado" });
   }
 
   try {

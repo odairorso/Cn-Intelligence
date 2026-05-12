@@ -4601,20 +4601,42 @@ export default function App() {
   const supplierFromFileName = (fileName: string): string => {
     let name = String(fileName || '').replace(/\.pdf$/i, '');
     name = name.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+    name = name.replace(/^\d{10,}\s*/i, '').trim();
+    name = name.replace(/^\d{6,}\s*/i, '').trim();
+    name = name.replace(/^(?:BOLETO|BOL|MAT|MATRICULA|PAGAMENTO|PAGAR)\b[\s\-_:]*/i, '').trim();
     while (/^(BOL|BOLETO|MAT)\b/i.test(name)) {
       name = name.replace(/^(BOL|BOLETO|MAT)\b[\s\-_:]*/i, '').trim();
     }
+    name = name.replace(/^\d{6,}\s*/i, '').trim();
     name = name.replace(/[\s\-_:]*(\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?)$/i, '').trim();
     return name;
   };
 
   const extractBoletoData = (text: string, fileName: string): PdfImportDraft => {
     const normalizedText = text.toUpperCase().replace(/\s+/g, ' ');
+    const normalizedTextKey = normalizeSupplierName(normalizedText);
     let fornecedor = 'Fornecedor não identificado';
     let vencimento = '';
     let valor = 0;
 
     const sanitizeBoletoValor = (v: number) => (Number.isFinite(v) && v > 0 && v <= 500000 ? v : 0);
+
+    const looksLikePersonName = (value: string) => {
+      const s = String(value || '').trim();
+      if (!s) return false;
+      if (/\d/.test(s)) return false;
+      const words = s.split(/\s+/).filter(Boolean);
+      if (words.length < 3 || words.length > 6) return false;
+      const upper = s.toUpperCase();
+      const corporateTokens = [
+        ' LTDA', 'LTDA ', ' EIRELI', ' S/A', ' SA ', 'MEI', ' EPP', ' ME ',
+        ' CIA', 'COMPANHIA', 'COOPERATIVA', 'ASSOCIACAO', 'FUNDAÇÃO', 'FUNDACAO',
+        'INSTITUTO', 'UNIVERSIDADE', 'FACULDADE', 'COLEGIO', 'ESCOLA',
+        'HOSPITAL', 'CLINICA', 'BANCO', 'PREFEITURA', 'SECRETARIA',
+      ];
+      if (corporateTokens.some((t) => upper.includes(t))) return false;
+      return true;
+    };
 
     const fornecedorPatterns = [
       /BENEFICI[AÁ]RIO[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
@@ -4622,7 +4644,6 @@ export default function App() {
       /VENDEDOR[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/i,
       /EMISSOR[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/i,
       /RAZ[AÃ]O SOCIAL[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/i,
-      /SACADO[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
       // Nome seguido de CNPJ
       /([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,60})\s+\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/i,
     ];
@@ -4635,27 +4656,26 @@ export default function App() {
       }
     }
 
-    if (fornecedor === 'Fornecedor não identificado') {
-      const bestSupplier = suppliers
-        .map((s) => {
-          const normS = normalizeSupplierName(s.nome);
-          if (!normS || normS.length < 3) return { supplier: s, score: 0 };
+    const bestSupplier = suppliers
+      .map((s) => {
+        const normS = normalizeSupplierName(s.nome);
+        if (!normS || normS.length < 3) return { supplier: s, score: 0 };
+        const hasMatch = normalizedTextKey.includes(normS);
+        let score = hasMatch ? normS.length : 0;
+        if (hasMatch && (normS === 'CLARO' || normS === 'ENERGISA')) score += 1000;
+        return { supplier: s, score };
+      })
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)[0];
 
-          // Busca por palavra inteira (\b) para evitar que "atualizados" pegue "ATUALIZA"
-          const regex = new RegExp(`\\b${normS}\\b`, 'i');
-          const hasFullMatch = regex.test(normalizedText);
-
-          // Pontuação: comprimento do nome se for palavra inteira
-          let score = hasFullMatch ? normS.length : 0;
-
-          // Super prioridade para parceiros estratégicos se encontrados no texto
-          if (hasFullMatch && (normS === 'CLARO' || normS === 'ENERGISA')) score += 1000;
-
-          return { supplier: s, score };
-        })
-        .filter((x) => x.score > 0)
-        .sort((a, b) => b.score - a.score)[0];
-      if (bestSupplier) fornecedor = bestSupplier.supplier.nome;
+    if (bestSupplier) {
+      if (
+        fornecedor === 'Fornecedor não identificado' ||
+        shouldRejectSupplierName(fornecedor) ||
+        looksLikePersonName(fornecedor)
+      ) {
+        fornecedor = bestSupplier.supplier.nome;
+      }
     }
 
     // Último recurso: usa o nome do arquivo
@@ -4987,6 +5007,11 @@ export default function App() {
       const validRows = pdfExtractedRows
         .filter((row) => row.fornecedor && row.vencimento && row.valor > 0)
         .map((row) => ({ ...row, numero_boleto: normalizeBoletoNumber(row.numero_boleto) }));
+
+      if (validRows.length === 0) {
+        showNotification('Preencha Fornecedor, Vencimento e Valor para confirmar a importação.', 'error');
+        return;
+      }
 
       const recheckedRows = applyDuplicateFlags(validRows as PdfImportDraft[]);
       const nonDuplicateRows = recheckedRows.filter((row) => !row.duplicate);
