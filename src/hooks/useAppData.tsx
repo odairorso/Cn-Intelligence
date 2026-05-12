@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { api, apiAuth } from '../api';
 import type { Transaction, Supplier, Bank, ContaContabil } from '../types';
+import { DEFAULT_COMPANIES } from '../lib/constants';
+import { normalizeCompanyKey } from '../lib/utils';
 
 // --------------------------------------------------------------
 // Estado global da aplicação
@@ -105,41 +107,68 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
     status: 'TODOS',
     conta_contabil_id: undefined as number | undefined,
   });
-  const [companyOptions, setCompanyOptions] = useState<string[]>([]);
+  const transactionsRef = useRef<Transaction[]>([]);
+  const [companyOptions, setCompanyOptions] = useState<string[]>(() => {
+    try {
+      const keys = ['cn_company_options', 'cn_companyOptions', 'companyOptions', 'cn_companies'];
+      for (const k of keys) {
+        const raw = localStorage.getItem(k);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+          return parsed.length ? parsed : DEFAULT_COMPANIES;
+        }
+      }
+    } catch { /* ignore */ }
+    return DEFAULT_COMPANIES;
+  });
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const fetchLock = useRef(false);
 
-  // Carregar empresas do localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('cn_company_options');
-    if (saved) {
-      try {
-        setCompanyOptions(JSON.parse(saved));
-      } catch {
-        setCompanyOptions(['CN', 'CEI', 'ELAINE', 'GABRIEL', 'CONSTRUTORA', 'OUTROS']);
-      }
-    } else {
-      setCompanyOptions(['CN', 'CEI', 'ELAINE', 'GABRIEL', 'CONSTRUTORA', 'OUTROS']);
-    }
-  }, []);
-
   const saveCompanies = (options: string[]) => {
-    setCompanyOptions(options);
-    localStorage.setItem('cn_company_options', JSON.stringify(options));
+    const sanitized = Array.isArray(options) ? options.map((x) => String(x || '').trim()).filter(Boolean) : [];
+    const unique: string[] = [];
+    const seen = new Set<string>();
+    for (const c of sanitized) {
+      const k = normalizeCompanyKey(c);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      unique.push(c);
+    }
+    const finalList = unique.length ? unique : DEFAULT_COMPANIES;
+    setCompanyOptions(finalList);
+    try { localStorage.setItem('cn_company_options', JSON.stringify(finalList)); } catch { /* ignore */ }
   };
 
   const addCompanyOption = (name: string) => {
-    if (!name || companyOptions.includes(name)) return;
-    saveCompanies([...companyOptions, name]);
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return;
+    const key = normalizeCompanyKey(trimmed);
+    const existingKeys = new Set(companyOptions.map(normalizeCompanyKey));
+    if (existingKeys.has(key)) return;
+    saveCompanies([...companyOptions, trimmed]);
   };
 
   const removeCompanyOption = (name: string) => {
-    saveCompanies(companyOptions.filter(c => c !== name));
+    const key = normalizeCompanyKey(name);
+    saveCompanies(companyOptions.filter(c => normalizeCompanyKey(c) !== key));
   };
 
   const updateCompanyOption = (oldName: string, newName: string) => {
-    if (!newName || companyOptions.includes(newName)) return;
-    saveCompanies(companyOptions.map(c => c === oldName ? newName : c));
+    const fromKey = normalizeCompanyKey(oldName);
+    const to = String(newName || '').trim();
+    if (!to) return;
+    const toKey = normalizeCompanyKey(to);
+    const keys = companyOptions.map(normalizeCompanyKey);
+    const fromIdx = keys.findIndex((k) => k === fromKey);
+    if (fromIdx === -1) return;
+    const existsOther = keys.some((k, idx) => idx !== fromIdx && k === toKey);
+    if (existsOther) return;
+    const next = companyOptions.slice();
+    next[fromIdx] = to;
+    saveCompanies(next);
   };
 
   const showNotification = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -217,7 +246,7 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
     try {
       setLoadingTransactions(true);
       const limit = options?.limit || 100;
-      const offset = append ? transactions.length : 0;
+      const offset = append ? transactionsRef.current.length : 0;
       const data = await api.getTransactions(
         limit, offset,
         year || activeFilters.year,
@@ -230,12 +259,17 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
       );
       const newTxs = Array.isArray(data) ? data : [];
       if (append) {
-        setTransactions((prev) => [...prev, ...newTxs]);
+        setTransactions((prev) => {
+          const updated = [...prev, ...newTxs];
+          transactionsRef.current = updated;
+          return updated;
+        });
         setHasMoreTransactions(newTxs.length >= limit);
         setTransactionPage((prev) => prev + 1);
       } else {
         setTransactions(newTxs);
         setAllTransactions(newTxs);
+        transactionsRef.current = newTxs;
         setTransactionPage(0);
         setHasMoreTransactions(newTxs.length >= limit);
       }
@@ -246,10 +280,15 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
       setLoadingTransactions(false);
       fetchLock.current = false;
     }
-  }, [transactions, activeFilters]);
+  }, [activeFilters]);
 
   const loadMoreTransactions = useCallback(async () => {
-    await fetchTransactions(true);
+    setIsLoadingMore(true);
+    try {
+      await fetchTransactions(true);
+    } finally {
+      setIsLoadingMore(false);
+    }
   }, [fetchTransactions]);
 
   const addTransaction = useCallback(async (tx: Partial<Transaction>) => {
@@ -359,9 +398,10 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
   const fetchSuppliers = useCallback(async (force = false) => {
     try {
       const data = await api.getSuppliers(force);
-      setSuppliers(data);
+      setSuppliers(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.error('[fetchSuppliers]', err.message);
+      setSuppliers([]);
     }
   }, []);
 
@@ -403,12 +443,13 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
   const fetchBanks = useCallback(async (force = false) => {
     try {
       const data = await api.getBanks(force);
-      setBanks(data);
-      if (data.length > 0) {
-        setBalance(data.reduce((acc, b) => acc + (Number(b.saldo) || 0), 0));
-      }
+      const list = Array.isArray(data) ? data : [];
+      setBanks(list);
+      setBalance(list.reduce((acc, b) => acc + (Number(b.saldo) || 0), 0));
     } catch (err: any) {
       console.error('[fetchBanks]', err.message);
+      setBanks([]);
+      setBalance(0);
     }
   }, []);
 
@@ -433,9 +474,10 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
   const fetchContasContabeis = useCallback(async () => {
     try {
       const data = await api.getContasContabeis();
-      setContasContabeis(data);
+      setContasContabeis(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.error('[fetchContasContabeis]', err.message);
+      setContasContabeis([]);
     }
   }, []);
 
@@ -445,9 +487,10 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
   const fetchBoletoPatterns = useCallback(async (force = false) => {
     try {
       const data = await api.getBoletoPatterns();
-      setBoletoPatterns(data);
+      setBoletoPatterns(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.error('[fetchBoletoPatterns]', err.message);
+      setBoletoPatterns([]);
     }
   }, []);
 
@@ -507,13 +550,18 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
   useEffect(() => {
     if (!isAuthorized) return;
     const load = async () => {
-      await Promise.all([
-        fetchSuppliers(),
-        fetchBanks(),
-        fetchContasContabeis(),
-        fetchTransactions(),
-        fetchStats(),
-      ]);
+      setIsLoading(true);
+      try {
+        await Promise.all([
+          fetchSuppliers(),
+          fetchBanks(),
+          fetchContasContabeis(),
+          fetchTransactions(),
+          fetchStats(),
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
     };
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -527,7 +575,7 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
       transactions, allTransactions, transactionPage, hasMoreTransactions,
       loadingTransactions, suppliers, banks, contasContabeis, boletoPatterns,
       globalStats, activeFilters, isAuthorized, userEmail, displayName, balance,
-      companyOptions, notification, isLoading: loadingTransactions, isLoadingMore: false,
+      companyOptions, notification, isLoading, isLoadingMore,
     },
     actions: {
       login, logout,
