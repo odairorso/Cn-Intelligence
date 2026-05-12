@@ -7,6 +7,9 @@ coverage/
 .env*
 !.env.example
 *.traineddata
-boletos_teste/BOLETO CASSIA.pdf
-boletos_teste/BOLETO NATHALIA.pdf
+# Dados Sensíveis e Backups Locais
+Odair/
+boletos_teste/
+*.gbk
+*.csv
 supabase_config.txt
