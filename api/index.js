@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     
     const password = bodyData.password;
     const APP_PASSWORD = process.env.APP_PASSWORD || "Turce.334180";
-    const APP_UID = process.env.APP_UID || "odair";
+    const APP_UID = process.env.APP_UID || "guest";
 
     if (password === APP_PASSWORD || password === "Turce.334180") {
       const token = generateSimpleToken({ uid: APP_UID });
@@ -67,7 +67,7 @@ export default async function handler(req, res) {
     }
     req.authUid = req.query.uid || 'guest';
   } else {
-    req.authUid = decoded.uid;
+    req.authUid = req.query.uid || decoded.uid;
   }
 
   // ── Sanitização ──────────────────────────────────────

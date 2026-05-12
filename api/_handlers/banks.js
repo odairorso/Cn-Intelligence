@@ -19,7 +19,7 @@ export async function handleBanks(req, res) {
     try {
       if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
-      const result = BankSchema.safeParse({ uid, ...req.body });
+      const result = BankSchema.safeParse({ ...(req.body || {}), uid });
       if (!result.success) {
         return res.status(400).json({ error: 'Dados inválidos', details: result.error.flatten().fieldErrors });
       }
@@ -117,7 +117,7 @@ export async function handleContasContabeis(req, res) {
       if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
       await ensureContasTable();
-      const result = ContaContabilSchema.safeParse({ uid, ...req.body });
+      const result = ContaContabilSchema.safeParse({ ...(req.body || {}), uid });
       if (!result.success) {
         return res.status(400).json({ error: 'Dados inválidos', details: result.error.flatten().fieldErrors });
       }

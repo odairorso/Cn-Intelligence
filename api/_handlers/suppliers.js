@@ -21,7 +21,7 @@ export async function handleSuppliers(req, res) {
     try {
       if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
-      const result = SupplierSchema.safeParse({ uid, ...req.body });
+      const result = SupplierSchema.safeParse({ ...(req.body || {}), uid });
       if (!result.success) {
         return res.status(400).json({ error: 'Dados inválidos', details: result.error.flatten().fieldErrors });
       }
@@ -65,7 +65,7 @@ export async function handleSuppliersBatch(req, res) {
 
   try {
     for (const sup of suppliers) {
-      const result = SupplierSchema.safeParse({ uid, ...sup });
+      const result = SupplierSchema.safeParse({ ...(sup || {}), uid });
       if (!result.success) continue;
 
       const { nome, cnpj, email, telefone } = result.data;
@@ -101,7 +101,7 @@ export async function handleSuppliersMerge(req, res) {
   try {
     if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
-    const result = SupplierMergeSchema.safeParse({ uid, ...(req.body || {}) });
+    const result = SupplierMergeSchema.safeParse({ ...(req.body || {}), uid });
     if (!result.success) {
       return res.status(400).json({ error: 'Dados inválidos', details: result.error.flatten().fieldErrors });
     }
