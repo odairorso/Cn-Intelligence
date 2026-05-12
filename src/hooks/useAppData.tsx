@@ -338,11 +338,11 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   // --------------------------------------------------------------
   // Mark as Paid
   // --------------------------------------------------------------
-  const markAsPaid = useCallback(async (tx: Transaction, banco?: string) => {
-    await api.updateTransaction(String(tx.id), {
+  const markAsPaid = useCallback(async (id: string, banco?: string, pagamento?: string) => {
+    await api.updateTransaction(id, {
       status: 'PAGO',
-      banco: banco || tx.banco,
-      pagamento: new Date().toISOString().split('T')[0],
+      banco: banco,
+      pagamento: pagamento || new Date().toISOString().split('T')[0],
     });
     await fetchTransactions();
     showNotification('Marcado como pago!', 'success');
