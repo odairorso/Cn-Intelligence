@@ -42,9 +42,9 @@ const getUid = (): string | null => {
 
 const getDataUid = (): string => {
   try {
-    return localStorage.getItem('cn_data_uid') || 'guest';
+    return getUid() || localStorage.getItem('cn_data_uid') || 'guest';
   } catch {
-    return 'guest';
+    return getUid() || 'guest';
   }
 };
 
