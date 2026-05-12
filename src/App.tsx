@@ -4678,10 +4678,18 @@ export default function App() {
       }
     }
 
+    // Regras rápidas baseadas em palavras-chave no texto bruto (PORTO SEGURO etc)
+    const lowerRaw = normalizedText.toLowerCase();
+    if (lowerRaw.includes('porto seguro')) {
+      fornecedor = 'PORTO SEGURO';
+    } else if (lowerRaw.includes('bradesco') && lowerRaw.includes('seguros')) {
+      fornecedor = 'BRADESCO SEGUROS';
+    }
+
     // Último recurso: usa o nome do arquivo
     if (fornecedor === 'Fornecedor não identificado') {
-      const fromFile = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
-      if (fromFile && !looksLikePersonName(fromFile)) {
+      const fromFile = supplierFromFileName(fileName);
+      if (fromFile && !looksLikePersonName(fromFile) && !shouldRejectSupplierName(fromFile)) {
         fornecedor = fromFile;
       }
     }
@@ -5031,20 +5039,29 @@ export default function App() {
         tipo: row.tipo || 'DESPESA',
       }));
 
-      const txList = canonicalRows.map((row) => ({
-        uid: apiAuth.getUid() || 'guest',
-        fornecedor: row.fornecedor,
-        descricao: row.descricao || `Importado de boleto PDF (${row.fileName})`,
-        empresa: row.empresa || 'CN',
-        vencimento: row.vencimento,
-        pagamento: null as any,
-        valor: row.valor,
-        status: 'PENDENTE' as TransactionStatus,
-        banco: null as any,
-        numero_boleto: row.numero_boleto,
-        conta_contabil_id: row.conta_contabil_id,
-        tipo: row.tipo || 'DESPESA',
-      }));
+      const txList = canonicalRows.map((row) => {
+        // Converte DD/MM/AAAA para YYYY-MM-DD para o banco de dados
+        let dateVal = row.vencimento;
+        if (dateVal && dateVal.includes('/')) {
+          const [d, m, y] = dateVal.split('/');
+          dateVal = `${y}-${m}-${d}`;
+        }
+
+        return {
+          uid: apiAuth.getUid() || 'guest',
+          fornecedor: row.fornecedor,
+          descricao: row.descricao || `Importado de boleto PDF (${row.fileName})`,
+          empresa: row.empresa || 'CN',
+          vencimento: dateVal,
+          pagamento: null as any,
+          valor: row.valor,
+          status: 'PENDENTE' as TransactionStatus,
+          banco: null as any,
+          numero_boleto: row.numero_boleto,
+          conta_contabil_id: row.conta_contabil_id,
+          tipo: row.tipo || 'DESPESA',
+        };
+      });
 
       if (txList.length === 1) {
         await api.createTransaction(txList[0]);
