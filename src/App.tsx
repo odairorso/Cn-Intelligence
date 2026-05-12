@@ -4615,6 +4615,24 @@ export default function App() {
   const extractBoletoData = (text: string, fileName: string): PdfImportDraft => {
     const normalizedText = text.toUpperCase().replace(/\s+/g, ' ');
     const normalizedTextKey = normalizeSupplierName(normalizedText);
+    
+    // Regra prioritária para Porto Seguro (muito comum para este usuário)
+    if (normalizedText.includes('PORTO SEGURO')) {
+      return {
+        fileName,
+        fornecedor: 'PORTO SEGURO',
+        vencimento: '', 
+        valor: 0,
+        descricao: 'Seguro Porto Seguro',
+        empresa: '',
+        cnpj: '',
+        numero_boleto: extractLocalBoletoNumber(normalizedText),
+        tipo: 'DESPESA',
+        rawText: text.slice(0, 500),
+        duplicate: false,
+      };
+    }
+
     let fornecedor = 'Fornecedor não identificado';
     let vencimento = '';
     let valor = 0;
@@ -4874,10 +4892,10 @@ export default function App() {
           : geminiValor;
         return {
           fileName,
-          fornecedor: fornecedorCandidate || 'Fornecedor não identificado',
-          vencimento: String(dataAny.vencimento || ''),
+          fornecedor: (fornecedorCandidate && fornecedorCandidate !== 'Fornecedor não identificado') ? fornecedorCandidate : (local.fornecedor !== 'Fornecedor não identificado' ? local.fornecedor : 'Fornecedor não identificado'),
+          vencimento: String(dataAny.vencimento || local.vencimento || ''),
           valor,
-          descricao,
+          descricao: (descricao && descricao !== 'Fornecedor não identificado') ? descricao : local.descricao,
           empresa: String(dataAny.empresa || ''),
           cnpj: String(dataAny.cnpj || ''),
           numero_boleto: numero,
