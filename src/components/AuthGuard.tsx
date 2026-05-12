@@ -1,61 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Lock, Mail, AlertCircle } from 'lucide-react';
 import { apiAuth } from '../api';
-import { useAppData } from '../hooks/useAppData';
 
 interface AuthGuardProps {
   children: React.ReactNode;
+  isAuthorized?: boolean;
+  onLogin?: (email: string, password: string) => Promise<void>;
+  onLogout?: () => void;
 }
 
-export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
+export const AuthGuard: React.FC<AuthGuardProps> = ({
+  children,
+  isAuthorized: externalAuth,
+  onLogin: externalOnLogin,
+  onLogout: externalOnLogout,
+}) => {
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [logo, setLogo] = useState<string>('');
-  const { setIsAuthorized } = useAppData();
+
+  const isAuthed = externalAuth || apiAuth.isAuthenticated();
 
   useEffect(() => {
     const savedLogo = localStorage.getItem('cn_brand_logo');
     if (savedLogo) setLogo(savedLogo);
   }, []);
 
-  // Verificar se já está autenticado
-  useEffect(() => {
-    if (apiAuth.isAuthenticated()) {
-      setIsAuthorized(true);
-    }
-  }, [setIsAuthorized]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = useCallback(async (email: string, password: string) => {
     setError('');
     setLoading(true);
-
     try {
-      await apiAuth.login(email, password);
-      setIsAuthorized(true);
-      setPassword('');
-      setEmail('');
+      if (externalOnLogin) {
+        await externalOnLogin(email, password);
+      } else {
+        await apiAuth.login(email, password);
+      }
     } catch (err: any) {
       setError(err.message || 'Email ou senha inválidos');
       setPassword('');
+      throw err;
     } finally {
       setLoading(false);
     }
-  };
+  }, [externalOnLogin]);
 
-  const handleLogout = () => {
-    apiAuth.logout();
-    setIsAuthorized(false);
-  };
+  const handleLogout = useCallback(() => {
+    if (externalOnLogout) {
+      externalOnLogout();
+    } else {
+      apiAuth.logout();
+    }
+  }, [externalOnLogout]);
 
-  if (apiAuth.isAuthenticated()) {
+  if (isAuthed) {
     return (
       <div className="relative">
-        {/* Botão de logout discreto */}
         <button
           onClick={handleLogout}
           className="fixed top-4 right-4 z-[600] bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] font-bold text-white/60 uppercase tracking-widest hover:text-white transition-all backdrop-blur-sm"
@@ -77,7 +80,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
           className="glass-card p-10 w-full max-w-md border border-white/10 shadow-2xl text-center bg-[#111420]/80 backdrop-blur-2xl"
         >
           <div className="flex flex-col items-center gap-8">
-            {/* Logo */}
             <div className="relative">
               <div className="w-24 h-24 rounded-3xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-2xl shadow-primary/10">
                 {logo ? (
@@ -104,8 +106,17 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="w-full space-y-5">
-              {/* Email */}
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  await handleLogin(email, password);
+                } catch {
+                  /* handled by handleLogin */
+                }
+              }}
+              className="w-full space-y-5"
+            >
               <div className="space-y-2">
                 <div className="relative">
                   <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
@@ -123,7 +134,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
                 </div>
               </div>
 
-              {/* Senha */}
               <div className="space-y-2">
                 <div className="relative">
                   <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
