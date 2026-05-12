@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -11,6 +11,7 @@ interface AuthGuardProps {
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, onLogin }) => {
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [logo, setLogo] = useState<string>('');
@@ -81,9 +82,9 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
             </div>
 
             <form onSubmit={handleSubmit} className="w-full space-y-5">
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="Senha de Acesso"
                   className={cn(
                     "w-full bg-white/5 border rounded-2xl px-4 py-5 text-center text-xl font-bold text-white outline-none transition-all placeholder:text-white/20",
@@ -99,6 +100,15 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
                   autoFocus
                   disabled={loading}
                 />
+                
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors p-2"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+
                 {error && (
                   <motion.p 
                     initial={{ opacity: 0, y: -10 }}
