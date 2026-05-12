@@ -49,7 +49,7 @@ export async function handleExtractBoleto(req, res) {
 
     const ai = new GoogleGenAI(process.env.GEMINI_API_KEY);
     const generateContentWithFallback = async (contents, config) => {
-      const modelsToTry = [process.env.GEMINI_MODEL, 'gemini-2.0-flash', 'gemini-1.5-flash'].filter(Boolean);
+      const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', process.env.GEMINI_MODEL].filter(Boolean);
       let lastErr = null;
       for (const modelName of modelsToTry) {
         try {
@@ -78,7 +78,8 @@ export async function handleExtractBoleto(req, res) {
     const rawCnpj = allCnpjs[0] || '';
     const pattern = await lookupPattern(rawCnpj, normName(rawBenefName));
 
-    if (pattern && extractedText.length > 100) {
+    // Só usa o padrão se o fornecedor for válido
+    if (pattern && pattern.fornecedor && pattern.fornecedor !== 'Fornecedor não identificado' && extractedText.length > 100) {
       const dateMatch = srcUpper.match(/VENCIMENTO[:\\s]+(\d{2}\/\d{2}\/\d{4})/);
       const valorMatch = srcUpper.match(/VALOR[^0-9]*([\d.,]+)/);
       const numero = extractLocalBoletoNumber(srcUpper);
@@ -100,11 +101,14 @@ export async function handleExtractBoleto(req, res) {
     const prompt = `Extraia os dados deste boleto bancário (arquivo: ${fileName}).
     
     INSTRUÇÕES CRÍTICAS:
-    1. FORNECEDOR: Identifique o beneficiário principal (cedente). Ex: "Porto Seguro", "Energisa", "Sanesul". Remova IDs, números de contrato ou textos irrelevantes do nome.
+    1. FORNECEDOR: Identifique o beneficiário (quem recebe o dinheiro). 
+       - IGNORE o Pagador/Sacado (ex: NÃO use Elaine Cristina Camacho Cavalcante).
+       - USE o Cedente/Beneficiário (ex: Porto Seguro, Energisa, Sanesul).
+       - Remova IDs, números de contrato, endereços ou CPFs do nome.
     2. VENCIMENTO: Data no formato DD/MM/AAAA.
     3. VALOR: Valor total a pagar (numérico).
     4. CNPJ: Apenas números do beneficiário.
-    5. NÚMERO DO BOLETO: Linha digitável ou código de barras se visível.
+    5. NÚMERO DO BOLETO: Linha digitável ou código de barras.
     
     RETORNE APENAS JSON:
     {"fornecedor":"","vencimento":"","valor":0,"cnpj":"","numero_boleto":"","descricao":""}`;
@@ -124,9 +128,18 @@ export async function handleExtractBoleto(req, res) {
     const responseText = resultGemini.response.text().replace(/```json|```/gi, '').trim();
     const extracted = JSON.parse(responseText);
 
-    // Limpeza extra no fornecedor
+    // Limpeza rigorosa no fornecedor
     if (extracted.fornecedor) {
-      extracted.fornecedor = extracted.fornecedor.replace(/\d+/g, '').replace(/boleto/gi, '').trim();
+      extracted.fornecedor = extracted.fornecedor
+        .replace(/\d{4,}/g, '') // Remove sequências de 4+ números
+        .replace(/boleto/gi, '')
+        .replace(/\b(ELAI|ELAINE|CRISTINA|CAMACHO|CAVALCANTE)\b/gi, '') // Remove nome do pagador comum se a IA errar
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      if (!extracted.fornecedor || extracted.fornecedor.length < 3) {
+        extracted.fornecedor = 'Fornecedor não identificado';
+      }
     }
 
     return res.json({
