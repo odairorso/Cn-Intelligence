@@ -39,7 +39,12 @@ import { handleSetupTables, handleExportBackup, handleDbCheck, logRequest } from
 
 export default async function handler(req, res) {
   const startTime = Date.now();
-  setCors(res);
+  
+  // CORS Simples Seguro
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-cn-security');
+  
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const { route, id } = req.query;
@@ -71,8 +76,7 @@ export default async function handler(req, res) {
     req.authUid = decoded.uid;
   }
 
-  // ── Rate Limit e Sanitização ──────────────────────────────────────
-  if (!checkRateLimit(req, res)) return;
+  // ── Sanitização ──────────────────────────────────────
   if (['POST', 'PUT'].includes(req.method) && req.body && route !== 'extract-boleto') {
     req.body = sanitizeObject(req.body);
   }
