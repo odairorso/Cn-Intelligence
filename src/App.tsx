@@ -2018,10 +2018,10 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
                 <th className="px-4 py-4">Empresa</th>
                 <th className="px-4 py-4">Vencimento</th>
                 <th className="px-4 py-4">Pagamento</th>
-                <th className="px-4 py-4 text-right">Valor</th>
-                <th className="px-4 py-4 text-right">Juros</th>
-                <th className="px-4 py-4 text-right">Total</th>
-                <th className="px-4 py-4">Status</th>
+                <th className="px-4 py-4 text-right whitespace-nowrap">Valor</th>
+                <th className="px-4 py-4 text-right whitespace-nowrap">Juros</th>
+                <th className="px-4 py-4 text-right whitespace-nowrap">Total</th>
+                <th className="px-4 py-4 whitespace-nowrap">Status</th>
               </tr>
             </thead>
             <tbody className="text-xs divide-y divide-white/5">
@@ -2053,28 +2053,28 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
                       </td>
                       <td className={cn("px-4 py-4 font-semibold", isNaoPago && "text-[#f59e0b]")}>{tx.fornecedor}</td>
                       <td className="px-4 py-4 text-on-surface-variant">{tx.descricao}</td>
-                      <td className="px-4 py-4">{tx.empresa}</td>
-                      <td className="px-4 py-4">{tx.vencimento}</td>
-                      <td className="px-4 py-4 text-on-surface-variant">{tx.pagamento || '-'}</td>
+                      <td className="px-4 py-4 whitespace-nowrap">{tx.empresa}</td>
+                      <td className="px-4 py-4 whitespace-nowrap">{tx.vencimento}</td>
+                      <td className="px-4 py-4 text-on-surface-variant whitespace-nowrap">{tx.pagamento || '-'}</td>
                       <td className={cn(
-                        "px-4 py-4 text-right",
+                        "px-4 py-4 text-right whitespace-nowrap",
                         isNaoPago ? "text-[#f59e0b] font-black" : "font-medium"
                       )}>
                         {Number(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className={cn(
-                        "px-4 py-4 text-right text-xs",
+                        "px-4 py-4 text-right text-xs whitespace-nowrap",
                         isNaoPago ? "text-[#f59e0b] font-black" : "text-tertiary"
                       )}>
                         {Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
                       </td>
                     <td className={cn(
-                      "px-4 py-4 text-right font-black text-sm",
+                      "px-4 py-4 text-right font-black text-sm whitespace-nowrap",
                       isNaoPago ? "text-[#f59e0b]" : (isRev ? "text-success" : "text-primary")
                     )}>
                         {(isRev ? '' : '-')}{(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <span className={cn(
                           "text-[10px] font-black px-3 py-1 rounded-full border",
                           status === 'PAGO' && "bg-primary/20 text-primary border-primary/30",
