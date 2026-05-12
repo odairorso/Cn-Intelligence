@@ -30,10 +30,11 @@ export async function handleTransactions(req, res) {
       }
 
       if (search) {
+        const terms = String(search).trim().split(/\s+/).filter(t => t.length > 0);
         const parseSearchMoney = (input) => {
           const raw = String(input || '').trim();
           if (!raw) return null;
-          const cleaned = raw.replace(/[^\d,.\\-]/g, '');
+          const cleaned = raw.replace(/[^\d,.\-]/g, '');
           if (!cleaned) return null;
           let n;
           if (cleaned.includes(',') && cleaned.includes('.')) {
@@ -50,28 +51,31 @@ export async function handleTransactions(req, res) {
         };
 
         const money = parseSearchMoney(search);
-        const s = `%${search.replace(/[^\d]/g, '')}%`;
-        const sRaw = `%${search}%`;
+        
+        terms.forEach(term => {
+          const sRaw = `%${term}%`;
+          const sNum = `%${term.replace(/[^\d]/g, '')}%`;
+          
+          query = sql`${query} AND (
+            fornecedor ILIKE ${sRaw}
+            OR descricao ILIKE ${sRaw}
+            OR empresa ILIKE ${sRaw}
+            OR CAST(valor AS TEXT) ILIKE ${sRaw}
+            ${sNum.length > 2 ? sql`OR REPLACE(CAST(valor AS TEXT), '.', '') ILIKE ${sNum}` : sql``}
+            ${money !== null ? sql`OR abs(valor - ${money}) < 0.01 OR abs((valor + coalesce(juros, 0)) - ${money}) < 0.01` : sql``}
+          )`;
+        });
+      }
 
-        query = sql`${query} AND (
-          fornecedor ILIKE ${sRaw}
-          OR descricao ILIKE ${sRaw}
-          OR empresa ILIKE ${sRaw}
-          OR CAST(valor AS TEXT) ILIKE ${sRaw}
-          OR REPLACE(CAST(valor AS TEXT), '.', '') ILIKE ${s}
-          OR REPLACE(REPLACE(CAST(valor AS TEXT), '.', ''), ',', '') ILIKE ${s}
-          ${money !== null ? sql`OR abs(valor - ${money}) < 0.01 OR abs((valor + coalesce(juros, 0)) - ${money}) < 0.01` : sql``}
-        )`;
-      } else {
-        if (year && year !== 'TODOS') {
-          const start = `${year}-01-01`;
-          const end = `${year}-12-31`;
-          query = sql`${query} AND vencimento >= ${start} AND vencimento <= ${end}`;
-        }
-        if (month && month !== 'TODOS') {
-          const m = month.padStart(2, '0');
-          query = sql`${query} AND TO_CHAR(vencimento, 'MM') = ${m}`;
-        }
+      // Filtros de data (agora funcionam JUNTO com a busca)
+      if (year && year !== 'TODOS') {
+        const start = `${year}-01-01`;
+        const end = `${year}-12-31`;
+        query = sql`${query} AND vencimento >= ${start} AND vencimento <= ${end}`;
+      }
+      if (month && month !== 'TODOS') {
+        const m = month.padStart(2, '0');
+        query = sql`${query} AND TO_CHAR(vencimento, 'MM') = ${m}`;
       }
 
       const rows = await sql`${query} ORDER BY vencimento DESC LIMIT ${parsedLimit} OFFSET ${parsedOffset}`;
