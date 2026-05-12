@@ -103,7 +103,28 @@ export const apiAuth = {
 
   getToken,
   getUid,
-  isAuthenticated: (): boolean => !!getToken(),
+  isAuthenticated: (): boolean => {
+    try {
+      const token = getToken();
+      if (!token) return false;
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        removeToken();
+        return false;
+      }
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (payload?.exp && typeof payload.exp === 'number') {
+        if (Date.now() / 1000 > payload.exp) {
+          removeToken();
+          return false;
+        }
+      }
+      return true;
+    } catch {
+      removeToken();
+      return false;
+    }
+  },
 };
 
 // --------------------------------------------------------------
