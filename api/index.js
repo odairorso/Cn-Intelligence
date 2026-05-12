@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     
     const password = bodyData.password;
     const APP_PASSWORD = process.env.APP_PASSWORD || "Turce.334180";
-    const APP_UID = process.env.APP_UID || "guest";
+    const APP_UID = process.env.APP_UID || "odair";
 
     if (password === APP_PASSWORD || password === "Turce.334180") {
       const token = generateSimpleToken({ uid: APP_UID });
