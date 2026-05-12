@@ -41,7 +41,7 @@ import {
 } from 'recharts';
 import * as XLSX from 'xlsx';
 import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
+import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { motion, AnimatePresence } from 'motion/react';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
