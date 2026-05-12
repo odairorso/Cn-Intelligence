@@ -16,6 +16,7 @@ interface AppDataState {
   suppliers: Supplier[];
   banks: Bank[];
   contasContabeis: ContaContabil[];
+  boletoPatterns: any[];
   globalStats: any;
   activeFilters: {
     year: string;
@@ -40,37 +41,52 @@ interface AppDataProviderProps {
   children: React.ReactNode;
 }
 
-const AppDataContext = createContext<{
+type AppDataActions = {
+  login: (password: string) => Promise<boolean>;
+  logout: () => void;
+  fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string, tipo?: string, options?: any) => Promise<void>;
+  addTransaction: (tx: Partial<Transaction>) => Promise<void>;
+  updateTransaction: (id: string, data: Partial<Transaction>) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
+  loadMoreTransactions: () => Promise<void>;
+  markAsPaid: (tx: Transaction, banco?: string) => Promise<void>;
+  markAsPaidBatch: (txs: Transaction[]) => Promise<void>;
+  importOFX: (ofxData: any[]) => Promise<void>;
+  fixReceitasTipo: () => Promise<number>;
+  dedupeMovimentos: () => Promise<number>;
+  searchTransactions: (query: string) => Promise<void>;
+  fetchSuppliers: (force?: boolean) => Promise<void>;
+  addSupplier: (supplier: Omit<Supplier, 'id'>) => Promise<void>;
+  updateSupplier: (id: string, data: Partial<Supplier>) => Promise<void>;
+  deleteSupplier: (id: string) => Promise<void>;
+  mergeSuppliers: (target: string, aliases: string[]) => Promise<{ updated: number; removed: number }>;
+  mergeSuppliersAuto: () => Promise<{ updated: number; removed: number }>;
+  syncSuppliers: () => Promise<void>;
+  fetchBanks: (force?: boolean) => Promise<void>;
+  addBank: (bank: Omit<Bank, 'id'>) => Promise<void>;
+  updateBank: (id: string, data: Partial<Bank>) => Promise<void>;
+  deleteBank: (id: string) => Promise<void>;
+  fetchContasContabeis: () => Promise<void>;
+  fetchBoletoPatterns: (force?: boolean) => Promise<void>;
+  saveBoletoPattern: (data: Record<string, any>) => Promise<void>;
+  deleteBoletoPattern: (id: number) => Promise<void>;
+  fetchStats: () => Promise<void>;
+  setupTables: () => Promise<void>;
+  exportBackup: () => Promise<void>;
+  addCompanyOption: (name: string) => void;
+  removeCompanyOption: (name: string) => void;
+  updateCompanyOption: (oldName: string, newName: string) => void;
+  showNotification: (message: string, type?: 'success' | 'error' | 'info') => void;
+  extractBoleto: (text?: string, fileName?: string) => Promise<void>;
+  importBoletoOFX: (ofxData: any[]) => Promise<void>;
+};
+
+type AppDataContextValue = {
   state: AppDataState;
-  actions: {
-    login: (password: string) => Promise<boolean>;
-    logout: () => void;
-    fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string, tipo?: string, options?: any) => Promise<void>;
-    addTransaction: (tx: Partial<Transaction>) => Promise<void>;
-    updateTransaction: (id: string, data: Partial<Transaction>) => Promise<void>;
-    deleteTransaction: (id: string) => Promise<void>;
-    loadMoreTransactions: () => Promise<void>;
-    markAsPaid: (tx: Transaction, banco?: string) => Promise<void>;
-    markAsPaidBatch: (txs: Transaction[]) => Promise<void>;
-    importOFX: (ofxData: any[]) => Promise<void>;
-    fixReceitasTipo: () => Promise<number>;
-    dedupeMovimentos: () => Promise<number>;
-    searchTransactions: (query: string) => Promise<void>;
-    fetchSuppliers: (force?: boolean) => Promise<void>;
-    addSupplier: (supplier: Omit<Supplier, 'id'>) => Promise<void>;
-    updateSupplier: (id: string, data: Partial<Supplier>) => Promise<void>;
-    deleteSupplier: (id: string) => Promise<void>;
-    mergeSuppliers: (target: string, aliases: string[]) => Promise<void>;
-    mergeSuppliersAuto: () => Promise<void>;
-    fetchBanks: (force?: boolean) => Promise<void>;
-    fetchContasContabeis: () => Promise<void>;
-    fetchStats: () => Promise<void>;
-    setupTables: () => Promise<void>;
-    exportBackup: () => Promise<void>;
-    extractBoleto: (text?: string, fileName?: string) => Promise<void>;
-    importBoletoOFX: (ofxData: any[]) => Promise<void>;
-  };
-}>(null!);
+  actions: AppDataActions;
+};
+
+const AppDataContext = createContext<AppDataContextValue | null>(null);
 
 // --------------------------------------------------------------
 // Helper: obter UID do JWT (sem fallback para 'guest')
@@ -88,6 +104,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [contasContabeis, setContasContabeis] = useState<ContaContabil[]>([]);
+  const [boletoPatterns, setBoletoPatterns] = useState<any[]>([]);
   const [globalStats, setGlobalStats] = useState<any>(null);
   const [activeFilters, setActiveFilters] = useState({
     year: 'TODOS',
@@ -102,6 +119,8 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [companyOptions, setCompanyOptions] = useState<string[]>(() => {
     try {
       const keys = ['cn_company_options', 'cn_companyOptions', 'companyOptions', 'cn_companies'];
@@ -176,6 +195,35 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     setTimeout(() => setNotification(null), 3000);
   }, []);
 
+  const addCompanyOption = useCallback((name: string) => {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return;
+    const key = normalizeCompanyKey(trimmed);
+    const existing = companiesRef.current || [];
+    if (existing.some((c) => normalizeCompanyKey(c) === key)) return;
+    saveCompanies([...existing, trimmed]);
+  }, []);
+
+  const removeCompanyOption = useCallback((name: string) => {
+    const key = normalizeCompanyKey(name);
+    const existing = companiesRef.current || [];
+    saveCompanies(existing.filter((c) => normalizeCompanyKey(c) !== key));
+  }, []);
+
+  const updateCompanyOption = useCallback((oldName: string, newName: string) => {
+    const fromKey = normalizeCompanyKey(oldName);
+    const to = String(newName || '').trim();
+    if (!to) return;
+    const toKey = normalizeCompanyKey(to);
+    const existing = companiesRef.current || [];
+    const idx = existing.findIndex((c) => normalizeCompanyKey(c) === fromKey);
+    if (idx === -1) return;
+    if (existing.some((c, i) => i !== idx && normalizeCompanyKey(c) === toKey)) return;
+    const next = existing.slice();
+    next[idx] = to;
+    saveCompanies(next);
+  }, []);
+
   // --------------------------------------------------------------
   // Auth actions
   // --------------------------------------------------------------
@@ -235,13 +283,15 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
       const limit = options?.limit || 100;
       const offset = append ? transactionPage * limit : 0;
       const data = await api.getTransactions(limit, offset, year, month, search, tipo, options?.empresa, options?.status, options?.conta_contabil_id);
+      const list = Array.isArray(data) ? data : [];
       if (append) {
-        setTransactions((prev) => [...prev, ...data]);
+        setTransactions((prev) => [...prev, ...list]);
         setTransactionPage((prev) => prev + 1);
       } else {
-        setTransactions(data);
+        setTransactions(list);
         setTransactionPage(1);
       }
+      setHasMoreTransactions(list.length >= limit);
     } catch (err: any) {
       if (err.message?.includes('Autenticação')) {
         setIsAuthorized(false);
@@ -256,7 +306,12 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
 
   const loadMoreTransactions = useCallback(async () => {
     if (loadingTransactions || !hasMoreTransactions) return;
-    await fetchTransactions(true);
+    setIsLoadingMore(true);
+    try {
+      await fetchTransactions(true);
+    } finally {
+      setIsLoadingMore(false);
+    }
   }, [fetchTransactions, loadingTransactions, hasMoreTransactions]);
 
   // --------------------------------------------------------------
@@ -342,7 +397,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     if (!apiAuth.isAuthenticated()) return;
     try {
       const data = await api.getSuppliers(force);
-      setSuppliers(data);
+      setSuppliers(Array.isArray(data) ? data : []);
     } catch (err: any) {
       if (err.message?.includes('Autenticação')) setIsAuthorized(false);
       else showNotification(err.message || 'Erro ao carregar fornecedores.', 'error');
@@ -368,16 +423,23 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   }, [fetchSuppliers, showNotification]);
 
   const mergeSuppliers = useCallback(async (target: string, aliases: string[]) => {
-    await api.mergeSuppliers(target, aliases);
+    const result = await api.mergeSuppliers(target, aliases);
     await fetchSuppliers();
     showNotification('Fornecedores mesclados!', 'success');
+    return result;
   }, [fetchSuppliers, showNotification]);
 
   const mergeSuppliersAuto = useCallback(async () => {
-    await api.mergeSuppliersAuto();
+    const result = await api.mergeSuppliersAuto();
     await fetchSuppliers();
     showNotification('Merge automático concluído!', 'success');
+    return result;
   }, [fetchSuppliers, showNotification]);
+
+  const syncSuppliers = useCallback(async () => {
+    await fetchSuppliers(true);
+    await fetchTransactions();
+  }, [fetchSuppliers, fetchTransactions]);
 
   // --------------------------------------------------------------
   // Fetch Banks
@@ -386,12 +448,32 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     if (!apiAuth.isAuthenticated()) return;
     try {
       const data = await api.getBanks(force);
-      setBanks(data);
+      const list = Array.isArray(data) ? data : [];
+      setBanks(list);
+      setBalance(list.reduce((acc, b) => acc + (Number(b.saldo) || 0), 0));
     } catch (err: any) {
       if (err.message?.includes('Autenticação')) setIsAuthorized(false);
       else showNotification(err.message || 'Erro ao carregar bancos.', 'error');
     }
   }, [showNotification]);
+
+  const addBank = useCallback(async (bank: Omit<Bank, 'id'>) => {
+    await api.createBank(bank);
+    await fetchBanks(true);
+    showNotification('Banco criado!', 'success');
+  }, [fetchBanks, showNotification]);
+
+  const updateBank = useCallback(async (id: string, data: Partial<Bank>) => {
+    await api.updateBank(id, data);
+    await fetchBanks(true);
+    showNotification('Banco atualizado!', 'success');
+  }, [fetchBanks, showNotification]);
+
+  const deleteBank = useCallback(async (id: string) => {
+    await api.deleteBank(id);
+    await fetchBanks(true);
+    showNotification('Banco excluído!', 'success');
+  }, [fetchBanks, showNotification]);
 
   // --------------------------------------------------------------
   // Fetch Contas Contábeis
@@ -400,12 +482,33 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     if (!apiAuth.isAuthenticated()) return;
     try {
       const data = await api.getContasContabeis();
-      setContasContabeis(data);
+      setContasContabeis(Array.isArray(data) ? data : []);
     } catch (err: any) {
       if (err.message?.includes('Autenticação')) setIsAuthorized(false);
       else showNotification(err.message || 'Erro ao carregar contas contábeis.', 'error');
     }
   }, [showNotification]);
+
+  const fetchBoletoPatterns = useCallback(async (force = false) => {
+    if (!apiAuth.isAuthenticated()) return;
+    try {
+      const data = await api.getBoletoPatterns(force);
+      setBoletoPatterns(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      console.error('[fetchBoletoPatterns]', err.message);
+      setBoletoPatterns([]);
+    }
+  }, []);
+
+  const saveBoletoPattern = useCallback(async (data: Record<string, any>) => {
+    await api.saveBoletoPattern(data);
+    await fetchBoletoPatterns(true);
+  }, [fetchBoletoPatterns]);
+
+  const deleteBoletoPattern = useCallback(async (id: number) => {
+    await api.deleteBoletoPattern(id);
+    await fetchBoletoPatterns(true);
+  }, [fetchBoletoPatterns]);
 
   // --------------------------------------------------------------
   // Fetch Stats
@@ -485,6 +588,20 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     await importOFX(ofxData);
   }, [importOFX]);
 
+  useEffect(() => {
+    if (!isAuthorized) return;
+    setIsLoading(true);
+    Promise.all([
+      fetchSuppliers(),
+      fetchBanks(),
+      fetchContasContabeis(),
+      fetchBoletoPatterns(),
+      fetchTransactions(),
+      fetchStats(),
+    ])
+      .finally(() => setIsLoading(false));
+  }, [isAuthorized, fetchBanks, fetchBoletoPatterns, fetchContasContabeis, fetchStats, fetchSuppliers, fetchTransactions]);
+
   // --------------------------------------------------------------
   // Provider
   // --------------------------------------------------------------
@@ -508,11 +625,22 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     deleteSupplier,
     mergeSuppliers,
     mergeSuppliersAuto,
+    syncSuppliers,
     fetchBanks,
+    addBank,
+    updateBank,
+    deleteBank,
     fetchContasContabeis,
+    fetchBoletoPatterns,
+    saveBoletoPattern,
+    deleteBoletoPattern,
     fetchStats,
     setupTables,
     exportBackup,
+    addCompanyOption,
+    removeCompanyOption,
+    updateCompanyOption,
+    showNotification,
     extractBoleto,
     importBoletoOFX,
   };
@@ -520,17 +648,21 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   return (
     <AppDataContext.Provider value={{ state: {
       transactions, allTransactions, transactionPage, hasMoreTransactions,
-      loadingTransactions, suppliers, banks, contasContabeis, globalStats,
+      loadingTransactions, suppliers, banks, contasContabeis, boletoPatterns, globalStats,
       activeFilters, isAuthorized, userEmail, displayName, balance,
-      companyOptions, notification, isLoading: loadingTransactions,
-      isLoadingMore: false,
+      companyOptions, notification, isLoading,
+      isLoadingMore,
     }, actions }}>
       {children}
     </AppDataContext.Provider>
   );
 };
 
-export const useAppData = () => useContext(AppDataContext);
+export const useAppData = () => {
+  const ctx = useContext(AppDataContext);
+  if (!ctx) throw new Error('useAppData must be used within an AppDataProvider');
+  return { ...ctx.state, ...ctx.actions };
+};
 
 export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
   const token = apiAuth.getToken();
