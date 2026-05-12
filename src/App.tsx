@@ -47,7 +47,7 @@ import { motion, AnimatePresence } from 'motion/react';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 import { Transaction, KPI, Supplier, TransactionStatus, Bank, ContaContabil } from './types';
-import { api } from './api';
+import { api, apiAuth } from './api';
 import { OFXImportTab } from './OFXImport';
 import { useAppData } from './hooks/useAppData';
 import {
@@ -1134,7 +1134,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
       seenVirtual.add(key);
       byKey.set(key, {
         id: `virtual-${key}`,
-        uid: 'guest',
+        uid: apiAuth.getUid() || 'guest',
         nome: tx.fornecedor,
         cnpj: '',
         email: '',
@@ -2172,7 +2172,7 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
       const acc: Transaction[] = [];
 
       for (;;) {
-        const page = await api.getTransactions('guest', limit, offset);
+        const page = await api.getTransactions(limit, offset);
         if (!Array.isArray(page) || page.length === 0) break;
 
         const normalized = page.map((tx) => ({
@@ -2574,7 +2574,7 @@ const NewBankModal = ({ setShowNewBankModal, onSuccess }: NewBankModalProps) => 
     e.preventDefault();
     try {
       await api.createBank({
-        uid: 'guest',
+        uid: apiAuth.getUid() || 'guest',
         nome: formData.nome,
         agencia: formData.agencia || undefined,
         conta: formData.conta || undefined,
@@ -2992,7 +2992,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           : '';
 
         return {
-          uid: 'guest',
+          uid: apiAuth.getUid() || 'guest',
           fornecedor: fornecedorFinal,
           descricao: parcelas > 1 ? `${formData.descricao} (${i + 1}/${parcelas})` : formData.descricao,
           empresa: formData.empresa,
@@ -4206,9 +4206,6 @@ export default function App() {
     addCompanyOption, removeCompanyOption, updateCompanyOption,
     deleteBoletoPattern,
   } = useAppData();
-
-  const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [newCompanyName, setNewCompanyName] = useState('');
   const [editingCompany, setEditingCompany] = useState<string | null>(null);
@@ -4238,16 +4235,6 @@ export default function App() {
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const currentBrandLogo = brandLogo || defaultBrandLogo;
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (login(password)) {
-      setLoginError(false);
-    } else {
-      setLoginError(true);
-      showNotification('Senha incorreta!', 'error');
-    }
-  };
 
   useEffect(() => {
     if (!isAuthorized) return;
@@ -4353,7 +4340,7 @@ export default function App() {
       
       const batch = [
         {
-          uid: 'guest',
+          uid: apiAuth.getUid() || 'guest',
           fornecedor: `TRANSF: ${data.destBank} (${data.destCompany})`,
           descricao: data.description,
           empresa: data.originCompany,
@@ -4365,7 +4352,7 @@ export default function App() {
           tipo: 'TRANSFERENCIA' as any
         },
         {
-          uid: 'guest',
+          uid: apiAuth.getUid() || 'guest',
           fornecedor: `TRANSF: ${data.originBank} (${data.originCompany})`,
           descricao: data.description,
           empresa: data.destCompany,
@@ -5011,7 +4998,7 @@ export default function App() {
       }));
 
       const txList = canonicalRows.map((row) => ({
-        uid: 'guest',
+        uid: apiAuth.getUid() || 'guest',
         fornecedor: row.fornecedor,
         descricao: row.descricao || `Importado de boleto PDF (${row.fileName})`,
         empresa: row.empresa || 'CN',
@@ -5035,7 +5022,7 @@ export default function App() {
         .filter((row) => row.fornecedor !== 'Fornecedor não identificado')
         .filter((row) => !suppliers.some((s) => isSupplierMatch(row.fornecedor, s.nome)))
         .map((row) => ({
-          uid: 'guest',
+          uid: apiAuth.getUid() || 'guest',
           nome: row.fornecedor,
           email: '',
           telefone: '',
@@ -5256,7 +5243,7 @@ export default function App() {
             if (already) continue;
 
             supBatch.push({
-              uid: 'guest',
+              uid: apiAuth.getUid() || 'guest',
               nome,
               email: String(row?.EMAIL || '').trim(),
               telefone: String(row?.FONE || row?.CELULAR || '').trim(),
@@ -5474,7 +5461,7 @@ export default function App() {
             (colsPresent.has('CODCONTA') ? `Conta ${String(getRowValue(row, ['CODCONTA']) || '').trim()}` : '');
 
           txBatch.push({
-            uid: 'guest',
+            uid: apiAuth.getUid() || 'guest',
             fornecedor: fornecedorNomeFinal,
             descricao: String(rawDescricao || getRowValue(row, ['OBS']) || '-'),
             empresa: String(rawEmpresa || defaultEmpresa || 'Geral'),
@@ -5492,7 +5479,7 @@ export default function App() {
           // Handle supplier
           if (!localSuppliers.has(fornecedorNomeFinal) && fornecedorNomeFinal !== 'Desconhecido') {
             supBatch.push({
-              uid: 'guest',
+              uid: apiAuth.getUid() || 'guest',
               nome: fornecedorNomeFinal,
 
 
@@ -5567,20 +5554,6 @@ export default function App() {
       setShowPayBatchModal(txs);
     } else {
       markAsPaidBatch(txs.map(t => t.id), '');
-    }
-  };
-
-  const resetSystem = async () => {
-    if (!window.confirm('ATENÇÃO: Isso apagará TODOS os seus lançamentos e fornecedores da nuvem. Deseja continuar?')) return;
-    try {
-      showNotification('Iniciando limpeza de dados...', 'info');
-      await api.resetDatabase();
-      showNotification('Sistema resetado com sucesso!', 'success');
-      fetchTransactions();
-      fetchSuppliers(true);
-    } catch (error) {
-      console.error('Failed to reset system:', error);
-      showNotification('Erro ao resetar o sistema.', 'error');
     }
   };
 
@@ -6322,55 +6295,6 @@ export default function App() {
                 </div>
 
                 <div className="pt-8 border-t border-white/5">
-                  <h4 className="text-sm font-bold text-tertiary mb-4 uppercase tracking-widest">Limpeza de Dados</h4>
-                  <div className="space-y-4 max-w-md mx-auto">
-                    <div className="glass-card p-4 flex items-center justify-between">
-                      <div className="text-left">
-                        <p className="text-sm font-bold text-on-surface">Limpar Duplicados</p>
-                        <p className="text-[10px] text-on-surface-variant">Remove lançamentos com fornecedor + vencimento + valor + empresa iguais, mantendo apenas o mais antigo.</p>
-                      </div>
-                      <button
-                        onClick={async () => {
-                          if (!window.confirm('Isso removerá duplicados mantendo apenas o registro mais antigo. Continuar?')) return;
-                          try {
-                            const result = await api.cleanDuplicates();
-                            showNotification(`${result.deleted} duplicados removidos!`, 'success');
-                            fetchTransactions();
-                          } catch (error) {
-                            showNotification('Erro ao limpar duplicados.', 'error');
-                          }
-                        }}
-                        className="bg-secondary/10 text-secondary px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-secondary/20 transition-all border border-secondary/20 whitespace-nowrap ml-4"
-                      >
-                        <Trash2 size={14} /> Limpar Duplicados
-                      </button>
-                    </div>
-
-                    <div className="glass-card p-4 flex items-center justify-between">
-                      <div className="text-left">
-                        <p className="text-sm font-bold text-on-surface">Limpar Dados Suspeitos</p>
-                        <p className="text-[10px] text-on-surface-variant">Remove valores &gt; R$ 500k, &lt; R$ 0.01, nulos, ou com fornecedor inválido.</p>
-                      </div>
-                      <button
-                        onClick={async () => {
-                          if (!window.confirm('Isso removerá dados suspeitos (valores extremos ou inválidos). Continuar?')) return;
-                          try {
-                            const result = await api.cleanSuspicious();
-                            showNotification(`${result.deleted} registros suspeitos removidos!`, 'success');
-                            fetchTransactions();
-                          } catch (error) {
-                            showNotification('Erro ao limpar dados suspeitos.', 'error');
-                          }
-                        }}
-                        className="bg-tertiary/10 text-tertiary px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-tertiary/20 transition-all border border-tertiary/20 whitespace-nowrap ml-4"
-                      >
-                        <Trash2 size={14} /> Limpar Suspeitos
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-8 border-t border-white/5">
                   <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Padrões de Boletos</h4>
                   <div className="space-y-4 max-w-2xl mx-auto">
                     <div className="glass-card p-4">
@@ -6414,18 +6338,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="pt-8 border-t border-white/5">
-                  <h4 className="text-sm font-bold text-tertiary mb-4 uppercase tracking-widest">Zona de Perigo</h4>
-                  <button
-                    onClick={resetSystem}
-                    className="bg-tertiary/10 text-tertiary px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-tertiary/20 transition-all mx-auto border border-tertiary/20"
-                  >
-                    <Trash2 size={18} /> Resetar Todo o Sistema
-                  </button>
-                  <p className="text-[10px] text-on-surface-variant mt-3">
-                    Isso apagará todos os seus lançamentos e fornecedores salvos na nuvem.
-                  </p>
-                </div>
+                
               </div>
             )}
           </motion.div>
