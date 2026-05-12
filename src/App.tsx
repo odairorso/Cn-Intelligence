@@ -2008,7 +2008,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
 
         {/* Desktop: table */}
         <div className="overflow-x-auto hidden md:block w-full custom-scrollbar pb-2">
-          <table className="w-full text-left min-w-[1100px]">
+          <table className="w-full text-left min-w-[1400px]">
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
                 <th className="px-4 py-4 whitespace-nowrap">#</th>
