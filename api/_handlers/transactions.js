@@ -184,7 +184,10 @@ export async function handleTransactionById(req, res) {
 
       // Validação parcial com Zod (pick)
       if (vencimento) {
-        const vResult = TransactionSchema.pick({ vencimento: true }).safeParse({ vencimento });
+        const vPg = parseDateToPg(vencimento);
+        if (!vPg) return res.status(400).json({ error: 'Data de vencimento inválida' });
+        
+        const vResult = TransactionSchema.pick({ vencimento: true }).safeParse({ vencimento: vPg });
         if (!vResult.success) return res.status(400).json({ error: 'Data de vencimento inválida' });
       }
       if (valor !== undefined) {
