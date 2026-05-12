@@ -11,9 +11,17 @@ export async function handleTransactions(req, res) {
         return res.status(401).json({ error: 'Identificação de usuário (UID) obrigatória para esta operação.' });
       }
 
-      const defaultLimit = 100;
-      const parsedLimit = limit ? parseInt(limit) : defaultLimit;
+      // Limite seguro: máx 500 por requisição, padrão 200
+      const MAX_LIMIT = 500;
+      const DEFAULT_LIMIT = parseInt(process.env.DEFAULT_PAGE_SIZE || '200');
+      const parsedLimit = Math.min(limit ? parseInt(limit) : DEFAULT_LIMIT, MAX_LIMIT);
       const parsedOffset = offset ? parseInt(offset) : 0;
+
+      // Validação de inputs
+      const VALID_STATUS = ['PAGO', 'PENDENTE', 'VENCIDO', 'CANCELADO', 'NAO_PAGO', 'TODOS'];
+      const VALID_TIPOS = ['DESPESA', 'RECEITA', 'TRANSFERENCIA', 'TODOS'];
+      if (status && !VALID_STATUS.includes(status)) return res.status(400).json({ error: 'Status inválido' });
+      if (tipo && !VALID_TIPOS.includes(tipo)) return res.status(400).json({ error: 'Tipo inválido' });
 
       let query = sql`SELECT * FROM transactions WHERE 1=1`;
       if (uid) query = sql`${query} AND uid = ${uid}`;

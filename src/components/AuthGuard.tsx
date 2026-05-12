@@ -6,12 +6,13 @@ import { Lock } from 'lucide-react';
 interface AuthGuardProps {
   children: React.ReactNode;
   isAuthorized: boolean;
-  onLogin: (password: string) => boolean;
+  onLogin: (password: string) => boolean | Promise<boolean>;
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [logo, setLogo] = useState<string>('');
 
   useEffect(() => {
@@ -19,13 +20,16 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
     if (savedLogo) setLogo(savedLogo);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (onLogin(password)) {
-      setError(false);
-    } else {
+    setIsLoggingIn(true);
+    const ok = await onLogin(password);
+    setIsLoggingIn(false);
+    if (!ok) {
       setError(true);
       setPassword('');
+    } else {
+      setError(false);
     }
   };
 
@@ -100,9 +104,10 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
 
               <button
                 type="submit"
-                className="w-full bg-primary text-background py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] hover:bg-primary-dark transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
+                disabled={isLoggingIn}
+                className="w-full bg-primary text-background py-5 rounded-2xl text-xs font-black uppercase tracking-[0.2em] hover:bg-primary-dark transition-all shadow-xl shadow-primary/20 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Autenticar Sistema
+                {isLoggingIn ? 'Autenticando...' : 'Autenticar Sistema'}
               </button>
             </form>
 

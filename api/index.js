@@ -1,5 +1,6 @@
 import { setCors } from './_db.js';
 import { checkRateLimit, sanitizeObject, logSecurity } from './_utils.js';
+import { handleLogin, verifyToken } from './_handlers/auth.js';
 import { 
   handleTransactions, 
   handleTransactionById, 
@@ -31,16 +32,30 @@ export default async function handler(req, res) {
 
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  // Segurança e Rate Limit
-  const securityToken = req.headers["x-cn-security"];
-  const EXPECTED_TOKEN = process.env.SECURITY_TOKEN || "CN-INT-2024-SECURE-HARDENED-V1";
-  if (securityToken !== EXPECTED_TOKEN && req.query.route !== "health") {
-    res.status(403);
-    await logSecurity(req, res, "Token de segurança inválido");
-    return res.json({ error: "Acesso negado." });
-  }
+  // ── Rota pública: Login (não exige token)
+  if (req.query.route === 'login') return handleLogin(req, res);
+  if (req.query.route === 'health') return res.json({ ok: true, node: process.version });
 
+  // ── Rate Limit
   if (!checkRateLimit(req, res)) return;
+
+  // ── Verificar token JWT (todas as outras rotas)
+  const decoded = verifyToken(req);
+  if (!decoded) {
+    // Fallback para token legado x-cn-security durante a transição
+    const securityToken = req.headers['x-cn-security'];
+    const EXPECTED_TOKEN = process.env.SECURITY_TOKEN || 'CN-INT-2024-SECURE-HARDENED-V1';
+    if (securityToken !== EXPECTED_TOKEN) {
+      res.status(401);
+      await logSecurity(req, res, 'Token JWT ausente ou inválido');
+      return res.json({ error: 'Não autorizado. Faça login novamente.' });
+    }
+    // Token legado aceito — injeta uid do query param por compatibilidade
+    req.auth = { uid: req.query.uid || 'guest', legacy: true };
+  } else {
+    // JWT válido — uid vem do token, não do query param (mais seguro)
+    req.auth = { uid: decoded.uid, legacy: false };
+  }
 
   // Sanitização Global
   if (['POST', 'PUT'].includes(req.method) && req.body && req.query.route !== 'extract-boleto') {
