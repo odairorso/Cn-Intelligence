@@ -28,6 +28,10 @@ interface AppDataState {
   userEmail: string | null;
   displayName: string | null;
   balance: number;
+  companyOptions: string[];
+  notification: { message: string; type: 'success' | 'error' | 'info' } | null;
+  isLoading: boolean;
+  isLoadingMore: boolean;
 }
 
 interface AppDataProviderProps {
@@ -67,6 +71,10 @@ const AppDataContext = createContext<{
     deleteBoletoPattern: (id: number) => Promise<void>;
     fetchStats: (year?: string, period?: string, empresa?: string, tipo?: string, status?: string) => Promise<void>;
     setupTables: () => Promise<void>;
+    addCompanyOption: (name: string) => void;
+    removeCompanyOption: (name: string) => void;
+    updateCompanyOption: (oldName: string, newName: string) => void;
+    showNotification: (message: string, type?: 'success' | 'error' | 'info') => void;
   };
 } | null>(null);
 
@@ -97,7 +105,47 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
     status: 'TODOS',
     conta_contabil_id: undefined as number | undefined,
   });
+  const [companyOptions, setCompanyOptions] = useState<string[]>([]);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const fetchLock = useRef(false);
+
+  // Carregar empresas do localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('cn_company_options');
+    if (saved) {
+      try {
+        setCompanyOptions(JSON.parse(saved));
+      } catch {
+        setCompanyOptions(['CN', 'CEI', 'ELAINE', 'GABRIEL', 'CONSTRUTORA', 'OUTROS']);
+      }
+    } else {
+      setCompanyOptions(['CN', 'CEI', 'ELAINE', 'GABRIEL', 'CONSTRUTORA', 'OUTROS']);
+    }
+  }, []);
+
+  const saveCompanies = (options: string[]) => {
+    setCompanyOptions(options);
+    localStorage.setItem('cn_company_options', JSON.stringify(options));
+  };
+
+  const addCompanyOption = (name: string) => {
+    if (!name || companyOptions.includes(name)) return;
+    saveCompanies([...companyOptions, name]);
+  };
+
+  const removeCompanyOption = (name: string) => {
+    saveCompanies(companyOptions.filter(c => c !== name));
+  };
+
+  const updateCompanyOption = (oldName: string, newName: string) => {
+    if (!newName || companyOptions.includes(newName)) return;
+    saveCompanies(companyOptions.map(c => c === oldName ? newName : c));
+  };
+
+  const showNotification = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  }, []);
 
   // Verificar autenticação no mount
   useEffect(() => {
@@ -283,7 +331,7 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
 
   const fixReceitasTipo = useCallback(async () => {
     try {
-      const res = await fetch('/api?route=fix-receitas-tipo', { method: 'POST' });
+      const res = await fetchWithSecurity('/api?route=fix-receitas-tipo', { method: 'POST' });
       const data = await res.json();
       return data.updated || 0;
     } catch {
@@ -293,7 +341,7 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
 
   const dedupeMovimentos = useCallback(async () => {
     try {
-      const res = await fetch('/api?route=transactions-dedupe-movimentos', { method: 'DELETE' });
+      const res = await fetchWithSecurity('/api?route=transactions-dedupe-movimentos', { method: 'DELETE' });
       const data = await res.json();
       return data.count || 0;
     } catch {
@@ -479,6 +527,7 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
       transactions, allTransactions, transactionPage, hasMoreTransactions,
       loadingTransactions, suppliers, banks, contasContabeis, boletoPatterns,
       globalStats, activeFilters, isAuthorized, userEmail, displayName, balance,
+      companyOptions, notification, isLoading: loadingTransactions, isLoadingMore: false,
     },
     actions: {
       login, logout,
@@ -491,6 +540,8 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
       fetchContasContabeis,
       fetchBoletoPatterns, saveBoletoPattern, deleteBoletoPattern,
       fetchStats, setupTables,
+      addCompanyOption, removeCompanyOption, updateCompanyOption,
+      showNotification,
     },
   };
 
