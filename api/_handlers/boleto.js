@@ -92,11 +92,42 @@ export async function handleExtractBoleto(req, res) {
     }
 
     // Chamada completa ao Gemini se não houver padrão
-    const prompt = `Extraia dados deste boleto: ${fileName}\n\nTexto:\n${extractedText.slice(0, 5000)}\n\nRetorne JSON: {"fornecedor":"","vencimento":"","valor":0,"cnpj":"","numero_boleto":""}`;
-    const resultGemini = await generateContentWithFallback(prompt);
-    const extracted = JSON.parse(resultGemini.response.text().replace(/```json|```/gi, '').trim());
+    const prompt = `Extraia os dados deste boleto bancário (arquivo: ${fileName}).
+    
+    INSTRUÇÕES CRÍTICAS:
+    1. FORNECEDOR: Identifique o beneficiário principal (cedente). Ex: "Porto Seguro", "Energisa", "Sanesul". Remova IDs, números de contrato ou textos irrelevantes do nome.
+    2. VENCIMENTO: Data no formato DD/MM/AAAA.
+    3. VALOR: Valor total a pagar (numérico).
+    4. CNPJ: Apenas números do beneficiário.
+    5. NÚMERO DO BOLETO: Linha digitável ou código de barras se visível.
+    
+    RETORNE APENAS JSON:
+    {"fornecedor":"","vencimento":"","valor":0,"cnpj":"","numero_boleto":"","descricao":""}`;
 
-    return res.json(extracted);
+    const contents = [];
+    if (pdfBase64) {
+      contents.push({
+        inlineData: {
+          data: pdfBase64,
+          mimeType: 'application/pdf'
+        }
+      });
+    }
+    contents.push({ text: prompt + (extractedText ? `\n\nTexto extraído (OCR):\n${extractedText.slice(0, 3000)}` : '') });
+
+    const resultGemini = await generateContentWithFallback(contents);
+    const responseText = resultGemini.response.text().replace(/```json|```/gi, '').trim();
+    const extracted = JSON.parse(responseText);
+
+    // Limpeza extra no fornecedor
+    if (extracted.fornecedor) {
+      extracted.fornecedor = extracted.fornecedor.replace(/\d+/g, '').replace(/boleto/gi, '').trim();
+    }
+
+    return res.json({
+      ...extracted,
+      descricao: extracted.descricao || `${fileName} - Importado via IA`
+    });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
