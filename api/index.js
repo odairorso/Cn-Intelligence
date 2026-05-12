@@ -36,7 +36,7 @@ export default async function handler(req, res) {
 
   // 1. Rotas Públicas
   if (route === 'health') return res.json({ ok: true, node: process.version });
-  if (route === 'login') return handleLogin(req, res);
+  if (route === 'login' || route === 'auth-login') return handleLogin(req, res);
 
   // 2. Proteção JWT
   const decoded = verifyToken(req);
