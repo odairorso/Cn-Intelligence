@@ -339,22 +339,31 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   // Mark as Paid
   // --------------------------------------------------------------
   const markAsPaid = useCallback(async (id: string, banco?: string, pagamento?: string) => {
-    await api.updateTransaction(id, {
+    const today = new Date().toISOString().split('T')[0];
+    const dataPagamento = pagamento || today;
+    const updated = await api.updateTransaction(id, {
       status: 'PAGO',
       banco: banco,
-      pagamento: pagamento || new Date().toISOString().split('T')[0],
+      pagamento: dataPagamento,
     });
-    await fetchTransactions();
+    setTransactions((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, ...updated } : t)));
     showNotification('Marcado como pago!', 'success');
-  }, [fetchTransactions, showNotification]);
+  }, [showNotification]);
 
   const markAsPaidBatch = useCallback(async (ids: string[], banco?: string, dataPagamento?: string) => {
     if (!Array.isArray(ids) || ids.length === 0) return;
     const today = new Date().toISOString().split('T')[0];
-    await api.updateTransactionsBatch(ids.map(String), banco || '', dataPagamento || today);
-    await fetchTransactions();
+    const dataPag = dataPagamento || today;
+    await api.updateTransactionsBatch(ids.map(String), banco || '', dataPag);
+    
+    setTransactions((prev) => prev.map((t) => {
+      if (ids.map(String).includes(String(t.id))) {
+        return { ...t, status: 'PAGO', banco: banco || t.banco, pagamento: dataPag };
+      }
+      return t;
+    }));
     showNotification(`${ids.length} lançamento(s) marcados como pagos!`, 'success');
-  }, [fetchTransactions, showNotification]);
+  }, [showNotification]);
 
   // --------------------------------------------------------------
   // Fix Receitas Tipo
