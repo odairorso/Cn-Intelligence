@@ -210,12 +210,20 @@ export async function handleSupplierById(req, res) {
 
       const { nome, cnpj, email, telefone } = result.data;
 
-      // Verificar propriedade
-      const existing = await sql`SELECT id FROM suppliers WHERE id = ${id} AND uid = ${uid}`;
+      // Verificar propriedade e obter nome antigo
+      const existing = await sql`SELECT id, nome FROM suppliers WHERE id = ${id} AND uid = ${uid}`;
       if (existing.length === 0) return res.status(404).json({ error: 'Not found' });
+      
+      const oldName = existing[0].nome;
 
       const rows = await sql`UPDATE suppliers SET nome = COALESCE(${nome}, nome), cnpj = COALESCE(${cnpj}, cnpj), email = COALESCE(${email || null}, email), telefone = COALESCE(${telefone || null}, telefone), updated_at = NOW() WHERE id = ${id} AND uid = ${uid} RETURNING *`;
       if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+
+      // Se o nome mudou, atualizamos todas as transações que usavam o nome antigo
+      if (nome && nome !== oldName) {
+        await sql`UPDATE transactions SET fornecedor = ${nome}, updated_at = NOW() WHERE uid = ${uid} AND fornecedor = ${oldName}`;
+      }
+
       return res.json(rows[0]);
     } catch (e) {
       return res.status(500).json({ error: e.message });
