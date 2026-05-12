@@ -71,10 +71,8 @@ export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
     headers['Authorization'] = `Bearer ${token}`;
   }
   // Token de segurança para proteção contra bots (em produção, configurar via env)
-  const securityToken = import.meta.env.VITE_CN_SECURITY_TOKEN;
-  if (securityToken) {
-    headers['x-cn-security'] = securityToken;
-  }
+  const securityToken = import.meta.env.VITE_CN_SECURITY_TOKEN || 'CN-INT-2024-SECURE-HARDENED-V1';
+  headers['x-cn-security'] = securityToken;
   return fetch(url, { ...options, headers });
 };
 
@@ -82,11 +80,11 @@ export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
 // API Auth
 // --------------------------------------------------------------
 export const apiAuth = {
-  async login(email: string, senha: string): Promise<{ ok: boolean; token: string; user: { uid: string; email: string; display_name: string } }> {
+  async login(password: string): Promise<{ token: string; user: { uid: string } }> {
     const res = await fetchWithSecurity(`${API_BASE}?route=auth-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, senha }),
+      body: JSON.stringify({ password }),
     });
     if (!res.ok) {
       const error = await buildHttpError(res, 'Falha no login');

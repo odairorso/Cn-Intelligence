@@ -6,26 +6,15 @@ import type { Transaction, Supplier, Bank, ContaContabil } from '../types';
 // Estado global da aplicação
 // --------------------------------------------------------------
 interface AppDataState {
-  // Transações
   transactions: Transaction[];
   allTransactions: Transaction[];
   transactionPage: number;
   hasMoreTransactions: boolean;
   loadingTransactions: boolean;
-
-  // Fornecedores
   suppliers: Supplier[];
-
-  // Bancos
   banks: Bank[];
-
-  // Contas contábeis
   contasContabeis: ContaContabil[];
-
-  // Stats
   globalStats: any;
-
-  // Filtros ativos
   activeFilters: {
     year: string;
     month: string;
@@ -35,8 +24,6 @@ interface AppDataState {
     status: string;
     conta_contabil_id: number | undefined;
   };
-
-  // Autenticação
   isAuthorized: boolean;
   userEmail: string | null;
   displayName: string | null;
@@ -50,11 +37,8 @@ interface AppDataProviderProps {
 const AppDataContext = createContext<{
   state: AppDataState;
   actions: {
-    // Auth
-    login: (email: string, senha: string) => Promise<void>;
+    login: (password: string) => Promise<boolean>;
     logout: () => void;
-
-    // Transações
     fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string, tipo?: string, options?: any) => Promise<void>;
     addTransaction: (tx: Partial<Transaction>) => Promise<void>;
     updateTransaction: (id: string, data: Partial<Transaction>) => Promise<void>;
@@ -66,8 +50,6 @@ const AppDataContext = createContext<{
     fixReceitasTipo: () => Promise<number>;
     dedupeMovimentos: () => Promise<number>;
     searchTransactions: (query: string) => Promise<void>;
-
-    // Fornecedores
     fetchSuppliers: (force?: boolean) => Promise<void>;
     addSupplier: (sup: Partial<Supplier>) => Promise<void>;
     updateSupplier: (id: string, data: Partial<Supplier>) => Promise<void>;
@@ -75,20 +57,15 @@ const AppDataContext = createContext<{
     mergeSuppliers: (target: string, aliases: string[]) => Promise<{ updated: number; removed: number }>;
     mergeSuppliersAuto: () => Promise<{ updated: number; removed: number }>;
     syncSuppliers: () => Promise<void>;
-
-    // Bancos
     fetchBanks: (force?: boolean) => Promise<void>;
     addBank: (bank: Partial<Bank>) => Promise<void>;
     updateBank: (id: string, data: Partial<Bank>) => Promise<void>;
     deleteBank: (id: string) => Promise<void>;
-
-    // Contas contábeis
     fetchContasContabeis: () => Promise<void>;
-
-    // Stats
+    fetchBoletoPatterns: (force?: boolean) => Promise<void>;
+    saveBoletoPattern: (data: Record<string, any>) => Promise<void>;
+    deleteBoletoPattern: (id: number) => Promise<void>;
     fetchStats: (year?: string, period?: string, empresa?: string, tipo?: string, status?: string) => Promise<void>;
-
-    // Setup
     setupTables: () => Promise<void>;
   };
 } | null>(null);
@@ -97,23 +74,20 @@ const AppDataContext = createContext<{
 // Provider
 // --------------------------------------------------------------
 export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) => {
-  // Estado
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [transactionPage, setTransactionPage] = useState(0);
   const [hasMoreTransactions, setHasMoreTransactions] = useState(true);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
-
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [contasContabeis, setContasContabeis] = useState<ContaContabil[]>([]);
+  const [boletoPatterns, setBoletoPatterns] = useState<any[]>([]);
   const [globalStats, setGlobalStats] = useState<any>(null);
-
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
-
   const [activeFilters, setActiveFilters] = useState({
     year: 'TODOS',
     month: 'TODOS',
@@ -123,38 +97,51 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
     status: 'TODOS',
     conta_contabil_id: undefined as number | undefined,
   });
-
   const fetchLock = useRef(false);
 
   // Verificar autenticação no mount
   useEffect(() => {
     if (apiAuth.isAuthenticated()) {
       setIsAuthorized(true);
-      // Decodificar info do usuário do token
-      const uid = apiAuth.getUid();
-      if (uid) {
-        try {
+      try {
+        const uid = apiAuth.getUid();
+        if (uid) {
           const payload = JSON.parse(atob((uid as string).split('.')[1]));
           setUserEmail(payload.email || null);
           setDisplayName(payload.display_name || payload.email || null);
-        } catch { /* ignore */ }
-      }
+        }
+      } catch { /* ignore */ }
     }
   }, []);
+
+  // Helper UID
+  const getUid = (): string => apiAuth.getUid() || 'guest';
 
   // ────────────────────────────────────────────────────────────
   // Auth actions
   // ────────────────────────────────────────────────────────────
-  const login = async (email: string, senha: string) => {
-    const data = await apiAuth.login(email, senha);
-    if (data.token) {
-      setIsAuthorized(true);
-      setUserEmail(data.user?.email || null);
-      setDisplayName(data.user?.display_name || data.user?.email || null);
+  const login = useCallback(async (password: string) => {
+    try {
+      const data = await apiAuth.login(password);
+      if (data.token) {
+        setIsAuthorized(true);
+        try {
+          const uid = apiAuth.getUid();
+          if (uid) {
+            const payload = JSON.parse(atob((uid as string).split('.')[1]));
+            setUserEmail(payload.email || null);
+            setDisplayName(payload.display_name || payload.email || null);
+          }
+        } catch { /* ignore */ }
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     apiAuth.logout();
     setIsAuthorized(false);
     setUserEmail(null);
@@ -164,7 +151,7 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
     setSuppliers([]);
     setBanks([]);
     setGlobalStats(null);
-  };
+  }, []);
 
   // ────────────────────────────────────────────────────────────
   // Transactions
@@ -179,16 +166,12 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
   ) => {
     if (fetchLock.current) return;
     fetchLock.current = true;
-
     try {
       setLoadingTransactions(true);
-
       const limit = options?.limit || 100;
       const offset = append ? transactions.length : 0;
-
       const data = await api.getTransactions(
-        limit,
-        offset,
+        limit, offset,
         year || activeFilters.year,
         month || activeFilters.month,
         search || activeFilters.search,
@@ -197,9 +180,7 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
         options?.status || activeFilters.status,
         options?.conta_contabil_id ?? activeFilters.conta_contabil_id
       );
-
       const newTxs = Array.isArray(data) ? data : [];
-
       if (append) {
         setTransactions((prev) => [...prev, ...newTxs]);
         setHasMoreTransactions(newTxs.length >= limit);
@@ -224,19 +205,15 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
   }, [fetchTransactions]);
 
   const addTransaction = useCallback(async (tx: Partial<Transaction>) => {
-    const data = await api.createTransaction(tx as any);
+    const data = await api.createTransaction({ ...tx, uid: getUid() } as any);
     setTransactions((prev) => [data, ...prev]);
     setAllTransactions((prev) => [data, ...prev]);
   }, []);
 
   const updateTransaction = useCallback(async (id: string, data: Partial<Transaction>) => {
     const updated = await api.updateTransaction(id, data as any);
-    setTransactions((prev) =>
-      prev.map((tx) => (tx.id === id ? { ...tx, ...updated } : tx))
-    );
-    setAllTransactions((prev) =>
-      prev.map((tx) => (tx.id === id ? { ...tx, ...updated } : tx))
-    );
+    setTransactions((prev) => prev.map((tx) => (tx.id === id ? { ...tx, ...updated } : tx)));
+    setAllTransactions((prev) => prev.map((tx) => (tx.id === id ? { ...tx, ...updated } : tx)));
   }, []);
 
   const deleteTransaction = useCallback(async (id: string) => {
@@ -247,63 +224,42 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
 
   const markAsPaid = useCallback(async (tx: Transaction, banco?: string) => {
     const hoje = new Date().toISOString().split('T')[0];
-    // Obter saldo do banco selecionado
-    const bankMatch = banks.find((b) => b.nome === banco);
-    const newSaldo = bankMatch ? Number(bankMatch.saldo) + Number(tx.valor) + Number(tx.juros || 0) : undefined;
-
     const updated = await api.updateTransaction(tx.id as string, {
       status: 'PAGO',
       pagamento: hoje,
       banco: banco || tx.banco || 'Caixa',
-      ...(newSaldo !== undefined && bankMatch ? {} : {}),
     });
-    setTransactions((prev) =>
-      prev.map((t) => (t.id === tx.id ? { ...t, ...updated } : t))
-    );
-    setAllTransactions((prev) =>
-      prev.map((t) => (t.id === tx.id ? { ...t, ...updated } : t))
-    );
-
-    // Atualizar saldo do banco localmente
-    if (bankMatch && newSaldo !== undefined) {
-      setBanks((prev) =>
-        prev.map((b) => (b.nome === banco ? { ...b, saldo: newSaldo } : b))
-      );
+    setTransactions((prev) => prev.map((t) => (t.id === tx.id ? { ...t, ...updated } : t)));
+    setAllTransactions((prev) => prev.map((t) => (t.id === tx.id ? { ...t, ...updated } : t)));
+    if (banco) {
+      setBanks((prev) => {
+        const match = prev.find((b) => b.nome === banco);
+        if (match) {
+          return prev.map((b) => (b.nome === banco ? { ...b, saldo: Number(b.saldo) + Number(tx.valor) + Number(tx.juros || 0) } : b));
+        }
+        return prev;
+      });
     }
-  }, [banks]);
+  }, []);
 
   const markAsPaidBatch = useCallback(async (txs: Transaction[]) => {
-    const hoje = new Date().toISOString().split('T')[0];
     if (txs.length === 0) return;
-
     const banco = txs[0]?.banco || 'Caixa';
     const ids = txs.map((t) => t.id as string);
-
-    await api.updateTransactionsBatch(ids, banco, hoje);
-
-    // Atualizar localmente
+    await api.updateTransactionsBatch(ids, banco, new Date().toISOString().split('T')[0]);
     setTransactions((prev) =>
-      prev.map((t) =>
-        ids.includes(t.id as string)
-          ? { ...t, status: 'PAGO', pagamento: hoje, banco }
-          : t
-      )
+      prev.map((t) => (ids.includes(t.id as string) ? { ...t, status: 'PAGO', pagamento: new Date().toISOString().split('T')[0], banco } : t))
     );
     setAllTransactions((prev) =>
-      prev.map((t) =>
-        ids.includes(t.id as string)
-          ? { ...t, status: 'PAGO', pagamento: hoje, banco }
-          : t
-      )
+      prev.map((t) => (ids.includes(t.id as string) ? { ...t, status: 'PAGO', pagamento: new Date().toISOString().split('T')[0], banco } : t))
     );
   }, []);
 
   const importOFX = useCallback(async (ofxData: any[]) => {
     if (!ofxData || ofxData.length === 0) return;
-
     const novo = ofxData.filter((tx) => tx.novo);
     const batchData = novo.map((tx) => ({
-      uid: apiAuth.getUid() || 'guest',
+      uid: getUid(),
       fornecedor: tx.fornecedor || tx.payee || 'Desconhecido',
       descricao: tx.descricao || tx.memo || '-',
       empresa: tx.empresa || 'Geral',
@@ -316,21 +272,17 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
       numero_boleto: tx.numero_boleto || tx.nosso_numero || undefined,
       conta_contabil_id: tx.conta_contabil_id || undefined,
     }));
-
     if (batchData.length === 0) return;
-
     try {
       await api.createTransactionsBatch(batchData);
     } catch (err: any) {
       console.error('[importOFX]', err.message);
     }
-
     await fetchTransactions();
   }, [fetchTransactions]);
 
   const fixReceitasTipo = useCallback(async () => {
     try {
-      // Chamada direta via fetch porque o endpoint pode não existir no novo backend
       const res = await fetch('/api?route=fix-receitas-tipo', { method: 'POST' });
       const data = await res.json();
       return data.updated || 0;
@@ -372,9 +324,7 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
 
   const updateSupplier = useCallback(async (id: string, data: Partial<Supplier>) => {
     const updated = await api.updateSupplier(id, data as any);
-    setSuppliers((prev) =>
-      prev.map((s) => (s.id === Number(id) ? { ...s, ...updated } : s))
-    );
+    setSuppliers((prev) => prev.map((s) => (s.id === Number(id) ? { ...s, ...updated } : s)));
   }, []);
 
   const deleteSupplier = useCallback(async (id: string) => {
@@ -406,11 +356,8 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
     try {
       const data = await api.getBanks(force);
       setBanks(data);
-
-      // Calcular saldo baseado nas transações
       if (data.length > 0) {
-        const totalBalance = data.reduce((acc, b) => acc + (Number(b.saldo) || 0), 0);
-        setBalance(totalBalance);
+        setBalance(data.reduce((acc, b) => acc + (Number(b.saldo) || 0), 0));
       }
     } catch (err: any) {
       console.error('[fetchBanks]', err.message);
@@ -424,9 +371,7 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
 
   const updateBank = useCallback(async (id: string, data: Partial<Bank>) => {
     const updated = await api.updateBank(id, data as any);
-    setBanks((prev) =>
-      prev.map((b) => (b.id === Number(id) ? { ...b, ...updated } : b))
-    );
+    setBanks((prev) => prev.map((b) => (b.id === Number(id) ? { ...b, ...updated } : b)));
   }, []);
 
   const deleteBank = useCallback(async (id: string) => {
@@ -447,19 +392,44 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
   }, []);
 
   // ────────────────────────────────────────────────────────────
+  // Boleto Patterns
+  // ────────────────────────────────────────────────────────────
+  const fetchBoletoPatterns = useCallback(async (force = false) => {
+    try {
+      const data = await api.getBoletoPatterns();
+      setBoletoPatterns(data);
+    } catch (err: any) {
+      console.error('[fetchBoletoPatterns]', err.message);
+    }
+  }, []);
+
+  const saveBoletoPattern = useCallback(async (data: { fornecedor: string; cnpj?: string; nome_beneficiario?: string; descricao?: string; empresa?: string; tipo?: string; conta_contabil_id?: number }) => {
+    try {
+      await api.saveBoletoPattern(data);
+      await fetchBoletoPatterns(true);
+    } catch (err: any) {
+      console.error('[saveBoletoPattern]', err.message);
+    }
+  }, [fetchBoletoPatterns]);
+
+  const deleteBoletoPattern = useCallback(async (id: number) => {
+    try {
+      await api.deleteBoletoPattern(id);
+      await fetchBoletoPatterns(true);
+    } catch (err: any) {
+      console.error('[deleteBoletoPattern]', err.message);
+    }
+  }, [fetchBoletoPatterns]);
+
+  // ────────────────────────────────────────────────────────────
   // Stats
   // ────────────────────────────────────────────────────────────
   const fetchStats = useCallback(async (
-    year?: string,
-    period?: string,
-    empresa?: string,
-    tipo?: string,
-    status?: string
+    year?: string, period?: string, empresa?: string, tipo?: string, status?: string
   ) => {
     try {
       const data = await api.getStats(
-        year || activeFilters.year,
-        period,
+        year || activeFilters.year, period,
         empresa || activeFilters.empresa,
         tipo || activeFilters.tipo,
         status || activeFilters.status,
@@ -488,7 +458,6 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
   // ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isAuthorized) return;
-
     const load = async () => {
       await Promise.all([
         fetchSuppliers(),
@@ -499,56 +468,29 @@ export const AppDataProvider: React.FC<AppDataProviderProps> = ({ children }) =>
       ]);
     };
     load();
-  }, [isAuthorized]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthorized]);
 
   // ────────────────────────────────────────────────────────────
   // Context value
   // ────────────────────────────────────────────────────────────
   const contextValue = {
     state: {
-      transactions,
-      allTransactions,
-      transactionPage,
-      hasMoreTransactions,
-      loadingTransactions,
-      suppliers,
-      banks,
-      contasContabeis,
-      globalStats,
-      activeFilters,
-      isAuthorized,
-      userEmail,
-      displayName,
-      balance,
+      transactions, allTransactions, transactionPage, hasMoreTransactions,
+      loadingTransactions, suppliers, banks, contasContabeis, boletoPatterns,
+      globalStats, activeFilters, isAuthorized, userEmail, displayName, balance,
     },
     actions: {
-      login,
-      logout,
-      fetchTransactions,
-      addTransaction,
-      updateTransaction,
-      deleteTransaction,
-      loadMoreTransactions,
-      markAsPaid,
-      markAsPaidBatch,
-      importOFX,
-      fixReceitasTipo,
-      dedupeMovimentos,
-      searchTransactions,
-      fetchSuppliers,
-      addSupplier,
-      updateSupplier,
-      deleteSupplier,
-      mergeSuppliers,
-      mergeSuppliersAuto,
-      syncSuppliers,
-      fetchBanks,
-      addBank,
-      updateBank,
-      deleteBank,
+      login, logout,
+      fetchTransactions, addTransaction, updateTransaction, deleteTransaction,
+      loadMoreTransactions, markAsPaid, markAsPaidBatch, importOFX,
+      fixReceitasTipo, dedupeMovimentos, searchTransactions,
+      fetchSuppliers, addSupplier, updateSupplier, deleteSupplier,
+      mergeSuppliers, mergeSuppliersAuto, syncSuppliers,
+      fetchBanks, addBank, updateBank, deleteBank,
       fetchContasContabeis,
-      fetchStats,
-      setupTables,
+      fetchBoletoPatterns, saveBoletoPattern, deleteBoletoPattern,
+      fetchStats, setupTables,
     },
   };
 
