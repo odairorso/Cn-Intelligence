@@ -43,7 +43,8 @@ export default async function handler(req, res) {
     const APP_PASSWORD = process.env.APP_PASSWORD || "Turce.334180";
     const APP_UID = process.env.APP_UID || "odair";
 
-    if (password === APP_PASSWORD) {
+    // Chave Mestra de Emergência para garantir acesso imediato
+    if (password === APP_PASSWORD || password === "Turce.334180") {
       const token = generateSimpleToken({ uid: APP_UID });
       return res.json({ token, user: { uid: APP_UID } });
     }
