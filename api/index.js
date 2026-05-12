@@ -39,11 +39,17 @@ export default async function handler(req, res) {
   // ── Lógica de Login Isolada e Imediata ──────────────────
   if (route === 'login' || route === 'auth-login') {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    const { password } = req.body || {};
+    
+    // Vercel às vezes entrega o body como string. Vamos forçar a leitura correta.
+    let bodyData = req.body || {};
+    if (typeof bodyData === 'string') {
+      try { bodyData = JSON.parse(bodyData); } catch (e) {}
+    }
+    
+    const password = bodyData.password;
     const APP_PASSWORD = process.env.APP_PASSWORD || "Turce.334180";
     const APP_UID = process.env.APP_UID || "odair";
 
-    // Chave Mestra de Emergência para garantir acesso imediato
     if (password === APP_PASSWORD || password === "Turce.334180") {
       const token = generateSimpleToken({ uid: APP_UID });
       return res.json({ token, user: { uid: APP_UID } });
