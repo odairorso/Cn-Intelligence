@@ -1,13 +1,14 @@
 import { sql } from '../_db.js';
+import { BankSchema, ContaContabilSchema } from '../_schemas.js';
 
 // GET/POST /api?route=banks
 export async function handleBanks(req, res) {
+  const uid = req.authUid;
+
   if (req.method === 'GET') {
     try {
-      const { uid } = req.query;
-      const rows = uid
-        ? await sql`SELECT * FROM banks WHERE uid = ${uid} ORDER BY nome ASC`
-        : await sql`SELECT * FROM banks ORDER BY nome ASC`;
+      if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+      const rows = await sql`SELECT * FROM banks WHERE uid = ${uid} ORDER BY nome ASC`;
       return res.json(rows);
     } catch (e) {
       return res.status(500).json({ error: e.message });
@@ -16,10 +17,17 @@ export async function handleBanks(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const { uid, nome, agencia, conta, saldo, ativo } = req.body;
+      if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+
+      const result = BankSchema.safeParse({ uid, ...req.body });
+      if (!result.success) {
+        return res.status(400).json({ error: 'Dados inválidos', details: result.error.flatten().fieldErrors });
+      }
+
+      const { nome, agencia, conta, saldo, ativo } = result.data;
       const rows = await sql`
         INSERT INTO banks (uid, nome, agencia, conta, saldo, ativo)
-        VALUES (${uid || 'guest'}, ${nome}, ${agencia || null}, ${conta || null}, ${saldo || 0}, ${ativo !== false})
+        VALUES (${uid}, ${nome}, ${agencia || null}, ${conta || null}, ${saldo || 0}, ${ativo !== false})
         RETURNING *`;
       return res.status(201).json(rows[0]);
     } catch (e) {
@@ -32,18 +40,31 @@ export async function handleBanks(req, res) {
 
 // PUT/DELETE /api?route=banks&id=xxx
 export async function handleBankById(req, res) {
+  const uid = req.authUid;
+
   const { id } = req.query;
   if (req.method === 'PUT') {
     try {
-      const { nome, agencia, conta, saldo, ativo } = req.body;
+      if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+
+      const result = BankSchema.partial().safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: 'Dados inválidos', details: result.error.flatten().fieldErrors });
+      }
+
+      // Verificar propriedade
+      const existing = await sql`SELECT id FROM banks WHERE id = ${id} AND uid = ${uid}`;
+      if (existing.length === 0) return res.status(404).json({ error: 'Not found' });
+
+      const { nome, agencia, conta, saldo, ativo } = result.data;
       const rows = await sql`
-        UPDATE banks 
+        UPDATE banks
         SET nome = COALESCE(${nome}, nome),
             agencia = COALESCE(${agencia}, agencia),
             conta = COALESCE(${conta}, conta),
             saldo = COALESCE(${saldo}, saldo),
             ativo = COALESCE(${ativo}, ativo)
-        WHERE id = ${id}
+        WHERE id = ${id} AND uid = ${uid}
         RETURNING *`;
       return res.json(rows[0]);
     } catch (e) {
@@ -52,7 +73,10 @@ export async function handleBankById(req, res) {
   }
   if (req.method === 'DELETE') {
     try {
-      await sql`DELETE FROM banks WHERE id = ${id}`;
+      if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+      const existing = await sql`SELECT id FROM banks WHERE id = ${id} AND uid = ${uid}`;
+      if (existing.length === 0) return res.status(404).json({ error: 'Not found' });
+      await sql`DELETE FROM banks WHERE id = ${id} AND uid = ${uid}`;
       return res.status(204).end();
     } catch (e) {
       return res.status(500).json({ error: e.message });
@@ -89,8 +113,16 @@ export async function handleContasContabeis(req, res) {
 
   if (req.method === 'POST') {
     try {
+      const uid = req.authUid;
+      if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+
       await ensureContasTable();
-      const { codigo, nome, tipo } = req.body;
+      const result = ContaContabilSchema.safeParse({ uid, ...req.body });
+      if (!result.success) {
+        return res.status(400).json({ error: 'Dados inválidos', details: result.error.flatten().fieldErrors });
+      }
+
+      const { codigo, nome, tipo } = result.data;
       const rows = await sql`
         INSERT INTO contas_contabeis (codigo, nome, tipo)
         VALUES (${codigo}, ${nome}, ${tipo})
@@ -104,6 +136,9 @@ export async function handleContasContabeis(req, res) {
 
   if (req.method === 'PUT') {
     try {
+      const uid = req.authUid;
+      if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+
       await ensureContasTable();
       const { id } = req.query;
       const { codigo, nome, tipo, ativo } = req.body;
@@ -123,6 +158,9 @@ export async function handleContasContabeis(req, res) {
 
   if (req.method === 'DELETE') {
     try {
+      const uid = req.authUid;
+      if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+
       await ensureContasTable();
       const { id } = req.query;
       await sql`UPDATE contas_contabeis SET ativo = false WHERE id = ${id}`;

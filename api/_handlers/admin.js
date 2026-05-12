@@ -6,9 +6,16 @@ export async function handleSetupTables(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
     await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
-    // ... (Mantendo a lógica de criação de tabelas e índices que extraímos)
-    // Para economizar espaço aqui, incluirei as chamadas principais de criação
-    await sql`CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), uid VARCHAR(255) UNIQUE NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW())`;
+    await sql`CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      uid VARCHAR(255) UNIQUE NOT NULL,
+      email VARCHAR(255),
+      display_name VARCHAR(255),
+      photo_url TEXT,
+      password_hash TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )`;
     return res.json({ message: 'Tables verified/created successfully' });
   } catch (e) {
     return res.status(500).json({ error: e.message });
@@ -28,10 +35,16 @@ export async function handleDbCheck(req, res) {
 // GET /api?route=export-backup
 export async function handleExportBackup(req, res) {
   const backupToken = req.headers['x-cn-backup-token'];
-  const EXPECTED = process.env.BACKUP_TOKEN || 'CN-BACKUP-SECRET-2024';
-  if (backupToken !== EXPECTED) {
+  const BACKUP_TOKEN = process.env.BACKUP_TOKEN;
+
+  if (!BACKUP_TOKEN) {
+    await logSecurity(req, res, "BACKUP_TOKEN não configurado no servidor");
+    return res.status(500).json({ error: 'Backup não disponível. BACKUP_TOKEN não configurado.' });
+  }
+
+  if (backupToken !== BACKUP_TOKEN) {
     res.status(403);
-    await logSecurity(req, res, "Tentativa de backup sem token");
+    await logSecurity(req, res, "Tentativa de backup sem token válido");
     return res.json({ error: "Acesso negado" });
   }
 
