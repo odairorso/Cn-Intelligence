@@ -3,20 +3,19 @@ import { sql } from '../_db.js';
 // GET /api?route=stats — retorna agregados globais para o dashboard
 export async function handleStats(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  try {
-    const { uid, year, period, empresa, tipo, status, search } = req.query;
-    
-    if (!uid || uid === 'undefined' || uid === 'null') {
-      return res.status(401).json({ error: 'Identificação de usuário (UID) obrigatória para esta operação.' });
-    }
 
-    const filterUid = String(uid);
-    const uidFilterSql = sql`AND uid = ${filterUid}`;
+  const uid = req.authUid;
+  if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+
+  try {
+    const { year, period, empresa, tipo, status, search } = req.query;
+
+    const uidFilterSql = sql`AND uid = ${uid}`;
 
     // Filtros
     const empresaFilterSql = empresa && empresa !== 'TODOS' ? sql`AND upper(empresa) = upper(${empresa})` : sql``;
     const tipoFilterSql = tipo && tipo !== 'TODOS' ? sql`AND tipo = ${tipo}` : sql``;
-    const statusFilterSql = status && status !== 'TODOS' 
+    const statusFilterSql = status && status !== 'TODOS'
       ? (status === 'NAO_PAGO' ? sql`AND (status = 'PENDENTE' OR status = 'VENCIDO')` : sql`AND status = ${status}`)
       : sql``;
 
@@ -38,12 +37,12 @@ export async function handleStats(req, res) {
       const [start, end] = range.split('-');
       dateFilterSql = sql`AND vencimento >= ${start + '-01-01'} AND vencimento <= ${end + '-12-31'}`;
     } else {
-      dateFilterSql = sql``; // TODOS
+      dateFilterSql = sql``;
     }
 
     // 1. KPIs Agrupados
     const kpiRows = await sql`
-      SELECT 
+      SELECT
         COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as total_receitas,
         COALESCE(SUM(CASE WHEN tipo = 'DESPESA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as total_despesas,
         COUNT(CASE WHEN status = 'PAGO' AND tipo != 'TRANSFERENCIA' THEN 1 END) as count_pagos,
@@ -60,7 +59,7 @@ export async function handleStats(req, res) {
     if (year && year !== 'TODOS' && !activeRange) {
       const y = parseInt(year);
       fluxRows = await sql`
-        SELECT 
+        SELECT
           EXTRACT(MONTH FROM vencimento) as month_num,
           COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo = 'DESPESA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
@@ -73,7 +72,7 @@ export async function handleStats(req, res) {
     } else if (activeRange) {
       const [start, end] = activeRange.split('-');
       fluxRows = await sql`
-        SELECT 
+        SELECT
           EXTRACT(MONTH FROM vencimento) as month_num,
           COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo = 'DESPESA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
@@ -85,7 +84,7 @@ export async function handleStats(req, res) {
         ORDER BY month_num`;
     } else {
       fluxRows = await sql`
-        SELECT 
+        SELECT
           EXTRACT(MONTH FROM vencimento) as month_num,
           COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo = 'DESPESA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
@@ -99,7 +98,7 @@ export async function handleStats(req, res) {
 
     // 3. Top Fornecedores
     const supplierRows = await sql`
-      SELECT 
+      SELECT
         fornecedor as name,
         COALESCE(SUM(valor + COALESCE(juros, 0)), 0) as value
       FROM transactions

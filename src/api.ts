@@ -3,6 +3,43 @@ import type { Transaction, Supplier, Bank, ContaContabil } from './types';
 // O backend no Vercel usa api/index.js com roteamento por ?route=
 const API_BASE = '/api';
 
+// --------------------------------------------------------------
+// Helpers de autenticação - Token JWT no localStorage
+// --------------------------------------------------------------
+const getToken = (): string | null => {
+  try {
+    return localStorage.getItem('cn_jwt_token');
+  } catch {
+    return null;
+  }
+};
+
+const setToken = (token: string) => {
+  try {
+    localStorage.setItem('cn_jwt_token', token);
+  } catch { /* ignore */ }
+};
+
+const removeToken = () => {
+  try {
+    localStorage.removeItem('cn_jwt_token');
+  } catch { /* ignore */ }
+};
+
+const getUid = (): string | null => {
+  try {
+    const token = getToken();
+    if (!token) return null;
+    // Decodifica o payload do JWT sem depender de lib externa no frontend
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return payload.uid || null;
+  } catch {
+    return null;
+  }
+};
+
 const buildHttpError = async (res: Response, fallback: string) => {
   const contentType = res.headers.get('content-type') || '';
   try {
@@ -22,32 +59,61 @@ const buildHttpError = async (res: Response, fallback: string) => {
   }
 };
 
-/**
- * Wrapper para fetch que adiciona cabeçalhos de segurança para bloquear robôs
- */
+// --------------------------------------------------------------
+// fetchWithSecurity — carrega token JWT e token de segurança
+// --------------------------------------------------------------
 export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
-  const token = localStorage.getItem('cn_jwt');
+  const token = getToken();
   const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string> || {}),
-    // Token legado mantido para compatibilidade durante transição
-    'x-cn-security': 'CN-INT-2024-SECURE-HARDENED-V1',
+    ...(options.headers as Record<string, string>) || {},
   };
-  // Se JWT disponível, envia como Bearer token (mais seguro)
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+  // Token de segurança para proteção contra bots (em produção, configurar via env)
+  const securityToken = import.meta.env.VITE_CN_SECURITY_TOKEN;
+  if (securityToken) {
+    headers['x-cn-security'] = securityToken;
   }
   return fetch(url, { ...options, headers });
 };
 
-// Retorna o UID do usuário logado (do token JWT ou fallback)
-export const getCurrentUid = (): string => {
-  return localStorage.getItem('cn_uid') || 'guest';
+// --------------------------------------------------------------
+// API Auth
+// --------------------------------------------------------------
+export const apiAuth = {
+  async login(email: string, senha: string): Promise<{ ok: boolean; token: string; user: { uid: string; email: string; display_name: string } }> {
+    const res = await fetchWithSecurity(`${API_BASE}?route=auth-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, senha }),
+    });
+    if (!res.ok) {
+      const error = await buildHttpError(res, 'Falha no login');
+      throw error;
+    }
+    const data = await res.json();
+    if (data.token) {
+      setToken(data.token);
+    }
+    return data;
+  },
+
+  logout() {
+    removeToken();
+  },
+
+  getToken,
+  getUid,
+  isAuthenticated: (): boolean => !!getToken(),
 };
 
+// --------------------------------------------------------------
+// API Endpoints
+// --------------------------------------------------------------
 export const api = {
   // ─── Transactions ──────────────────────────────────────────────────────────
   async getTransactions(
-    _uid: string,
     limit?: number,
     offset?: number,
     year?: string,
@@ -58,9 +124,10 @@ export const api = {
     status?: string,
     conta_contabil_id?: number
   ): Promise<Transaction[]> {
+    const uid = getUid();
     const params = new URLSearchParams();
     params.append('route', 'transactions');
-    params.append('uid', _uid || 'guest');
+    params.append('uid', uid || 'guest');
     if (limit) params.append('limit', String(limit));
     if (offset) params.append('offset', String(offset));
     if (year) params.append('year', year);
@@ -76,7 +143,7 @@ export const api = {
     return res.json();
   },
 
-  async getStats(_uid: string, year?: string, period?: string, empresa?: string, tipo?: string, status?: string, search?: string): Promise<{
+  async getStats(year?: string, period?: string, empresa?: string, tipo?: string, status?: string, search?: string): Promise<{
     kpis: {
       total_receitas: number;
       total_despesas: number;
@@ -95,9 +162,10 @@ export const api = {
       value: number;
     }>;
   }> {
+    const uid = getUid();
     const params = new URLSearchParams();
     params.append('route', 'stats');
-    params.append('uid', _uid || 'guest');
+    params.append('uid', uid || 'guest');
     if (year) params.append('year', year);
     if (period) params.append('period', period);
     if (empresa) params.append('empresa', empresa);
@@ -160,10 +228,9 @@ export const api = {
   },
 
   // ─── Suppliers ─────────────────────────────────────────────────────────────
-  async getSuppliers(_uid: string, fresh?: boolean): Promise<Supplier[]> {
+  async getSuppliers(fresh?: boolean): Promise<Supplier[]> {
     const params = new URLSearchParams();
     params.append('route', 'suppliers');
-    params.append('uid', _uid || 'guest');
     if (fresh) params.append('fresh', '1');
     const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch suppliers');
@@ -221,10 +288,9 @@ export const api = {
   },
 
   // ─── Banks ─────────────────────────────────────────────────────────────────
-  async getBanks(_uid: string, fresh?: boolean): Promise<Bank[]> {
+  async getBanks(fresh?: boolean): Promise<Bank[]> {
     const params = new URLSearchParams();
     params.append('route', 'banks');
-    params.append('uid', _uid || 'guest');
     if (fresh) params.append('fresh', '1');
     const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`, fresh ? { cache: 'no-store' } : {});
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch banks');
@@ -289,25 +355,9 @@ export const api = {
     if (!res.ok) throw await buildHttpError(res, 'Failed to setup tables');
   },
 
-  async resetDatabase(): Promise<void> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=reset`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Failed to reset database');
-  },
-
-  async cleanDuplicates(): Promise<{ deleted: number }> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=clean-duplicates`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Failed to clean duplicates');
-    return res.json();
-  },
-
-  async cleanSuspicious(): Promise<{ deleted: number }> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=clean-suspicious`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Failed to clean suspicious data');
-    return res.json();
-  },
-
   async extractBoleto(text?: string, fileName?: string, pdfBase64?: string): Promise<Record<string, unknown>> {
-    const res = await fetchWithSecurity(`${API_BASE}?route=extract-boleto`, {
+    // Extração de boleto não exige autenticação (upload direto)
+    const res = await fetch(`${API_BASE}?route=extract-boleto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, fileName, pdfBase64 }),
@@ -357,7 +407,7 @@ export const api = {
   async exportBackup(): Promise<Blob> {
     const res = await fetchWithSecurity(`${API_BASE}?route=export-backup`, {
       headers: {
-        'x-cn-backup-token': 'CN-BACKUP-SECRET-2024'
+        'x-cn-backup-token': import.meta.env.VITE_CN_BACKUP_TOKEN || ''
       }
     });
     if (!res.ok) throw await buildHttpError(res, 'Failed to export backup');
