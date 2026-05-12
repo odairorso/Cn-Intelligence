@@ -880,8 +880,8 @@ const LancamentosTab = ({
                 </span>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-on-surface-variant mb-3">
-                <span><span className="font-bold text-on-surface">Venc:</span> {tx.vencimento}</span>
-                {tx.pagamento && <span><span className="font-bold text-on-surface">Pago:</span> {tx.pagamento}</span>}
+                <span><span className="font-bold text-on-surface">Venc:</span> {toDisplayDate(tx.vencimento)}</span>
+                {tx.pagamento && <span><span className="font-bold text-on-surface">Pago:</span> {toDisplayDate(tx.pagamento)}</span>}
                 <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded">{tx.empresa}</span>
               </div>
               {tx.descricao && tx.descricao !== '-' && (
@@ -983,8 +983,8 @@ const LancamentosTab = ({
                       {tx.empresa}
                     </span>
                   </td>
-                  <td className="px-8 py-4 whitespace-nowrap">{tx.vencimento}</td>
-                  <td className="px-8 py-4 text-on-surface-variant whitespace-nowrap hidden xl:table-cell">{tx.pagamento || '-'}</td>
+                  <td className="px-8 py-4 whitespace-nowrap">{toDisplayDate(tx.vencimento)}</td>
+                  <td className="px-8 py-4 text-on-surface-variant whitespace-nowrap hidden xl:table-cell">{toDisplayDate(tx.pagamento) || '-'}</td>
                   <td className="px-8 py-4 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold truncate max-w-[100px] hidden xl:table-cell" title={tx.banco}>{tx.banco || '-'}</td>
                   <td className="px-8 py-4 sticky right-0 bg-surface z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] group-hover:bg-surface-variant/20 transition-colors">
                     <div className="flex gap-2 justify-end">
