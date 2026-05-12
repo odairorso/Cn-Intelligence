@@ -3397,13 +3397,14 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
+    const { id, ...rest } = {
       ...transaction,
       ...formData,
       vencimento: toDisplayDate(formData.vencimento),
       pagamento: formData.status === 'PAGO' && formData.pagamento ? toDisplayDate(formData.pagamento) : null,
       valor: parseFloat(formData.valor)
-    });
+    };
+    onSave(String(id), rest);
     onClose();
   };
 

@@ -48,13 +48,16 @@ export async function handleExtractBoleto(req, res) {
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const generateContentWithFallback = async (contents, config) => {
-      const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', process.env.GEMINI_MODEL].filter(Boolean);
+    const generateContentWithFallback = async (contents) => {
+      const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', process.env.GEMINI_MODEL].filter(Boolean);
       let lastErr = null;
       for (const modelName of modelsToTry) {
         try {
-          const model = ai.getGenerativeModel(modelName);
-          return await model.generateContent(contents);
+          // No @google/genai a chamada é direta em ai.models.generateContent
+          return await ai.models.generateContent({
+            model: modelName,
+            contents: contents
+          });
         } catch (e) {
           lastErr = e;
           if (String(e?.message).includes('404')) continue;
@@ -68,7 +71,7 @@ export async function handleExtractBoleto(req, res) {
     const srcUpper = extractedText.toUpperCase();
     const allCnpjs = Array.from(new Set([...srcUpper.matchAll(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|\d{14}/g)].map(m => cleanCnpj(m[0])).filter(isValidCnpj)));
 
-    // Identificação básica do beneficiário
+    // Identificação básica do beneficiário para busca de padrão
     let rawBenefName = '';
     if (srcUpper.includes('SANESUL')) rawBenefName = 'SANESUL';
     else if (srcUpper.includes('ENERGISA')) rawBenefName = 'ENERGISA';
@@ -78,9 +81,9 @@ export async function handleExtractBoleto(req, res) {
     const rawCnpj = allCnpjs[0] || '';
     const pattern = await lookupPattern(rawCnpj, normName(rawBenefName));
 
-    // Só usa o padrão se o fornecedor for válido
+    // Se encontrou padrão e o texto é bom, usa o padrão (MUITO mais rápido)
     if (pattern && pattern.fornecedor && pattern.fornecedor !== 'Fornecedor não identificado' && extractedText.length > 100) {
-      const dateMatch = srcUpper.match(/VENCIMENTO[:\\s]+(\d{2}\/\d{2}\/\d{4})/);
+      const dateMatch = srcUpper.match(/VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/);
       const valorMatch = srcUpper.match(/VALOR[^0-9]*([\d.,]+)/);
       const numero = extractLocalBoletoNumber(srcUpper);
 
@@ -97,7 +100,7 @@ export async function handleExtractBoleto(req, res) {
       });
     }
 
-    // Chamada completa ao Gemini se não houver padrão
+    // --- Chamada à IA (Gemini) ---
     const prompt = `Extraia os dados deste boleto bancário (arquivo: ${fileName}).
     
     INSTRUÇÕES CRÍTICAS:
@@ -125,15 +128,15 @@ export async function handleExtractBoleto(req, res) {
     contents.push({ text: prompt + (extractedText ? `\n\nTexto extraído (OCR):\n${extractedText.slice(0, 3000)}` : '') });
 
     const resultGemini = await generateContentWithFallback(contents);
-    const responseText = resultGemini.response.text().replace(/```json|```/gi, '').trim();
+    const responseText = resultGemini.text.replace(/```json|```/gi, '').trim();
     const extracted = JSON.parse(responseText);
 
     // Limpeza rigorosa no fornecedor
     if (extracted.fornecedor) {
       extracted.fornecedor = extracted.fornecedor
-        .replace(/\d{4,}/g, '') // Remove sequências de 4+ números
+        .replace(/\d{4,}/g, '')
         .replace(/boleto/gi, '')
-        .replace(/\b(ELAI|ELAINE|CRISTINA|CAMACHO|CAVALCANTE)\b/gi, '') // Remove nome do pagador comum se a IA errar
+        .replace(/\b(ELAI|ELAINE|CRISTINA|CAMACHO|CAVALCANTE)\b/gi, '')
         .replace(/\s+/g, ' ')
         .trim();
       
