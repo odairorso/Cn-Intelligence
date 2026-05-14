@@ -102,7 +102,9 @@ export async function handleTransactions(req, res) {
       // Validação Zod
       const result = TransactionSchema.safeParse({ ...(req.body || {}), uid });
       if (!result.success) {
-        return res.status(400).json({ error: 'Dados inválidos', details: result.error.flatten().fieldErrors });
+        const errors = result.error.flatten().fieldErrors;
+        const firstError = Object.entries(errors).map(([k, v]) => `${k}: ${v}`).join(', ');
+        return res.status(400).json({ error: `Dados inválidos: ${firstError}`, details: errors });
       }
 
       const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = result.data;
