@@ -2998,7 +2998,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           empresa: formData.empresa,
           vencimento: toInputDate(vencimentoParcela),
           pagamento: formData.status === 'PAGO' ? toInputDate(pagamentoParcela) : null,
-          valor: Number(formData.valorTipo === 'total' ? (Number(formData.valor) / parcelas).toFixed(2) : formData.valor),
+          valor: formData.valorTipo === 'total' ? Number((parseMoneyToNumber(formData.valor) / parcelas).toFixed(2)) : parseMoneyToNumber(formData.valor),
           status: formData.status,
           banco: formData.status === 'PAGO' ? formData.banco : null,
           tipo: formData.tipo,
@@ -3402,7 +3402,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
       ...formData,
       vencimento: toInputDate(formData.vencimento),
       pagamento: formData.status === 'PAGO' && formData.pagamento ? toInputDate(formData.pagamento) : null,
-      valor: parseFloat(formData.valor)
+      valor: parseMoneyToNumber(formData.valor)
     };
     onSave(String(id), rest);
     onClose();
