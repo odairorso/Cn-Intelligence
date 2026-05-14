@@ -2996,8 +2996,8 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           fornecedor: fornecedorFinal,
           descricao: parcelas > 1 ? `${formData.descricao} (${i + 1}/${parcelas})` : formData.descricao,
           empresa: formData.empresa,
-          vencimento: toDisplayDate(vencimentoParcela),
-          pagamento: formData.status === 'PAGO' ? toDisplayDate(pagamentoParcela) : null,
+          vencimento: toInputDate(vencimentoParcela),
+          pagamento: formData.status === 'PAGO' ? toInputDate(pagamentoParcela) : null,
           valor: Number(formData.valorTipo === 'total' ? (Number(formData.valor) / parcelas).toFixed(2) : formData.valor),
           status: formData.status,
           banco: formData.status === 'PAGO' ? formData.banco : null,
@@ -4343,7 +4343,7 @@ export default function App() {
 
   const handleTransferSubmit = async (data: { originBank: string, destBank: string, originCompany: string, destCompany: string, value: number, date: string, description: string }) => {
     try {
-      const displayDate = toDisplayDate(data.date);
+      const isoDate = toInputDate(data.date);
       
       const batch = [
         {
@@ -4351,8 +4351,8 @@ export default function App() {
           fornecedor: `TRANSF: ${data.destBank} (${data.destCompany})`,
           descricao: data.description,
           empresa: data.originCompany,
-          vencimento: displayDate,
-          pagamento: displayDate,
+          vencimento: isoDate,
+          pagamento: isoDate,
           valor: data.value,
           status: 'PAGO' as TransactionStatus,
           banco: data.originBank,
@@ -4363,8 +4363,8 @@ export default function App() {
           fornecedor: `TRANSF: ${data.originBank} (${data.originCompany})`,
           descricao: data.description,
           empresa: data.destCompany,
-          vencimento: displayDate,
-          pagamento: displayDate,
+          vencimento: isoDate,
+          pagamento: isoDate,
           valor: data.value,
           status: 'PAGO' as TransactionStatus,
           banco: data.destBank,
