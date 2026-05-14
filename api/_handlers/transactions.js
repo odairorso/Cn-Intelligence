@@ -99,8 +99,22 @@ export async function handleTransactions(req, res) {
       const uid = req.authUid;
       if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
+      const rawBody = req.body || {};
+      const payload = { ...(rawBody || {}), uid };
+      if (payload.vencimento) {
+        const vPg = parseDateToPg(payload.vencimento);
+        if (!vPg) return res.status(400).json({ error: 'Data de vencimento inválida' });
+        payload.vencimento = vPg;
+      }
+      if (payload.pagamento === '') payload.pagamento = null;
+      if (payload.pagamento) {
+        const pPg = parseDateToPg(payload.pagamento);
+        if (!pPg) return res.status(400).json({ error: 'Data de pagamento inválida' });
+        payload.pagamento = pPg;
+      }
+
       // Validação Zod
-      const result = TransactionSchema.safeParse({ ...(req.body || {}), uid });
+      const result = TransactionSchema.safeParse(payload);
       if (!result.success) {
         const errors = result.error.flatten().fieldErrors;
         const firstError = Object.entries(errors).map(([k, v]) => `${k}: ${v}`).join(', ');
@@ -109,8 +123,8 @@ export async function handleTransactions(req, res) {
 
       const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = result.data;
 
-      const vDate = parseDateToPg(vencimento);
-      const pDate = parseDateToPg(pagamento);
+      const vDate = vencimento;
+      const pDate = pagamento ? parseDateToPg(pagamento) : null;
       const normalizedNumber = normalizeBoletoNumber(numero_boleto);
       const valorNumber = Number(valor);
 
