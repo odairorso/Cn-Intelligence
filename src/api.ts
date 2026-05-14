@@ -211,7 +211,7 @@ export const api = {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || 'Boleto já lançado');
       }
-      throw new Error('Failed to create transaction');
+      throw await buildHttpError(res, 'Falha ao criar lançamento');
     }
     return res.json();
   },
