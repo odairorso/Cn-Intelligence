@@ -5090,11 +5090,9 @@ export default function App() {
       }));
 
       const txList = canonicalRows.map((row) => {
-        // Converte DD/MM/AAAA para YYYY-MM-DD para o banco de dados
-        let dateVal = row.vencimento;
-        if (dateVal && dateVal.includes('/')) {
-          const [d, m, y] = dateVal.split('/');
-          dateVal = `${y}-${m}-${d}`;
+        const dateVal = toInputDate(row.vencimento);
+        if (!dateVal) {
+          throw new Error(`Data de vencimento inválida: "${row.vencimento}"`);
         }
 
         return {
