@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { api } from './api';
+import { api, apiAuth } from './api';
 import type { Transaction, Supplier, Bank, TransactionStatus } from './types';
 
 function cn(...inputs: ClassValue[]) {

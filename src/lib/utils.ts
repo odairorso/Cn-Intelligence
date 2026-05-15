@@ -109,9 +109,54 @@ export const dateSortKey = (value?: string | null): number => {
   return new Date(v).getTime() || 0;
 };
 
+// ─── LRU Cache ────────────────────────────────────────────────────────────────
+
+class LRUCache<K, V> {
+  private max: number;
+  private map: Map<K, V>;
+  private keysOrder: K[];
+
+  constructor(max: number) {
+    this.max = max;
+    this.map = new Map();
+    this.keysOrder = [];
+  }
+
+  has(key: K): boolean {
+    return this.map.has(key);
+  }
+
+  get(key: K): V | undefined {
+    if (!this.map.has(key)) return undefined;
+    this.touch(key);
+    return this.map.get(key);
+  }
+
+  set(key: K, value: V): void {
+    if (this.map.has(key)) {
+      this.touch(key);
+    } else {
+      this.keysOrder.push(key);
+      if (this.keysOrder.length > this.max) {
+        const oldest = this.keysOrder.shift()!;
+        this.map.delete(oldest);
+      }
+    }
+    this.map.set(key, value);
+  }
+
+  private touch(key: K): void {
+    const idx = this.keysOrder.indexOf(key);
+    if (idx !== -1) {
+      this.keysOrder.splice(idx, 1);
+      this.keysOrder.push(key);
+    }
+  }
+}
+
 // ─── Supplier name normalization ──────────────────────────────────────────────
 
-const normalizeCache = new Map<string, string>();
+const normalizeCache = new LRUCache<string, string>(2000);
 
 export const normalizeSupplierName = (value: string): string => {
   const cacheKey = String(value || '');
@@ -125,7 +170,6 @@ export const normalizeSupplierName = (value: string): string => {
     .replace(/\s+/g, ' ')
     .trim();
 
-  if (normalizeCache.size > 10000) normalizeCache.clear();
   normalizeCache.set(cacheKey, normalized);
   return normalized;
 };
@@ -143,7 +187,7 @@ export const normalizeCompanyKey = (value: string): string => {
 
 // ─── Supplier matching ────────────────────────────────────────────────────────
 
-const matchCache = new Map<string, boolean>();
+const matchCache = new LRUCache<string, boolean>(5000);
 
 export const isSupplierMatch = (transactionSupplier: string, supplierName: string): boolean => {
   const cacheKey = `${transactionSupplier}|${supplierName}`;
@@ -161,7 +205,6 @@ export const isSupplierMatch = (transactionSupplier: string, supplierName: strin
     result = tx.substring(0, 5) === sp.substring(0, 5);
   }
 
-  if (matchCache.size > 50000) matchCache.clear();
   matchCache.set(cacheKey, result);
   return result;
 };
