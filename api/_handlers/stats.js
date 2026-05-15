@@ -46,6 +46,7 @@ export async function handleStats(req, res) {
         COALESCE(SUM(CASE WHEN UPPER(tipo) = 'RECEITA' THEN valor ELSE 0 END), 0) as total_receitas,
         COALESCE(SUM(CASE WHEN UPPER(tipo) = 'DESPESA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as total_despesas,
         COALESCE(SUM(CASE WHEN UPPER(tipo) = 'TRANSFERENCIA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as total_transferencias,
+        COALESCE(SUM(ABS(valor) + COALESCE(juros, 0)), 0) as total_geral,
         COUNT(CASE WHEN status = 'PAGO' AND tipo != 'TRANSFERENCIA' THEN 1 END) as count_pagos,
         COUNT(CASE WHEN (status = 'PENDENTE' OR status = 'VENCIDO') AND (vencimento >= CURRENT_DATE OR vencimento IS NULL) AND tipo != 'TRANSFERENCIA' THEN 1 END) as count_pendentes,
         COUNT(CASE WHEN (status = 'VENCIDO' OR (status = 'PENDENTE' AND vencimento < CURRENT_DATE)) AND tipo != 'TRANSFERENCIA' THEN 1 END) as count_vencidos,
