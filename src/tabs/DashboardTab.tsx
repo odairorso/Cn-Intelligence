@@ -143,7 +143,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
   const filteredStats = useMemo(() => {
     if (realKpis) {
       return {
-        total: (Number(realKpis.total_receitas) || 0) + (Number(realKpis.total_despesas) || 0),
+        total: Number(realKpis.total_geral) || (Number(realKpis.total_receitas) + Number(realKpis.total_despesas)),
         total_financeiro: (Number(realKpis.total_receitas) || 0) - (Number(realKpis.total_despesas) || 0),
         receitas: Number(realKpis.total_receitas) || 0,
         despesas: Number(realKpis.total_despesas) || 0,
