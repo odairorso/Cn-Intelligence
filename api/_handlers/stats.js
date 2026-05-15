@@ -43,10 +43,19 @@ export async function handleStats(req, res) {
     // 1. KPIs Agrupados
     const kpiRows = await sql`
       SELECT
-        COALESCE(SUM(CASE WHEN UPPER(tipo) = 'RECEITA' THEN valor ELSE 0 END), 0) as total_receitas,
-        COALESCE(SUM(CASE WHEN UPPER(tipo) = 'DESPESA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as total_despesas,
-        COALESCE(SUM(CASE WHEN UPPER(tipo) = 'TRANSFERENCIA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as total_transferencias,
-        COALESCE(SUM(ABS(valor) + COALESCE(juros, 0)), 0) as total_geral,
+        COALESCE(SUM(CASE WHEN UPPER(tipo) = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as total_receitas,
+        COALESCE(SUM(CASE WHEN UPPER(tipo) = 'DESPESA'
+          THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
+             + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+          ELSE 0 END), 0) as total_despesas,
+        COALESCE(SUM(CASE WHEN UPPER(tipo) = 'TRANSFERENCIA'
+          THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
+             + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+          ELSE 0 END), 0) as total_transferencias,
+        COALESCE(SUM(
+          ABS(CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
+          + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+        ), 0) as total_geral,
         COUNT(CASE WHEN status = 'PAGO' AND tipo != 'TRANSFERENCIA' THEN 1 END) as count_pagos,
         COUNT(CASE WHEN (status = 'PENDENTE' OR status = 'VENCIDO') AND (vencimento >= CURRENT_DATE OR vencimento IS NULL) AND tipo != 'TRANSFERENCIA' THEN 1 END) as count_pendentes,
         COUNT(CASE WHEN (status = 'VENCIDO' OR (status = 'PENDENTE' AND vencimento < CURRENT_DATE)) AND tipo != 'TRANSFERENCIA' THEN 1 END) as count_vencidos,
@@ -63,8 +72,11 @@ export async function handleStats(req, res) {
       fluxRows = await sql`
         SELECT
           EXTRACT(MONTH FROM vencimento) as month_num,
-          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
-          COALESCE(SUM(CASE WHEN tipo = 'DESPESA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
+          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
+          COALESCE(SUM(CASE WHEN tipo = 'DESPESA'
+            THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
+               + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+            ELSE 0 END), 0) as despesas
         FROM transactions
         WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
           AND vencimento >= ${y + '-01-01'}
@@ -76,8 +88,11 @@ export async function handleStats(req, res) {
       fluxRows = await sql`
         SELECT
           EXTRACT(MONTH FROM vencimento) as month_num,
-          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
-          COALESCE(SUM(CASE WHEN tipo = 'DESPESA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
+          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
+          COALESCE(SUM(CASE WHEN tipo = 'DESPESA'
+            THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
+               + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+            ELSE 0 END), 0) as despesas
         FROM transactions
         WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
           AND vencimento >= ${start + '-01-01'}
@@ -88,8 +103,11 @@ export async function handleStats(req, res) {
       fluxRows = await sql`
         SELECT
           EXTRACT(MONTH FROM vencimento) as month_num,
-          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
-          COALESCE(SUM(CASE WHEN tipo = 'DESPESA' THEN valor + COALESCE(juros, 0) ELSE 0 END), 0) as despesas
+          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
+          COALESCE(SUM(CASE WHEN tipo = 'DESPESA'
+            THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
+               + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+            ELSE 0 END), 0) as despesas
         FROM transactions
         WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
           AND vencimento >= DATE_TRUNC('year', CURRENT_DATE)
@@ -102,7 +120,10 @@ export async function handleStats(req, res) {
     const supplierRows = await sql`
       SELECT
         fornecedor as name,
-        COALESCE(SUM(valor + COALESCE(juros, 0)), 0) as value
+        COALESCE(SUM(
+          (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
+          + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+        ), 0) as value
       FROM transactions
       WHERE 1=1 AND tipo != 'TRANSFERENCIA' ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
       GROUP BY fornecedor

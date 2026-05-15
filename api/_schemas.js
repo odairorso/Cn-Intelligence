@@ -7,13 +7,13 @@ export const TransactionSchema = z.object({
   empresa: z.string().optional(),
   vencimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Vencimento inválido (YYYY-MM-DD)"),
   pagamento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  valor: z.coerce.number({ invalid_type_error: "Valor deve ser um número" }),
+  valor: z.coerce.number({ invalid_type_error: "Valor deve ser um número" }).finite("Valor inválido"),
   status: z.enum(['PENDENTE', 'PAGO', 'VENCIDO']).default('PENDENTE'),
   banco: z.string().optional().nullable(),
   tipo: z.enum(['RECEITA', 'DESPESA']),
   numero_boleto: z.string().optional().nullable(),
-  conta_contabil_id: z.coerce.number().optional().nullable(),
-  juros: z.coerce.number().optional().nullable(),
+  conta_contabil_id: z.coerce.number().finite("Conta contábil inválida").optional().nullable(),
+  juros: z.coerce.number().finite("Juros inválido").optional().nullable(),
 });
 
 export const TransactionBatchSchema = z.array(TransactionSchema);
