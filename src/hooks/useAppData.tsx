@@ -546,10 +546,10 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   // --------------------------------------------------------------
   // Fetch Stats
   // --------------------------------------------------------------
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (year?: string, period?: string, empresa?: string, tipo?: string, status?: string, search?: string) => {
     if (!apiAuth.isAuthenticated()) return;
     try {
-      const data = await api.getStats();
+      const data = await api.getStats(year, period, empresa, tipo, status, search);
       setGlobalStats(data);
     } catch (err: any) {
       if (err.message?.includes('Autenticação')) setIsAuthorized(false);

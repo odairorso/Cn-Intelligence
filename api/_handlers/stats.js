@@ -10,7 +10,7 @@ export async function handleStats(req, res) {
   try {
     const { year, period, empresa, tipo, status, search } = req.query;
 
-    const uidFilterSql = sql`AND uid = ${uid}`;
+    const uidFilterSql = sql`AND (uid = ${uid} OR uid IS NULL)`;
 
     // Filtros
     const empresaFilterSql = empresa && empresa !== 'TODOS' ? sql`AND upper(empresa) = upper(${empresa})` : sql``;
