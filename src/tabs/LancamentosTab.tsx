@@ -292,7 +292,7 @@ const LancamentosTab = React.memo(({
                   "font-bold text-sm whitespace-nowrap",
                   tx.valor < 0 ? "text-tertiary" : (isRevenueTransaction(tx) ? "text-success" : "text-primary")
                 )}>
-                  {tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {Number(tx.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-on-surface-variant mb-3">
