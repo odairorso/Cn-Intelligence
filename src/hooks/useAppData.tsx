@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { api, apiAuth } from '../api';
 import type { Transaction, Supplier, Bank, ContaContabil } from '../types';
 import { DEFAULT_COMPANIES } from '../lib/constants';
 import { normalizeCompanyKey } from '../lib/utils';
+
+const API_BASE = '/api';
 
 // --------------------------------------------------------------
 // Estado global da aplicação
@@ -318,7 +320,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   // Add/Update/Delete Transaction
   // --------------------------------------------------------------
   const addTransaction = useCallback(async (tx: Partial<Transaction>) => {
-    const data = await api.createTransaction(tx);
+    const data = await api.createTransaction(tx as any);
     setTransactions((prev) => [data, ...prev]);
     showNotification('Lançamento criado com sucesso!', 'success');
   }, [showNotification]);
@@ -498,10 +500,10 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     }
   }, [showNotification]);
 
-  const fetchBoletoPatterns = useCallback(async (force = false) => {
+  const fetchBoletoPatterns = useCallback(async (_force = false) => {
     if (!apiAuth.isAuthenticated()) return;
     try {
-      const data = await api.getBoletoPatterns(force);
+      const data = await api.getBoletoPatterns();
       setBoletoPatterns(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.error('[fetchBoletoPatterns]', err.message);
@@ -510,7 +512,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   }, []);
 
   const saveBoletoPattern = useCallback(async (data: Record<string, any>) => {
-    await api.saveBoletoPattern(data);
+    await api.saveBoletoPattern(data as any);
     await fetchBoletoPatterns(true);
   }, [fetchBoletoPatterns]);
 
@@ -568,7 +570,8 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     if (!ofxData.length) return;
     try {
       const txList = ofxData.map((row) => ({
-        // UID obtido automaticamente pelo backend via JWT — NÃO hardcode
+        // UID pode ser opcional se backend extrai do JWT
+        uid: apiAuth.getUid() || 'guest',
         fornecedor: row.fornecedor,
         descricao: `${row.descricao} [OFX:${row.fitid}]`,
         empresa: row.empresa,
@@ -612,9 +615,21 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   }, [isAuthorized, fetchBanks, fetchBoletoPatterns, fetchContasContabeis, fetchStats, fetchSuppliers, fetchTransactions]);
 
   // --------------------------------------------------------------
-  // Provider
+  // Provider - optimized with useMemo to prevent unnecessary re-renders
   // --------------------------------------------------------------
-  const actions = {
+  const stateValue = useMemo(() => ({
+    transactions, allTransactions, transactionPage, hasMoreTransactions,
+    loadingTransactions, suppliers, banks, contasContabeis, boletoPatterns, globalStats,
+    activeFilters, isAuthorized, userEmail, displayName, balance,
+    companyOptions, notification, isLoading, isLoadingMore,
+  }), [
+    transactions, allTransactions, transactionPage, hasMoreTransactions,
+    loadingTransactions, suppliers, banks, contasContabeis, boletoPatterns, globalStats,
+    activeFilters, isAuthorized, userEmail, displayName, balance,
+    companyOptions, notification, isLoading, isLoadingMore,
+  ]);
+
+  const actions = useMemo(() => ({
     login,
     logout,
     fetchTransactions,
@@ -652,16 +667,23 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     showNotification,
     extractBoleto,
     importBoletoOFX,
-  };
+  }), [
+    login, logout, fetchTransactions, addTransaction, updateTransaction,
+    deleteTransaction, loadMoreTransactions, markAsPaid, markAsPaidBatch,
+    importOFX, fixReceitasTipo, dedupeMovimentos, searchTransactions,
+    fetchSuppliers, addSupplier, updateSupplier, deleteSupplier,
+    mergeSuppliers, mergeSuppliersAuto, syncSuppliers,
+    fetchBanks, addBank, updateBank, deleteBank,
+    fetchContasContabeis, fetchBoletoPatterns, saveBoletoPattern,
+    deleteBoletoPattern, fetchStats, setupTables, exportBackup,
+    addCompanyOption, removeCompanyOption, updateCompanyOption,
+    showNotification, extractBoleto, importBoletoOFX,
+  ]);
+
+  const contextValue = useMemo(() => ({ state: stateValue, actions }), [stateValue, actions]);
 
   return (
-    <AppDataContext.Provider value={{ state: {
-      transactions, allTransactions, transactionPage, hasMoreTransactions,
-      loadingTransactions, suppliers, banks, contasContabeis, boletoPatterns, globalStats,
-      activeFilters, isAuthorized, userEmail, displayName, balance,
-      companyOptions, notification, isLoading,
-      isLoadingMore,
-    }, actions }}>
+    <AppDataContext.Provider value={contextValue}>
       {children}
     </AppDataContext.Provider>
   );
