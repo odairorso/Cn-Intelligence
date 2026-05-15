@@ -17,7 +17,7 @@ export async function handleTransactions(req, res) {
       const parsedLimit = limit ? parseInt(limit) : defaultLimit;
       const parsedOffset = offset ? parseInt(offset) : 0;
 
-      let query = sql`SELECT * FROM transactions WHERE uid = ${uid}`;
+      let query = sql`SELECT * FROM transactions WHERE (uid = ${uid} OR uid IS NULL)`;
       if (tipo && tipo !== 'TODOS') query = sql`${query} AND tipo = ${tipo}`;
       if (empresa && empresa !== 'TODOS') query = sql`${query} AND upper(empresa) = upper(${empresa})`;
       if (status && status !== 'TODOS') {
@@ -175,7 +175,7 @@ export async function handleTransactionById(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const rows = await sql`SELECT * FROM transactions WHERE id = ${id} AND uid = ${uid}`;
+      const rows = await sql`SELECT * FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)`;
       if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
       const tx = rows[0];
       return res.json({
@@ -193,7 +193,7 @@ export async function handleTransactionById(req, res) {
   if (req.method === 'PUT') {
     try {
       // Verificar propriedade
-      const existing = await sql`SELECT id FROM transactions WHERE id = ${id} AND uid = ${uid}`;
+      const existing = await sql`SELECT id FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)`;
       if (existing.length === 0) return res.status(404).json({ error: 'Not found' });
 
       const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, juros, tipo, numero_boleto, conta_contabil_id } = req.body;
@@ -229,7 +229,7 @@ export async function handleTransactionById(req, res) {
             numero_boleto = COALESCE(${numero_boleto || null}, numero_boleto),
             conta_contabil_id = COALESCE(${conta_contabil_id || null}, conta_contabil_id),
             updated_at = NOW()
-        WHERE id = ${id} AND uid = ${uid}
+        WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)
         RETURNING *`;
       if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
       return res.json(rows[0]);
@@ -240,9 +240,9 @@ export async function handleTransactionById(req, res) {
 
   if (req.method === 'DELETE') {
     try {
-      const existing = await sql`SELECT id FROM transactions WHERE id = ${id} AND uid = ${uid}`;
+      const existing = await sql`SELECT id FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)`;
       if (existing.length === 0) return res.status(404).json({ error: 'Not found' });
-      await sql`DELETE FROM transactions WHERE id = ${id} AND uid = ${uid} RETURNING *`;
+      await sql`DELETE FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL) RETURNING *`;
       return res.json({ message: 'Deleted' });
     } catch (e) {
       return res.status(500).json({ error: e.message });
@@ -329,7 +329,7 @@ export async function handleTransactionsBatchUpdate(req, res) {
 
   try {
     const pDate = parseDateToPg(dataPagamento);
-    await sql`UPDATE transactions SET status = 'PAGO', banco = ${banco}, pagamento = ${pDate}, updated_at = NOW() WHERE uid = ${uid} AND id IN (${ids})`;
+    await sql`UPDATE transactions SET status = 'PAGO', banco = ${banco}, pagamento = ${pDate}, updated_at = NOW() WHERE (uid = ${uid} OR uid IS NULL) AND id IN (${ids})`;
     return res.json({ message: 'Updated successfully' });
   } catch (e) {
     return res.status(500).json({ error: e.message });
@@ -351,7 +351,7 @@ export async function handleTransactionsDedupeMovimentos(req, res) {
           ORDER BY created_at DESC
         ) as row_num
         FROM transactions
-        WHERE uid = ${uid} AND status = 'PAGO'
+        WHERE (uid = ${uid} OR uid IS NULL) AND status = 'PAGO'
       )
       DELETE FROM transactions WHERE id IN (SELECT id FROM duplicates WHERE row_num > 1) RETURNING *`;
     return res.json({ message: 'Deduplicated', count: rows.length });
