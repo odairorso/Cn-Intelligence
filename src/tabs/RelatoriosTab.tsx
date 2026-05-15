@@ -57,6 +57,12 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
 
   useEffect(() => {
     const contaId = selectedContaContabil === 'TODOS' ? undefined : Number(selectedContaContabil);
+    const apiStatus =
+      selectedStatus === 'TODOS'
+        ? undefined
+        : selectedStatus === 'PENDENTE'
+          ? 'NAO_PAGO'
+          : selectedStatus;
     fetchTransactions(
       false,
       selectedYear,
@@ -66,11 +72,11 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
       {
         limit: 5000,
         empresa: selectedCompany === 'TODOS' ? undefined : selectedCompany,
-        status: selectedStatus === 'TODOS' ? undefined : selectedStatus,
+        status: apiStatus,
         conta_contabil_id: Number.isFinite(contaId as any) ? (contaId as number) : undefined,
       }
     );
-    fetchStats(selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus);
+    fetchStats(selectedYear, selectedMonth, selectedCompany, selectedTipo, apiStatus);
   }, [selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, fetchTransactions, fetchStats]);
 
   const companies = useMemo(() => {
@@ -98,7 +104,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
       const matchesTipo = selectedTipo === 'TODOS' || txTipo === selectedTipo;
       const currentStatus = effectiveStatus(tx);
       const matchesStatus = selectedStatus === 'TODOS' 
-        || (selectedStatus === 'NAO_PAGO' ? (currentStatus === 'PENDENTE' || currentStatus === 'VENCIDO') : currentStatus === selectedStatus);
+        || (selectedStatus === 'NAO_PAGO' ? (currentStatus === 'PENDENTE' || currentStatus === 'VENCIDO') : selectedStatus === 'PENDENTE' ? (currentStatus === 'PENDENTE' || currentStatus === 'VENCIDO') : currentStatus === selectedStatus);
       const contaId = selectedContaContabil === 'TODOS' ? null : Number(selectedContaContabil);
       const matchesConta = selectedContaContabil === 'TODOS' || (Number.isFinite(contaId as any) && Number(tx.conta_contabil_id) === contaId);
       return matchesYear && matchesMonth && matchesCompany && matchesTipo && matchesStatus && matchesConta;
@@ -200,6 +206,8 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
         ? 'Todos'
         : selectedStatus === 'NAO_PAGO'
           ? 'Não Pagos'
+          : selectedStatus === 'PENDENTE'
+            ? 'Em Aberto'
           : selectedStatus;
       const now = new Date().toLocaleString('pt-BR', { 
         day: '2-digit', month: 'long', year: 'numeric', 
@@ -452,7 +460,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
             onChange={e => setSelectedStatus(e.target.value)}
           >
             <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
-            <option value="PENDENTE" className="bg-surface text-on-surface">Pendentes</option>
+            <option value="PENDENTE" className="bg-surface text-on-surface">Em Aberto (Pendentes + Vencidos)</option>
             <option value="VENCIDO" className="bg-surface text-on-surface">Vencidos</option>
             <option value="PAGO" className="bg-surface text-on-surface">Pagos</option>
             <option value="NAO_PAGO" className="bg-surface text-on-surface">Não Pagos (Pendentes + Vencidos)</option>
