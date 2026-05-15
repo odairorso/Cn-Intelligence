@@ -112,26 +112,6 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
   }, [transactions, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, todayKey]);
 
   const periodTotals = useMemo(() => {
-    if (globalStats?.kpis && selectedContaContabil === 'TODOS' && (selectedYear !== 'TODOS' || selectedMonth !== 'TODOS' || selectedCompany !== 'TODOS' || selectedTipo !== 'TODOS' || selectedStatus !== 'TODOS')) {
-      const k = globalStats.kpis;
-      return {
-        total: Number(k.total_receitas) - Number(k.total_despesas),
-        totalReceitas: Number(k.total_receitas),
-        totalDespesas: Number(k.total_despesas),
-        jurosTotal: 0,
-        realizadoTotal: 0,
-        realizadoReceitas: 0,
-        realizadoDespesas: 0,
-        naoPagoCount: Number(k.count_pendentes) + Number(k.count_vencidos),
-        naoPagoReceitas: 0,
-        naoPagoDespesas: 0,
-        naoPagoReceitasCount: 0,
-        naoPagoDespesasCount: 0,
-        naoPagoSaldo: 0,
-        count: Number(k.total_count)
-      };
-    }
-
     let total = 0;
     let totalReceitas = 0;
     let totalDespesas = 0;
