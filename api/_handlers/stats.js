@@ -130,10 +130,17 @@ export async function handleStats(req, res) {
       ORDER BY value DESC
       LIMIT 10`;
 
+    const yearRows = await sql`
+      SELECT DISTINCT EXTRACT(YEAR FROM vencimento)::int as year
+      FROM transactions
+      WHERE 1=1 ${uidFilterSql} AND vencimento IS NOT NULL
+      ORDER BY year DESC`;
+
     return res.json({
       kpis: kpiRows[0],
       monthlyFlux: fluxRows,
-      topSuppliers: supplierRows
+      topSuppliers: supplierRows,
+      years: yearRows.map(r => r.year).filter(Boolean)
     });
   } catch (e) {
     console.error('[stats] Error:', e.message);

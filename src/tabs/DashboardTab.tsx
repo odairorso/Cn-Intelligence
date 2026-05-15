@@ -30,6 +30,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
   const realKpis = globalStats?.kpis;
   const realMonthlyFlux = globalStats?.monthlyFlux;
   const realTopSuppliers = globalStats?.topSuppliers;
+  const statsYears = Array.isArray(globalStats?.years) ? globalStats.years : null;
 
   useEffect(() => {
     const updateStats = async () => {
@@ -45,6 +46,12 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
   }, [periodoFilter, fetchStats]);
 
   const anos = useMemo(() => {
+    if (statsYears && statsYears.length) {
+      return statsYears
+        .map((y: any) => Number(y))
+        .filter((y: any) => Number.isFinite(y) && y >= 1990 && y <= 2100)
+        .sort((a: number, b: number) => a - b);
+    }
     const set = new Set<number>();
     transactions.forEach((tx) => {
       const parts = String(tx.vencimento || '').split('/');
@@ -54,7 +61,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
       }
     });
     return Array.from(set).sort((a, b) => a - b);
-  }, [transactions]);
+  }, [transactions, statsYears]);
 
   const periodos = useMemo(() => {
     const list = ['TODOS'];
@@ -177,6 +184,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
     return { total, pagos, pendentes, vencidos, total_financeiro: total };
   }, [filteredTx, realKpis]);
 
+  const registrosTotal = realKpis?.total_count ? Number(realKpis.total_count) : filteredTx.length;
   const totalTx = (periodoFilter === 'TODOS' && realKpis?.total_count) ? Number(realKpis.total_count) : (filteredTx.length || 1);
   const pagosPercent = Math.round((filteredStats.pagos / totalTx) * 100);
   const pendentesPercent = Math.round((filteredStats.pendentes / totalTx) * 100);
@@ -208,7 +216,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
           { label: 'VALOR TOTAL', value: filteredStats.total, format: 'currency' as const, color: '#3b82f6' },
-          { label: 'REGISTROS', value: filteredTx.length, format: 'number' as const, color: '#3b82f6', desc: 'Volume operacional' },
+          { label: 'REGISTROS', value: registrosTotal, format: 'number' as const, color: '#3b82f6', desc: 'Volume operacional' },
           { label: 'PENDENTES', value: filteredStats.pendentes, format: 'number' as const, color: '#f59e0b', desc: 'Aguardando' },
           { label: 'PAGOS', value: filteredStats.pagos, format: 'number' as const, color: '#10b981', desc: 'Liquidados' },
           { label: 'VENCIDOS', value: filteredStats.vencidos, format: 'number' as const, color: '#ef4444', desc: 'Ação necessária' },
