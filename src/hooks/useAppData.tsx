@@ -90,6 +90,25 @@ type AppDataContextValue = {
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
 
+// Contextos separados para subscriptions otimizadas
+// - useDataContext: apenas dados (transactions, suppliers, etc.)
+// - useUIContext: apenas UI (auth, loading, notificações, etc.)
+const DataSubContext = createContext<Pick<AppDataState, 'transactions' | 'suppliers' | 'banks' | 'contasContabeis' | 'boletoPatterns' | 'globalStats' | 'loadingTransactions' | 'isLoadingMore' | 'hasMoreTransactions'> | null>(null);
+const UISubContext = createContext<Pick<AppDataState, 'isAuthorized' | 'userEmail' | 'displayName' | 'companyOptions' | 'notification' | 'isLoading' | 'balance' | 'activeFilters'> | null>(null);
+
+// Hooks otimizados: só re-renderizam quando o contexto específico muda
+export const useDataContext = () => {
+  const ctx = useContext(DataSubContext);
+  if (!ctx) throw new Error('useDataContext must be used within AppDataProvider');
+  return ctx;
+};
+
+export const useUIContext = () => {
+  const ctx = useContext(UISubContext);
+  if (!ctx) throw new Error('useUIContext must be used within AppDataProvider');
+  return ctx;
+};
+
 // --------------------------------------------------------------
 // Helper: obter UID do JWT (sem fallback para 'guest')
 // --------------------------------------------------------------
@@ -685,9 +704,32 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
 
   const contextValue = useMemo(() => ({ state: stateValue, actions }), [stateValue, actions]);
 
+  // Sub-contexts for optimized subscriptions
+  const dataSubValue = useMemo(() => ({
+    transactions, suppliers, banks, contasContabeis, boletoPatterns, globalStats,
+    loadingTransactions, isLoadingMore, hasMoreTransactions,
+    allTransactions, transactionPage,
+  }), [
+    transactions, suppliers, banks, contasContabeis, boletoPatterns, globalStats,
+    loadingTransactions, isLoadingMore, hasMoreTransactions,
+    allTransactions, transactionPage,
+  ]);
+
+  const uiSubValue = useMemo(() => ({
+    isAuthorized, userEmail, displayName, companyOptions, notification, isLoading,
+    balance, activeFilters,
+  }), [
+    isAuthorized, userEmail, displayName, companyOptions, notification, isLoading,
+    balance, activeFilters,
+  ]);
+
   return (
     <AppDataContext.Provider value={contextValue}>
-      {children}
+      <DataSubContext.Provider value={dataSubValue}>
+        <UISubContext.Provider value={uiSubValue}>
+          {children}
+        </UISubContext.Provider>
+      </DataSubContext.Provider>
     </AppDataContext.Provider>
   );
 };

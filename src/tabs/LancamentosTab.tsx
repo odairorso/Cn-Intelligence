@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { motion } from 'motion/react';
+import React, { useState, useRef, useEffect, useMemo, useDeferredValue } from 'react';
 import {
   Search, ChevronLeft, ChevronRight, Check, Edit, Trash2, Plus, Loader2, RefreshCw,
 } from 'lucide-react';
@@ -31,6 +30,10 @@ const LancamentosTab = React.memo(({
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [page, setPage] = useState(0);
   const [selectedMap, setSelectedMap] = useState<Map<string, Transaction>>(new Map());
+
+  // Deferred search: UI stays responsive while filtering heavy lists
+  const deferredFilter = useDeferredValue(filter);
+  const isFilterStale = filter !== deferredFilter;
 
   // Busca no servidor ao mudar filtros (debounce para o texto)
   // Usa ref para evitar busca no mount inicial (já feita pelo useAppData)
@@ -73,7 +76,7 @@ const LancamentosTab = React.memo(({
   ];
 
   const filtered = useMemo(() => {
-    const searchRaw = String(filter || '').trim();
+    const searchRaw = String(deferredFilter || '').trim();
     const searchLower = searchRaw.toLowerCase();
     const parseMoneySearch = (input: string): number | null => {
       const raw = String(input || '').trim();
@@ -129,10 +132,10 @@ const LancamentosTab = React.memo(({
       const keyB = dateSortKey(b.vencimento);
       return sortOrder === 'desc' ? keyB - keyA : keyA - keyB;
     });
-  }, [transactions, filter, statusFilter, monthFilter, yearFilter, sortOrder]);
+  }, [transactions, deferredFilter, statusFilter, monthFilter, yearFilter, sortOrder]);
 
   // Reset page when filters change
-  useEffect(() => { setPage(0); }, [filter, statusFilter, monthFilter, yearFilter, sortOrder]);
+  useEffect(() => { setPage(0); }, [deferredFilter, statusFilter, monthFilter, yearFilter, sortOrder]);
   // Preserve selection when filters change (do not clear)
   // The selection will automatically stay consistent with the filtered list.
   // If needed, we could prune IDs that are no longer in the filtered view elsewhere.
