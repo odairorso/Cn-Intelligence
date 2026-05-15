@@ -30,9 +30,11 @@ async function lookupPattern(cnpj, nomeNormalizado) {
 
 // POST /api?route=extract-boleto
 export async function handleExtractBoleto(req, res) {
+  const uid = req.authUid;
+  if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
-    // Não exige autenticação para extração rápida de boleto via upload
     const result = ExtractBoletoSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: 'Dados inválidos', details: result.error.flatten().fieldErrors });

@@ -140,6 +140,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const companiesRef = useRef<string[]>(companyOptions);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const transactionPageRef = useRef(0);
 
   companiesRef.current = companyOptions;
 
@@ -283,14 +284,16 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     try {
       setLoadingTransactions(true);
       const limit = options?.limit || 100;
-      const offset = append ? transactionPage * limit : 0;
+      const offset = append ? transactionPageRef.current * limit : 0;
       const data = await api.getTransactions(limit, offset, year, month, search, tipo, options?.empresa, options?.status, options?.conta_contabil_id);
       const list = Array.isArray(data) ? data : [];
       if (append) {
         setTransactions((prev) => [...prev, ...list]);
-        setTransactionPage((prev) => prev + 1);
+        transactionPageRef.current += 1;
+        setTransactionPage(transactionPageRef.current);
       } else {
         setTransactions(list);
+        transactionPageRef.current = 1;
         setTransactionPage(1);
       }
       setHasMoreTransactions(list.length >= limit);
@@ -304,7 +307,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     } finally {
       setLoadingTransactions(false);
     }
-  }, [transactionPage, showNotification]);
+  }, [showNotification]);
 
   const loadMoreTransactions = useCallback(async () => {
     if (loadingTransactions || !hasMoreTransactions) return;
