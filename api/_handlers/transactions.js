@@ -329,7 +329,7 @@ export async function handleTransactionsBatchUpdate(req, res) {
 
   try {
     const pDate = parseDateToPg(dataPagamento);
-    await sql`UPDATE transactions SET status = 'PAGO', banco = ${banco}, pagamento = ${pDate}, updated_at = NOW() WHERE (uid = ${uid} OR uid IS NULL) AND id IN (${ids})`;
+    await sql`UPDATE transactions SET status = 'PAGO', banco = ${banco}, pagamento = ${pDate}, updated_at = NOW() WHERE (uid = ${uid} OR uid IS NULL) AND id = ANY(${ids}::uuid[])`;
     return res.json({ message: 'Updated successfully' });
   } catch (e) {
     return res.status(500).json({ error: e.message });
