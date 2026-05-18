@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, TransactionStatus, ContaContabil } from '../types';
 import { cn, isRevenueTransaction, normalizeCompanyKey, dateSortKey, formatBRL } from '../lib/utils';
 import { api } from '../api';
-import { Printer } from 'lucide-react';
+import { Printer, Search } from 'lucide-react';
 
 interface RelatoriosTabProps {
   transactions: Transaction[];
@@ -38,6 +38,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
   const [selectedTipo, setSelectedTipo] = useState<string>('TODOS');
   const [selectedStatus, setSelectedStatus] = useState<string>('TODOS');
   const [selectedContaContabil, setSelectedContaContabil] = useState<string>('TODOS');
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   const todayKey = useMemo(() => {
     const d = new Date();
@@ -93,6 +94,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
   }, [transactions]);
 
   const filteredData = useMemo(() => {
+    const searchLower = searchTerm.trim().toLowerCase();
     return transactions.filter(tx => {
       const parts = tx.vencimento.includes('/') ? tx.vencimento.split('/') : tx.vencimento.split('-');
       const year = tx.vencimento.includes('/') ? parts[2] : parts[0];
@@ -107,9 +109,14 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
         || (selectedStatus === 'NAO_PAGO' ? (currentStatus === 'PENDENTE' || currentStatus === 'VENCIDO') : selectedStatus === 'PENDENTE' ? (currentStatus === 'PENDENTE' || currentStatus === 'VENCIDO') : currentStatus === selectedStatus);
       const contaId = selectedContaContabil === 'TODOS' ? null : Number(selectedContaContabil);
       const matchesConta = selectedContaContabil === 'TODOS' || (Number.isFinite(contaId as any) && Number(tx.conta_contabil_id) === contaId);
-      return matchesYear && matchesMonth && matchesCompany && matchesTipo && matchesStatus && matchesConta;
+      
+      const matchesSearch = !searchLower || 
+        (tx.fornecedor && tx.fornecedor.toLowerCase().includes(searchLower)) ||
+        (tx.descricao && tx.descricao.toLowerCase().includes(searchLower));
+
+      return matchesYear && matchesMonth && matchesCompany && matchesTipo && matchesStatus && matchesConta && matchesSearch;
     });
-  }, [transactions, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, todayKey]);
+  }, [transactions, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, todayKey, searchTerm]);
 
   const periodTotals = useMemo(() => {
     let total = 0;
@@ -465,10 +472,21 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
               ))}
           </select>
         </div>
-        <div className="flex-grow"></div>
+        <div className="flex-grow">
+          <div className="bg-surface-variant/20 flex items-center px-4 py-2 rounded-lg border border-white/10 focus-within:border-primary transition-all">
+            <Search size={16} className="text-on-surface-variant" />
+            <input
+              type="text"
+              placeholder="Buscar fornecedor ou descrição..."
+              className="bg-transparent border-none text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-0 p-0 outline-none w-full ml-2"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
         <button
           onClick={handlePrint}
-          className="bg-primary text-background px-5 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-primary-dark transition-all whitespace-nowrap"
+          className="bg-primary text-background px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-primary-dark transition-all whitespace-nowrap"
         >
           <Printer size={16} /> Imprimir / PDF
         </button>
