@@ -10,7 +10,7 @@ export const TransactionSchema = z.object({
   valor: z.coerce.number({ invalid_type_error: "Valor deve ser um número" }).finite("Valor inválido"),
   status: z.enum(['PENDENTE', 'PAGO', 'VENCIDO']).default('PENDENTE'),
   banco: z.string().optional().nullable(),
-  tipo: z.enum(['RECEITA', 'DESPESA']),
+  tipo: z.enum(['RECEITA', 'DESPESA', 'TRANSFERENCIA']),
   numero_boleto: z.string().optional().nullable(),
   conta_contabil_id: z.coerce.number().finite("Conta contábil inválida").optional().nullable(),
   juros: z.coerce.number().finite("Juros inválido").optional().nullable(),
