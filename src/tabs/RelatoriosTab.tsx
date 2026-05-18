@@ -274,7 +274,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
   <div class="header">
     <div class="header-info">
       <h1>${tipoLabel}</h1>
-          <p>Colégio Naviraí - Grupo CN | Período: ${monthLabel} de ${selectedYear} | Status: ${statusLabel}</p>
+          <p>${selectedCompany === 'TODOS' ? 'Grupo CN - Todas as Empresas' : 'Empresa: ' + selectedCompany} | Período: ${monthLabel} de ${selectedYear} | Status: ${statusLabel}</p>
     </div>
     <div style="text-align: right; font-size: 9pt; color: #64748b; font-weight: 600;">
       Gerado em: ${now}
@@ -525,6 +525,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-on-surface-variant">
                     <span>{tx.descricao}</span>
+                    <span>Empresa: {tx.empresa || '-'}</span>
                     <span>Venc: {tx.vencimento}</span>
                     <span className={cn(
                       "font-bold",
