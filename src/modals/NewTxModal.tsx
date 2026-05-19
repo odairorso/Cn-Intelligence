@@ -33,6 +33,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
   const [searchConta, setSearchConta] = useState('');
   const [showContaDropdown, setShowContaDropdown] = useState(false);
   const [searchSupplier, setSearchSupplier] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const getDefaultContaKey = (empresa: string, tipo: string) =>
     `cn_default_conta_contabil:${normalizeCompanyKey(empresa)}:${String(tipo || '').toUpperCase()}`;
@@ -75,7 +76,9 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
+    setIsSubmitting(true);
     try {
       const fornecedorRaw = String(formData.fornecedor || '').trim();
       const fornecedorKey = normalizeSupplierName(fornecedorRaw);
@@ -129,8 +132,11 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
       }
       setShowNewTxModal(false);
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create transaction:', error);
+      alert(error.message || 'Erro ao criar o lançamento. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -425,9 +431,10 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Salvar Lançamento
+              {isSubmitting ? 'Salvando...' : 'Salvar Lançamento'}
             </button>
           </div>
 
