@@ -196,43 +196,58 @@ export async function handleTransactionById(req, res) {
       const existing = await sql`SELECT id FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)`;
       if (existing.length === 0) return res.status(404).json({ error: 'Not found' });
 
-      const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, juros, tipo, numero_boleto, conta_contabil_id } = req.body;
+      const body = req.body || {};
 
       // Validação parcial com Zod (pick)
-      if (vencimento) {
-        const vPg = parseDateToPg(vencimento);
+      if (body.vencimento) {
+        const vPg = parseDateToPg(body.vencimento);
         if (vPg) {
           const vResult = TransactionSchema.pick({ vencimento: true }).safeParse({ vencimento: vPg });
           if (!vResult.success) return res.status(400).json({ error: 'Data de vencimento inválida' });
         }
       }
-      if (valor !== undefined) {
-        const valResult = TransactionSchema.pick({ valor: true }).safeParse({ valor });
+      if (body.valor !== undefined && body.valor !== null) {
+        const valResult = TransactionSchema.pick({ valor: true }).safeParse({ valor: Number(body.valor) });
         if (!valResult.success) return res.status(400).json({ error: 'Valor inválido' });
       }
 
-      const vDate = parseDateToPg(vencimento);
-      const pDate = parseDateToPg(pagamento);
+      const fields = [];
+      if (body.fornecedor !== undefined) fields.push(sql`fornecedor = ${body.fornecedor}`);
+      if (body.descricao !== undefined) fields.push(sql`descricao = ${body.descricao}`);
+      if (body.empresa !== undefined) fields.push(sql`empresa = ${body.empresa}`);
+      if (body.vencimento !== undefined) fields.push(sql`vencimento = ${parseDateToPg(body.vencimento)}`);
+      if (body.pagamento !== undefined) fields.push(sql`pagamento = ${parseDateToPg(body.pagamento)}`);
+      if (body.valor !== undefined) fields.push(sql`valor = ${body.valor === null ? null : Number(body.valor)}`);
+      if (body.status !== undefined) fields.push(sql`status = ${body.status}`);
+      if (body.banco !== undefined) fields.push(sql`banco = ${body.banco}`);
+      if (body.juros !== undefined) fields.push(sql`juros = ${body.juros === null ? null : Number(body.juros)}`);
+      if (body.tipo !== undefined) fields.push(sql`tipo = ${body.tipo}`);
+      if (body.numero_boleto !== undefined) fields.push(sql`numero_boleto = ${body.numero_boleto}`);
+      if (body.conta_contabil_id !== undefined) fields.push(sql`conta_contabil_id = ${body.conta_contabil_id}`);
+
+      if (fields.length === 0) {
+        return res.json(existing[0]);
+      }
+
+      const setClause = fields.reduce((acc, curr, i) => {
+        if (i === 0) return curr;
+        return sql`${acc}, ${curr}`;
+      }, sql``);
 
       const rows = await sql`
         UPDATE transactions
-        SET fornecedor = COALESCE(${fornecedor}, fornecedor),
-            descricao = COALESCE(${descricao}, descricao),
-            empresa = COALESCE(${empresa}, empresa),
-            vencimento = COALESCE(${vDate}, vencimento),
-            pagamento = ${pDate},
-            valor = COALESCE(${Number(valor)}, valor),
-            status = COALESCE(${status}, status),
-            banco = COALESCE(${banco}, banco),
-            juros = COALESCE(${Number(juros || 0)}, juros),
-            tipo = COALESCE(${tipo}, tipo),
-            numero_boleto = COALESCE(${numero_boleto || null}, numero_boleto),
-            conta_contabil_id = COALESCE(${conta_contabil_id || null}, conta_contabil_id),
-            updated_at = NOW()
+        SET ${setClause}, updated_at = NOW()
         WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)
         RETURNING *`;
+        
       if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
-      return res.json(rows[0]);
+      return res.json({
+        ...rows[0],
+        vencimento: rows[0].vencimento ? new Date(rows[0].vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
+        pagamento: rows[0].pagamento ? new Date(rows[0].pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
+        valor: Number(rows[0].valor),
+        juros: Number(rows[0].juros || 0),
+      });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
