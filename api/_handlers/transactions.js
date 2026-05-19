@@ -147,7 +147,10 @@ export async function handleTransactions(req, res) {
             LIMIT 1`;
 
       if (duplicateRows.length) {
-        return res.status(409).json({ error: 'Boleto já lançado para este usuário', duplicate: true });
+        const errorMsg = normalizedNumber 
+          ? 'Boleto já lançado para este usuário' 
+          : 'Lançamento duplicado detectado (já existe um registro com mesmo fornecedor, valor, vencimento e descrição). Se for intencional, altere a descrição.';
+        return res.status(409).json({ error: errorMsg, duplicate: true });
       }
 
       const rows = await sql`
