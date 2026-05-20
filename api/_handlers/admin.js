@@ -61,6 +61,28 @@ export async function handleSetupTables(req, res) {
       `;
     }
 
+    // Soft Delete + Auditoria (colunas adicionais em transactions)
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS deleted_by TEXT`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS created_by TEXT`;
+    await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS updated_by TEXT`;
+
+    // Tabela de Auditoria
+    await sql`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_uid TEXT NOT NULL,
+        action VARCHAR(20) NOT NULL,
+        tabela VARCHAR(50) NOT NULL DEFAULT 'transactions',
+        record_id TEXT,
+        dados_antigos JSONB,
+        dados_novos JSONB,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_record ON audit_logs(record_id)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_uid)`;
+
     return res.json({ message: 'Tables verified/created and default accounts seeded successfully' });
   } catch (e) {
     return res.status(500).json({ error: e.message });

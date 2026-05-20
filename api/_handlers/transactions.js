@@ -2,6 +2,26 @@ import { sql, parseDateToPg } from '../_db.js';
 import { normalizeBoletoNumber, sanitizeObject } from '../_utils.js';
 import { TransactionSchema, TransactionBatchSchema } from '../_schemas.js';
 
+// ── Audit Log Helper ────────────────────────────────────────────────────────
+async function auditLog(userUid, action, recordId, dadosAntigos, dadosNovos) {
+  try {
+    await sql`
+      INSERT INTO audit_logs (user_uid, action, tabela, record_id, dados_antigos, dados_novos)
+      VALUES (
+        ${userUid},
+        ${action},
+        'transactions',
+        ${recordId ? String(recordId) : null},
+        ${dadosAntigos ? JSON.stringify(dadosAntigos) : null},
+        ${dadosNovos ? JSON.stringify(dadosNovos) : null}
+      )
+    `;
+  } catch (e) {
+    // Nunca bloquear a operação principal por falha de log
+    console.error('[auditLog] Erro ao gravar:', e.message);
+  }
+}
+
 // GET /api?route=transactions
 export async function handleTransactions(req, res) {
   if (req.method === 'GET') {
@@ -17,7 +37,7 @@ export async function handleTransactions(req, res) {
       const parsedLimit = limit ? parseInt(limit) : defaultLimit;
       const parsedOffset = offset ? parseInt(offset) : 0;
 
-      let query = sql`SELECT * FROM transactions WHERE (uid = ${uid} OR uid IS NULL)`;
+      let query = sql`SELECT * FROM transactions WHERE (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL`;
       if (tipo && tipo !== 'TODOS') query = sql`${query} AND tipo = ${tipo}`;
       if (empresa && empresa !== 'TODOS') query = sql`${query} AND upper(empresa) = upper(${empresa})`;
       if (status && status !== 'TODOS') {
@@ -138,15 +158,17 @@ export async function handleTransactions(req, res) {
 
       if (!vDate) return res.status(400).json({ error: 'Data de vencimento inválida. Use o formato YYYY-MM-DD.' });
 
-      // Dedup por número de boleto ou chave composta
+      // Dedup por número de boleto ou chave composta (ignora soft-deleted)
       const duplicateRows = normalizedNumber
         ? await sql`
             SELECT id FROM transactions WHERE uid = ${uid}
+            AND deleted_at IS NULL
             AND regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') = ${normalizedNumber}
             LIMIT 1`
         : await sql`
             SELECT id FROM transactions
             WHERE uid = ${uid}
+              AND deleted_at IS NULL
               AND upper(coalesce(fornecedor, '')) = upper(${fornecedor})
               AND vencimento = ${vDate}
               AND abs(valor - ${valorNumber}) < 0.0001
@@ -162,10 +184,11 @@ export async function handleTransactions(req, res) {
       }
 
       const rows = await sql`
-        INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id)
+        INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
         VALUES (${uid}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'},
-                ${vDate}, ${pDate}, ${valorNumber}, ${status || 'PENDENTE'}, ${banco || null}, ${tipo}, ${normalizedNumber || null}, ${conta_contabil_id || null})
+                ${vDate}, ${pDate}, ${valorNumber}, ${status || 'PENDENTE'}, ${banco || null}, ${tipo}, ${normalizedNumber || null}, ${conta_contabil_id || null}, ${uid})
         RETURNING *`;
+      await auditLog(uid, 'CREATE', rows[0].id, null, rows[0]);
       return res.status(201).json(rows[0]);
     } catch (e) {
       console.error(e);
@@ -186,7 +209,7 @@ export async function handleTransactionById(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const rows = await sql`SELECT * FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)`;
+      const rows = await sql`SELECT * FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL`;
       if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
       const tx = rows[0];
       return res.json({
@@ -204,7 +227,7 @@ export async function handleTransactionById(req, res) {
   if (req.method === 'PUT') {
     try {
       // Verificar propriedade
-      const existing = await sql`SELECT id FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)`;
+      const existing = await sql`SELECT id, fornecedor, valor, status FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL`;
       if (existing.length === 0) return res.status(404).json({ error: 'Not found' });
 
       const body = req.body || {};
@@ -247,11 +270,12 @@ export async function handleTransactionById(req, res) {
 
       const rows = await sql`
         UPDATE transactions
-        SET ${setClause}, updated_at = NOW()
-        WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)
+        SET ${setClause}, updated_at = NOW(), updated_by = ${uid}
+        WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL
         RETURNING *`;
         
       if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+      await auditLog(uid, 'UPDATE', id, existing[0], rows[0]);
       return res.json({
         ...rows[0],
         vencimento: rows[0].vencimento ? new Date(rows[0].vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
@@ -266,9 +290,15 @@ export async function handleTransactionById(req, res) {
 
   if (req.method === 'DELETE') {
     try {
-      const existing = await sql`SELECT id FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)`;
+      const existing = await sql`SELECT * FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL`;
       if (existing.length === 0) return res.status(404).json({ error: 'Not found' });
-      await sql`DELETE FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL) RETURNING *`;
+      // Soft Delete — nunca apaga o registro do banco
+      await sql`
+        UPDATE transactions
+        SET deleted_at = NOW(), deleted_by = ${uid}, updated_at = NOW()
+        WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)
+      `;
+      await auditLog(uid, 'DELETE', id, existing[0], null);
       return res.json({ message: 'Deleted' });
     } catch (e) {
       return res.status(500).json({ error: e.message });
@@ -320,8 +350,8 @@ export async function handleTransactionsBatch(req, res) {
       }
 
       let duplicateRows = normalizedNumber
-        ? await sql`SELECT id FROM transactions WHERE uid = ${uid} AND regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') = ${normalizedNumber} LIMIT 1`
-        : await sql`SELECT id FROM transactions WHERE uid = ${uid} AND upper(coalesce(fornecedor, '')) = upper(${fornecedor}) AND vencimento = ${vDate} AND abs(valor - ${Number(valor)}) < 0.0001 AND upper(coalesce(descricao, '')) = upper(${descricao || ''}) AND upper(coalesce(empresa, '')) = upper(${empresa || ''}) LIMIT 1`;
+        ? await sql`SELECT id FROM transactions WHERE uid = ${uid} AND deleted_at IS NULL AND regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') = ${normalizedNumber} LIMIT 1`
+        : await sql`SELECT id FROM transactions WHERE uid = ${uid} AND deleted_at IS NULL AND upper(coalesce(fornecedor, '')) = upper(${fornecedor}) AND vencimento = ${vDate} AND abs(valor - ${Number(valor)}) < 0.0001 AND upper(coalesce(descricao, '')) = upper(${descricao || ''}) AND upper(coalesce(empresa, '')) = upper(${empresa || ''}) LIMIT 1`;
 
       if (duplicateRows.length) {
         blocked++;
@@ -329,8 +359,10 @@ export async function handleTransactionsBatch(req, res) {
       }
 
       try {
-        await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id)
-          VALUES (${uid}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(valor)}, ${status || 'PENDENTE'}, ${banco || null}, ${tipo}, ${normalizedNumber || null}, ${conta_contabil_id || null})`;
+        const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
+          VALUES (${uid}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(valor)}, ${status || 'PENDENTE'}, ${banco || null}, ${tipo}, ${normalizedNumber || null}, ${conta_contabil_id || null}, ${uid})
+          RETURNING id`;
+        await auditLog(uid, 'CREATE', inserted[0]?.id, null, { fornecedor, valor, empresa, vencimento: vDate, tipo });
         created++;
       } catch (rowError) {
         errors.push({ index: i, error: rowError.message });
@@ -370,6 +402,7 @@ export async function handleTransactionsDedupeMovimentos(req, res) {
   if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
   try {
+    // Soft delete dos duplicados (não apaga de verdade)
     const rows = await sql`
       WITH duplicates AS (
         SELECT id, ROW_NUMBER() OVER (
@@ -377,9 +410,13 @@ export async function handleTransactionsDedupeMovimentos(req, res) {
           ORDER BY created_at DESC
         ) as row_num
         FROM transactions
-        WHERE (uid = ${uid} OR uid IS NULL) AND status = 'PAGO'
+        WHERE (uid = ${uid} OR uid IS NULL) AND status = 'PAGO' AND deleted_at IS NULL
       )
-      DELETE FROM transactions WHERE id IN (SELECT id FROM duplicates WHERE row_num > 1) RETURNING *`;
+      UPDATE transactions
+      SET deleted_at = NOW(), deleted_by = ${uid}, updated_at = NOW()
+      WHERE id IN (SELECT id FROM duplicates WHERE row_num > 1)
+      RETURNING id`;
+    await auditLog(uid, 'DEDUPE', null, null, { count: rows.length });
     return res.json({ message: 'Deduplicated', count: rows.length });
   } catch (e) {
     return res.status(500).json({ error: e.message });
