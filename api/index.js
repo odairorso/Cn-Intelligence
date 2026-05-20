@@ -134,6 +134,7 @@ export default async function handler(req, res) {
       case 'setup-tables': { const m = await import('./_handlers/admin.js'); return m.handleSetupTables(req, res); }
       case 'export-backup': { const m = await import('./_handlers/admin.js'); return m.handleExportBackup(req, res); }
       case 'fix-receitas-tipo': { const m = await import('./_handlers/transactions.js'); return m.handleFixReceitasTipo(req, res); }
+      case 'folha-push': { const m = await import('./_handlers/folha.js'); return m.handleFolhaPush(req, res); }
       default: return res.status(404).json({ error: 'Route not found' });
     }
   } catch (e) {
