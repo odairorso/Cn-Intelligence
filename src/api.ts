@@ -144,7 +144,9 @@ export const api = {
     tipo?: string,
     empresa?: string,
     status?: string,
-    conta_contabil_id?: number
+    conta_contabil_id?: number,
+    startDate?: string,
+    endDate?: string
   ): Promise<Transaction[]> {
     if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     const params = new URLSearchParams();
@@ -159,13 +161,24 @@ export const api = {
     if (empresa) params.append('empresa', empresa);
     if (status) params.append('status', status);
     if (typeof conta_contabil_id === 'number') params.append('conta_contabil_id', String(conta_contabil_id));
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
 
     const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch transactions');
     return res.json();
   },
 
-  async getStats(year?: string, period?: string, empresa?: string, tipo?: string, status?: string, search?: string): Promise<{
+  async getStats(
+    year?: string,
+    period?: string,
+    empresa?: string,
+    tipo?: string,
+    status?: string,
+    search?: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<{
     kpis: {
       total_receitas: number;
       total_despesas: number;
@@ -193,6 +206,8 @@ export const api = {
     if (tipo) params.append('tipo', tipo);
     if (status) params.append('status', status);
     if (search) params.append('search', search);
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
 
     const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`);
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch stats');

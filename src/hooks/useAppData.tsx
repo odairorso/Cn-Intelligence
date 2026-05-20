@@ -72,7 +72,7 @@ type AppDataActions = {
   fetchBoletoPatterns: (force?: boolean) => Promise<void>;
   saveBoletoPattern: (data: Record<string, any>) => Promise<void>;
   deleteBoletoPattern: (id: number) => Promise<void>;
-  fetchStats: () => Promise<void>;
+  fetchStats: (year?: string, period?: string, empresa?: string, tipo?: string, status?: string, search?: string, startDate?: string, endDate?: string) => Promise<void>;
   setupTables: () => Promise<void>;
   exportBackup: () => Promise<void>;
   addCompanyOption: (name: string) => void;
@@ -304,7 +304,19 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
       setLoadingTransactions(true);
       const limit = options?.limit || 100;
       const offset = append ? transactionPageRef.current * limit : 0;
-      const data = await api.getTransactions(limit, offset, year, month, search, tipo, options?.empresa, options?.status, options?.conta_contabil_id);
+      const data = await api.getTransactions(
+        limit,
+        offset,
+        year,
+        month,
+        search,
+        tipo,
+        options?.empresa,
+        options?.status,
+        options?.conta_contabil_id,
+        options?.startDate,
+        options?.endDate
+      );
       const list = Array.isArray(data) ? data : [];
       if (append) {
         setTransactions((prev) => [...prev, ...list]);
@@ -546,10 +558,19 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   // --------------------------------------------------------------
   // Fetch Stats
   // --------------------------------------------------------------
-  const fetchStats = useCallback(async (year?: string, period?: string, empresa?: string, tipo?: string, status?: string, search?: string) => {
+  const fetchStats = useCallback(async (
+    year?: string,
+    period?: string,
+    empresa?: string,
+    tipo?: string,
+    status?: string,
+    search?: string,
+    startDate?: string,
+    endDate?: string
+  ) => {
     if (!apiAuth.isAuthenticated()) return;
     try {
-      const data = await api.getStats(year, period, empresa, tipo, status, search);
+      const data = await api.getStats(year, period, empresa, tipo, status, search, startDate, endDate);
       setGlobalStats(data);
     } catch (err: any) {
       if (err.message?.includes('Autenticação')) setIsAuthorized(false);

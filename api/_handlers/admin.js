@@ -6,6 +6,8 @@ export async function handleSetupTables(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
     await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+    
+    // Tabela de usuários
     await sql`CREATE TABLE IF NOT EXISTS users (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       uid VARCHAR(255) UNIQUE NOT NULL,
@@ -16,7 +18,49 @@ export async function handleSetupTables(req, res) {
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`;
-    return res.json({ message: 'Tables verified/created successfully' });
+
+    // Tabela de contas contábeis
+    await sql`CREATE TABLE IF NOT EXISTS contas_contabeis (
+      id SERIAL PRIMARY KEY,
+      codigo VARCHAR(20) UNIQUE NOT NULL,
+      nome VARCHAR(255) NOT NULL,
+      tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('RECEITA', 'DESPESA')),
+      ativo BOOLEAN DEFAULT true,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )`;
+
+    // Seeder de contas contábeis padrão
+    const defaultAccounts = [
+      { codigo: '3.1',  nome: 'Folha de Pagamento',    tipo: 'DESPESA' },
+      { codigo: '3.2',  nome: 'Aluguel',               tipo: 'DESPESA' },
+      { codigo: '3.3',  nome: 'Água / Luz / Telefone', tipo: 'DESPESA' },
+      { codigo: '3.4',  nome: 'Material de Escritório',tipo: 'DESPESA' },
+      { codigo: '3.5',  nome: 'Segurança',             tipo: 'DESPESA' },
+      { codigo: '3.6',  nome: 'Editoras',              tipo: 'DESPESA' },
+      { codigo: '3.7',  nome: 'Impostos',              tipo: 'DESPESA' },
+      { codigo: '3.8',  nome: 'Manutenção',            tipo: 'DESPESA' },
+      { codigo: '3.9',  nome: 'Tarifas Bancárias',     tipo: 'DESPESA' },
+      { codigo: '3.10', nome: 'Juros / Multas',        tipo: 'DESPESA' },
+      { codigo: '3.11', nome: 'Outras Despesas',       tipo: 'DESPESA' },
+      { codigo: '4.1',  nome: 'Mensalidades',          tipo: 'RECEITA' },
+      { codigo: '4.2',  nome: 'Repasses',              tipo: 'RECEITA' },
+      { codigo: '4.3',  nome: 'Matrículas',            tipo: 'RECEITA' },
+      { codigo: '4.4',  nome: 'Permutas / Convênios',  tipo: 'RECEITA' },
+      { codigo: '4.5',  nome: 'Aplicação Bancária',    tipo: 'RECEITA' },
+      { codigo: '4.6',  nome: 'Outras Receitas',       tipo: 'RECEITA' },
+      { codigo: '4.7',  nome: 'Dia das Mães',          tipo: 'RECEITA' },
+      { codigo: '4.8',  nome: 'Aluguel',               tipo: 'RECEITA' }
+    ];
+
+    for (const acc of defaultAccounts) {
+      await sql`
+        INSERT INTO contas_contabeis (codigo, nome, tipo)
+        VALUES (${acc.codigo}, ${acc.nome}, ${acc.tipo})
+        ON CONFLICT (codigo) DO UPDATE SET nome = EXCLUDED.nome, tipo = EXCLUDED.tipo, ativo = true
+      `;
+    }
+
+    return res.json({ message: 'Tables verified/created and default accounts seeded successfully' });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }

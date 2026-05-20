@@ -12,10 +12,19 @@ interface RelatoriosTabProps {
     month?: string,
     search?: string,
     tipo?: string,
-    options?: { limit?: number; empresa?: string; status?: string; conta_contabil_id?: number }
+    options?: { limit?: number; empresa?: string; status?: string; conta_contabil_id?: number; startDate?: string; endDate?: string }
   ) => void;
   globalStats: any;
-  fetchStats: (year?: string, period?: string, empresa?: string, tipo?: string, status?: string) => Promise<void>;
+  fetchStats: (
+    year?: string,
+    period?: string,
+    empresa?: string,
+    tipo?: string,
+    status?: string,
+    search?: string,
+    startDate?: string,
+    endDate?: string
+  ) => Promise<void>;
   contasContabeis: ContaContabil[];
 }
 
@@ -39,6 +48,17 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
   const [selectedStatus, setSelectedStatus] = useState<string>('TODOS');
   const [selectedContaContabil, setSelectedContaContabil] = useState<string>('TODOS');
   const [searchTerm, setSearchTerm] = useState<string>('');
+
+  const [filterType, setFilterType] = useState<'MES' | 'PERIODO'>('MES');
+  const [startDate, setStartDate] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  });
+  const [endDate, setEndDate] = useState<string>(() => {
+    const now = new Date();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  });
 
   const todayKey = useMemo(() => {
     const d = new Date();
@@ -64,10 +84,16 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
         : selectedStatus === 'PENDENTE'
           ? 'NAO_PAGO'
           : selectedStatus;
+          
+    const queryYear = filterType === 'MES' ? selectedYear : undefined;
+    const queryMonth = filterType === 'MES' ? selectedMonth : undefined;
+    const queryStartDate = filterType === 'PERIODO' ? (startDate || undefined) : undefined;
+    const queryEndDate = filterType === 'PERIODO' ? (endDate || undefined) : undefined;
+
     fetchTransactions(
       false,
-      selectedYear,
-      selectedMonth,
+      queryYear,
+      queryMonth,
       undefined,
       selectedTipo === 'TODOS' ? undefined : selectedTipo,
       {
@@ -75,10 +101,33 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
         empresa: selectedCompany === 'TODOS' ? undefined : selectedCompany,
         status: apiStatus,
         conta_contabil_id: Number.isFinite(contaId as any) ? (contaId as number) : undefined,
+        startDate: queryStartDate,
+        endDate: queryEndDate,
       }
     );
-    fetchStats(selectedYear, selectedMonth, selectedCompany, selectedTipo, apiStatus);
-  }, [selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, fetchTransactions, fetchStats]);
+    fetchStats(
+      queryYear,
+      queryMonth,
+      selectedCompany === 'TODOS' ? undefined : selectedCompany,
+      selectedTipo === 'TODOS' ? undefined : selectedTipo,
+      apiStatus,
+      undefined,
+      queryStartDate,
+      queryEndDate
+    );
+  }, [
+    filterType,
+    startDate,
+    endDate,
+    selectedYear,
+    selectedMonth,
+    selectedCompany,
+    selectedTipo,
+    selectedStatus,
+    selectedContaContabil,
+    fetchTransactions,
+    fetchStats
+  ]);
 
   const companies = useMemo(() => {
     const map = new Map<string, string>();
@@ -96,11 +145,30 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
   const filteredData = useMemo(() => {
     const searchLower = searchTerm.trim().toLowerCase();
     return transactions.filter(tx => {
-      const parts = tx.vencimento.includes('/') ? tx.vencimento.split('/') : tx.vencimento.split('-');
-      const year = tx.vencimento.includes('/') ? parts[2] : parts[0];
-      const month = tx.vencimento.includes('/') ? parts[1] : parts[1];
-      const matchesYear = selectedYear === 'TODOS' || year === selectedYear;
-      const matchesMonth = selectedMonth === 'TODOS' || month === selectedMonth;
+      let matchesDateRange = true;
+      if (filterType === 'PERIODO') {
+        let txDateStr = '';
+        if (tx.vencimento) {
+          const parts = tx.vencimento.includes('/') ? tx.vencimento.split('/') : tx.vencimento.split('-');
+          if (tx.vencimento.includes('/')) {
+            // DD/MM/YYYY
+            txDateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+          } else {
+            // YYYY-MM-DD
+            txDateStr = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+          }
+        }
+        if (startDate && txDateStr < startDate) matchesDateRange = false;
+        if (endDate && txDateStr > endDate) matchesDateRange = false;
+      } else {
+        const parts = tx.vencimento.includes('/') ? tx.vencimento.split('/') : tx.vencimento.split('-');
+        const year = tx.vencimento.includes('/') ? parts[2] : parts[0];
+        const month = tx.vencimento.includes('/') ? parts[1] : parts[1];
+        const matchesYear = selectedYear === 'TODOS' || year === selectedYear;
+        const matchesMonth = selectedMonth === 'TODOS' || month === selectedMonth;
+        matchesDateRange = matchesYear && matchesMonth;
+      }
+
       const matchesCompany = selectedCompany === 'TODOS' || normalizeCompanyKey(tx.empresa) === normalizeCompanyKey(selectedCompany);
       const txTipo = tx.tipo || (isRevenueTransaction(tx) ? 'RECEITA' : 'DESPESA');
       const matchesTipo = selectedTipo === 'TODOS' || txTipo === selectedTipo;
@@ -114,9 +182,9 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
         (tx.fornecedor && tx.fornecedor.toLowerCase().includes(searchLower)) ||
         (tx.descricao && tx.descricao.toLowerCase().includes(searchLower));
 
-      return matchesYear && matchesMonth && matchesCompany && matchesTipo && matchesStatus && matchesConta && matchesSearch;
+      return matchesDateRange && matchesCompany && matchesTipo && matchesStatus && matchesConta && matchesSearch;
     });
-  }, [transactions, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, todayKey, searchTerm]);
+  }, [transactions, filterType, startDate, endDate, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, todayKey, searchTerm]);
 
   const periodTotals = useMemo(() => {
     let total = 0;
@@ -201,6 +269,17 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
         hour: '2-digit', minute: '2-digit' 
       });
 
+      const formatDateForDisplay = (dateStr: string) => {
+        if (!dateStr) return '';
+        const parts = dateStr.split('-');
+        if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        return dateStr;
+      };
+
+      const periodDisplay = filterType === 'PERIODO' 
+        ? `${formatDateForDisplay(startDate)} a ${formatDateForDisplay(endDate)}` 
+        : `${monthLabel} de ${selectedYear}`;
+
       const pendentesCount = filteredData.filter(tx => effectiveStatus(tx) === 'PENDENTE').length;
       const vencidosCount = filteredData.filter(tx => effectiveStatus(tx) === 'VENCIDO').length;
       const pendentesValor = filteredData.filter(tx => {
@@ -252,11 +331,11 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
         </tr>`;
       }).join('');
 
-      printWindow.document.write(`<!DOCTYPE html>
+  printWindow.document.write(`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>${tipoLabel} - ${monthLabel}/${selectedYear}</title>
+  <title>${tipoLabel} - ${periodDisplay}</title>
   <style>
     @page { margin: 1.2cm; size: A4 landscape; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 11pt; color: #333; line-height: 1.4; margin: 0; padding: 0; }
@@ -281,7 +360,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
   <div class="header">
     <div class="header-info">
       <h1>${tipoLabel}</h1>
-          <p>${selectedCompany === 'TODOS' ? 'Grupo CN - Todas as Empresas' : 'Empresa: ' + selectedCompany} | Período: ${monthLabel} de ${selectedYear} | Status: ${statusLabel}</p>
+          <p>${selectedCompany === 'TODOS' ? 'Grupo CN - Todas as Empresas' : 'Empresa: ' + selectedCompany} | Período: ${periodDisplay} | Status: ${statusLabel}</p>
     </div>
     <div style="text-align: right; font-size: 9pt; color: #64748b; font-weight: 600;">
       Gerado em: ${now}
@@ -382,6 +461,82 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
     <div className="space-y-8">
       <div className="glass-card p-6 flex flex-wrap gap-4 items-end">
         <div className="space-y-1">
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase">Filtro por</label>
+          <select
+            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+            style={{ backgroundColor: '#1e1e2e' }}
+            value={filterType}
+            onChange={e => setFilterType(e.target.value as 'MES' | 'PERIODO')}
+          >
+            <option value="MES" className="bg-surface text-on-surface">Ano / Mês</option>
+            <option value="PERIODO" className="bg-surface text-on-surface">Período Customizado</option>
+          </select>
+        </div>
+
+        {filterType === 'MES' ? (
+          <>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-on-surface-variant uppercase">Ano</label>
+              <select
+                className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+                style={{ backgroundColor: '#1e1e2e' }}
+                value={selectedYear}
+                onChange={e => setSelectedYear(e.target.value)}
+              >
+                <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
+                {years.map(y => <option key={y} value={y} className="bg-surface text-on-surface">{y}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-on-surface-variant uppercase">Mês</label>
+              <select
+                className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+                style={{ backgroundColor: '#1e1e2e' }}
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(e.target.value)}
+              >
+                <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
+                <option value="01" className="bg-surface text-on-surface">Janeiro</option>
+                <option value="02" className="bg-surface text-on-surface">Fevereiro</option>
+                <option value="03" className="bg-surface text-on-surface">Março</option>
+                <option value="04" className="bg-surface text-on-surface">Abril</option>
+                <option value="05" className="bg-surface text-on-surface">Maio</option>
+                <option value="06" className="bg-surface text-on-surface">Junho</option>
+                <option value="07" className="bg-surface text-on-surface">Julho</option>
+                <option value="08" className="bg-surface text-on-surface">Agosto</option>
+                <option value="09" className="bg-surface text-on-surface">Setembro</option>
+                <option value="10" className="bg-surface text-on-surface">Outubro</option>
+                <option value="11" className="bg-surface text-on-surface">Novembro</option>
+                <option value="12" className="bg-surface text-on-surface">Dezembro</option>
+              </select>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-on-surface-variant uppercase">Data de Início</label>
+              <input
+                type="date"
+                className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+                style={{ backgroundColor: '#1e1e2e' }}
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-on-surface-variant uppercase">Data Final</label>
+              <input
+                type="date"
+                className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+                style={{ backgroundColor: '#1e1e2e' }}
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+              />
+            </div>
+          </>
+        )}
+
+        <div className="space-y-1">
           <label className="text-[10px] font-bold text-on-surface-variant uppercase">Tipo</label>
           <select
             className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
@@ -392,39 +547,6 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
             <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
             <option value="RECEITA" className="bg-surface text-on-surface">Receitas</option>
             <option value="DESPESA" className="bg-surface text-on-surface">Despesas</option>
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold text-on-surface-variant uppercase">Ano</label>
-          <select
-            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
-            value={selectedYear}
-            onChange={e => setSelectedYear(e.target.value)}
-          >
-            <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
-            {years.map(y => <option key={y} value={y} className="bg-surface text-on-surface">{y}</option>)}
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold text-on-surface-variant uppercase">Mês</label>
-          <select
-            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
-            value={selectedMonth}
-            onChange={e => setSelectedMonth(e.target.value)}
-          >
-            <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
-            <option value="01" className="bg-surface text-on-surface">Janeiro</option>
-            <option value="02" className="bg-surface text-on-surface">Fevereiro</option>
-            <option value="03" className="bg-surface text-on-surface">Março</option>
-            <option value="04" className="bg-surface text-on-surface">Abril</option>
-            <option value="05" className="bg-surface text-on-surface">Maio</option>
-            <option value="06" className="bg-surface text-on-surface">Junho</option>
-            <option value="07" className="bg-surface text-on-surface">Julho</option>
-            <option value="08" className="bg-surface text-on-surface">Agosto</option>
-            <option value="09" className="bg-surface text-on-surface">Setembro</option>
-            <option value="10" className="bg-surface text-on-surface">Outubro</option>
-            <option value="11" className="bg-surface text-on-surface">Novembro</option>
-            <option value="12" className="bg-surface text-on-surface">Dezembro</option>
           </select>
         </div>
         <div className="space-y-1">
