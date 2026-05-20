@@ -20,25 +20,22 @@
 
 @layer base {
   body {
-    @apply bg-background text-on-surface font-sans antialiased;
-    background: radial-gradient(circle at top left, #0d1b2e 0%, #050d1a 100%);
+    @apply bg-zinc-50 text-zinc-900 font-sans antialiased;
     min-height: 100vh;
   }
 }
 
 .glass-card {
-  @apply bg-surface/40 backdrop-blur-2xl border border-white/5 rounded-sm;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  @apply bg-white border border-zinc-200 shadow-sm rounded-xl;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-card:hover {
-  @apply border-primary/20 bg-surface/50;
-  box-shadow: 0 0 20px var(--color-border-glow);
+  @apply shadow-md border-zinc-300;
 }
 
 .premium-gradient-text {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary;
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-400;
 }
 
 .on-surface {
