@@ -8,7 +8,7 @@ export async function handleStats(req, res) {
   if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
   try {
-    const { year, period, empresa, tipo, status, search } = req.query;
+    const { year, period, empresa, tipo, status, search, startDate, endDate } = req.query;
 
     const uidFilterSql = sql`AND (uid = ${uid} OR uid IS NULL)`;
 
@@ -27,17 +27,26 @@ export async function handleStats(req, res) {
 
     // Filtro de data dinâmico
     let dateFilterSql;
-    const isRange = (val) => /^\d{4}-\d{4}$/.test(val);
-
-    if (year && year !== 'TODOS' && !isRange(year)) {
-      const y = parseInt(year);
-      dateFilterSql = sql`AND vencimento >= ${y + '-01-01'} AND vencimento <= ${y + '-12-31'}`;
-    } else if (isRange(year) || isRange(period)) {
-      const range = isRange(year) ? year : period;
-      const [start, end] = range.split('-');
-      dateFilterSql = sql`AND vencimento >= ${start + '-01-01'} AND vencimento <= ${end + '-12-31'}`;
+    if (startDate || endDate) {
+      dateFilterSql = sql`1=1`;
+      if (startDate) {
+        dateFilterSql = sql`${dateFilterSql} AND vencimento >= ${startDate}`;
+      }
+      if (endDate) {
+        dateFilterSql = sql`${dateFilterSql} AND vencimento <= ${endDate}`;
+      }
     } else {
-      dateFilterSql = sql``;
+      const isRange = (val) => /^\d{4}-\d{4}$/.test(val);
+      if (year && year !== 'TODOS' && !isRange(year)) {
+        const y = parseInt(year);
+        dateFilterSql = sql`AND vencimento >= ${y + '-01-01'} AND vencimento <= ${y + '-12-31'}`;
+      } else if (isRange(year) || isRange(period)) {
+        const range = isRange(year) ? year : period;
+        const [start, end] = range.split('-');
+        dateFilterSql = sql`AND vencimento >= ${start + '-01-01'} AND vencimento <= ${end + '-12-31'}`;
+      } else {
+        dateFilterSql = sql``;
+      }
     }
 
     // 1. KPIs Agrupados
@@ -67,7 +76,20 @@ export async function handleStats(req, res) {
     let fluxRows;
     const activeRange = isRange(year) ? year : (isRange(period) ? period : null);
 
-    if (year && year !== 'TODOS' && !activeRange) {
+    if (startDate || endDate) {
+      fluxRows = await sql`
+        SELECT
+          EXTRACT(MONTH FROM vencimento) as month_num,
+          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
+          COALESCE(SUM(CASE WHEN tipo = 'DESPESA'
+            THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
+               + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+            ELSE 0 END), 0) as despesas
+        FROM transactions
+        WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
+        GROUP BY EXTRACT(MONTH FROM vencimento)
+        ORDER BY month_num`;
+    } else if (year && year !== 'TODOS' && !activeRange) {
       const y = parseInt(year);
       fluxRows = await sql`
         SELECT

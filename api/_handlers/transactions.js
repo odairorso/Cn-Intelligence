@@ -7,7 +7,7 @@ export async function handleTransactions(req, res) {
   if (req.method === 'GET') {
     try {
       const uid = req.authUid;
-      const { limit, offset, year, month, search, tipo, empresa, status, conta_contabil_id } = req.query;
+      const { limit, offset, year, month, search, tipo, empresa, status, conta_contabil_id, startDate, endDate } = req.query;
 
       if (!uid || uid === 'undefined' || uid === 'null') {
         return res.status(401).json({ error: 'Identificação de usuário (UID) obrigatória para esta operação.' });
@@ -68,14 +68,22 @@ export async function handleTransactions(req, res) {
       }
 
       // Filtros de data (agora funcionam JUNTO com a busca)
-      if (year && year !== 'TODOS') {
-        const start = `${year}-01-01`;
-        const end = `${year}-12-31`;
-        query = sql`${query} AND vencimento >= ${start} AND vencimento <= ${end}`;
+      if (startDate) {
+        query = sql`${query} AND vencimento >= ${startDate}`;
       }
-      if (month && month !== 'TODOS') {
-        const m = month.padStart(2, '0');
-        query = sql`${query} AND TO_CHAR(vencimento, 'MM') = ${m}`;
+      if (endDate) {
+        query = sql`${query} AND vencimento <= ${endDate}`;
+      }
+      if (!startDate && !endDate) {
+        if (year && year !== 'TODOS') {
+          const start = `${year}-01-01`;
+          const end = `${year}-12-31`;
+          query = sql`${query} AND vencimento >= ${start} AND vencimento <= ${end}`;
+        }
+        if (month && month !== 'TODOS') {
+          const m = month.padStart(2, '0');
+          query = sql`${query} AND TO_CHAR(vencimento, 'MM') = ${m}`;
+        }
       }
 
       const rows = await sql`${query} ORDER BY vencimento DESC LIMIT ${parsedLimit} OFFSET ${parsedOffset}`;
