@@ -195,126 +195,96 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
   const healthLabel = healthScore >= 80 ? 'Saudável' : healthScore >= 60 ? 'Atenção' : 'Crítico';
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
-        {periodos.map((p) => (
-          <button
-            key={p}
-            onClick={() => setPeriodoFilter(p)}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
-              periodoFilter === p
-                ? "bg-primary text-background border-primary"
-                : "bg-white/5 text-on-surface-variant border-white/10 hover:border-primary/40 hover:text-on-surface"
-            )}
-          >
-            {p}
-          </button>
-        ))}
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* Header and Period Filter */}
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Visão Geral</h1>
+          <p className="text-zinc-500 text-sm">Acompanhe a saúde financeira do Grupo CN.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {periodos.map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriodoFilter(p)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+                periodoFilter === p
+                  ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                  : "bg-white text-zinc-600 border-zinc-200 hover:border-blue-400 hover:text-zinc-900"
+              )}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {/* KPI GRID */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {[
-          { label: 'VALOR TOTAL', value: filteredStats.total, format: 'currency' as const, color: '#3b82f6' },
-          { label: 'REGISTROS', value: registrosTotal, format: 'number' as const, color: '#3b82f6', desc: 'Volume operacional' },
-          { label: 'PENDENTES', value: filteredStats.pendentes, format: 'number' as const, color: '#f59e0b', desc: 'Aguardando' },
-          { label: 'PAGOS', value: filteredStats.pagos, format: 'number' as const, color: '#10b981', desc: 'Liquidados' },
-          { label: 'VENCIDOS', value: filteredStats.vencidos, format: 'number' as const, color: '#ef4444', desc: 'Ação necessária' },
-          { label: 'SAÚDE', value: healthScore, format: 'number' as const, color: healthColor, desc: healthLabel, suffix: '%' },
+          { label: 'VALOR TOTAL', value: filteredStats.total, format: 'currency' as const, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+          { label: 'REGISTROS', value: registrosTotal, format: 'number' as const, color: 'text-zinc-700', bg: 'bg-zinc-100', border: 'border-zinc-200' },
+          { label: 'PENDENTES', value: filteredStats.pendentes, format: 'number' as const, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+          { label: 'PAGOS', value: filteredStats.pagos, format: 'number' as const, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+          { label: 'VENCIDOS', value: filteredStats.vencidos, format: 'number' as const, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' },
+          { label: 'SAÚDE', value: healthScore, format: 'number' as const, color: healthColor === '#10b981' ? 'text-emerald-600' : healthColor === '#f59e0b' ? 'text-amber-600' : 'text-rose-600', bg: 'bg-zinc-50', border: 'border-zinc-200', suffix: '%' },
         ].map((kpi, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.07 }}
-            className="relative overflow-hidden glass-card p-5 group hover:border-primary/40 transition-all duration-300"
+            className={`bg-white border ${kpi.border} p-5 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden`}
           >
-            <div className="absolute top-0 right-0 w-16 h-16 rounded-bl-full" style={{ background: `radial-gradient(circle, ${kpi.color}18, transparent)` }} />
-            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/60 mb-2">{kpi.label}</p>
-            <h3 className="text-lg xl:text-2xl font-black font-headline text-on-surface group-hover:text-primary transition-colors leading-tight">
+            <p className="text-[10px] font-bold uppercase text-zinc-500 mb-2">{kpi.label}</p>
+            <h3 className={`text-xl lg:text-2xl font-bold ${kpi.color} tracking-tight leading-none`}>
               <AnimatedNumber value={kpi.value} format={kpi.format} duration={900} />
               {kpi.suffix}
             </h3>
-            {kpi.desc && <p className="text-[9px] text-on-surface-variant/50 mt-1 font-medium">{kpi.desc}</p>}
           </motion.div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { label: 'Pagos', value: filteredStats.pagos, percent: pagosPercent, color: 'primary', icon: <CheckCircle size={20} className="text-primary" />, delay: 0.2 },
-          { label: 'Pendentes', value: filteredStats.pendentes, percent: pendentesPercent, color: 'secondary', icon: <Calendar size={20} className="text-secondary" />, delay: 0.3 },
-          { label: 'Vencidos', value: filteredStats.vencidos, percent: vencidosPercent, color: 'tertiary', icon: <TrendingUp size={20} className="text-tertiary" />, delay: 0.4 },
-        ].map((item, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: item.delay }}
-            className={`glass-card p-6 border-l-4 border-${item.color}`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg bg-${item.color}/20 flex items-center justify-center`}>{item.icon}</div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/60">{item.label}</p>
-                  <p className={`text-2xl font-black text-${item.color}`}>
-                    <AnimatedNumber value={item.value} duration={900} />
-                  </p>
-                </div>
-              </div>
-              <span className={`text-3xl font-black text-${item.color}/20`}>{item.percent}%</span>
-            </div>
-            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${item.percent}%` }}
-                transition={{ delay: item.delay + 0.3, duration: 0.8 }}
-                className={`h-full bg-gradient-to-r from-${item.color} to-${item.color}/60 rounded-full`}
-              />
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
+      {/* CHARTS AREA */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-card p-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h4 className="text-lg font-bold font-headline">Receitas vs Despesas</h4>
-              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Fluxo mensal {new Date().getFullYear()}</p>
+              <h4 className="text-base font-semibold text-zinc-900">Receitas vs Despesas</h4>
+              <p className="text-xs text-zinc-500 mt-1">Fluxo mensal {new Date().getFullYear()}</p>
             </div>
-            <div className="flex items-center gap-4 text-[10px]">
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#10b981]" /> Receitas</span>
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-tertiary" /> Despesas</span>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Receitas</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500" /> Despesas</span>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={monthlyFlux} barGap={2}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
-              <XAxis dataKey="name" stroke="#c6c6cd" fontSize={10} axisLine={false} tickLine={false} />
-              <YAxis stroke="#c6c6cd" fontSize={10} axisLine={false} tickLine={false}
+              <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" vertical={false} />
+              <XAxis dataKey="name" stroke="#71717a" fontSize={10} axisLine={false} tickLine={false} />
+              <YAxis stroke="#71717a" fontSize={10} axisLine={false} tickLine={false}
                 tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
               <Tooltip
-                contentStyle={{ backgroundColor: '#1a1f2e', border: '1px solid #ffffff15', borderRadius: '12px' }}
-                itemStyle={{ color: '#dee2f7', fontSize: '12px' }}
+                contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                itemStyle={{ color: '#18181b', fontSize: '12px', fontWeight: 500 }}
                 formatter={(v: number) => [v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }), '']}
               />
-              <Bar dataKey="receitas" fill="#10b981" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="despesas" fill="#ef4444" radius={[3, 3, 0, 0]} opacity={0.8} />
+              <Bar dataKey="receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="despesas" fill="#f43f5e" radius={[4, 4, 0, 0]} opacity={0.9} />
             </BarChart>
           </ResponsiveContainer>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="glass-card p-6">
-          <div className="mb-6">
-            <h4 className="text-lg font-bold font-headline">Status dos Lançamentos</h4>
-            <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Distribuição atual</p>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm flex flex-col">
+          <div className="mb-2">
+            <h4 className="text-base font-semibold text-zinc-900">Status dos Lançamentos</h4>
+            <p className="text-xs text-zinc-500 mt-1">Distribuição atual no período</p>
           </div>
-          <div className="flex items-center justify-center relative">
+          <div className="flex-1 flex items-center justify-center relative min-h-[260px]">
             {filteredTx.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[260px] text-on-surface-variant opacity-20">
-                <PieChartIcon size={64} /><p className="text-xs uppercase tracking-widest mt-4">Sem dados</p>
+              <div className="flex flex-col items-center justify-center text-zinc-400">
+                <PieChartIcon size={48} strokeWidth={1} /><p className="text-xs mt-4">Sem dados</p>
               </div>
             ) : (
               <>
@@ -324,45 +294,46 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
                       {statusChartData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
                     </Pie>
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#1a1f2e', border: '1px solid #ffffff15', borderRadius: '12px' }}
-                      itemStyle={{ color: '#dee2f7' }}
+                      contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e4e4e7', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      itemStyle={{ color: '#18181b', fontWeight: 500 }}
                       formatter={(v: number) => [`${v} lançamentos`, '']}
                     />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-4xl font-black" style={{ color: healthColor }}>{pagosPercent}%</span>
-                  <span className="text-[10px] uppercase text-on-surface-variant font-bold tracking-widest">{healthLabel}</span>
+                  <span className="text-4xl font-bold tracking-tight" style={{ color: healthColor === '#10b981' ? '#10b981' : healthColor === '#f59e0b' ? '#f59e0b' : '#ef4444' }}>{pagosPercent}%</span>
+                  <span className="text-xs text-zinc-500 font-medium uppercase tracking-wider">{healthLabel}</span>
                 </div>
               </>
             )}
           </div>
-          <div className="flex justify-center gap-6 mt-4">
+          <div className="flex justify-center gap-6 mt-4 pt-4 border-t border-zinc-100">
             {statusChartData.map((item, idx) => (
               <div key={idx} className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
-                <span className="text-xs font-medium text-on-surface-variant">{item.name}: {item.value}</span>
+                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="text-xs font-medium text-zinc-600">{item.name}: {item.value}</span>
               </div>
             ))}
           </div>
         </motion.div>
       </div>
 
+      {/* TOP FORNECEDORES E LISTAS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }} className="glass-card p-6">
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }} className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm">
           <div className="mb-6 flex items-center justify-between">
             <div>
-              <h4 className="text-lg font-bold font-headline">Top Fornecedores</h4>
-              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Por volume financeiro</p>
+              <h4 className="text-base font-semibold text-zinc-900">Top Fornecedores</h4>
+              <p className="text-xs text-zinc-500 mt-1">Por volume financeiro</p>
             </div>
-            <Building2 size={20} className="text-primary/40" />
+            <Building2 size={18} className="text-zinc-400" />
           </div>
           {topSuppliers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-on-surface-variant opacity-40">
-              <Building2 size={32} className="mb-3" /><p className="text-xs">Nenhum fornecedor</p>
+            <div className="flex flex-col items-center justify-center py-10 text-zinc-400">
+              <Building2 size={32} className="mb-3 opacity-50" /><p className="text-xs">Nenhum fornecedor</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-5">
               {topSuppliers.map((supplier, idx) => {
                 const maxValue = topSuppliers[0]?.value || 1;
                 const percent = Math.round((supplier.value / maxValue) * 100);
@@ -370,17 +341,17 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
                   <div key={idx} className="group">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
-                        <span className="w-6 h-6 rounded bg-primary/20 flex items-center justify-center text-[10px] font-black text-primary">{idx + 1}</span>
-                        <span className="text-sm font-semibold truncate max-w-[140px]">{supplier.name}</span>
+                        <span className="w-6 h-6 rounded bg-zinc-100 flex items-center justify-center text-[10px] font-bold text-zinc-600">{idx + 1}</span>
+                        <span className="text-sm font-medium text-zinc-900 truncate max-w-[140px]">{supplier.name}</span>
                       </div>
-                      <span className="text-xs font-bold text-primary">{formatBRL(supplier.value)}</span>
+                      <span className="text-xs font-bold text-zinc-900">{formatBRL(supplier.value)}</span>
                     </div>
-                    <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${percent}%` }}
                         transition={{ delay: 0.8 + idx * 0.1, duration: 0.6 }}
-                        className="h-full bg-gradient-to-r from-primary to-primary/40 rounded-full"
+                        className="h-full bg-blue-500 rounded-full"
                       />
                     </div>
                   </div>
@@ -390,87 +361,56 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
           )}
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }} className="glass-card p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h4 className="text-lg font-bold font-headline text-success">Últimas Receitas</h4>
-              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Entradas recentes</p>
-            </div>
-            <TrendingUp size={20} className="text-success/40" />
+        <div className="lg:col-span-2 bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col">
+          <div className="p-5 border-b border-zinc-200 flex justify-between items-center bg-white">
+            <h3 className="font-semibold text-zinc-900">Últimos Lançamentos</h3>
           </div>
-          <div className="space-y-3">
-            {filteredTx.filter(tx => isRevenueTransaction(tx)).slice(0, 5).map((tx, idx) => (
-              <motion.div
-                key={tx.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.9 + idx * 0.05 }}
-                className="flex flex-col p-3 bg-success/5 rounded-xl border border-success/10 hover:bg-success/10 transition-all group"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-on-surface truncate pr-2">{tx.fornecedor}</span>
-                  <span className="text-xs font-black text-success whitespace-nowrap">{formatBRL(tx.valor)}</span>
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/50">{tx.vencimento}</span>
-                    <span className="w-1 h-1 rounded-full bg-white/10" />
-                    <span className="text-[9px] font-bold text-success/60 uppercase">{tx.empresa}</span>
-                  </div>
-                  <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-success/20 text-success uppercase tracking-tighter">{tx.status}</span>
-                </div>
-              </motion.div>
-            ))}
-            {filteredTx.filter(tx => isRevenueTransaction(tx)).length === 0 && (
-              <div className="py-10 text-center opacity-30">
-                <p className="text-xs font-medium text-on-surface-variant">Nenhuma receita recente</p>
-              </div>
-            )}
-          </div>
-        </motion.div>
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-zinc-50 text-zinc-500 font-medium border-b border-zinc-200">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Fornecedor / Descrição</th>
+                  <th className="px-5 py-3 font-medium">Vencimento</th>
+                  <th className="px-5 py-3 font-medium text-right">Valor</th>
+                  <th className="px-5 py-3 font-medium text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {filteredTx.slice(0, 6).map((tx) => {
+                  let badgeStyle = 'bg-zinc-100 text-zinc-700 border-zinc-200';
+                  if (tx.status === 'PAGO') badgeStyle = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                  else if (tx.status === 'PENDENTE') badgeStyle = 'bg-amber-50 text-amber-700 border-amber-200';
+                  else if (tx.status === 'VENCIDO') badgeStyle = 'bg-rose-50 text-rose-700 border-rose-200';
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }} className="glass-card p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h4 className="text-lg font-bold font-headline text-primary">Últimas Despesas</h4>
-              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Saídas recentes</p>
-            </div>
-            <TrendingDown size={20} className="text-primary/40" />
+                  return (
+                    <tr key={tx.id} className="hover:bg-zinc-50 transition-colors">
+                      <td className="px-5 py-3">
+                        <p className="font-medium text-zinc-900 truncate max-w-[200px]">{tx.fornecedor}</p>
+                        <p className="text-xs text-zinc-500 truncate max-w-[200px]">{tx.descricao}</p>
+                      </td>
+                      <td className="px-5 py-3 text-zinc-600 whitespace-nowrap">{tx.vencimento}</td>
+                      <td className={`px-5 py-3 text-right font-medium whitespace-nowrap ${tx.tipo === 'RECEITA' ? 'text-emerald-600' : 'text-zinc-900'}`}>
+                        {formatBRL(tx.valor)}
+                      </td>
+                      <td className="px-5 py-3 text-center">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${badgeStyle}`}>
+                          {tx.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredTx.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-8 text-center text-zinc-500">
+                      Nenhum lançamento encontrado neste período.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-          <div className="space-y-3">
-            {filteredTx.filter(tx => !isRevenueTransaction(tx)).slice(0, 5).map((tx, idx) => (
-              <motion.div
-                key={tx.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 1.0 + idx * 0.05 }}
-                className="flex flex-col p-3 bg-primary/5 rounded-xl border border-primary/10 hover:bg-primary/10 transition-all group"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-on-surface truncate pr-2">{tx.fornecedor}</span>
-                  <span className="text-xs font-black text-primary whitespace-nowrap">{formatBRL(tx.valor)}</span>
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/50">{tx.vencimento}</span>
-                    <span className="w-1 h-1 rounded-full bg-white/10" />
-                    <span className="text-[9px] font-bold text-primary/60 uppercase">{tx.empresa}</span>
-                  </div>
-                  <span className={cn("text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter",
-                    tx.status === 'PAGO' && "bg-primary/20 text-primary",
-                    tx.status === 'PENDENTE' && "bg-secondary/20 text-secondary",
-                    tx.status === 'VENCIDO' && "bg-tertiary/20 text-tertiary"
-                  )}>{tx.status}</span>
-                </div>
-              </motion.div>
-            ))}
-            {filteredTx.filter(tx => !isRevenueTransaction(tx)).length === 0 && (
-              <div className="py-10 text-center opacity-30">
-                <p className="text-xs font-medium text-on-surface-variant">Nenhuma despesa recente</p>
-              </div>
-            )}
-          </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
