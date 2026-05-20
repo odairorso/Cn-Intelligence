@@ -73,9 +73,9 @@ type PdfImportDraft = {
   cnpj: string;
   numero_boleto: string;
   tipo?: 'RECEITA' | 'DESPESA';
+  conta_contabil_id?: number;
   rawText: string;
   duplicate: boolean;
-  conta_contabil_id?: number;
   ai_error?: string;
 };
 
@@ -816,6 +816,7 @@ export default function App() {
           empresa: String(dataAny.empresa || ''),
           cnpj: String(dataAny.cnpj || ''),
           numero_boleto: numero,
+          conta_contabil_id: dataAny.conta_contabil_id ? Number(dataAny.conta_contabil_id) : undefined,
           tipo: 'DESPESA',
           rawText: text.slice(0, 500),
           duplicate: false,
@@ -835,6 +836,7 @@ export default function App() {
         empresa: String((dataAny as any)?.empresa || ''),
         cnpj: String((dataAny as any)?.cnpj || ''),
         numero_boleto: String((dataAny as any)?.numero_boleto || fallback.numero_boleto || ''),
+        conta_contabil_id: dataAny.conta_contabil_id ? Number(dataAny.conta_contabil_id) : undefined,
         tipo: 'DESPESA'
       };
     } catch (err) {
