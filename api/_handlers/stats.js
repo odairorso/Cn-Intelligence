@@ -1,5 +1,7 @@
 import { sql } from '../_db.js';
 
+const isRange = (val) => typeof val === 'string' && /^\d{4}-\d{4}$/.test(val);
+
 // GET /api?route=stats — retorna agregados globais para o dashboard
 export async function handleStats(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -36,7 +38,6 @@ export async function handleStats(req, res) {
         dateFilterSql = sql`${dateFilterSql} AND vencimento <= ${endDate}`;
       }
     } else {
-      const isRange = (val) => /^\d{4}-\d{4}$/.test(val);
       if (year && year !== 'TODOS' && !isRange(year)) {
         const y = parseInt(year);
         dateFilterSql = sql`AND vencimento >= ${y + '-01-01'} AND vencimento <= ${y + '-12-31'}`;
