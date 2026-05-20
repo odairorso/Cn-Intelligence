@@ -83,6 +83,15 @@ export async function handleExtractBoleto(req, res) {
     const rawCnpj = allCnpjs[0] || '';
     const pattern = await lookupPattern(rawCnpj, normName(rawBenefName));
 
+    // Busca as contas contábeis cadastradas para o prompt da IA
+    let contasContabeisText = '';
+    try {
+      const contasRows = await sql`SELECT id, codigo, nome, tipo FROM contas_contabeis WHERE ativo = true ORDER BY codigo`;
+      if (contasRows.length > 0) {
+        contasContabeisText = '\n\nCONTAS CONTÁBEIS DISPONÍVEIS:\n' + contasRows.map(c => `- ID ${c.id}: ${c.codigo} - ${c.nome} (${c.tipo})`).join('\n');
+      }
+    } catch { /* ignore if fails */ }
+
     // Se encontrou padrão e o texto é bom, usa o padrão (MUITO mais rápido)
     if (pattern && pattern.fornecedor && pattern.fornecedor !== 'Fornecedor não identificado' && extractedText.length > 100) {
       const dateMatch = srcUpper.match(/VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/);
@@ -98,6 +107,7 @@ export async function handleExtractBoleto(req, res) {
         empresa: pattern.empresa,
         tipo: pattern.tipo,
         numero_boleto: numero,
+        conta_contabil_id: pattern.conta_contabil_id,
         _from_pattern: true
       });
     }
@@ -113,7 +123,8 @@ export async function handleExtractBoleto(req, res) {
     3. VALOR: Valor total (numérico).
     4. CNPJ: CNPJ do Beneficiário (quem recebe).
     5. NÚMERO DO BOLETO: Linha digitável ou código de barras.
-    6. DESCRIÇÃO: Uma breve descrição baseada no conteúdo (ex: "Seguro Auto", "Conta de Energia").`;
+    6. DESCRIÇÃO: Uma breve descrição baseada no conteúdo (ex: "Seguro Auto", "Conta de Energia").
+    7. CONTA CONTÁBIL (conta_contabil_id): Baseado na descrição e fornecedor, sugira o ID NUMÉRICO da conta contábil mais adequada. Retorne apenas o ID numérico ou null se não souber.${contasContabeisText}`;
 
     const parts = [];
     if (pdfBase64) {
@@ -141,7 +152,8 @@ export async function handleExtractBoleto(req, res) {
             valor: { type: 'number' },
             cnpj: { type: 'string' },
             numero_boleto: { type: 'string' },
-            descricao: { type: 'string' }
+            descricao: { type: 'string' },
+            conta_contabil_id: { type: 'number', nullable: true }
           },
           required: ['fornecedor', 'vencimento', 'valor']
         }
