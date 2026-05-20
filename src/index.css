@@ -10,35 +10,38 @@
   --color-secondary: #f59e0b;     /* Amber 500 */
   --color-tertiary: #ef4444;      /* Red 500 */
   --color-success: #10b981;       /* Emerald 500 */
-  --color-background: #050d1a;    /* Very dark navy */
-  --color-surface: #0d1b2e;       /* Dark navy */
-  --color-surface-variant: #162340; /* Navy blue variant */
-  --color-on-surface: #e8f0fe;    /* Light blue-white */
-  --color-on-surface-variant: #7da3c8; /* Muted blue-gray */
-  --color-border-glow: rgba(59, 130, 246, 0.25);
+  
+  /* Deep Dark Theme Colors (Zinc based) */
+  --color-background: #09090b;    /* zinc-950 */
+  --color-surface: #18181b;       /* zinc-900 */
+  --color-surface-variant: #27272a; /* zinc-800 */
+  
+  --color-on-surface: #f4f4f5;    /* zinc-50 */
+  --color-on-surface-variant: #a1a1aa; /* zinc-400 */
+  
+  --color-border-glow: rgba(59, 130, 246, 0.15);
 }
 
 @layer base {
   body {
     @apply bg-background text-on-surface font-sans antialiased;
-    background: radial-gradient(circle at top left, #0d1b2e 0%, #050d1a 100%);
     min-height: 100vh;
   }
 }
 
 .glass-card {
-  @apply bg-surface/40 backdrop-blur-2xl border border-white/5 rounded-sm;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  @apply bg-surface border border-surface-variant rounded-xl;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease-in-out;
 }
 
 .glass-card:hover {
-  @apply border-primary/20 bg-surface/50;
-  box-shadow: 0 0 20px var(--color-border-glow);
+  @apply border-primary/30;
+  box-shadow: 0 0 15px var(--color-border-glow);
 }
 
 .premium-gradient-text {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary;
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-400;
 }
 
 .on-surface {
@@ -51,21 +54,20 @@
 
 /* Scrollbar sempre visível e estilizada para tabelas */
 .custom-scrollbar::-webkit-scrollbar {
-  height: 10px;
-  width: 10px;
+  height: 8px;
+  width: 8px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-background);
   border-radius: 4px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(59, 130, 246, 0.4);
+  background: var(--color-surface-variant);
   border-radius: 4px;
-  border: 2px solid var(--color-surface);
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(59, 130, 246, 0.8);
+  background: #3f3f46; /* zinc-700 */
 }

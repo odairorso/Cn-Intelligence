@@ -191,7 +191,7 @@ const LancamentosTab = React.memo(({
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between gap-4">
         <div className="flex flex-wrap gap-3 flex-grow max-w-4xl">
-          <div className="bg-surface-variant/20 flex items-center px-4 py-2.5 rounded-sm border border-white/5 flex-grow min-w-[200px] focus-within:border-primary/40 transition-all">
+          <div className="bg-surface-variant/20 flex items-center px-4 py-2.5 rounded-sm border border-surface-variant flex-grow min-w-[200px] focus-within:border-primary/40 transition-all">
             <Search size={18} className="text-on-surface-variant" />
             <input
               type="text"
@@ -306,7 +306,7 @@ const LancamentosTab = React.memo(({
               <div className="flex justify-between items-center">
                 <span className={cn(
                   "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                  tx.status === 'PAGO' && "bg-primary/20 text-primary border-primary/30",
+                  tx.status === 'PAGO' && "bg-success/20 text-success border-success/30",
                   tx.status === 'PENDENTE' && "bg-secondary/20 text-secondary border-secondary/30",
                   tx.status === 'VENCIDO' && "bg-tertiary/20 text-tertiary border-tertiary/30"
                 )}>
@@ -318,7 +318,7 @@ const LancamentosTab = React.memo(({
                       <Check size={16} />
                     </button>
                   )}
-                  <button onClick={() => setEditingTx(tx)} className="p-2 text-on-surface-variant bg-white/5 rounded-lg">
+                  <button onClick={() => setEditingTx(tx)} className="p-2 text-on-surface-variant bg-surface-variant/40 rounded-lg">
                     <Edit size={16} />
                   </button>
                   <button onClick={() => deleteTransaction(tx.id)} className="p-2 text-tertiary bg-tertiary/10 rounded-lg">
@@ -336,7 +336,7 @@ const LancamentosTab = React.memo(({
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[980px]">
             <thead>
-              <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-white/5">
+              <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-surface-variant">
                 <th className="px-4 py-4 w-10 whitespace-nowrap">
                   <input
                     type="checkbox"
@@ -357,12 +357,12 @@ const LancamentosTab = React.memo(({
                 </th>
                 <th className="px-8 py-4 whitespace-nowrap w-32 hidden xl:table-cell">Pagamento</th>
                 <th className="px-8 py-4 whitespace-nowrap w-28 hidden xl:table-cell">Conta</th>
-                <th className="px-8 py-4 whitespace-nowrap w-24 sticky right-0 bg-surface z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)]">Ações</th>
+                <th className="px-8 py-4 whitespace-nowrap w-24 sticky right-0 bg-surface z-10 border-l border-surface-variant shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)]">Ações</th>
               </tr>
             </thead>
-            <tbody className="text-sm divide-y divide-white/5">
+            <tbody className="text-sm divide-y divide-surface-variant">
               {paginated.map((tx) => (
-                <tr key={tx.id} className={cn("hover:bg-white/5 transition-colors", selectedMap.has(tx.id) && "bg-primary/5")}>
+                <tr key={tx.id} className={cn("hover:bg-surface-variant/40 transition-colors", selectedMap.has(tx.id) && "bg-primary/5")}>
                   <td className="px-4 py-4">
                     {tx.status !== 'PAGO' && (
                       <input
@@ -387,7 +387,7 @@ const LancamentosTab = React.memo(({
                   <td className="px-8 py-4 hidden lg:table-cell">
                     <span className={cn(
                       "text-[10px] font-bold px-3 py-1 rounded-full border",
-                      tx.status === 'PAGO' && "bg-primary/20 text-primary border-primary/30",
+                      tx.status === 'PAGO' && "bg-success/20 text-success border-success/30",
                       tx.status === 'PENDENTE' && "bg-secondary/20 text-secondary border-secondary/30",
                       tx.status === 'VENCIDO' && "bg-tertiary/20 text-tertiary border-tertiary/30"
                     )}>
@@ -402,7 +402,7 @@ const LancamentosTab = React.memo(({
                   <td className="px-8 py-4 whitespace-nowrap">{toDisplayDate(tx.vencimento)}</td>
                   <td className="px-8 py-4 text-on-surface-variant whitespace-nowrap hidden xl:table-cell">{toDisplayDate(tx.pagamento) || '-'}</td>
                   <td className="px-8 py-4 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold truncate max-w-[100px] hidden xl:table-cell" title={tx.banco}>{tx.banco || '-'}</td>
-                  <td className="px-8 py-4 sticky right-0 bg-surface z-10 border-l border-white/5 shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] group-hover:bg-surface-variant/20 transition-colors">
+                  <td className="px-8 py-4 sticky right-0 bg-surface z-10 border-l border-surface-variant shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] group-hover:bg-surface-variant/20 transition-colors">
                     <div className="flex gap-2 justify-end">
                       {tx.status !== 'PAGO' && (
                         <button
@@ -415,7 +415,7 @@ const LancamentosTab = React.memo(({
                       )}
                       <button
                         onClick={() => setEditingTx(tx)}
-                        className="p-1.5 text-on-surface-variant hover:bg-white/10 rounded transition-colors"
+                        className="p-1.5 text-on-surface-variant hover:bg-surface-variant/60 rounded transition-colors"
                         title="Editar"
                       >
                         <Edit size={16} />
@@ -446,7 +446,7 @@ const LancamentosTab = React.memo(({
             <button
               onClick={() => setPage(p => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="p-2 rounded-lg bg-white/5 text-on-surface-variant disabled:opacity-30 hover:bg-white/10 transition-colors"
+              className="p-2 rounded-lg bg-surface-variant/40 text-on-surface-variant disabled:opacity-30 hover:bg-surface-variant/60 transition-colors"
             >
               <ChevronLeft size={16} />
             </button>
@@ -454,7 +454,7 @@ const LancamentosTab = React.memo(({
             <button
               onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
               disabled={page === totalPages - 1}
-              className="p-2 rounded-lg bg-white/5 text-on-surface-variant disabled:opacity-30 hover:bg-white/10 transition-colors"
+              className="p-2 rounded-lg bg-surface-variant/40 text-on-surface-variant disabled:opacity-30 hover:bg-surface-variant/60 transition-colors"
             >
               <ChevronRight size={16} />
             </button>
@@ -463,7 +463,7 @@ const LancamentosTab = React.memo(({
       )}
 
       {/* Carregar mais do Banco de Dados */}
-      <div className="flex justify-center pt-4 border-t border-white/5">
+      <div className="flex justify-center pt-4 border-t border-surface-variant">
         <button
           onClick={() => onLoadMore?.(true, yearFilter, monthFilter, filter)}
           disabled={isLoadingMore}

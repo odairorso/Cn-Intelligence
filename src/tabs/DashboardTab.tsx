@@ -205,7 +205,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
               "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
               periodoFilter === p
                 ? "bg-primary text-background border-primary"
-                : "bg-white/5 text-on-surface-variant border-white/10 hover:border-primary/40 hover:text-on-surface"
+                : "bg-surface-variant/40 text-on-surface-variant border-surface-variant hover:border-primary/40 hover:text-on-surface"
             )}
           >
             {p}
@@ -242,7 +242,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { label: 'Pagos', value: filteredStats.pagos, percent: pagosPercent, color: 'primary', icon: <CheckCircle size={20} className="text-primary" />, delay: 0.2 },
+          { label: 'Pagos', value: filteredStats.pagos, percent: pagosPercent, color: 'success', icon: <CheckCircle size={20} className="text-success" />, delay: 0.2 },
           { label: 'Pendentes', value: filteredStats.pendentes, percent: pendentesPercent, color: 'secondary', icon: <Calendar size={20} className="text-secondary" />, delay: 0.3 },
           { label: 'Vencidos', value: filteredStats.vencidos, percent: vencidosPercent, color: 'tertiary', icon: <TrendingUp size={20} className="text-tertiary" />, delay: 0.4 },
         ].map((item, i) => (

@@ -1589,11 +1589,11 @@ export default function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-background">
         <div className="flex items-center gap-3">
-          <img src={currentBrandLogo} alt="Logo" className="h-10 w-10 object-contain rounded-sm border border-white/10 bg-white/5 p-1" />
+          <img src={currentBrandLogo} alt="Logo" className="h-10 w-10 object-contain rounded-sm border border-surface-variant bg-surface-variant/40 p-1" />
           <h1 className="text-2xl font-black tracking-tighter premium-gradient-text font-headline">Fluxo Caixa CN</h1>
         </div>
         <div className="flex flex-col items-center gap-3">
-          <div className="w-48 h-1.5 bg-white/10 rounded-full overflow-hidden">
+          <div className="w-48 hover:bg-surface-variant/60 rounded-full overflow-hidden">
             <div className="h-full bg-primary rounded-full animate-[loading_1.2s_ease-in-out_infinite]" style={{ width: '60%', animation: 'pulse 1.2s ease-in-out infinite' }} />
           </div>
           <p className="text-xs text-on-surface-variant/50 uppercase tracking-widest font-bold">Carregando dados...</p>
@@ -1615,13 +1615,13 @@ export default function App() {
     <AuthGuard isAuthorized={isAuthorized} onLogin={login}>
       <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="bg-surface/80 backdrop-blur-md border-b border-white/5 flex justify-between items-center w-full px-4 md:px-8 py-5 fixed top-0 z-50">
+      <header className="bg-surface/80 backdrop-blur-md border-b border-surface-variant flex justify-between items-center w-full px-4 md:px-8 py-5 fixed top-0 z-50">
         <div className="flex items-center gap-4 md:gap-8">
           <div className="flex items-center gap-3">
             <img
               src={currentBrandLogo}
               alt="Logo Fluxo Caixa CN"
-              className="h-9 w-9 md:h-10 md:w-10 object-contain rounded-sm border border-white/10 bg-white/5 p-1"
+              className="h-9 w-9 md:h-10 md:w-10 object-contain rounded-sm border border-surface-variant bg-surface-variant/40 p-1"
             />
             <h1 className="text-xl md:text-2xl font-black tracking-tighter premium-gradient-text font-headline">Fluxo Caixa CN</h1>
           </div>
@@ -1629,13 +1629,13 @@ export default function App() {
           <nav className="hidden lg:flex gap-6">
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'dashboard' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'dashboard' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
             >
               Dashboard
             </button>
             <button
               onClick={() => setActiveTab('lancamentos')}
-              className={cn("relative transition-all duration-200 font-medium text-sm", activeTab === 'lancamentos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+              className={cn("relative transition-all duration-200 font-medium text-sm", activeTab === 'lancamentos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
             >
               Lançamentos
               {stats.vencidos > 0 && (
@@ -1646,37 +1646,37 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveTab('fornecedores')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'fornecedores' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'fornecedores' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
             >
               Fornecedores
             </button>
             <button
               onClick={() => setActiveTab('relatorios')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'relatorios' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'relatorios' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
             >
               Relatórios
             </button>
             <button
               onClick={() => setActiveTab('receitas')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'receitas' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'receitas' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
             >
               Receitas
             </button>
             <button
               onClick={() => setActiveTab('bancos')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'bancos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'bancos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
             >
               Bancos
             </button>
             <button
               onClick={() => setActiveTab('extrato')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'extrato' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'extrato' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
             >
               Extrato OFX
             </button>
             <button
               onClick={() => setActiveTab('configuracoes')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'configuracoes' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'configuracoes' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
             >
               Configurações
             </button>
@@ -1696,14 +1696,14 @@ export default function App() {
           >
             <X size={20} />
           </button>
-          <button className="p-2 text-on-surface-variant hover:bg-white/5 rounded-full transition-colors hidden sm:block">
+          <button className="p-2 text-on-surface-variant hover:bg-surface-variant/40 rounded-full transition-colors hidden sm:block">
             <Bell size={20} />
           </button>
         </div>
       </header>
 
       {/* Mobile Navigation (Bottom Bar) */}
-      <nav className="lg:hidden fixed bottom-6 left-6 right-6 bg-surface/90 backdrop-blur-xl border border-white/10 z-50 flex justify-around items-center py-4 px-4 rounded-sm shadow-2xl">
+      <nav className="lg:hidden fixed bottom-6 left-6 right-6 bg-surface/90 backdrop-blur-xl border border-surface-variant z-50 flex justify-around items-center py-4 px-4 rounded-sm shadow-2xl">
         <button
           onClick={() => setActiveTab('dashboard')}
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'dashboard' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
@@ -1822,7 +1822,7 @@ export default function App() {
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="bg-surface-variant/20 text-on-surface px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-surface-variant/40 transition-all border border-white/5"
+              className="bg-surface-variant/20 text-on-surface px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-surface-variant/40 transition-all border border-surface-variant"
             >
               <FileSpreadsheet size={18} className="text-primary" /> Importar CSV
             </button>
@@ -1919,7 +1919,7 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="pt-8 border-t border-white/5">
+                <div className="pt-8 border-t border-surface-variant">
                   <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Identidade Visual</h4>
                   <div className="space-y-4 max-w-md mx-auto">
                     <div className="glass-card p-4">
@@ -1947,7 +1947,7 @@ export default function App() {
                         <img
                           src={currentBrandLogo}
                           alt="Prévia da logo"
-                          className="h-20 w-20 object-contain rounded-sm border border-white/10 bg-white/5 p-2"
+                          className="h-20 w-20 object-contain rounded-sm border border-surface-variant bg-surface-variant/40 p-2"
                         />
                       </div>
                     </div>
@@ -1955,7 +1955,7 @@ export default function App() {
                 </div>
 
                 {/* Backup do Sistema */}
-                <div className="pt-8 border-t border-white/5">
+                <div className="pt-8 border-t border-surface-variant">
                   <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">💾 Backup dos Dados</h4>
                   <div className="space-y-4 max-w-xl mx-auto">
                     <div className="glass-card p-6">
@@ -1984,7 +1984,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="pt-8 border-t border-white/5">
+                <div className="pt-8 border-t border-surface-variant">
                   <h4 className="text-sm font-bold text-secondary mb-4 uppercase tracking-widest">Empresas</h4>
                   <div className="space-y-4 max-w-xl mx-auto">
                     <div className="glass-card p-4">
@@ -1995,7 +1995,7 @@ export default function App() {
                           value={newCompanyName}
                           onChange={(e) => setNewCompanyName(e.target.value)}
                           placeholder="Ex: POLO NOVO"
-                          className="flex-1 bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                          className="flex-1 bg-surface-variant/20 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                         <button
                           onClick={() => addCompanyOption(newCompanyName)}
@@ -2006,13 +2006,13 @@ export default function App() {
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
                         {safeCompanyOptions.map((company) => (
-                          <span key={company} className="inline-flex items-center gap-2 bg-surface-variant/20 border border-white/10 rounded-lg px-2 py-1.5 text-xs font-bold">
+                          <span key={company} className="inline-flex items-center gap-2 bg-surface-variant/20 border border-surface-variant rounded-lg px-2 py-1.5 text-xs font-bold">
                             {editingCompany === company ? (
                               <>
                                 <input
                                   value={editingCompanyName}
                                   onChange={(e) => setEditingCompanyName(e.target.value)}
-                                  className="bg-transparent border border-white/10 rounded px-2 py-1 text-xs outline-none focus:border-primary w-36"
+                                  className="bg-transparent border border-surface-variant rounded px-2 py-1 text-xs outline-none focus:border-primary w-36"
                                 />
                                 <button
                                   onClick={() => saveEditCompany(company)}
@@ -2054,7 +2054,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="pt-8 border-t border-white/5">
+                <div className="pt-8 border-t border-surface-variant">
                   <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Plano de Contas</h4>
                   <div className="space-y-4 max-w-3xl mx-auto">
                     <div className="glass-card p-4">
@@ -2065,7 +2065,7 @@ export default function App() {
                             value={newContaContabil.codigo}
                             onChange={(e) => setNewContaContabil(prev => ({ ...prev, codigo: e.target.value }))}
                             placeholder="Ex: 3.1"
-                            className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                            className="w-full bg-surface-variant/20 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                           />
                         </div>
                         <div className="col-span-6">
@@ -2074,7 +2074,7 @@ export default function App() {
                             value={newContaContabil.nome}
                             onChange={(e) => setNewContaContabil(prev => ({ ...prev, nome: e.target.value }))}
                             placeholder="Ex: Folha de Pagamento"
-                            className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                            className="w-full bg-surface-variant/20 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                           />
                         </div>
                         <div className="col-span-3">
@@ -2082,7 +2082,7 @@ export default function App() {
                           <select
                             value={newContaContabil.tipo}
                             onChange={(e) => setNewContaContabil(prev => ({ ...prev, tipo: e.target.value as 'DESPESA' | 'RECEITA' }))}
-                            className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                            className="w-full bg-surface-variant/20 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                           >
                             <option value="DESPESA">DESPESA</option>
                             <option value="RECEITA">RECEITA</option>
@@ -2135,7 +2135,7 @@ export default function App() {
                           <p className="text-[11px] font-bold uppercase text-on-surface-variant mb-2">Despesas</p>
                           <div className="space-y-1 max-h-64 overflow-auto pr-1">
                             {safeContasContabeis.filter(c => matchesAccountType(c, 'DESPESA')).map((c) => (
-                              <div key={c.id} className="flex items-center justify-between border border-white/10 rounded-lg px-3 py-2">
+                              <div key={c.id} className="flex items-center justify-between border border-surface-variant rounded-lg px-3 py-2">
                                 <span className="text-xs">{c.nome}</span>
                                 <label className="text-[10px] flex items-center gap-2">
                                   <span className="text-on-surface-variant">{c.ativo ? 'Ativa' : 'Inativa'}</span>
@@ -2160,7 +2160,7 @@ export default function App() {
                           <p className="text-[11px] font-bold uppercase text-on-surface-variant mb-2">Receitas</p>
                           <div className="space-y-1 max-h-64 overflow-auto pr-1">
                             {safeContasContabeis.filter(c => matchesAccountType(c, 'RECEITA')).map((c) => (
-                              <div key={c.id} className="flex items-center justify-between border border-white/10 rounded-lg px-3 py-2">
+                              <div key={c.id} className="flex items-center justify-between border border-surface-variant rounded-lg px-3 py-2">
                                 <span className="text-xs">{c.nome}</span>
                                 <label className="text-[10px] flex items-center gap-2">
                                   <span className="text-on-surface-variant">{c.ativo ? 'Ativa' : 'Inativa'}</span>
@@ -2185,7 +2185,7 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-                <div className="pt-8 border-t border-white/5">
+                <div className="pt-8 border-t border-surface-variant">
                   <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Contas Contábeis</h4>
                   <div className="space-y-4 max-w-xl mx-auto">
                     <div className="glass-card p-4">
@@ -2213,19 +2213,19 @@ export default function App() {
                           value={newContaContabil.codigo}
                           onChange={(e) => setNewContaContabil({ ...newContaContabil, codigo: e.target.value })}
                           placeholder="Código (ex: 3.10)"
-                          className="w-24 bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                          className="w-24 bg-surface-variant/20 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                         <input
                           type="text"
                           value={newContaContabil.nome}
                           onChange={(e) => setNewContaContabil({ ...newContaContabil, nome: e.target.value })}
                           placeholder="Nome da conta"
-                          className="flex-1 bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                          className="flex-1 bg-surface-variant/20 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                         <select
                           value={newContaContabil.tipo}
                           onChange={(e) => setNewContaContabil({ ...newContaContabil, tipo: e.target.value })}
-                          className="bg-surface-variant/20 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                          className="bg-surface-variant/20 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         >
                           <option value="DESPESA">Despesa</option>
                           <option value="RECEITA">Receita</option>
@@ -2246,7 +2246,7 @@ export default function App() {
                           placeholder="Buscar conta..."
                           value={searchContaContabil || ''}
                           onChange={(e) => setSearchContaContabil(e.target.value)}
-                          className="w-full bg-surface-variant/20 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm outline-none focus:border-primary"
+                          className="w-full bg-surface-variant/20 border border-surface-variant rounded-lg pl-9 pr-4 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
 
@@ -2258,7 +2258,7 @@ export default function App() {
                             return c.codigo.toLowerCase().includes(q) || c.nome.toLowerCase().includes(q);
                           })
                           .map((conta) => (
-                            <div key={conta.id} className="flex items-center justify-between bg-surface-variant/10 border border-white/5 rounded-lg px-3 py-2">
+                            <div key={conta.id} className="flex items-center justify-between bg-surface-variant/10 border border-surface-variant rounded-lg px-3 py-2">
                               <div className="flex items-center gap-3">
                                 <span className={`text-xs font-bold px-2 py-1 rounded ${conta.tipo === 'RECEITA' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                                   {conta.codigo}
@@ -2283,7 +2283,7 @@ export default function App() {
 
 
 
-                <div className="pt-8 border-t border-white/5">
+                <div className="pt-8 border-t border-surface-variant">
                   <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Padrões de Boletos</h4>
                   <div className="space-y-4 max-w-2xl mx-auto">
                     <div className="glass-card p-4">
@@ -2301,7 +2301,7 @@ export default function App() {
                           <p className="text-center text-xs text-on-surface-variant py-4">Nenhum padrão aprendido ainda.</p>
                         ) : (
                           safeBoletoPatterns.map((pattern) => (
-                            <div key={pattern.id} className="flex items-center justify-between bg-surface-variant/10 border border-white/5 rounded-lg px-3 py-2">
+                            <div key={pattern.id} className="flex items-center justify-between bg-surface-variant/10 border border-surface-variant rounded-lg px-3 py-2">
                               <div className="flex flex-col">
                                 <span className="text-sm font-bold">{pattern.fornecedor}</span>
                                 <span className="text-[10px] text-on-surface-variant">
@@ -2364,8 +2364,8 @@ export default function App() {
 
       {showPdfImportModal && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-surface border border-white/10 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+          <div className="bg-surface border border-surface-variant rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-surface-variant flex items-center justify-between">
               <h3 className="text-lg md:text-xl font-bold font-headline flex items-center gap-2">
                 <FileUp className="text-primary" size={20} /> Automação de Boletos
               </h3>
@@ -2377,7 +2377,7 @@ export default function App() {
             <div className="p-4 max-h-[60vh] overflow-auto">
               <div className="space-y-3">
                 {pdfExtractedRows.map((row, index) => (
-                  <div key={`${row.fileName}-${index}`} className={cn("border rounded-xl p-3", row.duplicate ? "border-tertiary/40 bg-tertiary/5" : "border-white/10 bg-surface-variant/10")}>
+                  <div key={`${row.fileName}-${index}`} className={cn("border rounded-xl p-3", row.duplicate ? "border-tertiary/40 bg-tertiary/5" : "border-surface-variant bg-surface-variant/10")}>
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                       <div className="md:col-span-3">
                         <p className="text-[10px] font-bold uppercase text-on-surface-variant mb-1">Arquivo</p>
@@ -2392,7 +2392,7 @@ export default function App() {
                           value={row.fornecedor}
                           onChange={(e) => updatePdfRow(index, { fornecedor: e.target.value })}
                           placeholder="Digite o fornecedor..."
-                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary cursor-text"
+                          className="w-full bg-surface-variant/30 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary cursor-text"
                           autoComplete="off"
                           spellCheck={false}
                         />
@@ -2403,7 +2403,7 @@ export default function App() {
                           value={row.vencimento}
                           onChange={(e) => updatePdfRow(index, { vencimento: e.target.value })}
                           placeholder="DD/MM/AAAA"
-                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                          className="w-full bg-surface-variant/30 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -2417,7 +2417,7 @@ export default function App() {
                             const n = Number(raw);
                             updatePdfRow(index, { valor: Number.isFinite(n) ? n : 0 });
                           }}
-                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                          className="w-full bg-surface-variant/30 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
                       <div className="md:col-span-2 flex md:justify-end items-end">
@@ -2440,7 +2440,7 @@ export default function App() {
                           value={row.descricao}
                           onChange={(e) => updatePdfRow(index, { descricao: e.target.value })}
                           placeholder="Descrição do boleto"
-                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                          className="w-full bg-surface-variant/30 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
                       <div className="md:col-span-4">
@@ -2449,7 +2449,7 @@ export default function App() {
                           value={row.numero_boleto || ''}
                           onChange={(e) => updatePdfRow(index, { numero_boleto: e.target.value })}
                           placeholder="Nosso número / Nro documento"
-                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                          className="w-full bg-surface-variant/30 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -2457,7 +2457,7 @@ export default function App() {
                         <select
                           value={row.tipo || 'DESPESA'}
                           onChange={(e) => updatePdfRow(index, { tipo: e.target.value as 'RECEITA' | 'DESPESA', conta_contabil_id: undefined })}
-                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary text-on-surface"
+                          className="w-full bg-surface-variant/30 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary text-on-surface"
                           style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}
                         >
                           <option value="DESPESA" style={{ backgroundColor: '#1e1e2e' }}>Despesa</option>
@@ -2469,7 +2469,7 @@ export default function App() {
                         <select
                           value={row.empresa}
                           onChange={(e) => updatePdfRow(index, { empresa: e.target.value })}
-                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary text-on-surface"
+                          className="w-full bg-surface-variant/30 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary text-on-surface"
                           style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}
                         >
                           <option value="" style={{ backgroundColor: '#1e1e2e' }}>Selecione</option>
@@ -2483,7 +2483,7 @@ export default function App() {
                         <select
                           value={row.conta_contabil_id || ''}
                           onChange={(e) => updatePdfRow(index, { conta_contabil_id: e.target.value ? Number(e.target.value) : undefined })}
-                          className="w-full bg-surface-variant/30 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary text-on-surface"
+                          className="w-full bg-surface-variant/30 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary text-on-surface"
                           style={{ backgroundColor: '#1e1e2e', color: '#e0e0e0' }}
                         >
                           <option value="" style={{ backgroundColor: '#1e1e2e' }}>Selecione a conta</option>
@@ -2512,13 +2512,13 @@ export default function App() {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-white/10 flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-surface-variant flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowPdfImportModal(false);
                   setPdfExtractedRows([]);
                 }}
-                className="px-4 py-2 rounded-lg text-sm font-bold text-on-surface-variant hover:text-white hover:bg-white/5 transition-all"
+                className="px-4 py-2 rounded-lg text-sm font-bold text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/40 transition-all"
               >
                 Cancelar
               </button>
@@ -2629,7 +2629,7 @@ export default function App() {
       )}
 
       {/* Footer */}
-      <footer className="bg-surface border-t border-white/5 hidden lg:flex flex-col md:flex-row justify-between items-center px-8 w-full py-6 mt-auto">
+      <footer className="bg-surface border-t border-surface-variant hidden lg:flex flex-col md:flex-row justify-between items-center px-8 w-full py-6 mt-auto">
         <div className="mb-4 md:mb-0">
           <p className="text-[11px] font-medium uppercase tracking-wider text-on-surface-variant">
             Dashboard Fluxo de Caixa - Grupo CN | Dados atualizados em tempo real | © 2025
