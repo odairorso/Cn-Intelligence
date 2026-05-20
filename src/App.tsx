@@ -26,7 +26,6 @@ import {
 import { DEFAULT_COMPANIES } from './lib/constants';
 import { GlobalSearch } from './components/GlobalSearch';
 import { AuthGuard } from './components/AuthGuard';
-import { ModernLayout } from './components/ModernLayout';
 
 // Lazy-loaded tabs
 const DashboardTab = lazy(() => import('./tabs/DashboardTab'));
@@ -1614,29 +1613,181 @@ export default function App() {
 
   return (
     <AuthGuard isAuthorized={isAuthorized} onLogin={login}>
-      <ModernLayout activeTab={activeTab} setActiveTab={setActiveTab as any} uid={apiAuth.getUid() || 'AD'}>
-      <main className="flex-grow pb-12 w-full max-w-7xl mx-auto">
+      <div className="min-h-screen flex flex-col">
+      {/* Header */}
+      <header className="bg-surface/80 backdrop-blur-md border-b border-white/5 flex justify-between items-center w-full px-4 md:px-8 py-5 fixed top-0 z-50">
+        <div className="flex items-center gap-4 md:gap-8">
+          <div className="flex items-center gap-3">
+            <img
+              src={currentBrandLogo}
+              alt="Logo Fluxo Caixa CN"
+              className="h-9 w-9 md:h-10 md:w-10 object-contain rounded-sm border border-white/10 bg-white/5 p-1"
+            />
+            <h1 className="text-xl md:text-2xl font-black tracking-tighter premium-gradient-text font-headline">Fluxo Caixa CN</h1>
+          </div>
+
+          <nav className="hidden lg:flex gap-6">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'dashboard' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => setActiveTab('lancamentos')}
+              className={cn("relative transition-all duration-200 font-medium text-sm", activeTab === 'lancamentos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+            >
+              Lançamentos
+              {stats.vencidos > 0 && (
+                <span className="absolute -top-2 -right-3 bg-tertiary text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
+                  {stats.vencidos}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('fornecedores')}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'fornecedores' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+            >
+              Fornecedores
+            </button>
+            <button
+              onClick={() => setActiveTab('relatorios')}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'relatorios' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+            >
+              Relatórios
+            </button>
+            <button
+              onClick={() => setActiveTab('receitas')}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'receitas' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+            >
+              Receitas
+            </button>
+            <button
+              onClick={() => setActiveTab('bancos')}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'bancos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+            >
+              Bancos
+            </button>
+            <button
+              onClick={() => setActiveTab('extrato')}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'extrato' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+            >
+              Extrato OFX
+            </button>
+            <button
+              onClick={() => setActiveTab('configuracoes')}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'configuracoes' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-white")}
+            >
+              Configurações
+            </button>
+          </nav>
+        </div>
+        <div className="flex items-center gap-2 md:gap-4">
+          <GlobalSearch
+            transactions={transactions}
+            suppliers={suppliers}
+            banks={banks}
+            onNavigate={setActiveTab}
+          />
+          <button 
+            onClick={logout}
+            className="p-2 text-on-surface-variant hover:bg-tertiary/10 hover:text-tertiary rounded-full transition-colors hidden sm:block"
+            title="Sair do Sistema"
+          >
+            <X size={20} />
+          </button>
+          <button className="p-2 text-on-surface-variant hover:bg-white/5 rounded-full transition-colors hidden sm:block">
+            <Bell size={20} />
+          </button>
+        </div>
+      </header>
+
+      {/* Mobile Navigation (Bottom Bar) */}
+      <nav className="lg:hidden fixed bottom-6 left-6 right-6 bg-surface/90 backdrop-blur-xl border border-white/10 z-50 flex justify-around items-center py-4 px-4 rounded-sm shadow-2xl">
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'dashboard' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
+        >
+          <LayoutDashboard size={22} strokeWidth={activeTab === 'dashboard' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Dash</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('lancamentos')}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'lancamentos' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
+        >
+          <FileText size={22} strokeWidth={activeTab === 'lancamentos' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Lanç</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('fornecedores')}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'fornecedores' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
+        >
+          <Building2 size={22} strokeWidth={activeTab === 'fornecedores' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Forn</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('relatorios')}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'relatorios' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
+        >
+          <BarChart3 size={22} strokeWidth={activeTab === 'relatorios' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Relat</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('receitas')}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'receitas' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
+        >
+          <Wallet size={22} strokeWidth={activeTab === 'receitas' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Rec</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('bancos')}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'bancos' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
+        >
+          <CreditCard size={22} strokeWidth={activeTab === 'bancos' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Bancos</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('extrato')}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'extrato' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
+        >
+          <Download size={22} strokeWidth={activeTab === 'extrato' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">OFX</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('configuracoes')}
+          className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'configuracoes' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}
+        >
+          <Settings size={22} strokeWidth={activeTab === 'configuracoes' ? 3 : 2} />
+          <span className="text-[9px] font-black uppercase tracking-tighter">Config</span>
+        </button>
+      </nav>
+
+
+      <main className="flex-grow pt-24 pb-24 lg:pb-12 px-4 md:px-8 max-w-[1600px] mx-auto w-full">
         {/* Dashboard Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-zinc-900 mb-2 tracking-tight">
-              {activeTab === 'dashboard' && 'Dashboard Financeiro'}
-              {activeTab === 'lancamentos' && 'Gestão de Lançamentos'}
-              {activeTab === 'fornecedores' && 'Fornecedores'}
-              {activeTab === 'relatorios' && 'Relatórios Financeiros'}
-              {activeTab === 'receitas' && 'Receitas'}
-              {activeTab === 'bancos' && 'Contas Bancárias'}
-              {activeTab === 'extrato' && 'Importar Extrato OFX'}
-              {activeTab === 'configuracoes' && 'Configurações'}
+            <h2 className="text-2xl md:text-4xl font-extrabold font-headline text-on-surface mb-3 tracking-tight">
+              {activeTab === 'dashboard' && '💰 Dashboard Fluxo de Caixa'}
+              {activeTab === 'lancamentos' && '📋 Gestão de Lançamentos'}
+              {activeTab === 'fornecedores' && '🏢 Fornecedores'}
+              {activeTab === 'relatorios' && '📈 Relatórios Financeiros'}
+              {activeTab === 'receitas' && '💸 Receitas'}
+              {activeTab === 'bancos' && '🏦 Bancos'}
+              {activeTab === 'extrato' && '📄 Importar Extrato OFX'}
+              {activeTab === 'configuracoes' && '⚙️ Configurações'}
             </h2>
-            <div className="flex flex-wrap gap-2">
-              <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md text-xs font-semibold border border-blue-100 flex items-center gap-1.5">
+            <div className="flex flex-wrap gap-3">
+              <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-primary border border-primary/20 flex items-center gap-2">
                 <LayoutDashboard size={14} /> Grupo CN
               </span>
-              <span className="bg-zinc-100 text-zinc-600 px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 border border-zinc-200">
+              <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-surface-variant flex items-center gap-2">
                 <CheckCircle size={14} /> {transactions.length} registros
               </span>
-              <span className="bg-zinc-100 text-zinc-600 px-2.5 py-1 rounded-md text-[10px] font-medium flex items-center gap-1.5 border border-zinc-200">
+              <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-surface-variant flex items-center gap-2">
+                <Calendar size={14} /> {[...new Set(transactions.map(t => t.vencimento.substring(0, 7)))].length} períodos
+              </span>
+              <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-on-surface-variant flex items-center gap-2">
                 Build: {(__BUILD_SHA__ || __BUILD_TIME__).slice(0, 8)}
               </span>
             </div>
@@ -2512,7 +2663,7 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-      </ModernLayout>
+    </div>
     </AuthGuard>
   );
 }
