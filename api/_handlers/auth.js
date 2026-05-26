@@ -1,10 +1,11 @@
+import jwt from 'jsonwebtoken';
 import { logSecurity } from '../_utils.js';
 
 // btoa/atob não existem no Node.js — usamos Buffer do Node
-const generateSimpleToken = (payload) => {
-  const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64');
-  const data = Buffer.from(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) })).toString('base64');
-  return `${header}.${data}.signature`;
+const generateToken = (payload) => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return null;
+  return jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 };
 
 export const handleLogin = async (req, res) => {
@@ -15,13 +16,14 @@ export const handleLogin = async (req, res) => {
   // APP_PASSWORD DEVE estar configurada em variáveis de ambiente
   const APP_PASSWORD = process.env.APP_PASSWORD;
   const APP_UID = process.env.APP_UID || 'odair';
+  const APP_EMAIL = process.env.APP_EMAIL || 'user@cn.com';
 
-  if (!APP_PASSWORD) {
+  if (!APP_PASSWORD || !process.env.JWT_SECRET) {
     return res.status(503).json({ error: 'Autenticação não configurada no servidor.' });
   }
 
   if (password === APP_PASSWORD) {
-    const token = generateSimpleToken({ uid: APP_UID, email: email || null });
+    const token = generateToken({ uid: APP_UID, email: email || APP_EMAIL || null });
 
     // Log de sucesso com assinatura correta: (req, res, event)
     try {
@@ -30,7 +32,7 @@ export const handleLogin = async (req, res) => {
 
     return res.json({
       token,
-      user: { uid: APP_UID, email: email || null }
+      user: { uid: APP_UID, email: email || APP_EMAIL || null }
     });
   }
 
@@ -51,16 +53,8 @@ export const verifyToken = (req) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-
-    // atob não existe no Node — usamos Buffer
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-
-    // Verificar expiração
-    if (payload.exp && Date.now() / 1000 > payload.exp) return null;
-
-    return payload;
+    if (!process.env.JWT_SECRET) return null;
+    return jwt.verify(token, process.env.JWT_SECRET);
   } catch {
     return null;
   }

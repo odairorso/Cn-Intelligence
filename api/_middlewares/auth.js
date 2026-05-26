@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'cn-default-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
  * Middleware de autenticação JWT.
@@ -14,6 +14,7 @@ export function authMiddleware(req, res, next) {
 
   if (token) {
     try {
+      if (!JWT_SECRET) throw new Error('JWT_SECRET not configured');
       const decoded = jwt.verify(token, JWT_SECRET);
       req.authUid = decoded.uid;
       if (typeof next === 'function') next();
@@ -25,11 +26,11 @@ export function authMiddleware(req, res, next) {
 
   // 2. Fallback: token legado x-cn-security (compatibilidade durante transição)
   const securityToken = req.headers['x-cn-security'];
-  const EXPECTED_TOKEN = process.env.SECURITY_TOKEN || 'CN-INT-2024-SECURE-HARDENED-V1';
+  const EXPECTED_TOKEN = process.env.SECURITY_TOKEN;
 
-  if (securityToken === EXPECTED_TOKEN) {
-    // Token legado aceito — uid vem do query param
-    req.authUid = req.query.uid || 'guest';
+  if (EXPECTED_TOKEN && securityToken === EXPECTED_TOKEN) {
+    // Token legado aceito somente como ponte para rotas antigas.
+    req.authUid = process.env.APP_UID || 'odair';
     if (typeof next === 'function') next();
     return;
   }
