@@ -24,7 +24,7 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
       const acc: Transaction[] = [];
 
       for (;;) {
-        const page = await api.getTransactions(limit, offset);
+        const page = await api.getTransactions(limit, offset, undefined, undefined, undefined, 'RECEITA');
         if (!Array.isArray(page) || page.length === 0) break;
 
         const normalized = page.map((tx) => ({
