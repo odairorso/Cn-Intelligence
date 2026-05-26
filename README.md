@@ -1,20 +1,47 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Fluxo de Caixa - Grupo CN
 
-# Run and deploy your AI Studio app
+Sistema web para controle de lancamentos, fornecedores, bancos, receitas, relatorios, importacao de planilhas/OFX e extracao de boletos.
 
-This contains everything you need to run your app locally.
+## Requisitos
 
-View your app in AI Studio: https://ai.studio/apps/2e84ba65-b898-4633-a2f7-d3774fda862c
+- Node.js
+- Banco PostgreSQL compativel com a string `DATABASE_URL`
 
-## Run Locally
+## Rodar localmente
 
-**Prerequisites:**  Node.js
+1. Instale as dependencias:
+   ```bash
+   npm install
+   ```
 
+2. Copie `.env.example` para `.env` e preencha os valores reais.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+3. Inicie a API local:
+   ```bash
+   node server.js
+   ```
+
+4. Em outro terminal, inicie o frontend:
+   ```bash
+   npm run dev
+   ```
+
+5. Acesse `http://localhost:5173`.
+
+## Verificacoes
+
+```bash
+npm run lint
+npm run build
+npm audit --audit-level=high
+```
+
+## Variaveis importantes
+
+- `APP_PASSWORD`: senha de login do sistema.
+- `JWT_SECRET`: segredo usado para assinar tokens JWT. Use um valor longo e aleatorio.
+- `SECURITY_TOKEN` e `VITE_CN_SECURITY_TOKEN`: devem ser iguais.
+- `BACKUP_TOKEN` e `VITE_CN_BACKUP_TOKEN`: devem ser iguais para exportacao de backup.
+- `ALLOWED_ORIGINS`: dominios autorizados pelo CORS, separados por virgula.
+
+Ao trocar `JWT_SECRET`, usuarios ja logados precisam entrar novamente.

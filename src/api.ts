@@ -73,9 +73,8 @@ export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  // Token de segurança para proteção contra bots (em produção, configurar via env)
-  const securityToken = import.meta.env.VITE_CN_SECURITY_TOKEN || 'CN-INT-2024-SECURE-HARDENED-V1';
-  headers['x-cn-security'] = securityToken;
+  const securityToken = import.meta.env.VITE_CN_SECURITY_TOKEN;
+  if (securityToken) headers['x-cn-security'] = securityToken;
   return fetch(url, { ...options, headers });
 };
 

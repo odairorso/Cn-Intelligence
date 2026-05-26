@@ -1,4 +1,5 @@
 // --- Inicialização super rápida sem dependências externas ---
+import jwt from 'jsonwebtoken';
 import { setCors } from './_db.js';
 import { checkRateLimit, sanitizeObject } from './_utils.js';
 
@@ -6,15 +7,16 @@ import { checkRateLimit, sanitizeObject } from './_utils.js';
 const APP_PASSWORD = process.env.APP_PASSWORD;
 const APP_UID = process.env.APP_UID || 'odair';
 const APP_EMAIL = process.env.APP_EMAIL || 'user@cn.com';
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 if (!APP_PASSWORD) {
-  console.warn('[AUTH] AVISO: APP_PASSWORD não definida em variáveis de ambiente. Autenticação desabilitada!');
+  console.warn('[AUTH] AVISO: APP_PASSWORD não definida em variáveis de ambiente. Login desabilitado!');
 }
 
-const generateSimpleToken = (payload) => {
-  const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64');
-  const data = Buffer.from(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) })).toString('base64');
-  return `${header}.${data}.signature`;
+const generateToken = (payload) => {
+  if (!JWT_SECRET) return null;
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 };
 
 const verifyToken = (req) => {
@@ -22,11 +24,8 @@ const verifyToken = (req) => {
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
   const token = authHeader.split(' ')[1];
   try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-    if (payload.exp && Date.now() / 1000 > payload.exp) return null;
-    return payload;
+    if (!JWT_SECRET) return null;
+    return jwt.verify(token, JWT_SECRET);
   } catch { return null; }
 };
 
@@ -37,7 +36,7 @@ export default async function handler(req, res) {
   const startTime = Date.now();
 
   // CORS Centralizado via _db.js
-  setCors(res);
+  setCors(req, res);
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
@@ -54,16 +53,16 @@ export default async function handler(req, res) {
 
     const { password, email } = bodyData;
 
-    if (!APP_PASSWORD) {
-      return res.status(503).json({ error: 'Servidor: autenticação não configurada. Defina APP_PASSWORD nas variáveis de ambiente.' });
+    if (!APP_PASSWORD || !JWT_SECRET) {
+      return res.status(503).json({ error: 'Servidor: autenticação não configurada. Defina APP_PASSWORD e JWT_SECRET nas variáveis de ambiente.' });
     }
 
     if (password === APP_PASSWORD) {
-      const token = generateSimpleToken({ uid: APP_UID, email: email || null });
+      const token = generateToken({ uid: APP_UID, email: email || APP_EMAIL || null });
       try {
         await logSecurity(req, res, `Login bem-sucedido: ${email || APP_UID}`);
       } catch {}
-      return res.json({ token, user: { uid: APP_UID, email: email || null } });
+      return res.json({ token, user: { uid: APP_UID, email: email || APP_EMAIL || null } });
     }
 
     try {
@@ -82,8 +81,8 @@ export default async function handler(req, res) {
     const publicRoutes = new Set(['health']);
     if (!publicRoutes.has(route)) {
       const securityToken = req.headers['x-cn-security'];
-      const EXPECTED = process.env.SECURITY_TOKEN || 'CN-INT-2024-SECURE-HARDENED-V1';
-      if (securityToken !== EXPECTED) {
+      const EXPECTED = process.env.SECURITY_TOKEN;
+      if (!EXPECTED || securityToken !== EXPECTED) {
         return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
       }
     }

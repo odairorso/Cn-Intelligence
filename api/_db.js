@@ -94,11 +94,14 @@ export const parseDateToPg = (val) => {
   return null;
 };
 
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:3000'];
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-export const setCors = (res) => {
-  const origin = res.getHeader('origin') || '';
-  const safeOrigin = !origin || ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+export const setCors = (req, res) => {
+  const origin = req?.headers?.origin || '';
+  const safeOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   if (safeOrigin) {
     res.setHeader('Access-Control-Allow-Origin', safeOrigin);
   }

@@ -7,7 +7,7 @@ import {
   BarChart3, PieChart as PieChartIcon, UserPlus, FileSpreadsheet,
   X, Edit, RefreshCw, CreditCard, FileUp, Loader2, Printer, Merge
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import readXlsxFile from 'read-excel-file/browser';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { motion, AnimatePresence } from 'motion/react';
@@ -1057,10 +1057,59 @@ export default function App() {
     reader.onload = async (e) => {
       try {
         showNotification('Processando arquivo... Por favor, aguarde.', 'info');
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const arrayBuffer = e.target?.result as ArrayBuffer;
+        const fileName = file.name.toLowerCase();
+        if (fileName.endsWith('.xls') && !fileName.endsWith('.xlsx')) {
+          showNotification('Formato .xls antigo nao e suportado por seguranca. Salve como .xlsx ou .csv e tente novamente.', 'error');
+          return;
+        }
 
         let allDataMatrix: any[] = [];
+        let sheetEntries: Array<{ sheetName: string; sheetMatrix: any[][] }> = [];
+
+        const parseCsv = (text: string): any[][] => {
+          const rows: string[][] = [];
+          let row: string[] = [];
+          let cell = '';
+          let inQuotes = false;
+
+          for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            const next = text[i + 1];
+            if (ch === '"' && inQuotes && next === '"') {
+              cell += '"';
+              i++;
+            } else if (ch === '"') {
+              inQuotes = !inQuotes;
+            } else if (ch === ',' && !inQuotes) {
+              row.push(cell);
+              cell = '';
+            } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
+              if (ch === '\r' && next === '\n') i++;
+              row.push(cell);
+              if (row.some((v) => String(v || '').trim() !== '')) rows.push(row);
+              row = [];
+              cell = '';
+            } else {
+              cell += ch;
+            }
+          }
+
+          row.push(cell);
+          if (row.some((v) => String(v || '').trim() !== '')) rows.push(row);
+          return rows;
+        };
+
+        if (fileName.endsWith('.csv')) {
+          const text = new TextDecoder('utf-8').decode(arrayBuffer);
+          sheetEntries = [{ sheetName: file.name.replace(/\.csv$/i, ''), sheetMatrix: parseCsv(text) }];
+        } else {
+          const sheets = await readXlsxFile(file);
+          sheetEntries = sheets.map(({ sheet, data }) => ({
+            sheetName: sheet,
+            sheetMatrix: data.map((row) => row.map((value) => value ?? '')),
+          }));
+        }
 
         // Colunas consideradas "cabeçalho padrão"
         const KNOWN_COLS = ['FORNECEDOR', 'FORNECEDORES', 'NOME', 'FAVORECIDO', 'CLIENTE', 'VALOR', 'VENCIMENTO', 'DATA', 'PAGAMENTO', 'SITUAÇÃO', 'SITUACAO'];
@@ -1114,14 +1163,9 @@ export default function App() {
         };
 
         // Iterar sobre todas as abas do Excel
-        for (const sheetName of workbook.SheetNames) {
+        for (const { sheetName, sheetMatrix } of sheetEntries) {
           // Ignora abas de sumário que não são lançamentos
           if (['CASHFLOW'].includes(sheetName.trim().toUpperCase())) continue;
-
-          const worksheet = workbook.Sheets[sheetName];
-
-          // Ler como matriz para evitar cruzamento de colunas
-          const sheetMatrix = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true }) as any[][];
 
           if (sheetMatrix.length < 1) continue; // Pula abas vazias
 
@@ -1830,7 +1874,7 @@ export default function App() {
               type="file"
               ref={fileInputRef}
               onChange={handleFileUpload}
-              accept=".xlsx, .xls, .csv"
+              accept=".xlsx, .csv"
               className="hidden"
             />
           </div>
