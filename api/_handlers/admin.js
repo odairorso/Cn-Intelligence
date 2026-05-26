@@ -42,6 +42,7 @@ export async function handleSetupTables(req, res) {
       { codigo: '3.9',  nome: 'Tarifas Bancárias',     tipo: 'DESPESA' },
       { codigo: '3.10', nome: 'Juros / Multas',        tipo: 'DESPESA' },
       { codigo: '3.11', nome: 'Outras Despesas',       tipo: 'DESPESA' },
+      { codigo: '3.12', nome: 'Pagamento de Empréstimo', tipo: 'DESPESA' },
       { codigo: '4.1',  nome: 'Mensalidades',          tipo: 'RECEITA' },
       { codigo: '4.2',  nome: 'Repasses',              tipo: 'RECEITA' },
       { codigo: '4.3',  nome: 'Matrículas',            tipo: 'RECEITA' },
@@ -50,7 +51,8 @@ export async function handleSetupTables(req, res) {
       { codigo: '4.6',  nome: 'Outras Receitas',       tipo: 'RECEITA' },
       { codigo: '4.7',  nome: 'Dia das Mães',          tipo: 'RECEITA' },
       { codigo: '4.8',  nome: 'Aluguel',               tipo: 'RECEITA' },
-      { codigo: '4.9',  nome: 'Receita Cartão',        tipo: 'RECEITA' }
+      { codigo: '4.9',  nome: 'Receita Cartão',        tipo: 'RECEITA' },
+      { codigo: '4.10', nome: 'Empréstimo',            tipo: 'RECEITA' }
     ];
 
     for (const acc of defaultAccounts) {

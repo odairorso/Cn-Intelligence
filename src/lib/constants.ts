@@ -14,6 +14,7 @@ export const DEFAULT_ACCOUNTS: ContaContabil[] = [
   { id: 0, codigo: '3.9',  nome: 'Tarifas Bancárias',     tipo: 'DESPESA', ativo: true },
   { id: 0, codigo: '3.10', nome: 'Juros / Multas',        tipo: 'DESPESA', ativo: true },
   { id: 0, codigo: '3.11', nome: 'Outras Despesas',       tipo: 'DESPESA', ativo: true },
+  { id: 0, codigo: '3.12', nome: 'Pagamento de Empréstimo', tipo: 'DESPESA', ativo: true },
   { id: 0, codigo: '4.1',  nome: 'Mensalidades',          tipo: 'RECEITA', ativo: true },
   { id: 0, codigo: '4.2',  nome: 'Repasses',              tipo: 'RECEITA', ativo: true },
   { id: 0, codigo: '4.3',  nome: 'Matrículas',            tipo: 'RECEITA', ativo: true },
@@ -23,6 +24,7 @@ export const DEFAULT_ACCOUNTS: ContaContabil[] = [
   { id: 0, codigo: '4.7',  nome: 'Dia das Mães',          tipo: 'RECEITA', ativo: true },
   { id: 0, codigo: '4.8',  nome: 'Aluguel',               tipo: 'RECEITA', ativo: true },
   { id: 0, codigo: '4.9',  nome: 'Receita Cartão',        tipo: 'RECEITA', ativo: true },
+  { id: 0, codigo: '4.10', nome: 'Empréstimo',            tipo: 'RECEITA', ativo: true }
 ];
 
 export const PAGE_SIZE = 50;
