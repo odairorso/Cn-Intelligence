@@ -892,8 +892,9 @@ export default function App() {
           const local = extractBoletoData(fullText, file.name);
           local.fornecedor = resolveSupplierName(local.fornecedor, fullText);
 
-          // PROTEÇÃO: Se for Energisa e a data for Maio/2026, NÃO confia na extração local (provavelmente pegou data de leitura)
-          const isEnergisaSuspicious = local.fornecedor.includes('ENERGISA') && local.vencimento === '07/05/2026';
+          // PROTEÇÃO: Para concessionárias complexas (Energisa, Sanesul, Claro, Vivo), a extração local via regex é instável e costuma falhar ou extrair dados incorretos.
+          // Sempre forçamos o uso da IA (Gemini) para esses fornecedores.
+          const isEnergisaSuspicious = local.fornecedor.includes('ENERGISA') || local.fornecedor.includes('SANESUL') || local.fornecedor.includes('CLARO') || local.fornecedor.includes('VIVO');
           const hasLocalCore = !!local.vencimento && local.valor > 0 && local.fornecedor !== 'Fornecedor não identificado' && !isEnergisaSuspicious;
 
           // Se a extração local funcionou perfeitamente, usa ela (conforme pedido: sempre acrescentar, nunca mudar o que já funciona)
@@ -913,8 +914,9 @@ export default function App() {
           ai.fornecedor = resolveSupplierName(ai.fornecedor, fullText);
 
           const fornecedor = (!shouldRejectSupplierName(ai.fornecedor) && ai.fornecedor) ? ai.fornecedor : local.fornecedor;
-          const vencimento = local.vencimento || ai.vencimento;
-          const valor = local.valor > 0 ? local.valor : ai.valor;
+          // Se a IA obteve vencimento/valor válidos, prioriza a IA. Caso contrário, cai no local.
+          const vencimento = ai.vencimento || local.vencimento;
+          const valor = ai.valor > 0 ? ai.valor : local.valor;
           const numero_boleto = normalizeBoletoNumber(ai.numero_boleto || '') || normalizeBoletoNumber(local.numero_boleto || '') || '';
           const descricao = ai.descricao || local.descricao;
 
