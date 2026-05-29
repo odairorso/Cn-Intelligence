@@ -51,7 +51,7 @@ export async function handleExtractBoleto(req, res) {
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const generateContentWithFallback = async (contents) => {
-      const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', process.env.GEMINI_MODEL].filter(Boolean);
+      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', process.env.GEMINI_MODEL].filter(Boolean);
       let lastErr = null;
       for (const modelName of modelsToTry) {
         try {
@@ -92,7 +92,112 @@ export async function handleExtractBoleto(req, res) {
       }
     } catch { /* ignore if fails */ }
 
-    // Se encontrou padrão e o texto é bom, usa o padrão (MUITO mais rápido)
+    let extracted = null;
+    let geminiError = null;
+
+    try {
+      const prompt = `Analise este boleto bancário (arquivo: ${fileName}).
+      
+      REGRAS DE EXTRAÇÃO (MUITO IMPORTANTE):
+      1. FORNECEDOR (BENEFICIÁRIO): Identifique quem recebe o dinheiro.
+         - NÃO USE o Pagador/Sacado (Ex: ignore nomes como ELAINE CRISTINA CAMACHO CAVALCANTE).
+         - USE o Cedente/Beneficiário/Emissor (Ex: Porto Seguro, Energisa, Sanesul, Claro).
+      2. VENCIMENTO: Data no formato DD/MM/AAAA.
+         - Para ENERGISA/SANESUL: NUNCA use a data de leitura anterior/atual ou de leitura próxima. Use a data limite de pagamento/vencimento.
+      3. VALOR: Valor total (numérico).
+         - Use o "Valor Total a Pagar" ou "Total da Fatura". NUNCA use sub-valores de taxas, ICMS ou distribuição como valor total.
+      4. CNPJ: CNPJ do Beneficiário (quem recebe).
+      5. NÚMERO DO BOLETO: Linha digitável ou código de barras.
+      6. DESCRIÇÃO: Uma breve descrição baseada no conteúdo (ex: "Seguro Auto", "Conta de Energia").
+      7. CONTA CONTÁBIL (conta_contabil_id): Baseado na descrição e fornecedor, sugira o ID NUMÉRICO da conta contábil mais adequada. Retorne apenas o ID numérico ou null se não souber.${contasContabeisText}`;
+
+      const parts = [];
+      if (pdfBase64) {
+        parts.push({
+          inlineData: {
+            data: pdfBase64,
+            mimeType: 'application/pdf'
+          }
+        });
+      }
+      parts.push({ text: prompt + (extractedText ? `\n\nTexto extraído (OCR):\n${extractedText.slice(0, 5000)}` : '') });
+
+      const contents = [{ role: 'user', parts }];
+
+      const resultGemini = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: contents,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            properties: {
+              fornecedor: { type: 'string' },
+              vencimento: { type: 'string' },
+              valor: { type: 'number' },
+              cnpj: { type: 'string' },
+              numero_boleto: { type: 'string' },
+              descricao: { type: 'string' },
+              conta_contabil_id: { type: 'number', nullable: true }
+            },
+            required: ['fornecedor', 'vencimento', 'valor']
+          }
+        }
+      });
+
+      const responseText = resultGemini.text || resultGemini.response?.text?.() || '';
+      if (responseText) {
+        let cleanedText = responseText.trim();
+        if (cleanedText.startsWith('```')) {
+          cleanedText = cleanedText.replace(/^```(?:json)?\n?/i, '').replace(/```$/, '').trim();
+        }
+        extracted = JSON.parse(cleanedText);
+      } else {
+        throw new Error('Resposta vazia da IA');
+      }
+    } catch (e) {
+      console.error('Erro na extração com Gemini:', e.message);
+      geminiError = e.message;
+    }
+
+    if (extracted) {
+      // Limpeza rigorosa no fornecedor
+      if (extracted.fornecedor) {
+        extracted.fornecedor = extracted.fornecedor
+          .replace(/\d{4,}/g, '')
+          .replace(/boleto/gi, '')
+          .replace(/\b(ELAI|ELAINE|CRISTINA|CAMACHO|CAVALCANTE)\b/gi, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        if (!extracted.fornecedor || extracted.fornecedor.length < 3) {
+          extracted.fornecedor = 'Fornecedor não identificado';
+        }
+      }
+
+      // Se a IA funcionou, aplicamos o padrão do banco (se existir) para garantir consistência
+      const finalCnpj = extracted.cnpj || rawCnpj;
+      const finalName = extracted.fornecedor || rawBenefName;
+      const dbPattern = await lookupPattern(finalCnpj, normName(finalName));
+
+      if (dbPattern) {
+        extracted.fornecedor = dbPattern.fornecedor || extracted.fornecedor;
+        extracted.empresa = dbPattern.empresa || extracted.empresa;
+        extracted.tipo = dbPattern.tipo || extracted.tipo || 'DESPESA';
+        extracted.conta_contabil_id = dbPattern.conta_contabil_id || extracted.conta_contabil_id;
+        extracted._from_pattern = true;
+        if (dbPattern.descricao && (!extracted.descricao || extracted.descricao === 'Fatura de Energia Elétrica' || extracted.descricao === 'Importado via IA')) {
+          extracted.descricao = `${fileName} - ${dbPattern.descricao}`;
+        }
+      }
+
+      return res.json({
+        ...extracted,
+        descricao: extracted.descricao || `${fileName} - Importado via IA`
+      });
+    }
+
+    // Se a IA falhou, usamos o fallback de padrão se existir
     if (pattern && pattern.fornecedor && pattern.fornecedor !== 'Fornecedor não identificado' && extractedText.length > 100) {
       const dateMatch = srcUpper.match(/VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/);
       const valorMatch = srcUpper.match(/VALOR[^0-9]*([\d.,]+)/);
@@ -108,80 +213,12 @@ export async function handleExtractBoleto(req, res) {
         tipo: pattern.tipo,
         numero_boleto: numero,
         conta_contabil_id: pattern.conta_contabil_id,
-        _from_pattern: true
+        _from_pattern: true,
+        _gemini_error: geminiError
       });
     }
 
-    // --- Chamada à IA (Gemini) ---
-    const prompt = `Analise este boleto bancário (arquivo: ${fileName}).
-    
-    REGRAS DE EXTRAÇÃO (MUITO IMPORTANTE):
-    1. FORNECEDOR (BENEFICIÁRIO): Identifique quem recebe o dinheiro.
-       - NÃO USE o Pagador/Sacado (Ex: ignore nomes como ELAINE CRISTINA CAMACHO CAVALCANTE).
-       - USE o Cedente/Beneficiário/Emissor (Ex: Porto Seguro, Energisa, Sanesul, Claro).
-    2. VENCIMENTO: Data no formato DD/MM/AAAA.
-    3. VALOR: Valor total (numérico).
-    4. CNPJ: CNPJ do Beneficiário (quem recebe).
-    5. NÚMERO DO BOLETO: Linha digitável ou código de barras.
-    6. DESCRIÇÃO: Uma breve descrição baseada no conteúdo (ex: "Seguro Auto", "Conta de Energia").
-    7. CONTA CONTÁBIL (conta_contabil_id): Baseado na descrição e fornecedor, sugira o ID NUMÉRICO da conta contábil mais adequada. Retorne apenas o ID numérico ou null se não souber.${contasContabeisText}`;
-
-    const parts = [];
-    if (pdfBase64) {
-      parts.push({
-        inlineData: {
-          data: pdfBase64,
-          mimeType: 'application/pdf'
-        }
-      });
-    }
-    parts.push({ text: prompt + (extractedText ? `\n\nTexto extraído (OCR):\n${extractedText.slice(0, 5000)}` : '') });
-
-    const contents = [{ role: 'user', parts }];
-
-    const resultGemini = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: contents,
-      config: {
-        response_mime_type: 'application/json',
-        response_schema: {
-          type: 'object',
-          properties: {
-            fornecedor: { type: 'string' },
-            vencimento: { type: 'string' },
-            valor: { type: 'number' },
-            cnpj: { type: 'string' },
-            numero_boleto: { type: 'string' },
-            descricao: { type: 'string' },
-            conta_contabil_id: { type: 'number', nullable: true }
-          },
-          required: ['fornecedor', 'vencimento', 'valor']
-        }
-      }
-    });
-
-    const responseText = resultGemini.text || resultGemini.response?.text?.() || '';
-    if (!responseText) throw new Error('Falha na resposta da IA');
-    const extracted = JSON.parse(responseText);
-
-    // Limpeza rigorosa no fornecedor
-    if (extracted.fornecedor) {
-      extracted.fornecedor = extracted.fornecedor
-        .replace(/\d{4,}/g, '')
-        .replace(/boleto/gi, '')
-        .replace(/\b(ELAI|ELAINE|CRISTINA|CAMACHO|CAVALCANTE)\b/gi, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      
-      if (!extracted.fornecedor || extracted.fornecedor.length < 3) {
-        extracted.fornecedor = 'Fornecedor não identificado';
-      }
-    }
-
-    return res.json({
-      ...extracted,
-      descricao: extracted.descricao || `${fileName} - Importado via IA`
-    });
+    throw new Error(geminiError || 'Falha na resposta da IA');
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
