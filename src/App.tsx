@@ -892,12 +892,11 @@ export default function App() {
           const local = extractBoletoData(fullText, file.name);
           local.fornecedor = resolveSupplierName(local.fornecedor, fullText);
 
-          // PROTEÇÃO: Para concessionárias complexas (Energisa, Sanesul, Claro, Vivo), a extração local via regex é instável e costuma falhar ou extrair dados incorretos.
-          // Sempre forçamos o uso da IA (Gemini) para esses fornecedores.
-          const isEnergisaSuspicious = local.fornecedor.includes('ENERGISA') || local.fornecedor.includes('SANESUL') || local.fornecedor.includes('CLARO') || local.fornecedor.includes('VIVO');
-          const hasLocalCore = !!local.vencimento && local.valor > 0 && local.fornecedor !== 'Fornecedor não identificado' && !isEnergisaSuspicious;
+          // Para garantir 100% de acerto nas datas e valores, sempre usamos a IA (Gemini) como primeira opção.
+          // O leitor local (regex) é muito propenso a falhas de leitura (como capturar descontos, multas ou juros no lugar do valor real, ex: R$ 7,95 de desconto).
+          const hasLocalCore = false;
 
-          // Se a extração local funcionou perfeitamente, usa ela (conforme pedido: sempre acrescentar, nunca mudar o que já funciona)
+          // Se a extração local funcionou perfeitamente, usa ela (desabilitado em favor da precisão da IA)
           if (hasLocalCore) return local;
 
           // Converte PDF para base64 para o Gemini
