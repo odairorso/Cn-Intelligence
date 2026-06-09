@@ -1,4 +1,7 @@
 import pg from 'pg';
+import { AsyncLocalStorage } from 'async_hooks';
+
+export const dbStorage = new AsyncLocalStorage();
 
 let connectionString = process.env.DATABASE_URL || process.env.URL_DO_BANCO_DE_DADOS || process.env.DATABASE_URLL;
 // Remove any sslmode that might conflict with our manual ssl config
@@ -33,13 +36,23 @@ class SqlQuery {
   // Thenable implementation
   then(resolve, reject) {
     const { query, params } = this.build();
-    pool.query(query, params)
-      .then(res => resolve(res.rows))
-      .catch(err => {
-        console.error('[DB Error] Query:', query);
-        console.error('[DB Error] Object:', err);
-        reject(err);
-      });
+    const uid = dbStorage.getStore();
+    pool.connect()
+      .then(async client => {
+        try {
+          const currentUid = uid || '';
+          await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, false]);
+          const res = await client.query(query, params);
+          resolve(res.rows);
+        } catch (err) {
+          console.error('[DB Error] Query:', query);
+          console.error('[DB Error] Object:', err);
+          reject(err);
+        } finally {
+          client.release();
+        }
+      })
+      .catch(reject);
   }
 
   build() {
@@ -69,7 +82,17 @@ class SqlQuery {
 
 export const sql = (strings, ...values) => {
   if (!Array.isArray(strings)) {
-    return pool.query(strings, values).then(res => res.rows);
+    const uid = dbStorage.getStore();
+    return pool.connect().then(async client => {
+      try {
+        const currentUid = uid || '';
+        await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, false]);
+        const res = await client.query(strings, values);
+        return res.rows;
+      } finally {
+        client.release();
+      }
+    });
   }
   return new SqlQuery(strings, values);
 };

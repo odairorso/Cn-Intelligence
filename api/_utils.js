@@ -135,28 +135,21 @@ export const normSupplier = (val) => {
     .trim();
 };
 
-// --- Auditoria de Segurança ---
 export async function logSecurity(req, res, event) {
-  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || 'unknown';
+  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || '127.0.0.1';
   const ua = req.headers['user-agent'] || 'unknown';
-  const { route } = req.query;
-  const method = req.method;
+  const { route } = req.query || {};
+  const method = req.method || 'GET';
+  const uid = req.authUid || null;
+  const eventType = event.toLowerCase().includes('falhou') || event.toLowerCase().includes('injeção')
+    ? 'SECURITY_WARNING'
+    : 'SECURITY_INFO';
   
   try {
     await sql`
-      CREATE TABLE IF NOT EXISTS security_logs (
-        id SERIAL PRIMARY KEY,
-        ip VARCHAR(50),
-        user_agent TEXT,
-        route VARCHAR(100),
-        method VARCHAR(10),
-        event TEXT,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      )`;
-      
-    await sql`
-      INSERT INTO security_logs (ip, user_agent, route, method, event)
-      VALUES (${ip}, ${ua}, ${route || 'unknown'}, ${method}, ${event})`;
+      INSERT INTO security_logs (event_type, description, ip_address, user_agent, uid, route)
+      VALUES (${eventType}, ${event}, ${ip}, ${ua}, ${uid}, ${route || 'unknown'})
+    `;
   } catch (e) {
     console.error('[security_log] erro', e);
   }
