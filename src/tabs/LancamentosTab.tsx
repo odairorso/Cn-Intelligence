@@ -54,10 +54,15 @@ const LancamentosTab = React.memo(({
   // Extrair meses e anos únicos para os filtros
   const availableYears = useMemo(() => {
     const years = transactions.map(tx => {
-      const parts = tx.vencimento.split('/');
-      return parts.length === 3 ? parts[2] : null;
+      const dateParts = tx.vencimento.includes('-') ? tx.vencimento.split('-') : tx.vencimento.split('/');
+      return tx.vencimento.includes('-') ? dateParts[0] : dateParts[2];
     }).filter(Boolean);
-    return [...new Set(years)].sort().reverse();
+    const set = new Set<string>(years);
+    const currentYear = new Date().getFullYear();
+    for (let yr = currentYear; yr >= 2020; yr -= 1) {
+      set.add(String(yr));
+    }
+    return Array.from(set).sort().reverse();
   }, [transactions]);
 
   const availableMonths = [
