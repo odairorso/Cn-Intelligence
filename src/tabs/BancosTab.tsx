@@ -18,7 +18,11 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
     });
     transactions.filter(tx => tx.status === 'PAGO' && tx.banco).forEach(tx => {
       if (tx.banco && totals[tx.banco] !== undefined) {
-        totals[tx.banco] += tx.valor;
+        if (tx.tipo === 'RECEITA') {
+          totals[tx.banco] += tx.valor;
+        } else {
+          totals[tx.banco] -= tx.valor;
+        }
       }
     });
     return totals;
@@ -86,8 +90,8 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
               <div className="pt-2 border-t border-white/5">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-primary">Saldo Atual</span>
-                  <span className="text-lg font-black" style={{ color: (Number(bank.saldo) - (bankTotals[bank.nome] || 0)) < 0 ? '#ef4444' : '#3b82f6' }}>
-                    {(Number(bank.saldo) - (bankTotals[bank.nome] || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <span className="text-lg font-black" style={{ color: (Number(bank.saldo) + (bankTotals[bank.nome] || 0)) < 0 ? '#ef4444' : '#3b82f6' }}>
+                    {(Number(bank.saldo) + (bankTotals[bank.nome] || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>

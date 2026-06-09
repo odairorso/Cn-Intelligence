@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { api, apiAuth } from '../api';
+import { api, apiAuth, decodeJwtPayload } from '../api';
 import type { Transaction, Supplier, Bank, ContaContabil } from '../types';
 import { DEFAULT_COMPANIES } from '../lib/constants';
 import { normalizeCompanyKey } from '../lib/utils';
@@ -200,9 +200,8 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
         try {
           const token = apiAuth.getToken();
           if (token) {
-            const parts = token.split('.');
-            if (parts.length === 3) {
-              const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+            const payload = decodeJwtPayload(token);
+            if (payload) {
               setUserEmail(payload.email || null);
               setDisplayName(payload.display_name || payload.email || null);
             }
@@ -259,9 +258,8 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
           if (uid) {
             const token = apiAuth.getToken();
             if (token) {
-              const parts = token.split('.');
-              if (parts.length === 3) {
-                const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+              const payload = decodeJwtPayload(token);
+              if (payload) {
                 setUserEmail(payload.email || null);
                 setDisplayName(payload.display_name || payload.email || null);
               }

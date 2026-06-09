@@ -26,18 +26,25 @@ const removeToken = () => {
   } catch { /* ignore */ }
 };
 
-const getUid = (): string | null => {
+export const decodeJwtPayload = (token: string): any => {
   try {
-    const token = getToken();
-    if (!token) return null;
-    // Decodifica o payload do JWT sem depender de lib externa no frontend
     const parts = token.split('.');
     if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    return payload.uid || null;
+    let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+    return JSON.parse(atob(base64));
   } catch {
     return null;
   }
+};
+
+const getUid = (): string | null => {
+  const token = getToken();
+  if (!token) return null;
+  const payload = decodeJwtPayload(token);
+  return payload ? payload.uid || null : null;
 };
 
 // UID para uso em inserts (banco de dados) — obsoleto, mantido apenas para compatibilidade
@@ -109,13 +116,12 @@ export const apiAuth = {
     try {
       const token = getToken();
       if (!token) return false;
-      const parts = token.split('.');
-      if (parts.length !== 3) {
+      const payload = decodeJwtPayload(token);
+      if (!payload) {
         removeToken();
         return false;
       }
-      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-      if (payload?.exp && typeof payload.exp === 'number') {
+      if (payload.exp && typeof payload.exp === 'number') {
         if (Date.now() / 1000 > payload.exp) {
           removeToken();
           return false;

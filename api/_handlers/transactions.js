@@ -34,8 +34,10 @@ export async function handleTransactions(req, res) {
       }
 
       const defaultLimit = 100;
-      const parsedLimit = limit ? parseInt(limit) : defaultLimit;
-      const parsedOffset = offset ? parseInt(offset) : 0;
+      let parsedLimit = limit ? parseInt(limit) : defaultLimit;
+      let parsedOffset = offset ? parseInt(offset) : 0;
+      if (isNaN(parsedLimit)) parsedLimit = defaultLimit;
+      if (isNaN(parsedOffset)) parsedOffset = 0;
 
       let query = sql`SELECT * FROM transactions WHERE (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL`;
       if (tipo && tipo !== 'TODOS') query = sql`${query} AND tipo = ${tipo}`;
