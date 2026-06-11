@@ -293,12 +293,20 @@ const LancamentosTab = React.memo(({
                   />
                 )}
                 <span className="font-semibold text-sm leading-tight flex-1">{tx.fornecedor}</span>
-                <span className={cn(
-                  "font-bold text-sm whitespace-nowrap",
-                  tx.valor < 0 ? "text-tertiary" : (isRevenueTransaction(tx) ? "text-success" : "text-primary")
-                )}>
-                  {Number(tx.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
+                <div className="flex flex-col items-end">
+                  <span className={cn(
+                    "font-bold text-sm whitespace-nowrap",
+                    tx.valor < 0 ? "text-tertiary" : (isRevenueTransaction(tx) ? "text-success" : "text-primary")
+                  )}>
+                    {(Number(tx.valor || 0) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  {Number(tx.juros) > 0 && (
+                    <span className="text-[9px] text-tertiary font-normal">(inclui {Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })} juros)</span>
+                  )}
+                  {Number(tx.juros) < 0 && (
+                    <span className="text-[9px] text-success font-normal">(desconto de {Number(Math.abs(tx.juros)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+                  )}
+                </div>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-on-surface-variant mb-3">
                 <span><span className="font-bold text-on-surface">Venc:</span> {toDisplayDate(tx.vencimento)}</span>
@@ -387,6 +395,9 @@ const LancamentosTab = React.memo(({
                     {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     {Number(tx.juros) > 0 && (
                       <p className="text-[9px] text-tertiary font-normal">(inclui {Number(tx.juros).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })} juros)</p>
+                    )}
+                    {Number(tx.juros) < 0 && (
+                      <p className="text-[9px] text-success font-normal">(desconto de {Number(Math.abs(tx.juros)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })})</p>
                     )}
                   </td>
                   <td className="px-8 py-4 hidden lg:table-cell">
