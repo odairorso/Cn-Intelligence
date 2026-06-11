@@ -24,6 +24,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
     banco: transaction.banco || '',
     tipo: transaction.tipo || 'DESPESA',
     juros: transaction.juros || 0,
+    valorPago: transaction.status === 'PAGO' ? String(Number(transaction.valor || 0) + Number(transaction.juros || 0)) : '',
   });
   const [searchConta, setSearchConta] = useState('');
   const [showContaDropdown, setShowContaDropdown] = useState(false);
@@ -76,6 +77,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
       banco: transaction.banco || '',
       tipo: transaction.tipo || 'DESPESA',
       juros: transaction.juros || 0,
+      valorPago: transaction.status === 'PAGO' ? String(Number(transaction.valor || 0) + Number(transaction.juros || 0)) : '',
     });
   }, [transaction]);
 
@@ -251,7 +253,14 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.status}
-                onChange={e => setFormData({ ...formData, status: e.target.value as TransactionStatus })}
+                onChange={e => {
+                  const newStatus = e.target.value as TransactionStatus;
+                  if (newStatus !== 'PAGO') {
+                    setFormData({ ...formData, status: newStatus, juros: 0, valorPago: '' });
+                  } else {
+                    setFormData({ ...formData, status: newStatus });
+                  }
+                }}
               >
                 <option value="PENDENTE" className="bg-[#161b2a] text-on-surface">PENDENTE</option>
                 <option value="PAGO" className="bg-[#161b2a] text-on-surface">PAGO</option>
@@ -288,15 +297,21 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                   value={formData.valorPago || ''}
                   placeholder={formData.valor}
                   onChange={e => {
-                    const valorPago = Number(e.target.value) || 0;
+                    const val = e.target.value;
+                    const valorPago = val === '' ? 0 : Number(val);
                     const valorOriginal = Number(formData.valor) || 0;
-                    const jurosCalculado = Math.max(0, valorPago - valorOriginal);
-                    setFormData({ ...formData, valorPago: valorPago, juros: jurosCalculado });
+                    const jurosCalculado = val === '' ? 0 : (valorPago - valorOriginal);
+                    setFormData({ ...formData, valorPago: val, juros: jurosCalculado });
                   }}
                 />
                 {formData.juros > 0 && (
                   <p className="text-[10px] text-tertiary mt-1 font-bold">
                     Juros: R$ {Number(formData.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                )}
+                {formData.juros < 0 && (
+                  <p className="text-[10px] text-success mt-1 font-bold">
+                    Desconto: R$ {Number(Math.abs(formData.juros)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                 )}
               </div>
