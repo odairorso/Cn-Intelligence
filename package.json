@@ -7,8 +7,11 @@
     "dev": "vite --port=5173 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "lint": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -41,5 +44,8 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.4.2"
+  },
+  "overrides": {
+    "esbuild": ">=0.25.0"
   }
 }

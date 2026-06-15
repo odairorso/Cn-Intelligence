@@ -28,5 +28,18 @@ export default defineConfig(({mode}) => {
         },
       },
     },
+    build: {
+      target: 'es2022',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            recharts: ['recharts'],
+            pdfjs: ['pdfjs-dist'],
+            'read-excel': ['read-excel-file/browser'],
+            motion: ['motion'],
+          },
+        },
+      },
+    },
   };
 });

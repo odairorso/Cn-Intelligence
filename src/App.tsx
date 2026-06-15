@@ -1043,10 +1043,14 @@ export default function App() {
       showNotification(`${nonDuplicateRows.length} boleto(s) importado(s). ${blockedCount} bloqueado(s) por duplicidade.`, 'success');
     } catch (error: any) {
       console.error('Error creating transaction from PDF:', error);
-      const msg = error.message === 'Boleto já lançado' 
+      const isDuplicate = error.message && (
+        error.message.includes('Boleto já lançado') ||
+        error.message.includes('Lançamento duplicado')
+      );
+      const msg = isDuplicate 
         ? 'Este boleto já foi lançado no sistema.'
         : 'Erro ao salvar lançamentos de boleto.';
-      showNotification(msg, 'error');
+      showNotification(msg, isDuplicate ? 'info' : 'error');
     }
   };
 
