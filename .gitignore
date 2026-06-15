@@ -13,3 +13,5 @@ boletos_teste/
 *.gbk
 *.csv
 supabase_config.txt
+
+.vercel
