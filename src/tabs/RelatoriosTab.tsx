@@ -144,7 +144,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
 
   const filteredData = useMemo(() => {
     const searchLower = searchTerm.trim().toLowerCase();
-    return transactions.filter(tx => {
+    const filtered = transactions.filter(tx => {
       let matchesDateRange = true;
       if (filterType === 'PERIODO') {
         let txDateStr = '';
@@ -183,6 +183,17 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
         (tx.descricao && tx.descricao.toLowerCase().includes(searchLower));
 
       return matchesDateRange && matchesCompany && matchesTipo && matchesStatus && matchesConta && matchesSearch;
+    });
+
+    return filtered.sort((a, b) => {
+      const keyA = dateSortKey(a.vencimento);
+      const keyB = dateSortKey(b.vencimento);
+      if (keyA !== keyB) {
+        return keyA - keyB;
+      }
+      const fornA = String(a.fornecedor || '').toLowerCase();
+      const fornB = String(b.fornecedor || '').toLowerCase();
+      return fornA.localeCompare(fornB, 'pt-BR');
     });
   }, [transactions, filterType, startDate, endDate, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, todayKey, searchTerm]);
 
