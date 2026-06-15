@@ -774,66 +774,80 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
                 })
               )}
             </tbody>
-            {filteredData.length > 0 && (
-              <tfoot className="border-t-2 border-white/20 bg-white/[0.02]">
-                <tr className="font-bold">
-                  <td colSpan={7} className="px-4 py-6 text-right">
-                    <div className="flex flex-col gap-1 items-end">
-                      <span className="text-[10px] text-on-surface-variant uppercase tracking-widest font-black">Resumo Financeiro Detalhado</span>
-                      <div className="flex gap-10 mt-3">
-                        <div className="text-right">
-                          <p className="text-[9px] uppercase text-on-surface-variant mb-1 font-black">Saldo Atual em Caixa</p>
-                          <p className={cn("text-xl font-black", periodTotals.realizadoTotal >= 0 ? "text-primary" : "text-tertiary")}>
-                            {periodTotals.realizadoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </p>
-                        </div>
-                        {periodTotals.naoPagoDespesas > 0 && (
-                          <div className="text-right border-l border-white/10 pl-10">
-                            <p className="text-[9px] uppercase text-on-surface-variant mb-1 font-black">Total a Pagar (Pendências)</p>
-                            <p className="text-xl font-black text-[#f59e0b]">
-                              - {periodTotals.naoPagoDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td colSpan={3} className="px-4 py-6 text-right bg-white/[0.03]">
-                    <p className="text-[9px] uppercase text-on-surface-variant mb-1 font-black">Saldo Final Líquido (Previsto)</p>
-                    <div className={cn(
-                      "text-3xl font-black tracking-tighter",
-                      periodTotals.total >= 0 ? "text-primary" : "text-tertiary"
-                    )}>
-                      {periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </div>
-                    {periodTotals.naoPagoCount > 0 && (
-                      <div className="mt-3 space-y-1 bg-black/20 p-2 rounded-lg border border-white/5">
-                        <div className="flex justify-between text-[10px] gap-4">
-                          <span className="text-on-surface-variant font-bold uppercase">A Receber:</span>
-                          <span className="text-primary font-black">{periodTotals.naoPagoReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                        </div>
-                        <div className="flex justify-between text-[10px] gap-4">
-                          <span className="text-on-surface-variant font-bold uppercase">A Pagar:</span>
-                          <span className="text-[#f59e0b] font-black">{periodTotals.naoPagoDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                        </div>
-                        <div className="h-px bg-white/10 my-1"></div>
-                        <div className="flex justify-between text-[10px] gap-4">
-                          <span className="text-on-surface-variant font-bold uppercase">Saldo de Pendências:</span>
-                          <span className={cn("font-black", periodTotals.naoPagoSaldo >= 0 ? "text-primary" : "text-tertiary")}>
-                            {periodTotals.naoPagoSaldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-6 text-xs text-on-surface-variant text-center border-l border-white/10 font-black">
-                    {periodTotals.count}<br/>REGISTROS
-                  </td>
-                </tr>
-              </tfoot>
-            )}
           </table>
         </div>
+
+        {/* Responsive Summary Card (No longer inside the scrolling table to prevent cut off!) */}
+        {filteredData.length > 0 && (
+          <div className="border-t border-white/5 bg-white/[0.01] p-4 md:p-6">
+            <div className="flex flex-col lg:flex-row justify-between items-stretch gap-6">
+              
+              {/* Left Column: Title and Caixa/Pendente */}
+              <div className="flex-grow flex flex-col justify-between gap-4">
+                <div>
+                  <span className="text-[10px] text-on-surface-variant uppercase tracking-widest font-black">
+                    Resumo Financeiro Detalhado
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-6 md:gap-10">
+                  <div>
+                    <p className="text-[10px] uppercase text-on-surface-variant mb-1 font-bold">Saldo Atual em Caixa</p>
+                    <p className={cn("text-xl md:text-2xl font-black", periodTotals.realizadoTotal >= 0 ? "text-primary" : "text-tertiary")}>
+                      {periodTotals.realizadoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </p>
+                  </div>
+                  {periodTotals.naoPagoDespesas > 0 && (
+                    <div className="border-l border-white/10 pl-6 md:pl-10">
+                      <p className="text-[10px] uppercase text-on-surface-variant mb-1 font-bold">Total a Pagar (Pendências)</p>
+                      <p className="text-xl md:text-2xl font-black text-[#f59e0b]">
+                        - {periodTotals.naoPagoDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Middle Column: Details of Pendências */}
+              {periodTotals.naoPagoCount > 0 && (
+                <div className="w-full lg:w-80 bg-black/20 p-4 rounded-lg border border-white/5 flex flex-col justify-center gap-1.5">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-on-surface-variant font-bold uppercase">A Receber:</span>
+                    <span className="text-primary font-black">{periodTotals.naoPagoReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-on-surface-variant font-bold uppercase">A Pagar:</span>
+                    <span className="text-[#f59e0b] font-black">{periodTotals.naoPagoDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  </div>
+                  <div className="h-px bg-white/10 my-1"></div>
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-on-surface-variant font-bold uppercase">Saldo de Pendências:</span>
+                    <span className={cn("font-black", periodTotals.naoPagoSaldo >= 0 ? "text-primary" : "text-tertiary")}>
+                      {periodTotals.naoPagoSaldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Right Column: Saldo Final Líquido (Previsto) and count */}
+              <div className="flex items-center justify-between lg:justify-end gap-6 border-t lg:border-t-0 lg:border-l border-white/10 pt-4 lg:pt-0 lg:pl-6 bg-white/[0.02] lg:bg-transparent p-4 lg:p-0 rounded-lg lg:rounded-none">
+                <div className="text-left lg:text-right">
+                  <p className="text-[10px] uppercase text-on-surface-variant mb-1 font-bold">Saldo Final Líquido (Previsto)</p>
+                  <div className={cn(
+                    "text-2xl md:text-3xl font-black tracking-tighter",
+                    periodTotals.total >= 0 ? "text-primary" : "text-tertiary"
+                  )}>
+                    {periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </div>
+                </div>
+                <div className="text-center border-l border-white/10 pl-6 text-xs text-on-surface-variant font-black leading-tight">
+                  <span className="text-xl block">{periodTotals.count}</span>
+                  REGISTROS
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
