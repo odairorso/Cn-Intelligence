@@ -77,17 +77,11 @@ export default async function handler(req, res) {
   const decoded = verifyToken(req);
 
   if (!decoded) {
-    // Sem JWT válido — verificar fallback de security token (APENAS para rotas públicas)
+    // Sem JWT válido — apenas rotas públicas podem continuar
     const publicRoutes = new Set(['health']);
     if (!publicRoutes.has(route)) {
-      const securityToken = req.headers['x-cn-security'];
-      const EXPECTED = process.env.SECURITY_TOKEN;
-      if (!EXPECTED || securityToken !== EXPECTED) {
-        return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
-      }
+      return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
     }
-    // Security token válido: usar APP_UID como fallback (NUNCA aceitar uid de query param)
-    req.authUid = APP_UID;
   } else {
     const uid = decoded.uid || APP_UID;
     req.authUid = uid === 'guest' ? APP_UID : uid;

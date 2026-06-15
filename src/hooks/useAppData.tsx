@@ -633,7 +633,14 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
       showNotification(`${txList.length} lançamento(s) importado(s) com sucesso!`, 'success');
     } catch (err: any) {
       console.error(err);
-      showNotification('Erro ao importar lançamentos. Tente novamente.', 'error');
+      const isDuplicate = err.message && (
+        err.message.includes('Boleto já lançado') ||
+        err.message.includes('Lançamento duplicado')
+      );
+      const msg = isDuplicate 
+        ? 'Este boleto já foi lançado no sistema.'
+        : 'Erro ao importar lançamentos. Tente novamente.';
+      showNotification(msg, isDuplicate ? 'info' : 'error');
     }
   }, [showNotification]);
 

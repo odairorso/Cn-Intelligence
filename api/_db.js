@@ -10,10 +10,14 @@ if (connectionString) {
 }
 
 const poolMax = (() => {
-  const raw = process.env.PG_POOL_MAX || process.env.DB_POOL_MAX || '1';
+  const raw = process.env.PG_POOL_MAX || process.env.DB_POOL_MAX || '3';
   const n = Number.parseInt(String(raw), 10);
-  return Number.isFinite(n) && n > 0 ? Math.min(n, 5) : 1;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 10) : 3;
 })();
+
+// SSL: por padrão exige certificado válido. Em ambiente local com certificado self-signed,
+// defina PG_SSL_REJECT_UNAUTHORIZED=false (nunca faça isso em produção).
+const sslRejectUnauthorized = String(process.env.PG_SSL_REJECT_UNAUTHORIZED ?? 'true').toLowerCase() !== 'false';
 
 const pool = new pg.Pool({
   connectionString,
@@ -21,9 +25,11 @@ const pool = new pg.Pool({
   idleTimeoutMillis: 10_000,
   connectionTimeoutMillis: 10_000,
   allowExitOnIdle: true,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: connectionString
+    ? {
+        rejectUnauthorized: sslRejectUnauthorized,
+      }
+    : false,
 });
 
 class SqlQuery {
@@ -134,4 +140,5 @@ export const setCors = (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
 };
