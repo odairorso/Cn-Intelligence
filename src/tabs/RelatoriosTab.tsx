@@ -143,7 +143,9 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
   }, [transactions]);
 
   const filteredData = useMemo(() => {
-    const searchLower = searchTerm.trim().toLowerCase();
+    const removeAccents = (str: string) => 
+      str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const searchNormalized = removeAccents(searchTerm);
     const filtered = transactions.filter(tx => {
       let matchesDateRange = true;
       if (filterType === 'PERIODO') {
@@ -178,9 +180,9 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
       const contaId = selectedContaContabil === 'TODOS' ? null : Number(selectedContaContabil);
       const matchesConta = selectedContaContabil === 'TODOS' || (Number.isFinite(contaId as any) && Number(tx.conta_contabil_id) === contaId);
       
-      const matchesSearch = !searchLower || 
-        (tx.fornecedor && tx.fornecedor.toLowerCase().includes(searchLower)) ||
-        (tx.descricao && tx.descricao.toLowerCase().includes(searchLower));
+      const matchesSearch = !searchNormalized || 
+        (tx.fornecedor && removeAccents(tx.fornecedor).includes(searchNormalized)) ||
+        (tx.descricao && removeAccents(tx.descricao).includes(searchNormalized));
 
       return matchesDateRange && matchesCompany && matchesTipo && matchesStatus && matchesConta && matchesSearch;
     });
