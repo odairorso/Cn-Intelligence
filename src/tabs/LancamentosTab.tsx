@@ -82,7 +82,10 @@ const LancamentosTab = React.memo(({
 
   const filtered = useMemo(() => {
     const searchRaw = String(deferredFilter || '').trim();
-    const searchLower = searchRaw.toLowerCase();
+    const removeAccents = (str: string) =>
+      str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const searchNormalized = removeAccents(searchRaw);
+
     const parseMoneySearch = (input: string): number | null => {
       const raw = String(input || '').trim();
       if (!raw) return null;
@@ -104,10 +107,10 @@ const LancamentosTab = React.memo(({
     const moneySearch = parseMoneySearch(searchRaw);
 
     return transactions.filter(tx => {
-      const matchesTextSearch = !searchLower ||
-        tx.fornecedor.toLowerCase().includes(searchLower) ||
-        (tx.descricao && tx.descricao.toLowerCase().includes(searchLower)) ||
-        (tx.empresa && tx.empresa.toLowerCase().includes(searchLower));
+      const matchesTextSearch = !searchNormalized ||
+        removeAccents(tx.fornecedor || '').includes(searchNormalized) ||
+        (tx.descricao && removeAccents(tx.descricao).includes(searchNormalized)) ||
+        (tx.empresa && removeAccents(tx.empresa).includes(searchNormalized));
 
       const txValor = Number(tx.valor) || 0;
       const txJuros = Number(tx.juros || 0) || 0;
