@@ -4,6 +4,7 @@
 
 -- Extensões
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS unaccent;
 
 -- ============================================
 -- Tabela de Usuários
@@ -63,6 +64,11 @@ CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_vencimento ON transactions(vencimento);
 CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
 CREATE INDEX IF NOT EXISTS idx_transactions_empresa ON transactions(empresa);
+
+-- Índice composto otimizado para busca e ordenação de transações ativas
+CREATE INDEX IF NOT EXISTS idx_transactions_uid_vencimento_active 
+ON transactions(uid, vencimento DESC) 
+WHERE deleted_at IS NULL;
 
 -- ============================================
 -- Tabela de Bancos
