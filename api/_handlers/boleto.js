@@ -107,7 +107,10 @@ export async function handleExtractBoleto(req, res) {
       3. VALOR: Valor total (numérico).
          - Use o "Valor Total a Pagar" ou "Total da Fatura". NUNCA use sub-valores de taxas, ICMS ou distribuição como valor total.
       4. CNPJ: CNPJ do Beneficiário (quem recebe).
-      5. NÚMERO DO BOLETO: Linha digitável ou código de barras.
+      5. NÚMERO DO BOLETO: Use o campo "Número do Documento" que aparece no corpo/ficha do boleto (campo específico, geralmente alfanumérico curto como "0002a1rvwn").
+         - NÃO use a linha digitável (aquele número gigante com 47+ dígitos que aparece no topo).
+         - NÃO use o código de barras numérico.
+         - Se não houver "Número do Documento" explícito, retorne o "Nosso Número" ou deixe vazio.
       6. DESCRIÇÃO: Uma breve descrição baseada no conteúdo (ex: "Seguro Auto", "Conta de Energia").
       7. CONTA CONTÁBIL (conta_contabil_id): Baseado na descrição e fornecedor, sugira o ID NUMÉRICO da conta contábil mais adequada. Retorne apenas o ID numérico ou null se não souber.${contasContabeisText}`;
 
