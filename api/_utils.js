@@ -47,6 +47,10 @@ export const checkRateLimit = (req, res) => {
 // --- Processamento de Boleto ---
 export const normalizeBoletoNumber = (value) => {
   if (value === null || value === undefined || value === '') return '';
+  const clean = String(value).replace(/[^A-Z0-9]/g, '');
+  if (clean.length === 47 || clean.length === 48 || clean.length === 44) {
+    return clean;
+  }
   const raw = String(value).toUpperCase();
   if (!raw || raw === 'UNDEFINED' || raw === 'NULL') return '';
   const tokens = raw
@@ -55,7 +59,7 @@ export const normalizeBoletoNumber = (value) => {
     .filter(Boolean);
   const bestToken = tokens.find((token) => /\d{4,}/.test(token) && token.length >= 6 && token.length <= 30);
   if (bestToken) return bestToken;
-  return raw.replace(/[^A-Z0-9]/g, '');
+  return clean;
 };
 
 export const isAddressLike = (value) => {

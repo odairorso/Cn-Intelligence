@@ -274,6 +274,11 @@ export default function App() {
   // --- Handlers ---
 
   const normalizeBoletoNumber = (value?: string) => {
+    if (value === null || value === undefined || value === '') return '';
+    const clean = String(value).replace(/[^A-Z0-9]/g, '');
+    if (clean.length === 47 || clean.length === 48 || clean.length === 44) {
+      return clean;
+    }
     const raw = String(value || '').toUpperCase();
     if (!raw) return '';
     const tokens = raw
@@ -282,7 +287,7 @@ export default function App() {
       .filter(Boolean);
     const bestToken = tokens.find((token) => /\d{4,}/.test(token) && token.length >= 6 && token.length <= 30);
     if (bestToken) return bestToken;
-    return raw.replace(/[^A-Z0-9]/g, '');
+    return clean;
   };
 
   const boletoDuplicateKey = (fornecedor: string, vencimento: string, valor: number, numeroBoleto?: string, descricao?: string, empresa?: string) => {
