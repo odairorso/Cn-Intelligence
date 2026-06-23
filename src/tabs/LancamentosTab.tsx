@@ -501,8 +501,8 @@ const LancamentosTab = React.memo(({
             )}
           </button>
         ) : (
-          <div className="text-xs text-on-surface-variant bg-surface-variant/20 px-4 py-2.5 rounded-lg border border-surface-variant/30 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-on-surface-variant/40 animate-pulse" />
+          <div className="text-xs text-on-surface bg-surface-variant/20 px-4 py-2.5 rounded-lg border border-surface-variant/30 flex items-center gap-2 font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
             Todos os registros deste filtro foram carregados ({filtered.length} no total)
           </div>
         )}
