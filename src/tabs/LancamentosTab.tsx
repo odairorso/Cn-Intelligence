@@ -15,13 +15,14 @@ interface LancamentosTabProps {
   deleteTransaction: (id: string) => void;
   setShowNewTxModal: (show: boolean) => void;
   setEditingTx: (tx: Transaction) => void;
-  onLoadMore?: (append?: boolean, year?: string, month?: string, search?: string) => void;
+  onLoadMore?: (append?: boolean, year?: string, month?: string, search?: string, status?: string) => void;
   isLoadingMore?: boolean;
+  hasMoreTransactions?: boolean;
 }
 
 const LancamentosTab = React.memo(({
   transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteTransaction, setShowNewTxModal, setEditingTx,
-  onLoadMore, isLoadingMore
+  onLoadMore, isLoadingMore, hasMoreTransactions
 }: LancamentosTabProps) => {
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('TODOS');
@@ -45,11 +46,11 @@ const LancamentosTab = React.memo(({
     }
     if (onLoadMore) {
       const timer = setTimeout(() => {
-        onLoadMore(false, yearFilter, monthFilter, filter);
+        onLoadMore(false, yearFilter, monthFilter, filter, statusFilter);
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [filter, yearFilter, monthFilter]);
+  }, [filter, yearFilter, monthFilter, statusFilter]);
 
   // Extrair meses e anos únicos para os filtros
   const availableYears = useMemo(() => {
@@ -483,21 +484,28 @@ const LancamentosTab = React.memo(({
 
       {/* Carregar mais do Banco de Dados */}
       <div className="flex justify-center pt-4 border-t border-surface-variant">
-        <button
-          onClick={() => onLoadMore?.(true, yearFilter, monthFilter, filter)}
-          disabled={isLoadingMore}
-          className="flex items-center gap-2 px-6 py-3 bg-primary/10 text-primary rounded-xl text-sm font-bold hover:bg-primary/20 transition-all disabled:opacity-50"
-        >
-          {isLoadingMore ? (
-            <>
-              <Loader2 size={18} className="animate-spin" /> Carregando do Banco...
-            </>
-          ) : (
-            <>
-              <RefreshCw size={18} /> Carregar mais registros do Banco de Dados
-            </>
-          )}
-        </button>
+        {hasMoreTransactions ? (
+          <button
+            onClick={() => onLoadMore?.(true, yearFilter, monthFilter, filter, statusFilter)}
+            disabled={isLoadingMore}
+            className="flex items-center gap-2 px-6 py-3 bg-primary/10 text-primary rounded-xl text-sm font-bold hover:bg-primary/20 transition-all disabled:opacity-50"
+          >
+            {isLoadingMore ? (
+              <>
+                <Loader2 size={18} className="animate-spin" /> Carregando do Banco...
+              </>
+            ) : (
+              <>
+                <RefreshCw size={18} /> Carregar mais registros do Banco de Dados
+              </>
+            )}
+          </button>
+        ) : (
+          <div className="text-xs text-on-surface-variant bg-surface-variant/20 px-4 py-2.5 rounded-lg border border-surface-variant/30 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-on-surface-variant/40 animate-pulse" />
+            Todos os registros deste filtro foram carregados ({filtered.length} no total)
+          </div>
+        )}
       </div>
     </div>
   );

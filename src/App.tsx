@@ -84,7 +84,7 @@ type PdfImportDraft = {
 
 export default function App() {
   const {
-    transactions, globalStats, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, isLoadingMore, boletoPatterns, isAuthorized,
+    transactions, globalStats, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, isLoadingMore, hasMoreTransactions, boletoPatterns, isAuthorized,
     fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns, fetchStats,
     showNotification, login, logout, markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
     deleteSupplier, syncSuppliers, mergeSuppliers, mergeSuppliersAuto, updateSupplier,
@@ -1916,8 +1916,9 @@ export default function App() {
                 deleteTransaction={deleteTransaction}
                 setShowNewTxModal={setShowNewTxModal}
                 setEditingTx={setEditingTx}
-                onLoadMore={(append, year, month, search) => fetchTransactions(append, year, month, search)}
+                onLoadMore={(append, year, month, search, status) => fetchTransactions(append, year, month, search, undefined, { status })}
                 isLoadingMore={isLoadingMore}
+                hasMoreTransactions={hasMoreTransactions}
               />
             )}
             {activeTab === 'fornecedores' && (
