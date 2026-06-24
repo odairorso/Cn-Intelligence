@@ -677,7 +677,6 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     const data = await api.extractBoleto(text, fileName);
     return data;
   }, []);
-
   const importOFX = useCallback(async (ofxData: any[]) => {
     if (!apiAuth.isAuthenticated()) {
       showNotification('Faça login para importar.', 'error');
@@ -686,7 +685,6 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     if (!ofxData.length) return;
     try {
       const txList = ofxData.map((row) => ({
-        // UID pode ser opcional se backend extrai do JWT
         uid: apiAuth.getUid() || 'guest',
         fornecedor: row.fornecedor,
         descricao: `${row.descricao} [OFX:${row.fitid}]`,
@@ -705,6 +703,9 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
         await api.createTransactionsBatch(txList as any);
       }
 
+      clearCache(`suppliers_${apiAuth.getUid()}`);
+      await fetchSuppliers(true);
+      await fetchTransactions();
       showNotification(`${txList.length} lançamento(s) importado(s) com sucesso!`, 'success');
     } catch (err: any) {
       console.error(err);
@@ -717,7 +718,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
         : 'Erro ao importar lançamentos. Tente novamente.';
       showNotification(msg, isDuplicate ? 'info' : 'error');
     }
-  }, [showNotification]);
+  }, [fetchSuppliers, fetchTransactions, showNotification]);
 
   const importBoletoOFX = useCallback(async (ofxData: any[]) => {
     await importOFX(ofxData);
