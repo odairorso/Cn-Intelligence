@@ -43,8 +43,8 @@ const SupplierDetailModal = ({ supplier, transactions: _transactions, onClose, o
   }, [supplier]);
 
   const kpis = useMemo(() => {
-    const total = supplierTransactions.reduce((acc, t) => acc + t.valor, 0);
-    const pago = supplierTransactions.filter(t => t.status === 'PAGO').reduce((acc, t) => acc + t.valor, 0);
+    const total = supplierTransactions.reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
+    const pago = supplierTransactions.filter(t => t.status === 'PAGO').reduce((acc, t) => acc + (Number(t.valor) || 0), 0);
     const aberto = total - pago;
     return { total, pago, aberto };
   }, [supplierTransactions]);
@@ -87,15 +87,15 @@ const SupplierDetailModal = ({ supplier, transactions: _transactions, onClose, o
         <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-white/5">
           <div className="p-6 bg-surface/40">
             <p className="text-[10px] font-black uppercase text-on-surface-variant/40 tracking-widest mb-1">Total Movimentado</p>
-            <p className="text-xl font-black font-headline">{kpis.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            <p className="text-xl font-black font-headline">{(kpis.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="p-6 bg-surface/40">
             <p className="text-[10px] font-black uppercase text-primary/60 tracking-widest mb-1">Total Liquidado</p>
-            <p className="text-xl font-black font-headline text-primary">{kpis.pago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            <p className="text-xl font-black font-headline text-primary">{(kpis.pago || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="p-6 bg-surface/40">
             <p className="text-[10px] font-black uppercase text-secondary/60 tracking-widest mb-1">Saldo em Aberto</p>
-            <p className="text-xl font-black font-headline text-secondary">{kpis.aberto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            <p className="text-xl font-black font-headline text-secondary">{(kpis.aberto || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
         </div>
 
@@ -120,7 +120,7 @@ const SupplierDetailModal = ({ supplier, transactions: _transactions, onClose, o
                       </div>
                     </div>
                     <div className="flex items-center gap-6">
-                      <span className={cn("text-sm font-black font-headline", tx.valor < 0 ? "text-tertiary" : "text-primary")}>{tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className={cn("text-sm font-black font-headline", (tx.valor || 0) < 0 ? "text-tertiary" : "text-primary")}>{(tx.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       <span className={cn(
                         "text-[9px] font-black px-2 py-0.5 rounded-sm border uppercase tracking-widest",
                         tx.status === 'PAGO' ? "bg-primary/20 text-primary border-primary/30" : "bg-secondary/20 text-secondary border-secondary/30"
