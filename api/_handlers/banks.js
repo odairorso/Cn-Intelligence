@@ -1,5 +1,6 @@
 import { sql } from '../_db.js';
 import { BankSchema, ContaContabilSchema } from '../_schemas.js';
+import { handleError } from '../_utils.js';
 
 // GET/POST /api?route=banks
 export async function handleBanks(req, res) {
@@ -11,7 +12,7 @@ export async function handleBanks(req, res) {
       const rows = await sql`SELECT * FROM banks WHERE uid = ${uid} ORDER BY nome ASC`;
       return res.json(rows);
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'banks.js handleBanks GET');
     }
   }
 
@@ -31,7 +32,7 @@ export async function handleBanks(req, res) {
         RETURNING *`;
       return res.status(201).json(rows[0]);
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'banks.js handleBanks POST');
     }
   }
 
@@ -68,7 +69,7 @@ export async function handleBankById(req, res) {
         RETURNING *`;
       return res.json(rows[0]);
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'banks.js handleBankById PUT');
     }
   }
   if (req.method === 'DELETE') {
@@ -79,7 +80,7 @@ export async function handleBankById(req, res) {
       await sql`DELETE FROM banks WHERE id = ${id} AND uid = ${uid}`;
       return res.status(204).end();
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'banks.js handleBankById DELETE');
     }
   }
   return res.status(405).json({ error: 'Method not allowed' });
@@ -107,7 +108,7 @@ export async function handleContasContabeis(req, res) {
         : await sql`SELECT * FROM contas_contabeis WHERE ativo = true ORDER BY tipo, codigo ASC`;
       return res.json(rows);
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'banks.js handleContasContabeis GET');
     }
   }
 
@@ -130,7 +131,7 @@ export async function handleContasContabeis(req, res) {
         RETURNING *`;
       return res.status(201).json(rows[0]);
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'banks.js handleContasContabeis POST');
     }
   }
 
@@ -152,7 +153,7 @@ export async function handleContasContabeis(req, res) {
         RETURNING *`;
       return res.json(rows[0]);
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'banks.js handleContasContabeis PUT');
     }
   }
 
@@ -166,7 +167,7 @@ export async function handleContasContabeis(req, res) {
       await sql`UPDATE contas_contabeis SET ativo = false WHERE id = ${id}`;
       return res.status(204).end();
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'banks.js handleContasContabeis DELETE');
     }
   }
   return res.status(405).json({ error: 'Method not allowed' });

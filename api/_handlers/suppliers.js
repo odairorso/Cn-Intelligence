@@ -1,5 +1,5 @@
 import { sql } from '../_db.js';
-import { normSupplier } from '../_utils.js';
+import { normSupplier, handleError } from '../_utils.js';
 import { SupplierSchema, SupplierMergeSchema } from '../_schemas.js';
 
 // GET/POST /api?route=suppliers
@@ -24,8 +24,7 @@ export async function handleSuppliers(req, res) {
         ORDER BY s.nome ASC`;
       return res.json(rows);
     } catch (e) {
-      console.error(e);
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'suppliers.js handleSuppliers GET');
     }
   }
 
@@ -57,8 +56,7 @@ export async function handleSuppliers(req, res) {
         RETURNING *`;
       return res.status(201).json(rows[0]);
     } catch (e) {
-      console.error(e);
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'suppliers.js handleSuppliers POST');
     }
   }
 
@@ -99,8 +97,7 @@ export async function handleSuppliersBatch(req, res) {
     }
     return res.status(201).json({ message: 'Batch created successfully', count: suppliers.length });
   } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'suppliers.js handleSuppliersBatch');
   }
 }
 
@@ -143,7 +140,7 @@ export async function handleSuppliersMerge(req, res) {
     }
     return res.json({ updated, removed, target: canonical });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'suppliers.js handleSuppliersMerge');
   }
 }
 
@@ -202,7 +199,7 @@ export async function handleSuppliersMergeAuto(req, res) {
     }
     return res.json({ updated: totalUpdated, removed: totalRemoved });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'suppliers.js handleSuppliersMergeAuto');
   }
 }
 
@@ -238,7 +235,7 @@ export async function handleSupplierById(req, res) {
 
       return res.json(rows[0]);
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'suppliers.js handleSupplierById PUT');
     }
   }
   if (req.method === 'DELETE') {
@@ -249,7 +246,7 @@ export async function handleSupplierById(req, res) {
       await sql`DELETE FROM suppliers WHERE id = ${id} AND uid = ${uid}`;
       return res.status(204).end();
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'suppliers.js handleSupplierById DELETE');
     }
   }
   return res.status(405).json({ error: 'Method not allowed' });

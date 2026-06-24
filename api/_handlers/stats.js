@@ -1,4 +1,5 @@
 import { sql } from '../_db.js';
+import { handleError } from '../_utils.js';
 
 const isRange = (val) => typeof val === 'string' && /^\d{4}-\d{4}$/.test(val);
 
@@ -170,7 +171,6 @@ export async function handleStats(req, res) {
       years: yearRows.map(r => r.year).filter(Boolean)
     });
   } catch (e) {
-    console.error('[stats] Error:', e.message);
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'stats.js handleStats');
   }
 }

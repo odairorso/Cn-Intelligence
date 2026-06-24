@@ -158,3 +158,8 @@ export async function logSecurity(req, res, event) {
     console.error('[security_log] erro', e);
   }
 }
+
+export function handleError(res, error, context = 'API Error') {
+  console.error(`[${context}]:`, error);
+  return res.status(500).json({ error: 'Erro interno no servidor' });
+}

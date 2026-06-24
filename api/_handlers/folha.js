@@ -1,4 +1,5 @@
 import { sql, parseDateToPg } from '../_db.js';
+import { handleError } from '../_utils.js';
 import { TransactionSchema } from '../_schemas.js';
 
 // POST /api?route=folha-push
@@ -71,7 +72,6 @@ export async function handleFolhaPush(req, res) {
 
     return res.status(201).json(rows[0]);
   } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'folha.js handleFolhaPush');
   }
 }
