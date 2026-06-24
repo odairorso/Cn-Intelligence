@@ -42,8 +42,11 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
   }, [transactions]);
 
   // Fast lookup for transaction count
-  const getTransactionCount = (supplierName: string): number => {
-    const key = normalizeSupplierName(supplierName);
+  const getTransactionCount = (s: Supplier): number => {
+    if (typeof s.transaction_count === 'number') {
+      return s.transaction_count;
+    }
+    const key = normalizeSupplierName(s.nome);
     return supplierTransactionCount.get(key) || 0;
   };
 
@@ -265,7 +268,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
             </div>
             <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center">
               <p className="text-[10px] font-black text-primary uppercase tracking-widest">
-                {getTransactionCount(s.nome)} Lançamentos
+                {getTransactionCount(s)} Lançamentos
               </p>
               <button className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest hover:text-primary transition-colors">
                 Detalhes →

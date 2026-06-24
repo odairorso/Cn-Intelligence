@@ -9,7 +9,19 @@ export async function handleSuppliers(req, res) {
   if (req.method === 'GET') {
     try {
       if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
-      const rows = await sql`SELECT * FROM suppliers WHERE uid = ${uid} ORDER BY nome ASC`;
+      const rows = await sql`
+        SELECT 
+          s.*,
+          COALESCE(tc.count, 0)::int AS transaction_count
+        FROM suppliers s
+        LEFT JOIN (
+          SELECT fornecedor, COUNT(*)::int as count
+          FROM transactions
+          WHERE uid = ${uid} AND deleted_at IS NULL
+          GROUP BY fornecedor
+        ) tc ON immutable_unaccent(coalesce(tc.fornecedor, '')) = immutable_unaccent(coalesce(s.nome, ''))
+        WHERE s.uid = ${uid}
+        ORDER BY s.nome ASC`;
       return res.json(rows);
     } catch (e) {
       console.error(e);
