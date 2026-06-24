@@ -132,7 +132,8 @@ export default async function handler(req, res) {
         default: return res.status(404).json({ error: 'Route not found' });
       }
     } catch (e) {
-      return res.status(500).json({ error: 'Erro no servidor', details: e.message });
+      console.error('[API Router Error]:', e);
+      return res.status(500).json({ error: 'Erro interno no servidor' });
     } finally {
       if (!SKIP_LOG_ROUTES.has(route)) {
         try {
