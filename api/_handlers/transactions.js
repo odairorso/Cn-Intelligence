@@ -79,9 +79,9 @@ export async function handleTransactions(req, res) {
           const sNum = `%${term.replace(/[^\d]/g, '')}%`;
           
           query = sql`${query} AND (
-            unaccent(fornecedor) ILIKE unaccent(${sRaw})
-            OR unaccent(coalesce(descricao, '')) ILIKE unaccent(${sRaw})
-            OR unaccent(coalesce(empresa, '')) ILIKE unaccent(${sRaw})
+            immutable_unaccent(fornecedor) ILIKE immutable_unaccent(${sRaw})
+            OR immutable_unaccent(coalesce(descricao, '')) ILIKE immutable_unaccent(${sRaw})
+            OR immutable_unaccent(coalesce(empresa, '')) ILIKE immutable_unaccent(${sRaw})
             OR CAST(valor AS TEXT) ILIKE ${sRaw}
             ${sNum.length > 2 ? sql`OR REPLACE(CAST(valor AS TEXT), '.', '') ILIKE ${sNum}` : sql``}
             ${money !== null ? sql`OR abs(valor - ${money}) < 0.01 OR abs((valor + coalesce(juros, 0)) - ${money}) < 0.01` : sql``}

@@ -24,7 +24,11 @@ export async function handleStats(req, res) {
     let searchFilterSql = sql``;
     if (search) {
       const sRaw = `%${search}%`;
-      searchFilterSql = sql`AND (fornecedor ILIKE ${sRaw} OR descricao ILIKE ${sRaw} OR empresa ILIKE ${sRaw})`;
+      searchFilterSql = sql`AND (
+        immutable_unaccent(fornecedor) ILIKE immutable_unaccent(${sRaw})
+        OR immutable_unaccent(coalesce(descricao, '')) ILIKE immutable_unaccent(${sRaw})
+        OR immutable_unaccent(coalesce(empresa, '')) ILIKE immutable_unaccent(${sRaw})
+      )`;
     }
 
     // Filtro de data dinâmico
