@@ -386,26 +386,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     }
   }, [fetchTransactions, loadingTransactions, hasMoreTransactions]);
 
-  // --------------------------------------------------------------
-  // Add/Update/Delete Transaction
-  // --------------------------------------------------------------
-  const addTransaction = useCallback(async (tx: Partial<Transaction>) => {
-    const data = await api.createTransaction(tx as any);
-    setTransactions((prev) => [data, ...prev]);
-    showNotification('Lançamento criado com sucesso!', 'success');
-  }, [showNotification]);
 
-  const updateTransaction = useCallback(async (id: string, data: Partial<Transaction>) => {
-    const updated = await api.updateTransaction(id, data);
-    setTransactions((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, ...updated } : t)));
-    showNotification('Lançamento atualizado!', 'success');
-  }, [showNotification]);
-
-  const deleteTransaction = useCallback(async (id: string) => {
-    await api.deleteTransaction(id);
-    setTransactions((prev) => prev.filter((t) => String(t.id) !== id));
-    showNotification('Lançamento excluído!', 'success');
-  }, [showNotification]);
 
   // --------------------------------------------------------------
   // Mark as Paid
@@ -537,6 +518,33 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     await fetchSuppliers(true);
     await fetchTransactions();
   }, [fetchSuppliers, fetchTransactions]);
+
+  // --------------------------------------------------------------
+  // Add/Update/Delete Transaction (with Suppliers Cache Sync)
+  // --------------------------------------------------------------
+  const addTransaction = useCallback(async (tx: Partial<Transaction>) => {
+    const data = await api.createTransaction(tx as any);
+    setTransactions((prev) => [data, ...prev]);
+    clearCache(`suppliers_${apiAuth.getUid()}`);
+    await fetchSuppliers(true);
+    showNotification('Lançamento criado com sucesso!', 'success');
+  }, [fetchSuppliers, showNotification]);
+
+  const updateTransaction = useCallback(async (id: string, data: Partial<Transaction>) => {
+    const updated = await api.updateTransaction(id, data);
+    setTransactions((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, ...updated } : t)));
+    clearCache(`suppliers_${apiAuth.getUid()}`);
+    await fetchSuppliers(true);
+    showNotification('Lançamento atualizado!', 'success');
+  }, [fetchSuppliers, showNotification]);
+
+  const deleteTransaction = useCallback(async (id: string) => {
+    await api.deleteTransaction(id);
+    setTransactions((prev) => prev.filter((t) => String(t.id) !== id));
+    clearCache(`suppliers_${apiAuth.getUid()}`);
+    await fetchSuppliers(true);
+    showNotification('Lançamento excluído!', 'success');
+  }, [fetchSuppliers, showNotification]);
 
   // --------------------------------------------------------------
   // Fetch Banks
