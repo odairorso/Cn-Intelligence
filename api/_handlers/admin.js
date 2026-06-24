@@ -1,5 +1,5 @@
 import { sql } from '../_db.js';
-import { logSecurity } from '../_utils.js';
+import { logSecurity, handleError } from '../_utils.js';
 
 // POST /api?route=setup-tables
 export async function handleSetupTables(req, res) {
@@ -87,7 +87,7 @@ export async function handleSetupTables(req, res) {
 
     return res.json({ message: 'Tables verified/created and default accounts seeded successfully' });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'admin.js handleSetupTables');
   }
 }
 
@@ -97,7 +97,8 @@ export async function handleDbCheck(req, res) {
     const rows = await sql`SELECT 1 AS ok, version(), current_database() as db`;
     return res.json({ ok: true, info: rows[0] });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: e.message });
+    console.error('[admin.js handleDbCheck Error]:', e);
+    return res.status(500).json({ ok: false, error: 'Erro interno no servidor' });
   }
 }
 
@@ -124,7 +125,7 @@ export async function handleExportBackup(req, res) {
     ]);
     return res.json({ timestamp: new Date(), data: { transactions: txs, suppliers: sups, banks } });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'admin.js handleExportBackup');
   }
 }
 

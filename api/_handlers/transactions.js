@@ -1,5 +1,5 @@
 import { sql, parseDateToPg } from '../_db.js';
-import { normalizeBoletoNumber, sanitizeObject } from '../_utils.js';
+import { normalizeBoletoNumber, sanitizeObject, handleError } from '../_utils.js';
 import { TransactionSchema, TransactionBatchSchema } from '../_schemas.js';
 
 // ── Audit Log Helper ────────────────────────────────────────────────────────
@@ -119,8 +119,7 @@ export async function handleTransactions(req, res) {
       }));
       return res.json(formatted);
     } catch (e) {
-      console.error(e);
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'transactions.js handleTransactions');
     }
   }
 
@@ -193,8 +192,7 @@ export async function handleTransactions(req, res) {
       await auditLog(uid, 'CREATE', rows[0].id, null, rows[0]);
       return res.status(201).json(rows[0]);
     } catch (e) {
-      console.error(e);
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'transactions.js handleTransactions POST');
     }
   }
 
@@ -222,7 +220,7 @@ export async function handleTransactionById(req, res) {
         juros: Number(tx.juros || 0),
       });
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'transactions.js handleTransactionById GET');
     }
   }
 
@@ -284,9 +282,8 @@ export async function handleTransactionById(req, res) {
         pagamento: rows[0].pagamento ? new Date(rows[0].pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
         valor: Number(rows[0].valor),
         juros: Number(rows[0].juros || 0),
-      });
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'transactions.js handleTransactionById PUT');
     }
   }
 
@@ -301,9 +298,8 @@ export async function handleTransactionById(req, res) {
         WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)
       `;
       await auditLog(uid, 'DELETE', id, existing[0], null);
-      return res.json({ message: 'Deleted' });
     } catch (e) {
-      return res.status(500).json({ error: e.message });
+      return handleError(res, e, 'transactions.js handleTransactionById DELETE');
     }
   }
 
@@ -434,7 +430,7 @@ export async function handleTransactionsBatch(req, res) {
     }
     return res.status(201).json({ message: 'Batch processed', count: created, blocked, errors });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'transactions.js handleTransactionsBatch');
   }
 }
 
@@ -453,7 +449,7 @@ export async function handleTransactionsBatchUpdate(req, res) {
     await sql`UPDATE transactions SET status = 'PAGO', banco = ${banco}, pagamento = ${pDate}, updated_at = NOW() WHERE (uid = ${uid} OR uid IS NULL) AND id = ANY(${ids}::uuid[])`;
     return res.json({ message: 'Updated successfully' });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'transactions.js handleTransactionsBatchUpdate');
   }
 }
 
@@ -482,7 +478,7 @@ export async function handleTransactionsDedupeMovimentos(req, res) {
     await auditLog(uid, 'DEDUPE', null, null, { count: rows.length });
     return res.json({ message: 'Deduplicated', count: rows.length });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'transactions.js handleTransactionsDedupeMovimentos');
   }
 }
 
@@ -508,6 +504,6 @@ export async function handleFixReceitasTipo(req, res) {
     `;
     return res.json({ ok: true, updated: result.count || 0 });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'transactions.js handleFixReceitasTipo');
   }
 }

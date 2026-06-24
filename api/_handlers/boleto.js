@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { sql } from '../_db.js';
+import { handleError } from '../_utils.js';
 import {
   normName,
   cleanCnpj,
@@ -223,7 +224,7 @@ export async function handleExtractBoleto(req, res) {
 
     throw new Error(geminiError || 'Falha na resposta da IA');
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'boleto.js handleExtractBoleto');
   }
 }
 
@@ -236,7 +237,7 @@ export async function handleBoletoPatterns(req, res) {
     const rows = await sql`SELECT * FROM boleto_patterns ORDER BY confirmacoes DESC, fornecedor ASC`;
     return res.json(rows);
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'boleto.js handleBoletoPatterns');
   }
 }
 
@@ -262,7 +263,7 @@ export async function handleSaveBoletoPattern(req, res) {
       ON CONFLICT (nome_normalizado) DO UPDATE SET confirmacoes = boleto_patterns.confirmacoes + 1, ultima_confirmacao = NOW()`;
     return res.json({ ok: true });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'boleto.js handleSaveBoletoPattern');
   }
 }
 
@@ -276,6 +277,6 @@ export async function handleDeleteBoletoPattern(req, res) {
     await sql`DELETE FROM boleto_patterns WHERE id = ${id} AND uid = ${uid}`;
     return res.status(204).end();
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    return handleError(res, e, 'boleto.js handleDeleteBoletoPattern');
   }
 }
