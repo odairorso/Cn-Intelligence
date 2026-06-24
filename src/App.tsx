@@ -2597,6 +2597,7 @@ export default function App() {
           setShowNewTxModal={setShowNewTxModal}
           onSuccess={() => {
             fetchTransactions();
+            syncSuppliers();
             showNotification('Lançamento salvo com sucesso!', 'success');
           }}
           initialTipo={newTxInitialTipo}
