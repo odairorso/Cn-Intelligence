@@ -1,10 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Edit, X } from 'lucide-react';
+import { Edit, X, Loader2 } from 'lucide-react';
 import { Supplier, Transaction } from '../types';
 import { cn, isSupplierMatch } from '../lib/utils';
+import { api } from '../api';
 
-const SupplierDetailModal = ({ supplier, transactions, onClose, onEdit }: { supplier: Supplier, transactions: Transaction[], onClose: () => void, onEdit: (s: Supplier) => void }) => {
+const SupplierDetailModal = ({ supplier, transactions: _transactions, onClose, onEdit }: { supplier: Supplier, transactions?: Transaction[], onClose: () => void, onEdit: (s: Supplier) => void }) => {
+  const [supplierTransactions, setSupplierTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const txDateToNumber = (value: string) => {
     if (!value) return 0;
     if (value.includes('/')) {
@@ -17,12 +21,26 @@ const SupplierDetailModal = ({ supplier, transactions, onClose, onEdit }: { supp
     return 0;
   };
 
-  const supplierTransactions = useMemo(() =>
-    transactions.filter(t => isSupplierMatch(t.fornecedor, supplier.nome))
-      .sort((a, b) => {
-        return txDateToNumber(b.vencimento) - txDateToNumber(a.vencimento);
-      }),
-    [transactions, supplier]);
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    api.getTransactions(1000, 0, undefined, undefined, supplier.nome)
+      .then((data) => {
+        if (!active) return;
+        const matched = data
+          .filter(t => isSupplierMatch(t.fornecedor, supplier.nome))
+          .sort((a, b) => txDateToNumber(b.vencimento) - txDateToNumber(a.vencimento));
+        setSupplierTransactions(matched);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Error fetching supplier transactions:', err);
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [supplier]);
 
   const kpis = useMemo(() => {
     const total = supplierTransactions.reduce((acc, t) => acc + t.valor, 0);
@@ -85,29 +103,37 @@ const SupplierDetailModal = ({ supplier, transactions, onClose, onEdit }: { supp
         <div className="flex-grow overflow-y-auto p-8">
           <h4 className="text-xs font-black uppercase tracking-[0.3em] text-on-surface-variant/40 mb-6">Histórico Financeiro</h4>
           <div className="space-y-3">
-            {supplierTransactions.map((tx) => (
-              <div key={tx.id} className="flex items-center justify-between p-4 bg-white/5 rounded-sm border-l-2 hover:bg-white/10 transition-all group" style={{ borderLeftColor: tx.status === 'PAGO' ? '#10b981' : '#f59e0b' }}>
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold text-on-surface group-hover:text-white">{tx.descricao}</span>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-tighter">{tx.vencimento}</span>
-                    <span className="w-1 h-1 rounded-full bg-white/10" />
-                    <span className="text-[10px] font-black text-primary/60 uppercase">{tx.empresa}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6">
-                  <span className={cn("text-sm font-black font-headline", tx.valor < 0 ? "text-tertiary" : "text-primary")}>{tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  <span className={cn(
-                    "text-[9px] font-black px-2 py-0.5 rounded-sm border uppercase tracking-widest",
-                    tx.status === 'PAGO' ? "bg-primary/20 text-primary border-primary/30" : "bg-secondary/20 text-secondary border-secondary/30"
-                  )}>
-                    {tx.status}
-                  </span>
-                </div>
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="animate-spin text-primary" size={24} />
               </div>
-            ))}
-            {supplierTransactions.length === 0 && (
-              <p className="text-sm text-on-surface-variant text-center py-12">Nenhum lançamento encontrado para este fornecedor.</p>
+            ) : (
+              <>
+                {supplierTransactions.map((tx) => (
+                  <div key={tx.id} className="flex items-center justify-between p-4 bg-white/5 rounded-sm border-l-2 hover:bg-white/10 transition-all group" style={{ borderLeftColor: tx.status === 'PAGO' ? '#10b981' : '#f59e0b' }}>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-on-surface group-hover:text-white">{tx.descricao}</span>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-tighter">{tx.vencimento}</span>
+                        <span className="w-1 h-1 rounded-full bg-white/10" />
+                        <span className="text-[10px] font-black text-primary/60 uppercase">{tx.empresa}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <span className={cn("text-sm font-black font-headline", tx.valor < 0 ? "text-tertiary" : "text-primary")}>{tx.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className={cn(
+                        "text-[9px] font-black px-2 py-0.5 rounded-sm border uppercase tracking-widest",
+                        tx.status === 'PAGO' ? "bg-primary/20 text-primary border-primary/30" : "bg-secondary/20 text-secondary border-secondary/30"
+                      )}>
+                        {tx.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {supplierTransactions.length === 0 && (
+                  <p className="text-sm text-on-surface-variant text-center py-12">Nenhum lançamento encontrado para este fornecedor.</p>
+                )}
+              </>
             )}
           </div>
         </div>
