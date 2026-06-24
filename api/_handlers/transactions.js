@@ -188,7 +188,7 @@ export async function handleTransactions(req, res) {
       const rows = await sql`
         INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
         VALUES (${uid}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'},
-                ${vDate}, ${pDate}, ${valorNumber}, ${status || 'PENDENTE'}, ${banco || null}, ${tipo}, ${normalizedNumber || null}, ${conta_contabil_id || null}, ${uid})
+                ${vDate}, ${pDate}, ${valorNumber}, ${status || 'PENDENTE'}, ${banco ?? null}, ${tipo}, ${normalizedNumber || null}, ${conta_contabil_id ?? null}, ${uid})
         RETURNING *`;
       await auditLog(uid, 'CREATE', rows[0].id, null, rows[0]);
       return res.status(201).json(rows[0]);
@@ -332,6 +332,8 @@ export async function handleTransactionsBatch(req, res) {
     let errors = [];
     const seenKeys = new Set();
 
+    // Phase 1: Pre-validate and deduplicate locally (no DB calls)
+    const prepared = [];
     for (let i = 0; i < batchResult.data.length; i++) {
       const tx = batchResult.data[i];
       const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = tx;
@@ -350,26 +352,85 @@ export async function handleTransactionsBatch(req, res) {
         blocked++;
         continue;
       }
+      seenKeys.add(localKey);
+      prepared.push({ i, tx, vDate, pDate, normalizedNumber, localKey });
+    }
 
-      let duplicateRows = normalizedNumber
-        ? await sql`SELECT id FROM transactions WHERE uid = ${uid} AND deleted_at IS NULL AND regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') = ${normalizedNumber} LIMIT 1`
-        : await sql`SELECT id FROM transactions WHERE uid = ${uid} AND deleted_at IS NULL AND upper(coalesce(fornecedor, '')) = upper(${fornecedor}) AND vencimento = ${vDate} AND abs(valor - ${Number(valor)}) < 0.0001 AND upper(coalesce(descricao, '')) = upper(${descricao || ''}) AND upper(coalesce(empresa, '')) = upper(${empresa || ''}) LIMIT 1`;
+    // Phase 2: Bulk dedup check against DB
+    const boletoNumbers = prepared.filter(p => p.normalizedNumber).map(p => p.normalizedNumber);
+    const existingBoletos = new Set();
+    if (boletoNumbers.length > 0) {
+      const rows = await sql`SELECT regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') AS num FROM transactions WHERE uid = ${uid} AND deleted_at IS NULL AND regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') IN ${sql(boletoNumbers)}`;
+      for (const r of rows) existingBoletos.add(r.num);
+    }
 
-      if (duplicateRows.length) {
+    // Also check composite-key duplicates for non-boleto rows against DB
+    const existingCompositeKeys = new Set();
+    const nonBoletoRows = prepared.filter(p => !p.normalizedNumber);
+    if (nonBoletoRows.length > 0) {
+      // Build a composite key check using multiple OR conditions
+      const compositeConditions = nonBoletoRows.map(p => {
+        const { tx, vDate } = p;
+        return sql`(upper(coalesce(fornecedor, '')) = upper(${tx.fornecedor}) AND vencimento = ${vDate} AND abs(valor - ${Number(tx.valor)}) < 0.0001 AND upper(coalesce(descricao, '')) = upper(${tx.descricao || ''}) AND upper(coalesce(empresa, '')) = upper(${tx.empresa || ''}))`;
+      });
+      const whereClause = sql.join(compositeConditions, sql` OR `);
+      const existingRows = await sql`SELECT upper(coalesce(fornecedor, '')) AS forn, vencimento AS venc, valor AS val, upper(coalesce(descricao, '')) AS "desc", upper(coalesce(empresa, '')) AS emp FROM transactions WHERE uid = ${uid} AND deleted_at IS NULL AND (${whereClause})`;
+      for (const r of existingRows) {
+        existingCompositeKeys.add(`${r.forn}|${r.venc}|${r.val}|${r.desc}|${r.emp}`);
+      }
+    }
+
+    // Phase 3: Insert valid rows in bulk using a single multi-row INSERT
+    const toInsert = [];
+    for (const p of prepared) {
+      if (p.normalizedNumber && existingBoletos.has(p.normalizedNumber)) {
         blocked++;
         continue;
       }
-
-      try {
-        const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
-          VALUES (${uid}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(valor)}, ${status || 'PENDENTE'}, ${banco || null}, ${tipo}, ${normalizedNumber || null}, ${conta_contabil_id || null}, ${uid})
-          RETURNING id`;
-        await auditLog(uid, 'CREATE', inserted[0]?.id, null, { fornecedor, valor, empresa, vencimento: vDate, tipo });
-        created++;
-      } catch (rowError) {
-        errors.push({ index: i, error: rowError.message });
+      if (!p.normalizedNumber) {
+        const { tx, vDate } = p;
+        const compositeKey = `${String(tx.fornecedor || '').toUpperCase()}|${vDate}|${Number(tx.valor)}|${String(tx.descricao || '').toUpperCase()}|${String(tx.empresa || '').toUpperCase()}`;
+        if (existingCompositeKeys.has(compositeKey)) {
+          blocked++;
+          continue;
+        }
       }
-      seenKeys.add(localKey);
+      toInsert.push(p);
+    }
+
+    if (toInsert.length > 0) {
+      try {
+        // Build a single bulk INSERT with multiple value rows
+        const values = toInsert.map(p => {
+          const { tx, vDate, pDate, normalizedNumber } = p;
+          return sql`(${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(tx.valor)}, ${tx.status || 'PENDENTE'}, ${tx.banco ?? null}, ${tx.tipo}, ${normalizedNumber || null}, ${tx.conta_contabil_id ?? null}, ${uid})`;
+        });
+
+        const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
+          VALUES ${sql.join(values, sql`, `)}
+          RETURNING id`;
+
+        created = inserted.length;
+        // Audit log in parallel (non-blocking)
+        Promise.all(inserted.map((row, idx) => {
+          const p = toInsert[idx];
+          return auditLog(uid, 'CREATE', row.id, null, { fornecedor: p.tx.fornecedor, valor: p.tx.valor, empresa: p.tx.empresa, vencimento: p.vDate, tipo: p.tx.tipo });
+        })).catch(() => {});
+      } catch (bulkError) {
+        // Fallback: if multi-row INSERT fails, try individual inserts
+        for (const p of toInsert) {
+          try {
+            const { tx, vDate, pDate, normalizedNumber } = p;
+            const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
+              VALUES (${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(tx.valor)}, ${tx.status || 'PENDENTE'}, ${tx.banco ?? null}, ${tx.tipo}, ${normalizedNumber || null}, ${tx.conta_contabil_id ?? null}, ${uid})
+              RETURNING id`;
+            await auditLog(uid, 'CREATE', inserted[0]?.id, null, { fornecedor: tx.fornecedor, valor: tx.valor, empresa: tx.empresa, vencimento: vDate, tipo: tx.tipo });
+            created++;
+          } catch (rowError) {
+            errors.push({ index: p.i, error: rowError.message });
+          }
+        }
+      }
     }
     return res.status(201).json({ message: 'Batch processed', count: created, blocked, errors });
   } catch (e) {

@@ -4,6 +4,44 @@ import type { Transaction, Supplier, Bank, ContaContabil } from '../types';
 import { DEFAULT_COMPANIES } from '../lib/constants';
 import { normalizeCompanyKey } from '../lib/utils';
 
+// ── Cache helpers (localStorage) ─────────────────────────────────────────────
+const CACHE_PREFIX = 'cn_cache_';
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+function getCache<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + key);
+    if (!raw) return null;
+    const entry: CacheEntry<T> = JSON.parse(raw);
+    if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+      localStorage.removeItem(CACHE_PREFIX + key);
+      return null;
+    }
+    return entry.data;
+  } catch {
+    return null;
+  }
+}
+
+function setCache<T>(key: string, data: T): void {
+  try {
+    const entry: CacheEntry<T> = { data, timestamp: Date.now() };
+    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
+  } catch { /* ignore */ }
+}
+
+function clearCache(key: string): void {
+  try {
+    localStorage.removeItem(CACHE_PREFIX + key);
+  } catch { /* ignore */ }
+}
+
+
 const API_BASE = '/api';
 
 // --------------------------------------------------------------
@@ -439,8 +477,18 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   const fetchSuppliers = useCallback(async (force = false) => {
     if (!apiAuth.isAuthenticated()) return;
     try {
+      const cacheKey = `suppliers_${apiAuth.getUid()}`;
+      if (!force) {
+        const cached = getCache<Supplier[]>(cacheKey);
+        if (cached) {
+          setSuppliers(cached);
+          return;
+        }
+      }
       const data = await api.getSuppliers(force);
-      setSuppliers(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setSuppliers(list);
+      setCache(cacheKey, list);
     } catch (err: any) {
       if (err.message?.includes('Autenticação')) setIsAuthorized(false);
       else showNotification(err.message || 'Erro ao carregar fornecedores.', 'error');
@@ -449,37 +497,43 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
 
   const addSupplier = useCallback(async (supplier: Omit<Supplier, 'id'>) => {
     await api.createSupplier(supplier);
-    await fetchSuppliers();
+    clearCache(`suppliers_${apiAuth.getUid()}`);
+    await fetchSuppliers(true);
     showNotification('Fornecedor criado!', 'success');
   }, [fetchSuppliers, showNotification]);
 
   const updateSupplier = useCallback(async (id: string, data: Partial<Supplier>) => {
     await api.updateSupplier(id, data);
-    await fetchSuppliers();
+    clearCache(`suppliers_${apiAuth.getUid()}`);
+    await fetchSuppliers(true);
     showNotification('Fornecedor atualizado!', 'success');
   }, [fetchSuppliers, showNotification]);
 
   const deleteSupplier = useCallback(async (id: string) => {
     await api.deleteSupplier(id);
-    await fetchSuppliers();
+    clearCache(`suppliers_${apiAuth.getUid()}`);
+    await fetchSuppliers(true);
     showNotification('Fornecedor excluído!', 'success');
   }, [fetchSuppliers, showNotification]);
 
   const mergeSuppliers = useCallback(async (target: string, aliases: string[]) => {
     const result = await api.mergeSuppliers(target, aliases);
-    await fetchSuppliers();
+    clearCache(`suppliers_${apiAuth.getUid()}`);
+    await fetchSuppliers(true);
     showNotification('Fornecedores mesclados!', 'success');
     return result;
   }, [fetchSuppliers, showNotification]);
 
   const mergeSuppliersAuto = useCallback(async () => {
     const result = await api.mergeSuppliersAuto();
-    await fetchSuppliers();
+    clearCache(`suppliers_${apiAuth.getUid()}`);
+    await fetchSuppliers(true);
     showNotification('Merge automático concluído!', 'success');
     return result;
   }, [fetchSuppliers, showNotification]);
 
   const syncSuppliers = useCallback(async () => {
+    clearCache(`suppliers_${apiAuth.getUid()}`);
     await fetchSuppliers(true);
     await fetchTransactions();
   }, [fetchSuppliers, fetchTransactions]);
@@ -490,10 +544,20 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   const fetchBanks = useCallback(async (force = false) => {
     if (!apiAuth.isAuthenticated()) return;
     try {
+      const cacheKey = `banks_${apiAuth.getUid()}`;
+      if (!force) {
+        const cached = getCache<Bank[]>(cacheKey);
+        if (cached) {
+          setBanks(cached);
+          setBalance(cached.reduce((acc: number, b: Bank) => acc + (Number(b.saldo) || 0), 0));
+          return;
+        }
+      }
       const data = await api.getBanks(force);
       const list = Array.isArray(data) ? data : [];
       setBanks(list);
       setBalance(list.reduce((acc, b) => acc + (Number(b.saldo) || 0), 0));
+      setCache(cacheKey, list);
     } catch (err: any) {
       if (err.message?.includes('Autenticação')) setIsAuthorized(false);
       else showNotification(err.message || 'Erro ao carregar bancos.', 'error');
@@ -502,18 +566,21 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
 
   const addBank = useCallback(async (bank: Omit<Bank, 'id'>) => {
     await api.createBank(bank);
+    clearCache(`banks_${apiAuth.getUid()}`);
     await fetchBanks(true);
     showNotification('Banco criado!', 'success');
   }, [fetchBanks, showNotification]);
 
   const updateBank = useCallback(async (id: string, data: Partial<Bank>) => {
     await api.updateBank(id, data);
+    clearCache(`banks_${apiAuth.getUid()}`);
     await fetchBanks(true);
     showNotification('Banco atualizado!', 'success');
   }, [fetchBanks, showNotification]);
 
   const deleteBank = useCallback(async (id: string) => {
     await api.deleteBank(id);
+    clearCache(`banks_${apiAuth.getUid()}`);
     await fetchBanks(true);
     showNotification('Banco excluído!', 'success');
   }, [fetchBanks, showNotification]);
