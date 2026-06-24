@@ -12,6 +12,7 @@ export interface Supplier {
   estado?: string;
   categoria?: string;
   observacoes?: string;
+  transaction_count?: number;
 }
 
 export interface Transaction {
