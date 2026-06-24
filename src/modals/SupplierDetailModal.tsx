@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Edit, X, Loader2 } from 'lucide-react';
 import { Supplier, Transaction } from '../types';
-import { cn, isSupplierMatch } from '../lib/utils';
+import { cn, isSupplierMatch, isRevenueTransaction, formatBRL } from '../lib/utils';
 import { api } from '../api';
 
 const SupplierDetailModal = ({ supplier, transactions: _transactions, onClose, onEdit }: { supplier: Supplier, transactions?: Transaction[], onClose: () => void, onEdit: (s: Supplier) => void }) => {
@@ -120,7 +120,18 @@ const SupplierDetailModal = ({ supplier, transactions: _transactions, onClose, o
                       </div>
                     </div>
                     <div className="flex items-center gap-6">
-                      <span className={cn("text-sm font-black font-headline", (tx.valor || 0) < 0 ? "text-tertiary" : "text-primary")}>{(tx.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <div className="flex flex-col items-end">
+                        <span className={cn("text-sm font-black font-headline", isRevenueTransaction(tx) ? "text-success" : "text-tertiary")}>
+                          {isRevenueTransaction(tx) ? '+ ' : '- '}
+                          {formatBRL(Number(tx.valor || 0) + Number(tx.juros || 0))}
+                        </span>
+                        {Number(tx.juros) > 0 && (
+                          <span className="text-[9px] text-tertiary font-normal">(inclui {formatBRL(Number(tx.juros))} juros)</span>
+                        )}
+                        {Number(tx.juros) < 0 && (
+                          <span className="text-[9px] text-success font-normal">(desconto de {formatBRL(Math.abs(Number(tx.juros)))})</span>
+                        )}
+                      </div>
                       <span className={cn(
                         "text-[9px] font-black px-2 py-0.5 rounded-sm border uppercase tracking-widest",
                         tx.status === 'PAGO' ? "bg-primary/20 text-primary border-primary/30" : "bg-secondary/20 text-secondary border-secondary/30"
