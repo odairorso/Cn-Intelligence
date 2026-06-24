@@ -282,6 +282,7 @@ export async function handleTransactionById(req, res) {
         pagamento: rows[0].pagamento ? new Date(rows[0].pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
         valor: Number(rows[0].valor),
         juros: Number(rows[0].juros || 0),
+      });
     } catch (e) {
       return handleError(res, e, 'transactions.js handleTransactionById PUT');
     }
