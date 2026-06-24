@@ -32,7 +32,7 @@ const pool = new pg.Pool({
     : false,
 });
 
-class SqlQuery {
+export class SqlQuery {
   constructor(strings, values) {
     this.strings = strings;
     this.values = values;
@@ -100,6 +100,29 @@ export const sql = (strings, ...values) => {
       }
     });
   }
+  return new SqlQuery(strings, values);
+};
+
+sql.join = (queries, separator = '') => {
+  if (!Array.isArray(queries) || queries.length === 0) {
+    return new SqlQuery([''], []);
+  }
+
+  const values = [];
+  const strings = [''];
+  const sep = (separator && separator._isSqlQuery) 
+    ? separator 
+    : new SqlQuery([String(separator)], []);
+
+  queries.forEach((q, idx) => {
+    if (idx > 0) {
+      values.push(sep);
+      strings.push('');
+    }
+    values.push(q);
+    strings.push('');
+  });
+
   return new SqlQuery(strings, values);
 };
 
