@@ -85,6 +85,9 @@ export async function handleSetupTables(req, res) {
     await sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_record ON audit_logs(record_id)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_uid)`;
 
+    // Índice de expressão para busca imutável no nome de fornecedores (otimização de join)
+    await sql`CREATE INDEX IF NOT EXISTS idx_suppliers_unaccent_nome ON suppliers (immutable_unaccent(nome))`;
+
     return res.json({ message: 'Tables verified/created and default accounts seeded successfully' });
   } catch (e) {
     return handleError(res, e, 'admin.js handleSetupTables');

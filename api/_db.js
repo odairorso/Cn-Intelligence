@@ -10,9 +10,9 @@ if (connectionString) {
 }
 
 const poolMax = (() => {
-  const raw = process.env.PG_POOL_MAX || process.env.DB_POOL_MAX || '3';
+  const raw = process.env.PG_POOL_MAX || process.env.DB_POOL_MAX || '2';
   const n = Number.parseInt(String(raw), 10);
-  return Number.isFinite(n) && n > 0 ? Math.min(n, 10) : 3;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 4) : 2;
 })();
 
 // SSL: por padrão exige certificado válido. Em ambiente local com certificado self-signed,

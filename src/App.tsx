@@ -26,6 +26,16 @@ import {
 import { DEFAULT_COMPANIES } from './lib/constants';
 import { GlobalSearch } from './components/GlobalSearch';
 import { AuthGuard } from './components/AuthGuard';
+import {
+  normalizeBoletoNumber,
+  extractLocalBoletoNumber,
+  parseLinhaDigitavel,
+  shouldRejectSupplierName,
+  resolveSupplierName,
+  supplierFromFileName,
+  extractBoletoData,
+  type PdfImportDraft
+} from './lib/boletoParser';
 
 // Lazy-loaded tabs
 const DashboardTab = lazy(() => import('./tabs/DashboardTab'));
@@ -62,22 +72,6 @@ const defaultBrandLogo = new URL('../Logo Cn/WhatsApp Image 2021-02-10 at 10.34.
 
 // --- Types ---
 type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'receitas' | 'bancos' | 'extrato' | 'configuracoes';
-
-type PdfImportDraft = {
-  fileName: string;
-  fornecedor: string;
-  vencimento: string;
-  valor: number;
-  descricao: string;
-  empresa: string;
-  cnpj: string;
-  numero_boleto: string;
-  tipo?: 'RECEITA' | 'DESPESA';
-  conta_contabil_id?: number;
-  rawText: string;
-  duplicate: boolean;
-  ai_error?: string;
-};
 
 // --- All tab & modal components extracted to tabs/ and modals/ ---
 // --- Main App ---
@@ -273,22 +267,7 @@ export default function App() {
 
   // --- Handlers ---
 
-  const normalizeBoletoNumber = (value?: string) => {
-    if (value === null || value === undefined || value === '') return '';
-    const clean = String(value).replace(/[^A-Z0-9]/g, '');
-    if (clean.length === 47 || clean.length === 48 || clean.length === 44) {
-      return clean;
-    }
-    const raw = String(value || '').toUpperCase();
-    if (!raw) return '';
-    const tokens = raw
-      .split(/[\s:;|,]+/)
-      .map((token) => token.replace(/[^A-Z0-9]/g, ''))
-      .filter(Boolean);
-    const bestToken = tokens.find((token) => /\d{4,}/.test(token) && token.length >= 6 && token.length <= 30);
-    if (bestToken) return bestToken;
-    return clean;
-  };
+
 
   const boletoDuplicateKey = (fornecedor: string, vencimento: string, valor: number, numeroBoleto?: string, descricao?: string, empresa?: string) => {
     const normalizedNumber = normalizeBoletoNumber(numeroBoleto);
@@ -424,7 +403,7 @@ export default function App() {
     return false;
   };
 
-  const resolveSupplierName = (detectedName: string, sourceText: string) => {
+  const resolveSupplierName = (detectedName: string, sourceText: string, suppliers: Supplier[]) => {
     const cleanDetected = String(detectedName || '').trim();
     const validDetected = shouldRejectSupplierName(cleanDetected) ? '' : cleanDetected;
     const normalizedDetected = normalizeSupplierName(validDetected);
@@ -503,7 +482,7 @@ export default function App() {
     return name;
   };
 
-  const extractBoletoData = (text: string, fileName: string): PdfImportDraft => {
+  const extractBoletoData = (text: string, fileName: string, suppliers: Supplier[]): PdfImportDraft => {
     const normalizedText = text.toUpperCase().replace(/\s+/g, ' ');
     const normalizedTextKey = normalizeSupplierName(normalizedText);
     const sanitizeBoletoValor = (v: number) => (Number.isFinite(v) && v > 0 && v <= 500000 ? v : 0);
@@ -780,7 +759,7 @@ export default function App() {
     };
 
     try {
-      const local = extractBoletoData(text, fileName);
+      const local = extractBoletoData(text, fileName, safeSuppliers);
 
       // Sempre envia o PDF em base64 para o Gemini (visão computacional é muito mais precisa)
       const payload = { text, fileName, pdfBase64 };
@@ -829,7 +808,7 @@ export default function App() {
       }
 
       console.log('[boleto] Gemini returned empty data, using local fallback');
-      const fallback = extractBoletoData(text, fileName);
+      const fallback = extractBoletoData(text, fileName, safeSuppliers);
       // Se nem o fallback local extraiu dados, usa o nome do arquivo como fornecedor
       if (fallback.fornecedor === 'Fornecedor não identificado') {
         const nameFromFile = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
@@ -846,7 +825,7 @@ export default function App() {
       };
     } catch (err) {
       console.error('[boleto] API error, using local fallback:', err);
-      const fallback = extractBoletoData(text, fileName);
+      const fallback = extractBoletoData(text, fileName, safeSuppliers);
       const errorMsg = String((err as any)?.message || err || 'Erro desconhecido na API');
       
       // Notifica o usuário sobre a falha da IA
@@ -894,8 +873,8 @@ export default function App() {
 
           const hasGoodText = fullText.trim().length > 100;
 
-          const local = extractBoletoData(fullText, file.name);
-          local.fornecedor = resolveSupplierName(local.fornecedor, fullText);
+          const local = extractBoletoData(fullText, file.name, safeSuppliers);
+          local.fornecedor = resolveSupplierName(local.fornecedor, fullText, safeSuppliers);
 
           // Para garantir 100% de acerto nas datas e valores, sempre usamos a IA (Gemini) como primeira opção.
           // O leitor local (regex) é muito propenso a falhas de leitura (como capturar descontos, multas ou juros no lugar do valor real, ex: R$ 7,95 de desconto).
@@ -915,7 +894,7 @@ export default function App() {
           });
 
           const ai = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
-          ai.fornecedor = resolveSupplierName(ai.fornecedor, fullText);
+          ai.fornecedor = resolveSupplierName(ai.fornecedor, fullText, safeSuppliers);
 
           const fornecedor = (!shouldRejectSupplierName(ai.fornecedor) && ai.fornecedor) ? ai.fornecedor : local.fornecedor;
           // Se a IA obteve vencimento/valor válidos, prioriza a IA. Caso contrário, cai no local.
@@ -978,7 +957,7 @@ export default function App() {
 
       const canonicalRows = nonDuplicateRows.map((row) => ({
         ...row,
-        fornecedor: resolveSupplierName(row.fornecedor, row.rawText),
+        fornecedor: resolveSupplierName(row.fornecedor, row.rawText, safeSuppliers),
         tipo: row.tipo || 'DESPESA',
       }));
 
