@@ -8,7 +8,11 @@ export async function handleFolhaPush(req, res) {
 
   // Autenticação via token fixo para integração servidor-a-servidor
   const authHeader = req.headers.authorization;
-  const INTEGRATION_TOKEN = process.env.FOLHA_INTEGRATION_TOKEN || 'DEFAULT_FOLHA_INTEGRATION_TOKEN_123';
+  const INTEGRATION_TOKEN = process.env.FOLHA_INTEGRATION_TOKEN;
+  if (!INTEGRATION_TOKEN) {
+    console.error('[FOLHA] Erro: FOLHA_INTEGRATION_TOKEN não configurada no servidor.');
+    return res.status(500).json({ error: 'Erro interno no servidor' });
+  }
   if (!authHeader || authHeader !== `Bearer ${INTEGRATION_TOKEN}`) {
     return res.status(401).json({ error: 'Token de integração inválido' });
   }
