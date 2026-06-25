@@ -24,25 +24,65 @@ const LancamentosTab = React.memo(({
   transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteTransaction, setShowNewTxModal, setEditingTx,
   onLoadMore, isLoadingMore, hasMoreTransactions
 }: LancamentosTabProps) => {
-  const [filter, setFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('TODOS');
-  const [monthFilter, setMonthFilter] = useState('TODOS');
-  const [yearFilter, setYearFilter] = useState('TODOS');
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [page, setPage] = useState(0);
+  const [filter, setFilter] = useState(() => {
+    try { return sessionStorage.getItem('cn_lancamentos_filter') || ''; } catch { return ''; }
+  });
+  const [statusFilter, setStatusFilter] = useState(() => {
+    try { return sessionStorage.getItem('cn_lancamentos_statusFilter') || 'TODOS'; } catch { return 'TODOS'; }
+  });
+  const [monthFilter, setMonthFilter] = useState(() => {
+    try { return sessionStorage.getItem('cn_lancamentos_monthFilter') || 'TODOS'; } catch { return 'TODOS'; }
+  });
+  const [yearFilter, setYearFilter] = useState(() => {
+    try { return sessionStorage.getItem('cn_lancamentos_yearFilter') || 'TODOS'; } catch { return 'TODOS'; }
+  });
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>(() => {
+    try { return (sessionStorage.getItem('cn_lancamentos_sortOrder') as 'desc' | 'asc') || 'desc'; } catch { return 'desc'; }
+  });
+  const [page, setPage] = useState(() => {
+    try { return Number(sessionStorage.getItem('cn_lancamentos_page')) || 0; } catch { return 0; }
+  });
   const [selectedMap, setSelectedMap] = useState<Map<string, Transaction>>(new Map());
+
+  // Save states to sessionStorage on change
+  useEffect(() => {
+    try { sessionStorage.setItem('cn_lancamentos_filter', filter); } catch { /* ignore */ }
+  }, [filter]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem('cn_lancamentos_statusFilter', statusFilter); } catch { /* ignore */ }
+  }, [statusFilter]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem('cn_lancamentos_monthFilter', monthFilter); } catch { /* ignore */ }
+  }, [monthFilter]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem('cn_lancamentos_yearFilter', yearFilter); } catch { /* ignore */ }
+  }, [yearFilter]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem('cn_lancamentos_sortOrder', sortOrder); } catch { /* ignore */ }
+  }, [sortOrder]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem('cn_lancamentos_page', String(page)); } catch { /* ignore */ }
+  }, [page]);
 
   // Deferred search: UI stays responsive while filtering heavy lists
   const deferredFilter = useDeferredValue(filter);
   const isFilterStale = filter !== deferredFilter;
 
   // Busca no servidor ao mudar filtros (debounce para o texto)
-  // Usa ref para evitar busca no mount inicial (já feita pelo useAppData)
+  // Usa ref para evitar busca no mount inicial se os filtros forem padrões
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
-      return;
+      const hasActiveFilters = filter !== '' || statusFilter !== 'TODOS' || monthFilter !== 'TODOS' || yearFilter !== 'TODOS';
+      if (!hasActiveFilters) {
+        return;
+      }
     }
     if (onLoadMore) {
       const timer = setTimeout(() => {
@@ -143,8 +183,15 @@ const LancamentosTab = React.memo(({
     });
   }, [transactions, deferredFilter, statusFilter, monthFilter, yearFilter, sortOrder]);
 
-  // Reset page when filters change
-  useEffect(() => { setPage(0); }, [deferredFilter, statusFilter, monthFilter, yearFilter, sortOrder]);
+  // Reset page when filters change, avoiding initial mount reset
+  const isFirstPageResetRef = useRef(true);
+  useEffect(() => {
+    if (isFirstPageResetRef.current) {
+      isFirstPageResetRef.current = false;
+      return;
+    }
+    setPage(0);
+  }, [deferredFilter, statusFilter, monthFilter, yearFilter, sortOrder]);
   // Preserve selection when filters change (do not clear)
   // The selection will automatically stay consistent with the filtered list.
   // If needed, we could prune IDs that are no longer in the filtered view elsewhere.

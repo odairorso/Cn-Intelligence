@@ -18,7 +18,19 @@ interface FornecedoresTabProps {
 }
 
 const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSupplierModal, syncSuppliers, mergeSuppliers, mergeSuppliersAuto, onSelectSupplier, onEditSupplier }: FornecedoresTabProps) => {
-  const [searchSupplier, setSearchSupplier] = useState('');
+  const [searchSupplier, setSearchSupplier] = useState(() => {
+    try {
+      return sessionStorage.getItem('cn_search_supplier') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  React.useEffect(() => {
+    try {
+      sessionStorage.setItem('cn_search_supplier', searchSupplier);
+    } catch { /* ignore */ }
+  }, [searchSupplier]);
   const [mergeTarget, setMergeTarget] = useState<string>('');
   const [mergeAliases, setMergeAliases] = useState<string[]>([]);
   const [showMergeModal, setShowMergeModal] = useState(false);
