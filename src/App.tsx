@@ -427,8 +427,7 @@ export default function App() {
 
       if (hasValidData) {
         const fallbackNumero = extractLocalBoletoNumber(text);
-        const inferredFromDescricao = normalizeBoletoNumber(dataAny.descricao || '');
-        const numero = normalizeBoletoNumber(dataAny.numero_boleto || '') || fallbackNumero || inferredFromDescricao;
+        const numero = (dataAny.numero_boleto || '').toString().trim() || fallbackNumero || '';
         const fallbackDesc = supplierFromFileName(fileName) || fileName.replace(/\.pdf$/i, '').trim();
         const descricao = hasValidPagador ? pagadorCandidate : ((dataAny.descricao && dataAny.descricao !== '-') ? dataAny.descricao : fallbackDesc);
         const linhaInfo = parseLinhaDigitavel(text);
@@ -584,7 +583,7 @@ export default function App() {
     try {
       const validRows = pdfExtractedRows
         .filter((row) => row.fornecedor && row.vencimento && row.valor > 0)
-        .map((row) => ({ ...row, numero_boleto: normalizeBoletoNumber(row.numero_boleto) }));
+        .map((row) => ({ ...row, numero_boleto: (row.numero_boleto || '').toString().trim() }));
 
       if (validRows.length === 0) {
         showNotification('Preencha Fornecedor, Vencimento e Valor para confirmar a importação.', 'error');
