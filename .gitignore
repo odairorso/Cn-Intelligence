@@ -15,3 +15,7 @@ boletos_teste/
 supabase_config.txt
 
 .vercel
+
+# Scripts de debug locais
+scratch/
+importa_boleto.cjs
