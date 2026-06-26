@@ -544,7 +544,7 @@ export default function App() {
           // Se a IA obteve vencimento/valor válidos, prioriza a IA. Caso contrário, cai no local.
           const vencimento = ai.vencimento || local.vencimento;
           const valor = ai.valor > 0 ? ai.valor : local.valor;
-          const numero_boleto = normalizeBoletoNumber(ai.numero_boleto || '') || normalizeBoletoNumber(local.numero_boleto || '') || '';
+          const numero_boleto = (ai.numero_boleto || local.numero_boleto || '').toString().trim();
           const descricao = ai.descricao || local.descricao;
 
           return {
