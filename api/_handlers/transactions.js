@@ -1,5 +1,5 @@
 import { sql, parseDateToPg } from '../_db.js';
-import { normalizeBoletoNumber, sanitizeObject, handleError } from '../_utils.js';
+import { normalizeBoletoNumber, sanitizeObject, handleError, getContaContabilId } from '../_utils.js';
 import { TransactionSchema, TransactionBatchSchema } from '../_schemas.js';
 
 // ── Audit Log Helper ────────────────────────────────────────────────────────
@@ -184,10 +184,15 @@ export async function handleTransactions(req, res) {
         return res.status(409).json({ error: errorMsg, duplicate: true });
       }
 
+      let resolvedContaContabilId = conta_contabil_id;
+      if (!resolvedContaContabilId) {
+        resolvedContaContabilId = await getContaContabilId(fornecedor, descricao, tipo);
+      }
+
       const rows = await sql`
         INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
         VALUES (${uid}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'},
-                ${vDate}, ${pDate}, ${valorNumber}, ${status || 'PENDENTE'}, ${banco ?? null}, ${tipo}, ${normalizedNumber || null}, ${conta_contabil_id ?? null}, ${uid})
+                ${vDate}, ${pDate}, ${valorNumber}, ${status || 'PENDENTE'}, ${banco ?? null}, ${tipo}, ${normalizedNumber || null}, ${resolvedContaContabilId ?? null}, ${uid})
         RETURNING *`;
       await auditLog(uid, 'CREATE', rows[0].id, null, rows[0]);
       return res.status(201).json(rows[0]);
@@ -361,7 +366,13 @@ export async function handleTransactionsBatch(req, res) {
         continue;
       }
       seenKeys.add(localKey);
-      prepared.push({ i, tx, vDate, pDate, normalizedNumber, localKey });
+
+      let resolvedCcId = conta_contabil_id;
+      if (!resolvedCcId) {
+        resolvedCcId = await getContaContabilId(fornecedor, descricao, tipo);
+      }
+
+      prepared.push({ i, tx, vDate, pDate, normalizedNumber, localKey, resolvedCcId });
     }
 
     // Phase 2: Bulk dedup check against DB
@@ -416,8 +427,8 @@ export async function handleTransactionsBatch(req, res) {
       try {
         // Build a single bulk INSERT with multiple value rows
         const values = toInsert.map(p => {
-          const { tx, vDate, pDate, normalizedNumber } = p;
-          return sql`(${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(tx.valor)}, ${tx.status || 'PENDENTE'}, ${tx.banco ?? null}, ${tx.tipo}, ${normalizedNumber || null}, ${tx.conta_contabil_id ?? null}, ${uid})`;
+          const { tx, vDate, pDate, normalizedNumber, resolvedCcId } = p;
+          return sql`(${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(tx.valor)}, ${tx.status || 'PENDENTE'}, ${tx.banco ?? null}, ${tx.tipo}, ${normalizedNumber || null}, ${resolvedCcId ?? null}, ${uid})`;
         });
 
         const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
@@ -434,9 +445,9 @@ export async function handleTransactionsBatch(req, res) {
         // Fallback: if multi-row INSERT fails, try individual inserts
         for (const p of toInsert) {
           try {
-            const { tx, vDate, pDate, normalizedNumber } = p;
+            const { tx, vDate, pDate, normalizedNumber, resolvedCcId } = p;
             const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
-              VALUES (${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(tx.valor)}, ${tx.status || 'PENDENTE'}, ${tx.banco ?? null}, ${tx.tipo}, ${normalizedNumber || null}, ${tx.conta_contabil_id ?? null}, ${uid})
+              VALUES (${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(tx.valor)}, ${tx.status || 'PENDENTE'}, ${tx.banco ?? null}, ${tx.tipo}, ${normalizedNumber || null}, ${resolvedCcId ?? null}, ${uid})
               RETURNING id`;
             await auditLog(uid, 'CREATE', inserted[0]?.id, null, { fornecedor: tx.fornecedor, valor: tx.valor, empresa: tx.empresa, vencimento: vDate, tipo: tx.tipo });
             created++;
