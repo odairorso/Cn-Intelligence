@@ -83,7 +83,14 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
     }
     if (route === 'folha-push') {
-      req.authUid = 'system_folha';
+      let targetUid = req.query.uid || (req.body && typeof req.body === 'object' ? req.body.uid : null);
+      if (!targetUid && req.body && typeof req.body === 'string') {
+        try {
+          const parsed = JSON.parse(req.body);
+          targetUid = parsed.uid;
+        } catch {}
+      }
+      req.authUid = targetUid || APP_UID;
     }
   } else {
     const uid = decoded.uid || APP_UID;
@@ -138,7 +145,7 @@ export default async function handler(req, res) {
       console.error('[API Router Error]:', e);
       return res.status(500).json({ error: 'Erro interno no servidor' });
     } finally {
-      if (!SKIP_LOG_ROUTES.has(route)) {
+      if (!SKIP_LOG_ROUTES.has(route) && res.statusCode !== 429) {
         try {
           const { logRequest } = await import('./_handlers/admin.js');
           await logRequest(req, res, startTime);

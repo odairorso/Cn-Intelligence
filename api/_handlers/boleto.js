@@ -14,15 +14,15 @@ import {
 import { ExtractBoletoSchema, SaveBoletoPatternSchema } from '../_schemas.js';
 
 // Auxiliar: busca padrão aprendido no banco
-async function lookupPattern(cnpj, nomeNormalizado) {
+async function lookupPattern(uid, cnpj, nomeNormalizado) {
   try {
     const cnpjClean = cleanCnpj(cnpj);
     if (isValidCnpj(cnpjClean)) {
-      const r = await sql`SELECT * FROM boleto_patterns WHERE cnpj = ${cnpjClean} LIMIT 1`;
+      const r = await sql`SELECT * FROM boleto_patterns WHERE uid = ${uid} AND cnpj = ${cnpjClean} LIMIT 1`;
       if (r.length) return r[0];
     }
     if (nomeNormalizado && nomeNormalizado.length >= 5) {
-      const r = await sql`SELECT * FROM boleto_patterns WHERE nome_normalizado = ${nomeNormalizado} LIMIT 1`;
+      const r = await sql`SELECT * FROM boleto_patterns WHERE uid = ${uid} AND nome_normalizado = ${nomeNormalizado} LIMIT 1`;
       if (r.length) return r[0];
     }
   } catch { /* tabela pode não existir */ }
@@ -82,7 +82,7 @@ export async function handleExtractBoleto(req, res) {
     else if (srcUpper.includes('VIVO')) rawBenefName = 'VIVO';
 
     const rawCnpj = allCnpjs[0] || '';
-    const pattern = await lookupPattern(rawCnpj, normName(rawBenefName));
+    const pattern = await lookupPattern(uid, rawCnpj, normName(rawBenefName));
 
     // Busca as contas contábeis cadastradas para o prompt da IA
     let contasContabeisText = '';
@@ -234,7 +234,7 @@ export async function handleBoletoPatterns(req, res) {
   if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
   try {
-    const rows = await sql`SELECT * FROM boleto_patterns ORDER BY confirmacoes DESC, fornecedor ASC`;
+    const rows = await sql`SELECT * FROM boleto_patterns WHERE uid = ${uid} ORDER BY confirmacoes DESC, fornecedor ASC`;
     return res.json(rows);
   } catch (e) {
     return handleError(res, e, 'boleto.js handleBoletoPatterns');
@@ -260,7 +260,7 @@ export async function handleSaveBoletoPattern(req, res) {
     await sql`
       INSERT INTO boleto_patterns (uid, cnpj, nome_normalizado, fornecedor, descricao, empresa, tipo, conta_contabil_id)
       VALUES (${uid}, ${cnpjClean || null}, ${nomeNorm}, ${fornecedor}, ${descricao}, ${empresa}, ${tipo}, ${conta_contabil_id})
-      ON CONFLICT (nome_normalizado) DO UPDATE SET confirmacoes = boleto_patterns.confirmacoes + 1, ultima_confirmacao = NOW()`;
+      ON CONFLICT (uid, nome_normalizado) DO UPDATE SET confirmacoes = boleto_patterns.confirmacoes + 1, ultima_confirmacao = NOW()`;
     return res.json({ ok: true });
   } catch (e) {
     return handleError(res, e, 'boleto.js handleSaveBoletoPattern');

@@ -34,7 +34,7 @@ export async function handleFolhaPush(req, res) {
       contaContabilId = contaRows[0].id;
     }
 
-    const uid = 'system_folha'; // UID especial ou fixo
+    const uid = req.authUid;
 
     // Dedup: se já enviou a mesma folha na mesma competência/empresa
     const duplicateRows = await sql`
