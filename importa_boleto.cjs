@@ -442,11 +442,21 @@ async function processarArquivo(caminhoArquivo) {
 async function inserirBoleto(dados) {
   const uid = process.env.APP_UID || 'odair';
   
+  const client = await pool.connect();
+  let contaContabilId = null;
+  try {
+    contaContabilId = await getContaContabilId(client, dados.fornecedor, dados.descricao, 'DESPESA');
+  } catch (err) {
+    console.error('Erro ao buscar conta contábil:', err.message);
+  } finally {
+    client.release();
+  }
+
   const result = await pool.query(
-    `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, valor, status)
-     VALUES ($1, $2, $3, $4, $5, $6, 'PENDENTE')
+    `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, valor, status, conta_contabil_id)
+     VALUES ($1, $2, $3, $4, $5, $6, 'PENDENTE', $7)
      RETURNING id`,
-    [uid, dados.fornecedor, dados.descricao, dados.empresa || 'CN', dados.vencimento, dados.valor]
+    [uid, dados.fornecedor, dados.descricao, dados.empresa || 'CN', dados.vencimento, dados.valor, contaContabilId]
   );
 
   console.log('\n✅ Boleto inserido com sucesso!');
@@ -454,6 +464,65 @@ async function inserirBoleto(dados) {
   console.log('Fornecedor:', dados.fornecedor);
   console.log('Valor:', `R$ ${dados.valor.toFixed(2)}`);
   console.log('Vencimento:', dados.vencimento);
+  console.log('Conta Contábil ID:', contaContabilId || 'Nenhuma');
+}
+
+async function getContaContabilId(client, fornecedor, descricao, tipo = 'DESPESA') {
+  const fUpper = String(fornecedor || '').toUpperCase();
+  const dUpper = String(descricao || '').toUpperCase();
+  const text = `${fUpper} ${dUpper}`;
+
+  let targetCodigo = null;
+
+  if (tipo === 'RECEITA') {
+    if (text.includes('MENSALIDADE') || text.includes('ALUNO') || text.includes('MATRICULA') || text.includes('MATRÍCULA')) {
+      targetCodigo = '4.1';
+    } else if (text.includes('REPASSE') || text.includes('CONVÊNIO') || text.includes('CONVENIO')) {
+      targetCodigo = '4.2';
+    } else if (text.includes('MATRICULA') || text.includes('MATRÍCULA')) {
+      targetCodigo = '4.3';
+    } else if (text.includes('PERMUTA')) {
+      targetCodigo = '4.4';
+    } else if (text.includes('APLICAÇÃO') || text.includes('APLICACAO') || text.includes('RENDIMENTO')) {
+      targetCodigo = '4.5';
+    } else {
+      targetCodigo = '4.6';
+    }
+  } else {
+    // DESPESA
+    if (text.includes('FOLHA') || text.includes('FOPAG') || text.includes('SALARIO') || text.includes('SALÁRIO') || text.includes('GPS') || text.includes('INSS') || text.includes('FGTS') || text.includes('CONTRIBUIÇÃO SINDICAL') || text.includes('RESCISÃO') || text.includes('13º') || text.includes('DECIMO')) {
+      targetCodigo = '3.1';
+    } else if (text.includes('ALUGUEL') || text.includes('LOCAÇÃO') || text.includes('LOCACAO')) {
+      targetCodigo = '3.2';
+    } else if (text.includes('ENERGISA') || text.includes('SANESUL') || text.includes('AGUA') || text.includes('ÁGUA') || text.includes('LUZ') || text.includes('TELEFONE') || text.includes('CLARO') || text.includes('VIVO') || text.includes('TIM') || text.includes('TELECOM')) {
+      targetCodigo = '3.3';
+    } else if (text.includes('PAPELARIA') || text.includes('ESCRITÓRIO') || text.includes('ESCRITORIO') || text.includes('MATERIAL') || text.includes('IMPRESSÃO') || text.includes('IMPRESSAO')) {
+      targetCodigo = '3.4';
+    } else if (text.includes('INVIOLAVEL') || text.includes('SEGURANÇA') || text.includes('SEGURANCA') || text.includes('VIGILANCIA') || text.includes('VIGILÂNCIA')) {
+      targetCodigo = '3.5';
+    } else if (text.includes('EDITOR') || text.includes('LIVRO') || text.includes('APOSTILA')) {
+      targetCodigo = '3.6';
+    } else if (text.includes('IMPOSTO') || text.includes('DARF') || text.includes('DAS') || text.includes('SIMPLES NACIONAL') || text.includes('RECEITA FEDERAL') || text.includes('TRIBUTO') || text.includes('CONTRIBUIÇÃO SOCIAL')) {
+      targetCodigo = '3.7';
+    } else if (text.includes('MANUTENÇÃO') || text.includes('MANUTENCAO') || text.includes('REFORMA') || text.includes('REPARO') || text.includes('CONSERTO')) {
+      targetCodigo = '3.8';
+    } else if (text.includes('TARIFA') || text.includes('MENSALIDADE CONTA') || text.includes('MENSALIDADE BANCARIA') || text.includes('SERVIÇOS BANCÁRIOS') || text.includes('SERVICOS BANCARIOS')) {
+      targetCodigo = '3.9';
+    } else if (text.includes('JUROS') || text.includes('MULTA') || text.includes('ENCARGOS')) {
+      targetCodigo = '3.10';
+    } else if (text.includes('CONTABILIDADE') || text.includes('ASSESSORIA') || text.includes('VSC') || text.includes('HONORÁRIOS') || text.includes('HONORARIOS')) {
+      targetCodigo = '3.11';
+    }
+  }
+
+  if (targetCodigo) {
+    const res = await client.query('SELECT id FROM contas_contabeis WHERE codigo = $1 AND ativo = true LIMIT 1', [targetCodigo]);
+    if (res.rows.length > 0) {
+      return res.rows[0].id;
+    }
+  }
+
+  return null;
 }
 
 async function main() {

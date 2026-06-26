@@ -176,3 +176,83 @@ export function handleError(res, error, context = 'API Error') {
   console.error(`[${context}]:`, error);
   return res.status(500).json({ error: 'Erro interno no servidor' });
 }
+
+export async function getContaContabilId(fornecedor, descricao, tipo = 'DESPESA') {
+  const fUpper = String(fornecedor || '').toUpperCase();
+  const dUpper = String(descricao || '').toUpperCase();
+  const text = `${fUpper} ${dUpper}`;
+
+  // 1. Tentar buscar em boleto_patterns por fornecedor normalizado
+  const normName = fUpper.replace(/[^A-Z0-9]/g, '');
+  if (normName.length >= 3) {
+    try {
+      const patternRows = await sql`
+        SELECT conta_contabil_id FROM boleto_patterns 
+        WHERE upper(replace(replace(replace(replace(replace(nome_normalizado, '.', ''), '-', ''), ' ', ''), '/', ''), '&', '')) = ${normName} 
+        LIMIT 1
+      `;
+      if (patternRows.length > 0 && patternRows[0].conta_contabil_id) {
+        return patternRows[0].conta_contabil_id;
+      }
+    } catch (e) {
+      console.error('[getContaContabilId] Erro ao buscar pattern:', e.message);
+    }
+  }
+
+  // 2. Mapeamento heurístico por palavras-chave
+  let targetCodigo = null;
+
+  if (tipo === 'RECEITA') {
+    if (text.includes('MENSALIDADE') || text.includes('ALUNO') || text.includes('MATRICULA') || text.includes('MATRÍCULA')) {
+      targetCodigo = '4.1';
+    } else if (text.includes('REPASSE') || text.includes('CONVÊNIO') || text.includes('CONVENIO')) {
+      targetCodigo = '4.2';
+    } else if (text.includes('MATRICULA') || text.includes('MATRÍCULA')) {
+      targetCodigo = '4.3';
+    } else if (text.includes('PERMUTA')) {
+      targetCodigo = '4.4';
+    } else if (text.includes('APLICAÇÃO') || text.includes('APLICACAO') || text.includes('RENDIMENTO')) {
+      targetCodigo = '4.5';
+    } else {
+      targetCodigo = '4.6';
+    }
+  } else {
+    // DESPESA
+    if (text.includes('FOLHA') || text.includes('FOPAG') || text.includes('SALARIO') || text.includes('SALÁRIO') || text.includes('GPS') || text.includes('INSS') || text.includes('FGTS') || text.includes('CONTRIBUIÇÃO SINDICAL') || text.includes('RESCISÃO') || text.includes('13º') || text.includes('DECIMO')) {
+      targetCodigo = '3.1';
+    } else if (text.includes('ALUGUEL') || text.includes('LOCAÇÃO') || text.includes('LOCACAO')) {
+      targetCodigo = '3.2';
+    } else if (text.includes('ENERGISA') || text.includes('SANESUL') || text.includes('AGUA') || text.includes('ÁGUA') || text.includes('LUZ') || text.includes('TELEFONE') || text.includes('CLARO') || text.includes('VIVO') || text.includes('TIM') || text.includes('TELECOM')) {
+      targetCodigo = '3.3';
+    } else if (text.includes('PAPELARIA') || text.includes('ESCRITÓRIO') || text.includes('ESCRITORIO') || text.includes('MATERIAL') || text.includes('IMPRESSÃO') || text.includes('IMPRESSAO')) {
+      targetCodigo = '3.4';
+    } else if (text.includes('INVIOLAVEL') || text.includes('SEGURANÇA') || text.includes('SEGURANCA') || text.includes('VIGILANCIA') || text.includes('VIGILÂNCIA')) {
+      targetCodigo = '3.5';
+    } else if (text.includes('EDITOR') || text.includes('LIVRO') || text.includes('APOSTILA')) {
+      targetCodigo = '3.6';
+    } else if (text.includes('IMPOSTO') || text.includes('DARF') || text.includes('DAS') || text.includes('SIMPLES NACIONAL') || text.includes('RECEITA FEDERAL') || text.includes('TRIBUTO') || text.includes('CONTRIBUIÇÃO SOCIAL')) {
+      targetCodigo = '3.7';
+    } else if (text.includes('MANUTENÇÃO') || text.includes('MANUTENCAO') || text.includes('REFORMA') || text.includes('REPARO') || text.includes('CONSERTO')) {
+      targetCodigo = '3.8';
+    } else if (text.includes('TARIFA') || text.includes('MENSALIDADE CONTA') || text.includes('MENSALIDADE BANCARIA') || text.includes('SERVIÇOS BANCÁRIOS') || text.includes('SERVICOS BANCARIOS')) {
+      targetCodigo = '3.9';
+    } else if (text.includes('JUROS') || text.includes('MULTA') || text.includes('ENCARGOS')) {
+      targetCodigo = '3.10';
+    } else if (text.includes('CONTABILIDADE') || text.includes('ASSESSORIA') || text.includes('VSC') || text.includes('HONORÁRIOS') || text.includes('HONORARIOS')) {
+      targetCodigo = '3.11';
+    }
+  }
+
+  if (targetCodigo) {
+    try {
+      const res = await sql`SELECT id FROM contas_contabeis WHERE codigo = ${targetCodigo} AND ativo = true LIMIT 1`;
+      if (res.length > 0) {
+        return res[0].id;
+      }
+    } catch (e) {
+      console.error('[getContaContabilId] Erro ao buscar contas_contabeis:', e.message);
+    }
+  }
+
+  return null;
+}
