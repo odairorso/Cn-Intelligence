@@ -1,7 +1,9 @@
 import { Client } from 'pg';
+import dotenv from 'dotenv';
+dotenv.config();
 
 async function run() {
-  const c = new Client('postgresql://neondb_owner:npg_c9LaAv3hXNmD@ep-young-mouse-aclmtaes-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require');
+  const c = new Client(process.env.DATABASE_URL);
   await c.connect();
   try {
     const q1 = await c.query(`

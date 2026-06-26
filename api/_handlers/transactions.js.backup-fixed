@@ -318,19 +318,8 @@ export async function handleTransactionsBatch(req, res) {
   if (!Array.isArray(transactions) || transactions.length === 0) return res.status(400).json({ error: 'Invalid batch data' });
 
   try {
-    // Formatar datas antes da validação do schema Zod
-    const formattedTransactions = transactions.map(tx => {
-      const vDate = parseDateToPg(tx.vencimento) || tx.vencimento;
-      const pDate = tx.pagamento ? (parseDateToPg(tx.pagamento) || tx.pagamento) : null;
-      return {
-        ...(tx || {}),
-        uid,
-        vencimento: vDate,
-        pagamento: pDate
-      };
-    });
-
-    const batchResult = TransactionBatchSchema.safeParse(formattedTransactions);
+    // Validação do batch com Zod
+    const batchResult = TransactionBatchSchema.safeParse(transactions.map(tx => ({ ...(tx || {}), uid })));
     if (!batchResult.success) {
       return res.status(400).json({ error: 'Dados do batch inválidos', details: batchResult.error.flatten() });
     }
@@ -346,8 +335,8 @@ export async function handleTransactionsBatch(req, res) {
       const tx = batchResult.data[i];
       const { fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id } = tx;
 
-      const vDate = vencimento || new Date().toISOString().split('T')[0];
-      const pDate = pagamento || null;
+      const vDate = parseDateToPg(vencimento) || new Date().toISOString().split('T')[0];
+      const pDate = parseDateToPg(pagamento);
       const normalizedNumber = numero_boleto ? normalizeBoletoNumber(numero_boleto) : '';
 
       const descKey = String(descricao || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -368,13 +357,7 @@ export async function handleTransactionsBatch(req, res) {
     const boletoNumbers = prepared.filter(p => p.normalizedNumber).map(p => p.normalizedNumber);
     const existingBoletos = new Set();
     if (boletoNumbers.length > 0) {
-      const rows = await sql`
-        SELECT regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') AS num 
-        FROM transactions 
-        WHERE uid = ${uid} 
-          AND deleted_at IS NULL 
-          AND regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') = ANY(${boletoNumbers}::text[])
-      `;
+      const rows = await sql`SELECT regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') AS num FROM transactions WHERE uid = ${uid} AND deleted_at IS NULL AND regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') IN ${sql(boletoNumbers)}`;
       for (const r of rows) existingBoletos.add(r.num);
     }
 
@@ -441,8 +424,7 @@ export async function handleTransactionsBatch(req, res) {
             await auditLog(uid, 'CREATE', inserted[0]?.id, null, { fornecedor: tx.fornecedor, valor: tx.valor, empresa: tx.empresa, vencimento: vDate, tipo: tx.tipo });
             created++;
           } catch (rowError) {
-            console.error(`[transactions.js handleTransactionsBatch fallback] Error inserting item ${p.i}:`, rowError);
-            errors.push({ index: p.i, error: 'Erro ao processar item' });
+            errors.push({ index: p.i, error: rowError.message });
           }
         }
       }

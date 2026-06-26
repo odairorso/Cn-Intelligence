@@ -350,7 +350,6 @@ async function processarArquivo(caminhoArquivo) {
           const worker = await createWorker('por', {
             logger: m => console.log('OCR:', m.status)
           });
-          const worker = await createWorker('por');
           const ret = await worker.recognize(screenshotPath);
           texto = ret.data.text;
           await worker.terminate();
@@ -441,7 +440,7 @@ async function processarArquivo(caminhoArquivo) {
 }
 
 async function inserirBoleto(dados) {
-  const uid = crypto.randomUUID();
+  const uid = process.env.APP_UID || 'odair';
   
   const result = await pool.query(
     `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, valor, status)

@@ -28,9 +28,12 @@ interface RelatoriosTabProps {
   contasContabeis: ContaContabil[];
 }
 
-const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStats, contasContabeis }: RelatoriosTabProps) => {
+const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<RelatoriosTabProps, 'transactions' | 'fetchTransactions'>) => {
+  const [reportTransactions, setReportTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+
   const years = useMemo(() => {
-    const y = transactions.map(tx => {
+    const y = reportTransactions.map(tx => {
       const dateParts = tx.vencimento.includes('-') ? tx.vencimento.split('-') : tx.vencimento.split('/');
       return tx.vencimento.includes('-') ? dateParts[0] : dateParts[2];
     });
@@ -38,7 +41,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
     const currentYear = new Date().getFullYear();
     for (let yr = currentYear; yr >= 2020; yr -= 1) set.add(String(yr));
     return Array.from(set).sort().reverse();
-  }, [transactions]);
+  }, [reportTransactions]);
 
   const [selectedYear, setSelectedYear] = useState<string>('TODOS');
 
@@ -90,21 +93,32 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
     const queryStartDate = filterType === 'PERIODO' ? (startDate || undefined) : undefined;
     const queryEndDate = filterType === 'PERIODO' ? (endDate || undefined) : undefined;
 
-    fetchTransactions(
-      false,
-      queryYear,
-      queryMonth,
-      undefined,
-      selectedTipo === 'TODOS' ? undefined : selectedTipo,
-      {
-        limit: 5000,
-        empresa: selectedCompany === 'TODOS' ? undefined : selectedCompany,
-        status: apiStatus,
-        conta_contabil_id: Number.isFinite(contaId as any) ? (contaId as number) : undefined,
-        startDate: queryStartDate,
-        endDate: queryEndDate,
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const data = await api.getTransactions(
+          5000,
+          0,
+          queryYear,
+          queryMonth,
+          undefined,
+          selectedTipo === 'TODOS' ? undefined : selectedTipo,
+          selectedCompany === 'TODOS' ? undefined : selectedCompany,
+          apiStatus,
+          Number.isFinite(contaId as any) ? (contaId as number) : undefined,
+          queryStartDate,
+          queryEndDate
+        );
+        setReportTransactions(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Erro ao carregar transações do relatório:', err);
+      } finally {
+        setLoading(false);
       }
-    );
+    };
+
+    loadData();
+
     fetchStats(
       queryYear,
       queryMonth,
@@ -125,13 +139,12 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
     selectedTipo,
     selectedStatus,
     selectedContaContabil,
-    fetchTransactions,
     fetchStats
   ]);
 
   const companies = useMemo(() => {
     const map = new Map<string, string>();
-    for (const tx of transactions) {
+    for (const tx of reportTransactions) {
       const raw = String(tx.empresa || '').trim();
       if (!raw) continue;
       const companyKey = normalizeCompanyKey(raw);
@@ -140,13 +153,13 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
     return Array.from(map.entries())
       .map(([, raw]) => ({ value: raw, label: raw }))
       .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [transactions]);
+  }, [reportTransactions]);
 
   const filteredData = useMemo(() => {
     const removeAccents = (str: string) => 
       str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const searchNormalized = removeAccents(searchTerm);
-    const filtered = transactions.filter(tx => {
+    const filtered = reportTransactions.filter(tx => {
       let matchesDateRange = true;
       if (filterType === 'PERIODO') {
         let txDateStr = '';
@@ -197,7 +210,7 @@ const RelatoriosTab = ({ transactions, fetchTransactions, globalStats, fetchStat
       const fornB = String(b.fornecedor || '').toLowerCase();
       return fornA.localeCompare(fornB, 'pt-BR');
     });
-  }, [transactions, filterType, startDate, endDate, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, todayKey, searchTerm]);
+  }, [reportTransactions, filterType, startDate, endDate, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, todayKey, searchTerm]);
 
   const periodTotals = useMemo(() => {
     let total = 0;

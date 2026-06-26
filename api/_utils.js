@@ -3,7 +3,10 @@ import { sql } from './_db.js';
 // --- Sanitização ---
 export const sanitizeInput = (value) => {
   if (typeof value !== 'string') return value;
-  return value.replace(/[<>'";&]/g, '').slice(0, 10000);
+  // Prepared statements do driver do PostgreSQL já cuidam da segurança de SQL Injection.
+  // Remove apenas caracteres de tags HTML para evitar injeções básicas no frontend,
+  // preservando aspas de nomes próprios (ex: D'Angelo) e ampersands (ex: A & B).
+  return value.replace(/[<>]/g, '').slice(0, 10000);
 };
 
 export const sanitizeObject = (obj) => {
@@ -22,6 +25,16 @@ export const sanitizeObject = (obj) => {
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW = 60 * 1000;
 const RATE_LIMIT_MAX = 60;
+
+// Limpeza periódica do rate limit para evitar vazamento de memória
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of rateLimitMap.entries()) {
+    if (now > record.resetAt) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}, 300_000).unref(); // Limpa a cada 5 minutos (não-bloqueante)
 
 export const checkRateLimit = (req, res) => {
   const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || 'unknown';

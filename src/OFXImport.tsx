@@ -122,8 +122,13 @@ function parseOFX(raw: string): OFXTransaction[] {
     const trntype = getTagValue(txRaw, 'TRNTYPE') || 'OTHER';
     const memo = getTagValue(txRaw, 'MEMO') || getTagValue(txRaw, 'NAME') || 'Sem descrição';
 
-    // Limpa valor: remove espaços, troca vírgula por ponto
-    const amtClean = amtRaw.replace(/\s/g, '').replace(',', '.');
+    // Limpa valor: remove espaços, trata corretamente formatos brasileiros e internacionais
+    let amtClean = amtRaw.replace(/\s/g, '');
+    if (amtClean.includes(',') && amtClean.includes('.')) {
+      amtClean = amtClean.replace(/\./g, '').replace(',', '.');
+    } else if (amtClean.includes(',')) {
+      amtClean = amtClean.replace(',', '.');
+    }
     const trnamt = parseFloat(amtClean) || 0;
     const dtposted = dtraw ? parseOFXDate(dtraw) : '';
 

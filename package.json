@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
   },
   "engines": {
     "node": ">=20"
@@ -44,7 +45,8 @@
     "tailwindcss": "^4.3.0",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.4.2"
+    "vite": "^6.4.2",
+    "vitest": "^4.1.9"
   },
   "overrides": {
     "esbuild": ">=0.25.0"
