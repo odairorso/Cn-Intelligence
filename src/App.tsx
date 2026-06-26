@@ -1440,7 +1440,7 @@ export default function App() {
       </nav>
 
 
-      <main className="flex-grow pt-24 pb-24 lg:pb-12 px-4 md:px-8 max-w-[1600px] mx-auto w-full">
+      <main className="flex-grow pt-24 pb-24 lg:pb-12 px-4 md:px-8 max-w-[1920px] mx-auto w-full">
         {/* Dashboard Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
           <div>
