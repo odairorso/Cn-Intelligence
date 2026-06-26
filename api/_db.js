@@ -34,9 +34,15 @@ const pool = new pg.Pool({
 
 export async function transaction(callback) {
   const client = await pool.connect();
+  const store = dbStorage.getStore();
+  const uid = store && typeof store === 'object' ? store.uid : store;
   try {
     await client.query('BEGIN');
-    const result = await callback(client);
+    const currentUid = uid || '';
+    await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, false]);
+    const result = await dbStorage.run({ uid, client }, async () => {
+      return await callback(client);
+    });
     await client.query('COMMIT');
     return result;
   } catch (e) {
@@ -57,23 +63,36 @@ export class SqlQuery {
   // Thenable implementation
   then(resolve, reject) {
     const { query, params } = this.build();
-    const uid = dbStorage.getStore();
-    pool.connect()
-      .then(async client => {
-        try {
-          const currentUid = uid || '';
-          await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, false]);
-          const res = await client.query(query, params);
-          resolve(res.rows);
-        } catch (err) {
-          console.error('[DB Error] Query:', query);
+    const store = dbStorage.getStore();
+    const uid = store && typeof store === 'object' ? store.uid : store;
+    const clientFromTx = store && typeof store === 'object' ? store.client : null;
+
+    if (clientFromTx) {
+      clientFromTx.query(query, params)
+        .then(res => resolve(res.rows))
+        .catch(err => {
+          console.error('[DB Error] Transaction Query:', query);
           console.error('[DB Error] Object:', err);
           reject(err);
-        } finally {
-          client.release();
-        }
-      })
-      .catch(reject);
+        });
+    } else {
+      pool.connect()
+        .then(async client => {
+          try {
+            const currentUid = uid || '';
+            await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, false]);
+            const res = await client.query(query, params);
+            resolve(res.rows);
+          } catch (err) {
+            console.error('[DB Error] Query:', query);
+            console.error('[DB Error] Object:', err);
+            reject(err);
+          } finally {
+            client.release();
+          }
+        })
+        .catch(reject);
+    }
   }
 
   build() {
@@ -103,7 +122,14 @@ export class SqlQuery {
 
 export const sql = (strings, ...values) => {
   if (!Array.isArray(strings)) {
-    const uid = dbStorage.getStore();
+    const store = dbStorage.getStore();
+    const uid = store && typeof store === 'object' ? store.uid : store;
+    const clientFromTx = store && typeof store === 'object' ? store.client : null;
+
+    if (clientFromTx) {
+      return clientFromTx.query(strings, values).then(res => res.rows);
+    }
+
     return pool.connect().then(async client => {
       try {
         const currentUid = uid || '';

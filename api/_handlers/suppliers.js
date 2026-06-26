@@ -1,4 +1,4 @@
-import { sql } from '../_db.js';
+import { sql, transaction } from '../_db.js';
 import { normSupplier, handleError } from '../_utils.js';
 import { SupplierSchema, SupplierMergeSchema } from '../_schemas.js';
 
@@ -124,21 +124,23 @@ export async function handleSuppliersMerge(req, res) {
     const upperAliases = list.map(normSupplier).filter((v) => v && v !== upperTarget);
     if (upperAliases.length === 0) return res.status(200).json({ updated: 0, removed: 0 });
 
-    const existingTarget = await sql`SELECT id FROM suppliers WHERE uid = ${uid} AND upper(regexp_replace(nome, '[^A-Za-z0-9]+', ' ', 'g')) = ${upperTarget} LIMIT 1`;
-    if (existingTarget.length === 0) await sql`INSERT INTO suppliers (uid, nome) VALUES (${uid}, ${canonical})`;
+    return await transaction(async () => {
+      const existingTarget = await sql`SELECT id FROM suppliers WHERE uid = ${uid} AND upper(regexp_replace(nome, '[^A-Za-z0-9]+', ' ', 'g')) = ${upperTarget} LIMIT 1`;
+      if (existingTarget.length === 0) await sql`INSERT INTO suppliers (uid, nome) VALUES (${uid}, ${canonical})`;
 
-    for (const alias of upperAliases) {
-      await sql`UPDATE transactions SET fornecedor = ${canonical}, updated_at = NOW() WHERE uid = ${uid} AND upper(regexp_replace(fornecedor, '[^A-Za-z0-9]+', ' ', 'g')) = ${alias}`;
-    }
-    const cnt = await sql`SELECT COUNT(*)::int AS c FROM transactions WHERE uid = ${uid} AND fornecedor = ${canonical}`;
-    const updated = Number(cnt[0].c) || 0;
+      for (const alias of upperAliases) {
+        await sql`UPDATE transactions SET fornecedor = ${canonical}, updated_at = NOW() WHERE uid = ${uid} AND upper(regexp_replace(fornecedor, '[^A-Za-z0-9]+', ' ', 'g')) = ${alias}`;
+      }
+      const cnt = await sql`SELECT COUNT(*)::int AS c FROM transactions WHERE uid = ${uid} AND fornecedor = ${canonical}`;
+      const updated = Number(cnt[0].c) || 0;
 
-    let removed = 0;
-    for (const alias of upperAliases) {
-      const rows = await sql`DELETE FROM suppliers WHERE uid = ${uid} AND upper(regexp_replace(nome, '[^A-Za-z0-9]+', ' ', 'g')) = ${alias} AND upper(regexp_replace(nome, '[^A-Za-z0-9]+', ' ', 'g')) <> ${upperTarget} RETURNING id`;
-      removed += rows.length;
-    }
-    return res.json({ updated, removed, target: canonical });
+      let removed = 0;
+      for (const alias of upperAliases) {
+        const rows = await sql`DELETE FROM suppliers WHERE uid = ${uid} AND upper(regexp_replace(nome, '[^A-Za-z0-9]+', ' ', 'g')) = ${alias} AND upper(regexp_replace(nome, '[^A-Za-z0-9]+', ' ', 'g')) <> ${upperTarget} RETURNING id`;
+        removed += rows.length;
+      }
+      return res.json({ updated, removed, target: canonical });
+    });
   } catch (e) {
     return handleError(res, e, 'suppliers.js handleSuppliersMerge');
   }
@@ -153,51 +155,53 @@ export async function handleSuppliersMergeAuto(req, res) {
   try {
     if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
-    const suppliers = await sql`SELECT id, nome FROM suppliers WHERE uid = ${uid} ORDER BY nome`;
-    const txs = await sql`SELECT id, fornecedor FROM transactions WHERE uid = ${uid}`;
+    return await transaction(async () => {
+      const suppliers = await sql`SELECT id, nome FROM suppliers WHERE uid = ${uid} ORDER BY nome`;
+      const txs = await sql`SELECT id, fornecedor FROM transactions WHERE uid = ${uid}`;
 
-    const freqByName = new Map();
-    txs.forEach((t) => {
-      const name = String(t.fornecedor || '').trim();
-      if (!name) return;
-      freqByName.set(name, (freqByName.get(name) || 0) + 1);
-    });
-
-    const groups = new Map();
-    suppliers.forEach((s) => {
-      const key = normSupplier(s.nome);
-      if (!key) return;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push({ id: s.id, nome: s.nome });
-    });
-
-    let totalUpdated = 0;
-    let totalRemoved = 0;
-
-    for (const [key, items] of groups.entries()) {
-      if (items.length <= 1) continue;
-      const names = items.map(i => i.nome);
-      let canonical = names[0];
-      let bestScore = -1;
-      names.forEach((n) => {
-        const score = freqByName.get(n) || 0;
-        if (score > bestScore || (score === bestScore && n.length > canonical.length)) {
-          bestScore = score;
-          canonical = n;
-        }
+      const freqByName = new Map();
+      txs.forEach((t) => {
+        const name = String(t.fornecedor || '').trim();
+        if (!name) return;
+        freqByName.set(name, (freqByName.get(name) || 0) + 1);
       });
 
-      const aliases = names.filter((n) => n !== canonical);
-      for (const alias of aliases) {
-        const normalizedAlias = normSupplier(alias);
-        await sql`UPDATE transactions SET fornecedor = ${canonical}, updated_at = NOW() WHERE uid = ${uid} AND (upper(regexp_replace(coalesce(fornecedor, ''), '[^A-Za-z0-9]+', ' ', 'g')) = ${normalizedAlias} OR fornecedor = ${alias})`;
-        totalUpdated++;
+      const groups = new Map();
+      suppliers.forEach((s) => {
+        const key = normSupplier(s.nome);
+        if (!key) return;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push({ id: s.id, nome: s.nome });
+      });
 
-        const deleteResult = await sql`DELETE FROM suppliers WHERE uid = ${uid} AND (upper(regexp_replace(coalesce(nome, ''), '[^A-Za-z0-9]+', ' ', 'g')) = ${normalizedAlias} OR nome = ${alias}) AND nome != ${canonical} RETURNING id`;
-        totalRemoved += deleteResult.length;
+      let totalUpdated = 0;
+      let totalRemoved = 0;
+
+      for (const [key, items] of groups.entries()) {
+        if (items.length <= 1) continue;
+        const names = items.map(i => i.nome);
+        let canonical = names[0];
+        let bestScore = -1;
+        names.forEach((n) => {
+          const score = freqByName.get(n) || 0;
+          if (score > bestScore || (score === bestScore && n.length > canonical.length)) {
+            bestScore = score;
+            canonical = n;
+          }
+        });
+
+        const aliases = names.filter((n) => n !== canonical);
+        for (const alias of aliases) {
+          const normalizedAlias = normSupplier(alias);
+          await sql`UPDATE transactions SET fornecedor = ${canonical}, updated_at = NOW() WHERE uid = ${uid} AND (upper(regexp_replace(coalesce(fornecedor, ''), '[^A-Za-z0-9]+', ' ', 'g')) = ${normalizedAlias} OR fornecedor = ${alias})`;
+          totalUpdated++;
+
+          const deleteResult = await sql`DELETE FROM suppliers WHERE uid = ${uid} AND (upper(regexp_replace(coalesce(nome, ''), '[^A-Za-z0-9]+', ' ', 'g')) = ${normalizedAlias} OR nome = ${alias}) AND nome != ${canonical} RETURNING id`;
+          totalRemoved += deleteResult.length;
+        }
       }
-    }
-    return res.json({ updated: totalUpdated, removed: totalRemoved });
+      return res.json({ updated: totalUpdated, removed: totalRemoved });
+    });
   } catch (e) {
     return handleError(res, e, 'suppliers.js handleSuppliersMergeAuto');
   }
