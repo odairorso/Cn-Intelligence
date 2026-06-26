@@ -1534,7 +1534,6 @@ export default function App() {
             {activeTab === 'lancamentos' && (
               <LancamentosTab
                 transactions={transactions}
-                contasContabeis={safeContasContabeis}
                 onMarkAsPaid={handleMarkAsPaidClick}
                 onMarkAsPaidBatch={handleMarkAsPaidBatchClick}
                 deleteTransaction={deleteTransaction}
