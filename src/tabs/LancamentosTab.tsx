@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useDeferredValue } from 'r
 import {
   Search, ChevronLeft, ChevronRight, Check, Edit, Trash2, Plus, Loader2, RefreshCw,
 } from 'lucide-react';
-import type { Transaction } from '../types';
+import type { Transaction, ContaContabil } from '../types';
 import {
   cn, toDisplayDate, dateSortKey, formatBRL, isRevenueTransaction,
 } from '../lib/utils';
@@ -10,6 +10,7 @@ import { PAGE_SIZE } from '../lib/constants';
 
 interface LancamentosTabProps {
   transactions: Transaction[];
+  contasContabeis: ContaContabil[];
   onMarkAsPaid: (tx: Transaction) => void;
   onMarkAsPaidBatch: (txs: Transaction[]) => void;
   deleteTransaction: (id: string) => void;
@@ -21,9 +22,14 @@ interface LancamentosTabProps {
 }
 
 const LancamentosTab = React.memo(({
-  transactions, onMarkAsPaid, onMarkAsPaidBatch, deleteTransaction, setShowNewTxModal, setEditingTx,
+  transactions, contasContabeis, onMarkAsPaid, onMarkAsPaidBatch, deleteTransaction, setShowNewTxModal, setEditingTx,
   onLoadMore, isLoadingMore, hasMoreTransactions
 }: LancamentosTabProps) => {
+  const getContaContabil = (tx: Transaction) => {
+    if (!tx.conta_contabil_id) return '-';
+    const conta = contasContabeis.find(c => c.id === tx.conta_contabil_id);
+    return conta ? `${conta.codigo} - ${conta.nome}` : '-';
+  };
   const [filter, setFilter] = useState(() => {
     try { return sessionStorage.getItem('cn_lancamentos_filter') || ''; } catch { return ''; }
   });
@@ -468,7 +474,7 @@ const LancamentosTab = React.memo(({
                   </td>
                   <td className="px-8 py-4 whitespace-nowrap">{toDisplayDate(tx.vencimento)}</td>
                   <td className="px-8 py-4 text-on-surface-variant whitespace-nowrap hidden xl:table-cell">{toDisplayDate(tx.pagamento) || '-'}</td>
-                  <td className="px-8 py-4 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold truncate max-w-[100px] hidden xl:table-cell" title={tx.banco}>{tx.banco || '-'}</td>
+                  <td className="px-8 py-4 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold truncate max-w-[150px] hidden xl:table-cell" title={getContaContabil(tx)}>{getContaContabil(tx)}</td>
                   <td className="px-8 py-4 sticky right-0 bg-surface z-10 border-l border-surface-variant shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] group-hover:bg-surface-variant/20 transition-colors">
                     <div className="flex gap-2 justify-end">
                       {tx.status !== 'PAGO' && (
