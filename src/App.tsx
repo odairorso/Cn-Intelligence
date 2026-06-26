@@ -288,11 +288,12 @@ export default function App() {
     const existingKeys = getExistingBoletoKeys();
     const batchKeys = new Set<string>();
     return rows.map((row) => {
-      const numero_boleto = normalizeBoletoNumber(row.numero_boleto);
-      const key = boletoDuplicateKey(row.fornecedor, row.vencimento, row.valor, numero_boleto, row.descricao, row.empresa);
+      // Usa numero normalizado só para verificar duplicata — NÃO sobrescreve o valor original
+      const numeroNorm = normalizeBoletoNumber(row.numero_boleto);
+      const key = boletoDuplicateKey(row.fornecedor, row.vencimento, row.valor, numeroNorm, row.descricao, row.empresa);
       const duplicate = existingKeys.has(key) || batchKeys.has(key);
       batchKeys.add(key);
-      return { ...row, numero_boleto, duplicate };
+      return { ...row, duplicate };
     });
   };
 

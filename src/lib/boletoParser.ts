@@ -37,26 +37,23 @@ export const normalizeBoletoNumber = (value?: string) => {
 export const extractLocalBoletoNumber = (text: string) => {
   const source = String(text || '').toUpperCase();
   const patterns = [
-    /NOSSO\s*N[UÚ]MERO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
-    /N[UÚ]MERO\s*DO\s*DOCUMENTO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
-    /N[ROº°]*\s*DOCUMENTO\s*[:\s-]*([A-Z0-9./-]{6,40})/,
-    /NR\.?\s*DOC\s*[:\s-]*([A-Z0-9./-]{6,40})/,
-    /N[º°]?\s*DOC\s*[:\s-]*([A-Z0-9./-]{6,40})/,
-    /DOCUMENTO\s*[:\s-]*([0-9]{6,20})/,
-    /COD(?:IGO)?\s*(?:DE)?\s*BARRAS\s*[:\s-]*([0-9]{47,48})/,
-    /C.{0,6}DIGO\s*(?:DE)?\s*BARRAS\s*[:\s-]*([0-9]{47,48})/,
-    /UTILIZE\s+O\s+C.{0,6}DIGO\s*[:\s-]*([A-Z0-9]{6,25})/,
-    /MATR.{0,6}CULA\s*[:\s-]*([0-9]{6,14}(?:[-/][0-9A-Z]{1,6}){1,8})/,
-    /NOTA\s+FISCAL\s+N[ROº°]*\s*[:\s-]*([0-9.]{6,25})/,
-    /([0-9]{11})\s+CADASTRE\s+SUA\s+FATURA/,
+    // APENAS Número do Documento — exatamente o que está no boleto, com letras
+    /N[UÚ]MERO\s*DO\s*DOCUMENTO\s*[:\s-]*([A-Z0-9][A-Z0-9./ -]{3,39})/,
+    /NR\s*DO\s*DOCUMENTO\s*[:\s-]*([A-Z0-9][A-Z0-9./ -]{3,39})/,
+    /N[ROº°]*\s*DOCUMENTO\s*[:\s-]*([A-Z0-9][A-Z0-9./ -]{3,39})/,
+    /NR\.?\s*DOC\.?\s*[:\s-]*([A-Z0-9][A-Z0-9./ -]{3,39})/,
+    /N[º°\.]\s*DOC\.?\s*[:\s-]*([A-Z0-9][A-Z0-9./ -]{3,39})/,
+    /NUMERO\s*DOCUMENTO\s*[:\s-]*([A-Z0-9][A-Z0-9./ -]{3,39})/,
+    /NUM\.\s*DOC\.?\s*[:\s-]*([A-Z0-9][A-Z0-9./ -]{3,39})/,
   ];
   for (const pattern of patterns) {
     const match = source.match(pattern);
     if (match?.[1]) {
-      const normalized = normalizeBoletoNumber(match[1]);
-      if (normalized) return normalized;
+      const raw = match[1].trim().replace(/\s+/g, ' ');
+      if (raw.length >= 4) return raw;
     }
   }
+  return '';
 
   const multiBlockMatch = source.match(/(\d{11}-\d)\s+(\d{11}-\d)\s+(\d{11}-\d)\s+(\d{11}-\d)/);
   if (multiBlockMatch) {
