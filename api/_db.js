@@ -39,7 +39,7 @@ export async function transaction(callback) {
   try {
     await client.query('BEGIN');
     const currentUid = uid || '';
-    await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, false]);
+    await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, true]true]);
     const result = await dbStorage.run({ uid, client }, async () => {
       return await callback(client);
     });
@@ -80,7 +80,7 @@ export class SqlQuery {
         .then(async client => {
           try {
             const currentUid = uid || '';
-            await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, false]);
+            await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, true]true]);
             const res = await client.query(query, params);
             resolve(res.rows);
           } catch (err) {
@@ -133,7 +133,7 @@ export const sql = (strings, ...values) => {
     return pool.connect().then(async client => {
       try {
         const currentUid = uid || '';
-        await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, false]);
+        await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, true]true]);
         const res = await client.query(strings, values);
         return res.rows;
       } finally {

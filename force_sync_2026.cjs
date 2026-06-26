@@ -63,6 +63,7 @@ async function forceSync2026() {
   const client = await pool.connect();
   
   try {
+      await client.query('BEGIN');
       console.log('Iniciando sincronização forçada de abas 2026...');
       
       const targetSheets = ['Janeiro 26', 'Fev 26', 'Março26'];
@@ -145,9 +146,9 @@ async function forceSync2026() {
                   if (check.rows.length === 0) {
                       const contaContabilId = await getContaContabilId(client, tx.fornecedor, tx.descricao, 'DESPESA');
                       await client.query(
-                          `INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, conta_contabil_id)
-                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                          [tx.uid, tx.fornecedor, tx.descricao, tx.empresa, tx.vencimento, tx.pagamento, tx.valor, tx.status, tx.banco, contaContabilId]
+                          `INSERT INTO transactions (uid, tipo, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, conta_contabil_id)
+                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                          [tx.uid, 'DESPESA', tx.fornecedor, tx.descricao, tx.empresa, tx.vencimento, tx.pagamento, tx.valor, tx.status, tx.banco, contaContabilId]
                       );
                       inserted++;
                   }
@@ -158,6 +159,7 @@ async function forceSync2026() {
           }
       }
       
+      await client.query('COMMIT');
       console.log(`\nSincronização concluída!`);
       console.log(`Inseridos novos: ${inserted}`);
       console.log(`Erros logados: ${errors}`);
