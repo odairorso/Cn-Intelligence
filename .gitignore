@@ -19,3 +19,4 @@ supabase_config.txt
 # Scripts de debug locais
 scratch/
 importa_boleto.cjs
+force_sync_2026.cjs
