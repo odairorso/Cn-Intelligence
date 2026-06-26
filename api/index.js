@@ -76,16 +76,7 @@ export default async function handler(req, res) {
   // ── Verificação de Token (OBRIGATÓRIA para todas as rotas exceto login) ──
   const decoded = verifyToken(req);
 
-  if (decoded) {
-    // Temos token válido
-    if (!decoded.uid) {
-      return res.status(401).json({ error: 'Token inválido: campo uid ausente.' });
-    }
-    if (decoded.uid === 'guest') {
-      return res.status(403).json({ error: 'Usuário guest não autorizado.' });
-    }
-    req.authUid = decoded.uid;
-  } else {
+  if (!decoded) {
     // Sem JWT válido — apenas rotas públicas podem continuar
     const publicRoutes = new Set(['health', 'folha-push']);
     if (!publicRoutes.has(route)) {
@@ -104,6 +95,15 @@ export default async function handler(req, res) {
       }
       req.authUid = targetUid;
     }
+  } else {
+    // Temos token válido
+    if (!decoded.uid) {
+      return res.status(401).json({ error: 'Token inválido: campo uid ausente.' });
+    }
+    if (decoded.uid === 'guest') {
+      return res.status(403).json({ error: 'Usuário guest não autorizado.' });
+    }
+    req.authUid = decoded.uid;
   }
 
   // BLOQUEAR qualquer tentativa de injeção de uid via query param
