@@ -398,7 +398,7 @@ const LancamentosTab = React.memo(({
       {/* Desktop: table */}
       <div className="glass-card overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[980px]">
+          <table className="w-full text-left min-w-[1200px]">
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-surface-variant">
                 <th className="px-4 py-4 w-10 whitespace-nowrap">
@@ -410,17 +410,17 @@ const LancamentosTab = React.memo(({
                     title="Selecionar todos pendentes desta página"
                   />
                 </th>
-                <th className="px-8 py-4 whitespace-nowrap min-w-[150px]">Fornecedor</th>
-                <th className="px-8 py-4 whitespace-nowrap w-[250px]">Descrição</th>
-                <th className="px-8 py-4 whitespace-nowrap w-36 text-right">Valor</th>
-                <th className="px-8 py-4 whitespace-nowrap w-28 hidden lg:table-cell">Status</th>
-                <th className="px-8 py-4 whitespace-nowrap w-28">Empresa</th>
-                <th className="px-8 py-4 whitespace-nowrap w-32">
+                <th className="px-6 py-4 whitespace-nowrap min-w-[180px]">Fornecedor</th>
+                <th className="px-6 py-4 whitespace-nowrap w-[320px]">Descrição</th>
+                <th className="px-6 py-4 whitespace-nowrap w-36 text-right">Valor</th>
+                <th className="px-6 py-4 whitespace-nowrap w-28 hidden lg:table-cell">Status</th>
+                <th className="px-6 py-4 whitespace-nowrap w-28">Empresa</th>
+                <th className="px-6 py-4 whitespace-nowrap w-32">
                   <span className="lg:hidden">Venc.</span>
                   <span className="hidden lg:inline">Vencimento</span>
                 </th>
-                <th className="px-8 py-4 whitespace-nowrap w-32 hidden xl:table-cell">Pagamento</th>
-                <th className="px-8 py-4 whitespace-nowrap w-28 hidden xl:table-cell">Conta</th>
+                <th className="px-6 py-4 whitespace-nowrap w-32 hidden xl:table-cell">Pagamento</th>
+                <th className="px-6 py-4 whitespace-nowrap w-28 hidden xl:table-cell">Conta</th>
                 <th className="px-8 py-4 whitespace-nowrap w-24 sticky right-0 bg-surface z-10 border-l border-surface-variant shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)]">Ações</th>
               </tr>
             </thead>
@@ -437,10 +437,10 @@ const LancamentosTab = React.memo(({
                       />
                     )}
                   </td>
-                  <td className="px-8 py-4 font-semibold max-w-[200px] truncate" title={tx.fornecedor}>{tx.fornecedor}</td>
-                  <td className="px-8 py-4 text-on-surface-variant max-w-[250px] truncate" title={tx.descricao}>{tx.descricao}</td>
+                  <td className="px-6 py-4 font-semibold max-w-[220px] truncate" title={tx.fornecedor}>{tx.fornecedor}</td>
+                  <td className="px-6 py-4 text-on-surface-variant max-w-[320px] truncate" title={tx.descricao}>{tx.descricao}</td>
                   <td className={cn(
-                    "px-8 py-4 font-bold text-right",
+                    "px-6 py-4 font-bold text-right",
                     tx.valor < 0 ? "text-tertiary" : (isRevenueTransaction(tx) ? "text-success" : "text-primary")
                   )}>
                     {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -451,7 +451,7 @@ const LancamentosTab = React.memo(({
                       <p className="text-[9px] text-success font-normal">(desconto de {Number(Math.abs(tx.juros)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })})</p>
                     )}
                   </td>
-                  <td className="px-8 py-4 hidden lg:table-cell">
+                  <td className="px-6 py-4 hidden lg:table-cell">
                     <span className={cn(
                       "text-[10px] font-bold px-3 py-1 rounded-full border",
                       tx.status === 'PAGO' && "bg-success/20 text-success border-success/30",
@@ -461,15 +461,15 @@ const LancamentosTab = React.memo(({
                       {tx.status}
                     </span>
                   </td>
-                  <td className="px-8 py-4">
+                  <td className="px-6 py-4">
                     <span className="bg-primary/10 text-primary text-[10px] px-2 py-1 rounded truncate max-w-[80px] inline-block text-center" title={tx.empresa}>
                       {tx.empresa}
                     </span>
                   </td>
-                  <td className="px-8 py-4 whitespace-nowrap">{toDisplayDate(tx.vencimento)}</td>
-                  <td className="px-8 py-4 text-on-surface-variant whitespace-nowrap hidden xl:table-cell">{toDisplayDate(tx.pagamento) || '-'}</td>
-                  <td className="px-8 py-4 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold truncate max-w-[100px] hidden xl:table-cell" title={tx.banco}>{tx.banco || '-'}</td>
-                  <td className="px-8 py-4 sticky right-0 bg-surface z-10 border-l border-surface-variant shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] group-hover:bg-surface-variant/20 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">{toDisplayDate(tx.vencimento)}</td>
+                  <td className="px-6 py-4 text-on-surface-variant whitespace-nowrap hidden xl:table-cell">{toDisplayDate(tx.pagamento) || '-'}</td>
+                  <td className="px-6 py-4 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold truncate max-w-[120px] hidden xl:table-cell" title={tx.banco}>{tx.banco || '-'}</td>
+                  <td className="px-6 py-4 sticky right-0 bg-surface z-10 border-l border-surface-variant shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] group-hover:bg-surface-variant/20 transition-colors">
                     <div className="flex gap-2 justify-end">
                       {tx.status !== 'PAGO' && (
                         <button
