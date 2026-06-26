@@ -182,7 +182,7 @@ export async function handleExtractBoleto(req, res) {
       // Se a IA funcionou, aplicamos o padrão do banco (se existir) para garantir consistência
       const finalCnpj = extracted.cnpj || rawCnpj;
       const finalName = extracted.fornecedor || rawBenefName;
-      const dbPattern = await lookupPattern(finalCnpj, normName(finalName));
+      const dbPattern = await lookupPattern(uid, finalCnpj, normName(finalName));
 
       if (dbPattern) {
         extracted.fornecedor = dbPattern.fornecedor || extracted.fornecedor;
