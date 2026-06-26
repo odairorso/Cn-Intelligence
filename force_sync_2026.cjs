@@ -97,7 +97,9 @@ async function forceSync2026() {
               // Ignorar se não for 2026
               if (!vencimento.startsWith('2026')) continue;
               
-              let valorNum = parseFloat(String(valorRaw).replace(/[^\d,-]/g, '').replace(',', '.'));
+              let valorNum = typeof valorRaw === 'number' 
+                ? valorRaw 
+                : parseFloat(String(valorRaw || '0').replace(/[^\d,-]/g, '').replace(',', '.'));
               if (isNaN(valorNum)) valorNum = 0;
               
               const statusRaw = String(getRowValue(rowData, ['SITUAÇÃO', 'SITUACAO']) || '').toUpperCase();
@@ -130,7 +132,6 @@ async function forceSync2026() {
           
           console.log(`Encontrados ${txs.length} registros válidos de 2026 na aba ${s}`);
           
-          await client.query('BEGIN');
           for (const tx of txs) {
               try {
                   // Prevenir duplicatas exatas usando SELECT EXISTS? (Opcional, mas seguro)
@@ -154,7 +155,6 @@ async function forceSync2026() {
                   console.error(`Falha ao inserir: ${tx.fornecedor} (${tx.vencimento}). Error: ${err.message}`);
               }
           }
-          await client.query('COMMIT');
       }
       
       console.log(`\nSincronização concluída!`);

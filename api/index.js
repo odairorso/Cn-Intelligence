@@ -78,9 +78,12 @@ export default async function handler(req, res) {
 
   if (!decoded) {
     // Sem JWT válido — apenas rotas públicas podem continuar
-    const publicRoutes = new Set(['health']);
+    const publicRoutes = new Set(['health', 'folha-push']);
     if (!publicRoutes.has(route)) {
       return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
+    }
+    if (route === 'folha-push') {
+      req.authUid = 'system_folha';
     }
   } else {
     const uid = decoded.uid || APP_UID;

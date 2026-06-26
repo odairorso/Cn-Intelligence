@@ -11,12 +11,19 @@ interface ReceitasTabProps {
   onNewRevenue: () => void;
 }
 
+// Cache em memória persistido durante o tempo de vida da aba/aplicativo
+let receitasBaseCache: Transaction[] | null = null;
+
 const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
   const MIN_YEAR = 2024;
   const [receitasBase, setReceitasBase] = React.useState<Transaction[]>([]);
   const [isLoadingReceitas, setIsLoadingReceitas] = React.useState(false);
 
-  const loadReceitasBase = React.useCallback(async () => {
+  const loadReceitasBase = React.useCallback(async (forceRefetch = false) => {
+    if (receitasBaseCache && !forceRefetch) {
+      setReceitasBase(receitasBaseCache);
+      return;
+    }
     setIsLoadingReceitas(true);
     try {
       const limit = 2000;
@@ -52,9 +59,9 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
         return !Number.isFinite(y) || y >= MIN_YEAR;
       });
 
-      setReceitasBase(
-        since.sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento))
-      );
+      const sorted = since.sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento));
+      receitasBaseCache = sorted;
+      setReceitasBase(sorted);
     } catch (e) {
       console.error(e);
       setReceitasBase(
@@ -66,7 +73,7 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
   }, [transactions]);
 
   React.useEffect(() => {
-    loadReceitasBase();
+    loadReceitasBase(false);
   }, [loadReceitasBase]);
 
   const revenueTransactions = React.useMemo(
@@ -190,6 +197,14 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
           className="bg-primary text-background px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-primary-dark transition-all whitespace-nowrap"
         >
           <Plus size={16} /> Nova Receita
+        </button>
+        <button
+          onClick={() => loadReceitasBase(true)}
+          disabled={isLoadingReceitas}
+          className="border border-white/10 hover:bg-white/5 text-on-surface px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap disabled:opacity-50"
+          title="Recarregar dados do banco"
+        >
+          Recarregar
         </button>
         {isLoadingReceitas && (
           <div className="text-xs text-on-surface-variant font-bold uppercase tracking-widest">
