@@ -125,7 +125,7 @@ export default async function handler(req, res) {
   return dbStorage.run(req.authUid, async () => {
     try {
       // Rate limiting (após auth para não bloquear login)
-      if (!checkRateLimit(req, res)) return;
+      if (!(await checkRateLimit(req, res))) return;
 
       // Carregamento Dinâmico (Lazy Load)
       switch (route) {

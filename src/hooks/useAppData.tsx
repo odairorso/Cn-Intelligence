@@ -845,6 +845,7 @@ export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
+  // Mantém o SECURITY_TOKEN legado apenas para compatibilidade — não é mais usado para auth
   const securityToken = import.meta.env.VITE_CN_SECURITY_TOKEN;
   if (securityToken) headers['x-cn-security'] = securityToken;
   return fetch(url, { ...options, headers });

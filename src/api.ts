@@ -470,11 +470,9 @@ export const api = {
 
   async exportBackup(): Promise<Blob> {
     if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
-    const res = await fetchWithSecurity(`${API_BASE}?route=export-backup`, {
-      headers: {
-        'x-cn-backup-token': import.meta.env.VITE_CN_BACKUP_TOKEN || ''
-      }
-    });
+    // O backup token é lido diretamente pelo backend via BACKUP_TOKEN (server-side).
+    // Não expomos o token no frontend para evitar riscos de XSS.
+    const res = await fetchWithSecurity(`${API_BASE}?route=export-backup`);
     if (!res.ok) throw new Error('Failed to export backup');
     return res.blob();
   },

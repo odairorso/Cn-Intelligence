@@ -251,8 +251,6 @@ export default function App() {
         }
       ];
 
-      (batch[1] as any).valor = -data.value; // Credit is negative so when subtracted it adds.
-
       await api.createTransactionsBatch(batch as any);
       setShowTransferModal(false);
       showNotification('Transferência realizada com sucesso!', 'success');

@@ -21,40 +21,83 @@ export const sanitizeObject = (obj) => {
   return sanitized;
 };
 
-// --- Rate Limiting ---
-const rateLimitMap = new Map();
-const RATE_LIMIT_WINDOW = 60 * 1000;
+// --- Rate Limiting via PostgreSQL (funciona em serverless) ---
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 60;
+const RATE_LIMIT_TABLE = 'rate_limits';
 
-// Limpeza periódica do rate limit para evitar vazamento de memória
-setInterval(() => {
+// Garante que a tabela de rate limit existe (criada automaticamente no primeiro uso)
+let rateLimitTableChecked = false;
+
+async function ensureRateLimitTable() {
+  if (rateLimitTableChecked) return;
+  rateLimitTableChecked = true;
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS ${sql.unsafe(RATE_LIMIT_TABLE)} (
+        key VARCHAR(255) PRIMARY KEY,
+        count INTEGER NOT NULL DEFAULT 1,
+        reset_at BIGINT NOT NULL
+      )
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_rate_limits_reset ON ${sql.unsafe(RATE_LIMIT_TABLE)} (reset_at)`;
+  } catch (e) {
+    console.error('[rateLimit] Falha ao criar tabela:', e.message);
+    rateLimitTableChecked = false; // Tenta de novo na próxima requisição
+  }
+}
+
+// Cleanup periódico das entradas expiradas (a cada 5 min)
+setInterval(async () => {
+  try {
+    await sql`DELETE FROM ${sql.unsafe(RATE_LIMIT_TABLE)} WHERE reset_at < ${Date.now() - RATE_LIMIT_WINDOW_MS}`;
+  } catch {}
+}, 300_000).unref();
+
+export const checkRateLimit = async (req, res) => {
+  await ensureRateLimitTable();
+
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+    || req.socket?.remoteAddress
+    || 'unknown';
   const now = Date.now();
-  for (const [ip, record] of rateLimitMap.entries()) {
-    if (now > record.resetAt) {
-      rateLimitMap.delete(ip);
+
+  try {
+    // Limpa entradas expiradas antes de checar
+    await sql`DELETE FROM ${sql.unsafe(RATE_LIMIT_TABLE)} WHERE reset_at < ${now}`;
+
+    // Tenta pegar registro existente
+    const existing = await sql`SELECT count, reset_at FROM ${sql.unsafe(RATE_LIMIT_TABLE)} WHERE key = ${ip}`;
+
+    if (!existing.length) {
+      // Primeira requisição na janela: insere e permite
+      const resetAt = now + RATE_LIMIT_WINDOW_MS;
+      await sql`INSERT INTO ${sql.unsafe(RATE_LIMIT_TABLE)} (key, count, reset_at) VALUES (${ip}, 1, ${resetAt})`;
+      return true;
     }
-  }
-}, 300_000).unref(); // Limpa a cada 5 minutos (não-bloqueante)
 
-export const checkRateLimit = (req, res) => {
-  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || 'unknown';
-  const now = Date.now();
-  const record = rateLimitMap.get(ip) || { count: 0, resetAt: now + RATE_LIMIT_WINDOW };
-  
-  if (now > record.resetAt) {
-    record.count = 1;
-    record.resetAt = now + RATE_LIMIT_WINDOW;
-  } else {
-    record.count++;
+    const record = existing[0];
+    if (record.reset_at <= now) {
+      // Janela expirou: reseta contador
+      const resetAt = now + RATE_LIMIT_WINDOW_MS;
+      await sql`UPDATE ${sql.unsafe(RATE_LIMIT_TABLE)} SET count = 1, reset_at = ${resetAt} WHERE key = ${ip}`;
+      return true;
+    }
+
+    if (record.count >= RATE_LIMIT_MAX) {
+      res.status(429).json({ error: 'Too many requests' });
+      return false;
+    }
+
+    // Incrementa contador
+    await sql`UPDATE ${sql.unsafe(RATE_LIMIT_TABLE)} SET count = count + 1 WHERE key = ${ip}`;
+    return true;
+  } catch (e) {
+    // Se o DB falhar, permite a requisição (fail-open)
+    // Importante para serverless em cold-start
+    console.error('[rateLimit] Erro:', e.message);
+    return true;
   }
-  
-  if (record.count > RATE_LIMIT_MAX) {
-    res.status(429).json({ error: 'Too many requests' });
-    return false;
-  }
-  
-  rateLimitMap.set(ip, record);
-  return true;
 };
 
 // --- Processamento de Boleto ---
