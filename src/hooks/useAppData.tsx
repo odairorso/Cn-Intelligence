@@ -49,7 +49,6 @@ const API_BASE = '/api';
 // --------------------------------------------------------------
 interface AppDataState {
   transactions: Transaction[];
-  allTransactions: Transaction[];
   transactionPage: number;
   hasMoreTransactions: boolean;
   loadingTransactions: boolean;
@@ -156,7 +155,6 @@ const getAuthenticatedUid = (): string | null => {
 
 export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [transactionPage, setTransactionPage] = useState(0);
   const [hasMoreTransactions, setHasMoreTransactions] = useState(true);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
@@ -318,7 +316,6 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     setUserEmail(null);
     setDisplayName(null);
     setTransactions([]);
-    setAllTransactions([]);
     setSuppliers([]);
     setBanks([]);
     setContasContabeis([]);
@@ -742,12 +739,12 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   // Provider - optimized with useMemo to prevent unnecessary re-renders
   // --------------------------------------------------------------
   const stateValue = useMemo(() => ({
-    transactions, allTransactions, transactionPage, hasMoreTransactions,
+    transactions, transactionPage, hasMoreTransactions,
     loadingTransactions, suppliers, banks, contasContabeis, boletoPatterns, globalStats,
     activeFilters, isAuthorized, userEmail, displayName, balance,
     companyOptions, notification, isLoading, isLoadingMore,
   }), [
-    transactions, allTransactions, transactionPage, hasMoreTransactions,
+    transactions, transactionPage, hasMoreTransactions,
     loadingTransactions, suppliers, banks, contasContabeis, boletoPatterns, globalStats,
     activeFilters, isAuthorized, userEmail, displayName, balance,
     companyOptions, notification, isLoading, isLoadingMore,
@@ -810,11 +807,9 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   const dataSubValue = useMemo(() => ({
     transactions, suppliers, banks, contasContabeis, boletoPatterns, globalStats,
     loadingTransactions, isLoadingMore, hasMoreTransactions,
-    allTransactions, transactionPage,
   }), [
     transactions, suppliers, banks, contasContabeis, boletoPatterns, globalStats,
     loadingTransactions, isLoadingMore, hasMoreTransactions,
-    allTransactions, transactionPage,
   ]);
 
   const uiSubValue = useMemo(() => ({
