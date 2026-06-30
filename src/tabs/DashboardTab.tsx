@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import {
   TrendingUp, TrendingDown, CheckCircle, Calendar, PieChart as PieChartIcon,
-  Building2,
+  Building2, AlertTriangle, ClipboardList, Clock, WalletCards, ArrowRight, Banknote,
 } from 'lucide-react';
 import type { Transaction } from '../types';
 import { useAppData } from '../hooks/useAppData';
@@ -14,6 +14,32 @@ import {
   cn, formatBRL, isRevenueTransaction,
 } from '../lib/utils';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+
+const parseTransactionDate = (value?: string | null): Date | null => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  if (raw.includes('/')) {
+    const [dd, mm, yyyy] = raw.split('/').map(Number);
+    if (!dd || !mm || !yyyy) return null;
+    const parsed = new Date(yyyy, mm - 1, dd);
+    parsed.setHours(0, 0, 0, 0);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+};
+
+const normalizeText = (value?: string | null) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
 
 interface DashboardTabProps {
   transactions: Transaction[];
@@ -194,6 +220,102 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
   const healthColor = healthScore >= 80 ? '#10b981' : healthScore >= 60 ? '#f59e0b' : '#ef4444';
   const healthLabel = healthScore >= 80 ? 'Saudável' : healthScore >= 60 ? 'Atenção' : 'Crítico';
 
+  const attentionData = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const in7 = new Date(today);
+    in7.setDate(today.getDate() + 7);
+    const in15 = new Date(today);
+    in15.setDate(today.getDate() + 15);
+    const in30 = new Date(today);
+    in30.setDate(today.getDate() + 30);
+
+    const businessTx = filteredTx.filter(tx => tx.tipo !== 'TRANSFERENCIA');
+    const openTx = businessTx.filter(tx => tx.status !== 'PAGO');
+    const overdue = openTx
+      .filter((tx) => {
+        const due = parseTransactionDate(tx.vencimento);
+        return tx.status === 'VENCIDO' || Boolean(due && due < today);
+      })
+      .sort((a, b) => (Number(b.valor) || 0) - (Number(a.valor) || 0));
+    const dueSoon = openTx.filter((tx) => {
+      const due = parseTransactionDate(tx.vencimento);
+      return Boolean(due && due >= today && due <= in7);
+    });
+    const missingSupplier = businessTx.filter((tx) => {
+      const supplier = normalizeText(tx.fornecedor);
+      return !supplier || supplier.includes('NAO IDENTIFICADO');
+    });
+    const missingBankPaid = businessTx.filter((tx) => tx.status === 'PAGO' && !String(tx.banco || '').trim());
+    const missingAccount = businessTx.filter((tx) => !tx.conta_contabil_id);
+    const missingCompany = businessTx.filter((tx) => !String(tx.empresa || '').trim());
+
+    const sumByWindow = (limit: Date, tipo: 'RECEITA' | 'DESPESA') =>
+      openTx.reduce((sum, tx) => {
+        const due = parseTransactionDate(tx.vencimento);
+        if (!due || due < today || due > limit) return sum;
+        const isRevenue = isRevenueTransaction(tx);
+        if (tipo === 'RECEITA' && !isRevenue) return sum;
+        if (tipo === 'DESPESA' && isRevenue) return sum;
+        return sum + (Number(tx.valor) || 0) + (Number(tx.juros) || 0);
+      }, 0);
+
+    const flowWindows = [7, 15, 30].map((days) => {
+      const limit = days === 7 ? in7 : days === 15 ? in15 : in30;
+      const receitas = sumByWindow(limit, 'RECEITA');
+      const despesas = sumByWindow(limit, 'DESPESA');
+      return { days, receitas, despesas, saldo: receitas - despesas };
+    });
+
+    return {
+      overdue,
+      dueSoon,
+      missingSupplier,
+      missingBankPaid,
+      missingAccount,
+      missingCompany,
+      flowWindows,
+    };
+  }, [filteredTx]);
+
+  const attentionCards = [
+    {
+      label: 'Vencidos',
+      value: filteredStats.vencidos,
+      desc: 'Prioridade de baixa ou renegociação',
+      tone: 'danger',
+      icon: <AlertTriangle size={19} />,
+    },
+    {
+      label: 'Vencem em 7 dias',
+      value: attentionData.dueSoon.length,
+      desc: 'Contas abertas nos registros carregados',
+      tone: 'warning',
+      icon: <Clock size={19} />,
+    },
+    {
+      label: 'Pagos sem banco',
+      value: attentionData.missingBankPaid.length,
+      desc: 'Afeta conferência e conciliação',
+      tone: 'info',
+      icon: <Banknote size={19} />,
+    },
+    {
+      label: 'Cadastro incompleto',
+      value: attentionData.missingSupplier.length + attentionData.missingAccount.length + attentionData.missingCompany.length,
+      desc: 'Fornecedor, empresa ou conta contábil',
+      tone: 'neutral',
+      icon: <ClipboardList size={19} />,
+    },
+  ];
+
+  const toneClasses: Record<string, string> = {
+    danger: 'border-tertiary/30 bg-tertiary/5 text-tertiary',
+    warning: 'border-secondary/30 bg-secondary/5 text-secondary',
+    info: 'border-primary/30 bg-primary/5 text-primary',
+    neutral: 'border-surface-variant bg-surface-variant/20 text-on-surface',
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2">
@@ -275,6 +397,118 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
             </div>
           </motion.div>
         ))}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }} className="glass-card p-6 xl:col-span-2">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-5">
+            <div>
+              <h4 className="text-lg font-bold font-headline flex items-center gap-2">
+                <AlertTriangle size={20} className="text-secondary" /> Ações necessárias
+              </h4>
+              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">
+                O que precisa da sua atenção agora
+              </p>
+            </div>
+            {isFetching && <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Atualizando...</span>}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+            {attentionCards.map((card) => (
+              <div key={card.label} className={cn('rounded-xl border p-4', toneClasses[card.tone])}>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="w-9 h-9 rounded-lg bg-black/20 flex items-center justify-center shrink-0">{card.icon}</span>
+                  <span className="text-2xl font-black text-on-surface">{card.value}</span>
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-widest mt-3">{card.label}</p>
+                <p className="text-[10px] text-on-surface-variant mt-1 leading-snug">{card.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="rounded-xl border border-surface-variant bg-background/30 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Maiores vencidos</p>
+                <span className="text-[10px] text-on-surface-variant">lista carregada</span>
+              </div>
+              <div className="space-y-2">
+                {attentionData.overdue.slice(0, 5).map((tx) => (
+                  <div key={tx.id} className="flex items-center justify-between gap-3 rounded-lg bg-surface-variant/20 border border-surface-variant/70 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold truncate">{tx.fornecedor || 'Sem fornecedor'}</p>
+                      <p className="text-[10px] text-on-surface-variant truncate">{tx.vencimento} • {tx.empresa || 'Sem empresa'}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs font-black text-tertiary">{formatBRL(Number(tx.valor) || 0)}</span>
+                      <button
+                        type="button"
+                        onClick={() => onMarkAsPaid(tx)}
+                        className="w-8 h-8 rounded-lg bg-success/15 text-success border border-success/25 flex items-center justify-center hover:bg-success/25 transition-all"
+                        title="Marcar como pago"
+                        aria-label="Marcar como pago"
+                      >
+                        <CheckCircle size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {attentionData.overdue.length === 0 && (
+                  <div className="py-7 text-center text-xs text-on-surface-variant/60">Nenhum vencido nos registros carregados.</div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-surface-variant bg-background/30 p-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">Checklist de qualidade</p>
+              {[
+                ['Fornecedor não identificado', attentionData.missingSupplier.length],
+                ['Lançamento sem empresa', attentionData.missingCompany.length],
+                ['Sem conta contábil', attentionData.missingAccount.length],
+                ['Pago sem banco', attentionData.missingBankPaid.length],
+              ].map(([label, count]) => (
+                <div key={label} className="flex items-center justify-between border-b border-surface-variant/50 last:border-0 py-2">
+                  <span className="text-xs text-on-surface-variant">{label}</span>
+                  <span className={cn("text-xs font-black px-2 py-1 rounded-md", Number(count) > 0 ? "bg-secondary/15 text-secondary" : "bg-success/15 text-success")}>
+                    {count}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-card p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h4 className="text-lg font-bold font-headline flex items-center gap-2">
+                <WalletCards size={20} className="text-primary" /> Fluxo futuro
+              </h4>
+              <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Previsão dos abertos</p>
+            </div>
+            <ArrowRight size={18} className="text-primary/50" />
+          </div>
+          <div className="space-y-3">
+            {attentionData.flowWindows.map((item) => (
+              <div key={item.days} className="rounded-xl border border-surface-variant bg-background/30 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-black uppercase tracking-widest">Próximos {item.days} dias</span>
+                  <span className={cn("text-xs font-black", item.saldo >= 0 ? "text-success" : "text-tertiary")}>{formatBRL(item.saldo)}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[9px] font-bold uppercase text-on-surface-variant">Entradas</p>
+                    <p className="text-sm font-black text-success">{formatBRL(item.receitas)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold uppercase text-on-surface-variant">Saídas</p>
+                    <p className="text-sm font-black text-tertiary">{formatBRL(item.despesas)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
