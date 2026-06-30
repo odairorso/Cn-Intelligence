@@ -229,22 +229,22 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   // --------------------------------------------------------------
   useEffect(() => {
     loadCompanies();
-    if (apiAuth.isAuthenticated()) {
-      setIsAuthorized(true);
-      const uid = getAuthenticatedUid();
-      if (uid) {
+    const verifySession = async () => {
+      if (apiAuth.isAuthenticated()) {
         try {
-          const token = apiAuth.getToken();
-          if (token) {
-            const payload = decodeJwtPayload(token);
-            if (payload) {
-              setUserEmail(payload.email || null);
-              setDisplayName(payload.display_name || payload.email || null);
-            }
-          }
-        } catch { /* ignore */ }
+          // Verifica se o cookie HttpOnly ainda está válido no servidor
+          const user = await apiAuth.checkSession();
+          setIsAuthorized(true);
+          setUserEmail(user.email || null);
+          setDisplayName(user.display_name || user.email || null);
+        } catch {
+          setIsAuthorized(false);
+          setUserEmail(null);
+          setDisplayName(null);
+        }
       }
-    }
+    };
+    verifySession();
   }, []);
 
   const showNotification = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -287,21 +287,10 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   const login = useCallback(async (password: string) => {
     try {
       const data = await apiAuth.login(password);
-      if (data.token) {
+      if (data.user) {
         setIsAuthorized(true);
-        try {
-          const uid = getAuthenticatedUid();
-          if (uid) {
-            const token = apiAuth.getToken();
-            if (token) {
-              const payload = decodeJwtPayload(token);
-              if (payload) {
-                setUserEmail(payload.email || null);
-                setDisplayName(payload.display_name || payload.email || null);
-              }
-            }
-          }
-        } catch { /* ignore */ }
+        setUserEmail(data.user.email || null);
+        setDisplayName(data.user.display_name || data.user.email || null);
         return true;
       }
       return false;
@@ -838,15 +827,15 @@ export const useAppData = () => {
 };
 
 export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
-  const token = apiAuth.getToken();
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>) || {},
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
   // Mantém o SECURITY_TOKEN legado apenas para compatibilidade — não é mais usado para auth
   const securityToken = import.meta.env.VITE_CN_SECURITY_TOKEN;
   if (securityToken) headers['x-cn-security'] = securityToken;
-  return fetch(url, { ...options, headers });
+  return fetch(url, { 
+    ...options, 
+    headers,
+    credentials: 'same-origin' // Habilita o envio automático de cookies HttpOnly
+  });
 };
