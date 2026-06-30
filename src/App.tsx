@@ -303,20 +303,6 @@ export default function App() {
     );
   };
 
-  const shouldRejectSupplierName = (name: string) => {
-    const value = String(name || '').trim().toUpperCase();
-    if (!value || value.length < 4) return true;
-    if (value.includes('DATA DO DOCUMENTO') || value.includes('VENCIMENTO') || value.includes('NOSSO NUMERO')) return true;
-    if (value.includes('AGENCIA') || value.includes('CÓDIGO') || value.includes('CODIGO') || value.includes('BENEFICI')) return true;
-    if (value.includes('LOCAL DE PAGAMENTO') || value.includes('PAGAVEL') || value.includes('INSTRUCOES')) return true;
-    if (value.includes('ESPECIE') || value.includes('CARTEIRA') || value.includes('USO DO BANCO')) return true;
-    if (value.includes('AVENIDA') || value.includes(' AV ') || value.includes('AV.') || value.includes('RUA') || value.includes('CEP')) return true;
-    const onlyNumericLike = value.replace(/[^0-9]/g, '').length >= Math.max(8, value.length - 2);
-    if (onlyNumericLike) return true;
-    if ((value.match(/[A-Z]/g) || []).length < 3) return true;
-    return false;
-  };
-
   const resolveSupplierName = (detectedName: string, sourceText: string, suppliers: Supplier[]) => {
     const cleanDetected = String(detectedName || '').trim();
     const validDetected = shouldRejectSupplierName(cleanDetected) ? '' : cleanDetected;
