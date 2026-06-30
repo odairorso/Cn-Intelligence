@@ -36,6 +36,9 @@ const LancamentosTab = React.memo(({
   const [yearFilter, setYearFilter] = useState(() => {
     try { return sessionStorage.getItem('cn_lancamentos_yearFilter') || 'TODOS'; } catch { return 'TODOS'; }
   });
+  const [specialFilter, setSpecialFilter] = useState(() => {
+    try { return sessionStorage.getItem('cn_lancamentos_specialFilter') || 'TODOS'; } catch { return 'TODOS'; }
+  });
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>(() => {
     try { return (sessionStorage.getItem('cn_lancamentos_sortOrder') as 'desc' | 'asc') || 'desc'; } catch { return 'desc'; }
   });
@@ -60,6 +63,10 @@ const LancamentosTab = React.memo(({
   useEffect(() => {
     try { sessionStorage.setItem('cn_lancamentos_yearFilter', yearFilter); } catch { /* ignore */ }
   }, [yearFilter]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem('cn_lancamentos_specialFilter', specialFilter); } catch { /* ignore */ }
+  }, [specialFilter]);
 
   useEffect(() => {
     try { sessionStorage.setItem('cn_lancamentos_sortOrder', sortOrder); } catch { /* ignore */ }
@@ -121,6 +128,61 @@ const LancamentosTab = React.memo(({
     { value: '12', label: 'Dezembro' }
   ];
 
+  const parseTxDate = (value?: string | null): Date | null => {
+    if (!value) return null;
+    const raw = String(value).trim();
+    if (!raw) return null;
+    if (raw.includes('/')) {
+      const [dd, mm, yyyy] = raw.split('/').map(Number);
+      if (!dd || !mm || !yyyy) return null;
+      const parsed = new Date(yyyy, mm - 1, dd);
+      parsed.setHours(0, 0, 0, 0);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return null;
+    parsed.setHours(0, 0, 0, 0);
+    return parsed;
+  };
+
+  const normalizeText = (value?: string | null) =>
+    String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toUpperCase();
+
+  const matchesSpecialFilter = (tx: Transaction) => {
+    if (specialFilter === 'TODOS') return true;
+    const supplier = normalizeText(tx.fornecedor);
+
+    if (specialFilter === 'missing_supplier') {
+      return !supplier || supplier.includes('NAO IDENTIFICADO');
+    }
+    if (specialFilter === 'missing_company') {
+      return !String(tx.empresa || '').trim();
+    }
+    if (specialFilter === 'missing_account') {
+      return !tx.conta_contabil_id;
+    }
+    if (specialFilter === 'missing_bank_paid') {
+      return tx.status === 'PAGO' && !String(tx.banco || '').trim();
+    }
+    if (specialFilter === 'incomplete_registration') {
+      return !supplier || supplier.includes('NAO IDENTIFICADO') || !String(tx.empresa || '').trim() || !tx.conta_contabil_id;
+    }
+    if (specialFilter === 'due_soon') {
+      if (tx.status === 'PAGO') return false;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const limit = new Date(today);
+      limit.setDate(today.getDate() + 7);
+      const due = parseTxDate(tx.vencimento);
+      return Boolean(due && due >= today && due <= limit);
+    }
+    return true;
+  };
+
   const filtered = useMemo(() => {
     const searchRaw = String(deferredFilter || '').trim();
     const removeAccents = (str: string) =>
@@ -175,13 +237,13 @@ const LancamentosTab = React.memo(({
         }
       }
 
-      return matchesSearch && matchesStatus && matchesMonth && matchesYear;
+      return matchesSearch && matchesStatus && matchesMonth && matchesYear && matchesSpecialFilter(tx);
     }).sort((a, b) => {
       const keyA = dateSortKey(a.vencimento);
       const keyB = dateSortKey(b.vencimento);
       return sortOrder === 'desc' ? keyB - keyA : keyA - keyB;
     });
-  }, [transactions, deferredFilter, statusFilter, monthFilter, yearFilter, sortOrder]);
+  }, [transactions, deferredFilter, statusFilter, monthFilter, yearFilter, specialFilter, sortOrder]);
 
   // Reset page when filters change, avoiding initial mount reset
   const isFirstPageResetRef = useRef(true);
@@ -191,7 +253,7 @@ const LancamentosTab = React.memo(({
       return;
     }
     setPage(0);
-  }, [deferredFilter, statusFilter, monthFilter, yearFilter, sortOrder]);
+  }, [deferredFilter, statusFilter, monthFilter, yearFilter, specialFilter, sortOrder]);
   // Preserve selection when filters change (do not clear)
   // The selection will automatically stay consistent with the filtered list.
   // If needed, we could prune IDs that are no longer in the filtered view elsewhere.
@@ -290,6 +352,23 @@ const LancamentosTab = React.memo(({
             {availableYears.map(y => (
               <option key={y} value={y || ''} className="bg-surface text-on-surface">{y}</option>
             ))}
+          </select>
+
+          <select
+            className={cn(
+              "bg-surface border text-on-surface text-sm rounded-sm px-4 py-2.5 outline-none hover:bg-surface-variant/20 transition-all",
+              specialFilter !== 'TODOS' ? "border-secondary/60 text-secondary font-bold" : "border-white/10"
+            )}
+            value={specialFilter}
+            onChange={(e) => setSpecialFilter(e.target.value)}
+          >
+            <option value="TODOS" className="bg-surface text-on-surface font-normal">Sem Filtro Especial</option>
+            <option value="due_soon" className="bg-surface text-on-surface font-normal">Vencem em 7 dias</option>
+            <option value="missing_bank_paid" className="bg-surface text-on-surface font-normal">Pagos sem banco</option>
+            <option value="missing_supplier" className="bg-surface text-on-surface font-normal">Fornecedor faltando</option>
+            <option value="missing_company" className="bg-surface text-on-surface font-normal">Empresa faltando</option>
+            <option value="missing_account" className="bg-surface text-on-surface font-normal">Conta contábil faltando</option>
+            <option value="incomplete_registration" className="bg-surface text-on-surface font-normal">Cadastro incompleto</option>
           </select>
 
           <button
