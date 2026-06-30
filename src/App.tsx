@@ -129,6 +129,19 @@ export default function App() {
     fetchBanks(true);
   }, [showNewTxModal, isAuthorized, banks.length, fetchBanks]);
 
+  useEffect(() => {
+    if (activeTab === 'dashboard' && isAuthorized) {
+      try {
+        sessionStorage.setItem('cn_lancamentos_filter', '');
+        sessionStorage.setItem('cn_lancamentos_statusFilter', 'TODOS');
+        sessionStorage.setItem('cn_lancamentos_specialFilter', 'TODOS');
+      } catch (e) {
+        // ignore
+      }
+      fetchTransactions(false, 'TODOS');
+    }
+  }, [activeTab, isAuthorized, fetchTransactions]);
+
 
   const addContaContabil = async () => {
     if (!newContaContabil.codigo || !newContaContabil.nome) {
