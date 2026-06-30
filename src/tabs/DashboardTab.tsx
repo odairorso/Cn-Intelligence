@@ -44,11 +44,12 @@ const normalizeText = (value?: string | null) =>
 interface DashboardTabProps {
   transactions: Transaction[];
   onMarkAsPaid: (tx: Transaction) => void;
+  onOpenLancamentos?: (filters?: { status?: string; search?: string; special?: string }) => void;
   globalStats: any;
   fetchStats: (year?: string, period?: string) => Promise<void>;
 }
 
-const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetchStats }: DashboardTabProps) => {
+const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos, globalStats, fetchStats }: DashboardTabProps) => {
   const { isAuthorized } = useAppData();
   const [periodoFilter, setPeriodoFilter] = useState('TODOS');
   const [isFetching, setIsFetching] = useState(false);
@@ -285,6 +286,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
       desc: 'Prioridade de baixa ou renegociação',
       tone: 'danger',
       icon: <AlertTriangle size={19} />,
+      action: () => onOpenLancamentos?.({ status: 'VENCIDO' }),
     },
     {
       label: 'Vencem em 7 dias',
@@ -292,6 +294,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
       desc: 'Contas abertas nos registros carregados',
       tone: 'warning',
       icon: <Clock size={19} />,
+      action: () => onOpenLancamentos?.({ status: 'PENDENTE', special: 'due_soon' }),
     },
     {
       label: 'Pagos sem banco',
@@ -299,6 +302,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
       desc: 'Afeta conferência e conciliação',
       tone: 'info',
       icon: <Banknote size={19} />,
+      action: () => onOpenLancamentos?.({ status: 'PAGO', special: 'missing_bank_paid' }),
     },
     {
       label: 'Cadastro incompleto',
@@ -306,6 +310,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
       desc: 'Fornecedor, empresa ou conta contábil',
       tone: 'neutral',
       icon: <ClipboardList size={19} />,
+      action: () => onOpenLancamentos?.({ special: 'incomplete_registration' }),
     },
   ];
 
@@ -415,14 +420,20 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
             {attentionCards.map((card) => (
-              <div key={card.label} className={cn('rounded-xl border p-4', toneClasses[card.tone])}>
+              <button
+                key={card.label}
+                type="button"
+                onClick={card.action}
+                className={cn('rounded-xl border p-4 text-left hover:border-primary/60 hover:bg-surface-variant/20 transition-all cursor-pointer', toneClasses[card.tone])}
+                title="Abrir lançamentos filtrados"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <span className="w-9 h-9 rounded-lg bg-black/20 flex items-center justify-center shrink-0">{card.icon}</span>
                   <span className="text-2xl font-black text-on-surface">{card.value}</span>
                 </div>
                 <p className="text-[10px] font-black uppercase tracking-widest mt-3">{card.label}</p>
                 <p className="text-[10px] text-on-surface-variant mt-1 leading-snug">{card.desc}</p>
-              </div>
+              </button>
             ))}
           </div>
 
@@ -434,7 +445,12 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
               </div>
               <div className="space-y-2">
                 {attentionData.overdue.slice(0, 5).map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between gap-3 rounded-lg bg-surface-variant/20 border border-surface-variant/70 px-3 py-2">
+                  <button
+                    key={tx.id}
+                    type="button"
+                    onClick={() => onOpenLancamentos?.({ status: 'VENCIDO', search: tx.fornecedor })}
+                    className="w-full flex items-center justify-between gap-3 rounded-lg bg-surface-variant/20 border border-surface-variant/70 px-3 py-2 text-left hover:border-tertiary/50 hover:bg-tertiary/5 transition-all"
+                  >
                     <div className="min-w-0">
                       <p className="text-xs font-bold truncate">{tx.fornecedor || 'Sem fornecedor'}</p>
                       <p className="text-[10px] text-on-surface-variant truncate">{tx.vencimento} • {tx.empresa || 'Sem empresa'}</p>
@@ -443,7 +459,10 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
                       <span className="text-xs font-black text-tertiary">{formatBRL(Number(tx.valor) || 0)}</span>
                       <button
                         type="button"
-                        onClick={() => onMarkAsPaid(tx)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onMarkAsPaid(tx);
+                        }}
                         className="w-8 h-8 rounded-lg bg-success/15 text-success border border-success/25 flex items-center justify-center hover:bg-success/25 transition-all"
                         title="Marcar como pago"
                         aria-label="Marcar como pago"
@@ -451,7 +470,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
                         <CheckCircle size={16} />
                       </button>
                     </div>
-                  </div>
+                  </button>
                 ))}
                 {attentionData.overdue.length === 0 && (
                   <div className="py-7 text-center text-xs text-on-surface-variant/60">Nenhum vencido nos registros carregados.</div>
@@ -462,17 +481,22 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, globalStats, fetc
             <div className="rounded-xl border border-surface-variant bg-background/30 p-4">
               <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">Checklist de qualidade</p>
               {[
-                ['Fornecedor não identificado', attentionData.missingSupplier.length],
-                ['Lançamento sem empresa', attentionData.missingCompany.length],
-                ['Sem conta contábil', attentionData.missingAccount.length],
-                ['Pago sem banco', attentionData.missingBankPaid.length],
-              ].map(([label, count]) => (
-                <div key={label} className="flex items-center justify-between border-b border-surface-variant/50 last:border-0 py-2">
+                ['Fornecedor não identificado', attentionData.missingSupplier.length, 'missing_supplier'],
+                ['Lançamento sem empresa', attentionData.missingCompany.length, 'missing_company'],
+                ['Sem conta contábil', attentionData.missingAccount.length, 'missing_account'],
+                ['Pago sem banco', attentionData.missingBankPaid.length, 'missing_bank_paid'],
+              ].map(([label, count, special]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => onOpenLancamentos?.({ special: String(special), status: special === 'missing_bank_paid' ? 'PAGO' : 'TODOS' })}
+                  className="w-full flex items-center justify-between border-b border-surface-variant/50 last:border-0 py-2 text-left hover:text-primary transition-colors"
+                >
                   <span className="text-xs text-on-surface-variant">{label}</span>
                   <span className={cn("text-xs font-black px-2 py-1 rounded-md", Number(count) > 0 ? "bg-secondary/15 text-secondary" : "bg-success/15 text-success")}>
                     {count}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           </div>

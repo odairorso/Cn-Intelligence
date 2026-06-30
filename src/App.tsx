@@ -1125,6 +1125,27 @@ export default function App() {
     }
   };
 
+  const handleOpenLancamentos = useCallback((filters?: { status?: string; search?: string; special?: string }) => {
+    if (filters) {
+      if (filters.status) {
+        sessionStorage.setItem('cn_lancamentos_statusFilter', filters.status);
+      } else {
+        sessionStorage.setItem('cn_lancamentos_statusFilter', 'TODOS');
+      }
+      if (filters.search) {
+        sessionStorage.setItem('cn_lancamentos_filter', filters.search);
+      } else {
+        sessionStorage.setItem('cn_lancamentos_filter', '');
+      }
+      if (filters.special) {
+        sessionStorage.setItem('cn_lancamentos_specialFilter', filters.special);
+      } else {
+        sessionStorage.setItem('cn_lancamentos_specialFilter', 'TODOS');
+      }
+    }
+    setActiveTab('lancamentos');
+  }, []);
+
   // --- Computed Stats ---
   const stats = useMemo(() => {
     let total = 0;
@@ -1432,6 +1453,7 @@ export default function App() {
               <DashboardTab
                 transactions={transactions}
                 onMarkAsPaid={handleMarkAsPaidClick}
+                onOpenLancamentos={handleOpenLancamentos}
                 globalStats={globalStats}
                 fetchStats={fetchStats}
               />
