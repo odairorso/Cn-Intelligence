@@ -54,33 +54,6 @@ export const extractLocalBoletoNumber = (text: string) => {
     }
   }
   return '';
-
-  const multiBlockMatch = source.match(/(\d{11}-\d)\s+(\d{11}-\d)\s+(\d{11}-\d)\s+(\d{11}-\d)/);
-  if (multiBlockMatch) {
-    const assembled = multiBlockMatch[0].replace(/[^0-9]/g, '');
-    if (assembled.length === 47 || assembled.length === 48) return assembled;
-  }
-  const labeledBlockPatterns = [
-    /LINHA\s*DIGIT[AÁ]VEL[^0-9]*([0-9\s.]{40,160})/,
-    /C.{0,6}DIGO\s*DE\s*BARRAS[^0-9]*([0-9\s.]{40,160})/,
-  ];
-  for (const p of labeledBlockPatterns) {
-    const m = source.match(p);
-    const digits = (m?.[1]?.match(/\d/g) || []).join('');
-    if (digits.length === 47 || digits.length === 48) return digits;
-    if (digits.length > 48) return digits.slice(0, 48);
-    if (digits.length > 47) return digits.slice(0, 47);
-  }
-  const barcodeMatch = source.match(/\b([0-9]{47,48})\b/);
-  if (barcodeMatch?.[1]) return barcodeMatch[1];
-
-  const fragmentPattern = /\d{5}\.\d{5}\s+\d{5}\.\d{6}\s+\d{5}\.\d{6}\s+\d\s+\d{14}/;
-  const fragMatch = source.match(fragmentPattern);
-  if (fragMatch?.[0]) {
-    const assembled = fragMatch[0].replace(/[^0-9]/g, '');
-    if (assembled.length === 47 || assembled.length === 48) return assembled;
-  }
-  return '';
 };
 
 export const parseLinhaDigitavel = (text: string) => {
