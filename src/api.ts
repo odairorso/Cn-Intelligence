@@ -4,27 +4,39 @@ import type { Transaction, Supplier, Bank, ContaContabil } from './types';
 const API_BASE = '/api';
 
 // --------------------------------------------------------------
-// Helpers de autenticação - Token JWT no localStorage
+// Helpers de autenticação - Usuário salvo localmente (metadados públicos)
+// O Token JWT em si fica seguro no cookie HttpOnly gerenciado pelo navegador.
 // --------------------------------------------------------------
-const getToken = (): string | null => {
+interface LocalUser {
+  uid: string;
+  email: string | null;
+  display_name?: string | null;
+}
+
+const getUser = (): LocalUser | null => {
   try {
-    return localStorage.getItem('cn_jwt_token');
+    const raw = localStorage.getItem('cn_user');
+    if (!raw) return null;
+    return JSON.parse(raw);
   } catch {
     return null;
   }
 };
 
-const setToken = (token: string) => {
+const setUser = (user: LocalUser) => {
   try {
-    localStorage.setItem('cn_jwt_token', token);
+    localStorage.setItem('cn_user', JSON.stringify(user));
   } catch { /* ignore */ }
 };
 
-const removeToken = () => {
+const removeUser = () => {
   try {
-    localStorage.removeItem('cn_jwt_token');
+    localStorage.removeItem('cn_user');
   } catch { /* ignore */ }
 };
+
+// Mantido apenas para compatibilidade de tipos no frontend
+const getToken = (): string | null => null;
 
 export const decodeJwtPayload = (token: string): any => {
   try {
@@ -41,14 +53,9 @@ export const decodeJwtPayload = (token: string): any => {
 };
 
 const getUid = (): string | null => {
-  const token = getToken();
-  if (!token) return null;
-  const payload = decodeJwtPayload(token);
-  return payload ? payload.uid || null : null;
+  const user = getUser();
+  return user ? user.uid : null;
 };
-
-// UID para uso em inserts (banco de dados) — obsoleto, mantido apenas para compatibilidade
-// O backend agora extrai o UID do JWT automaticamente via middleware
 
 const buildHttpError = async (res: Response, fallback: string) => {
   const contentType = res.headers.get('content-type') || '';
@@ -70,26 +77,26 @@ const buildHttpError = async (res: Response, fallback: string) => {
 };
 
 // --------------------------------------------------------------
-// fetchWithSecurity — carrega token JWT e token de segurança
+// fetchWithSecurity — envia credenciais de mesma origem para carregar cookies HttpOnly
 // --------------------------------------------------------------
 export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
-  const token = getToken();
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>) || {},
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
   const securityToken = import.meta.env.VITE_CN_SECURITY_TOKEN;
   if (securityToken) headers['x-cn-security'] = securityToken;
-  return fetch(url, { ...options, headers });
+  return fetch(url, { 
+    ...options, 
+    headers,
+    credentials: 'same-origin' // Habilita o envio automático de cookies HttpOnly
+  });
 };
 
 // --------------------------------------------------------------
 // API Auth
 // --------------------------------------------------------------
 export const apiAuth = {
-  async login(password: string): Promise<{ token: string; user: { uid: string } }> {
+  async login(password: string): Promise<{ token: string; user: { uid: string; email: string | null } }> {
     const res = await fetchWithSecurity(`${API_BASE}?route=auth-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -100,38 +107,36 @@ export const apiAuth = {
       throw error;
     }
     const data = await res.json();
-    if (data.token) {
-      setToken(data.token);
+    if (data.user) {
+      setUser(data.user);
     }
     return data;
   },
 
-  logout() {
-    removeToken();
+  async logout(): Promise<void> {
+    try {
+      await fetchWithSecurity(`${API_BASE}?route=auth-logout`, { method: 'POST' });
+    } catch { /* ignore */ }
+    removeUser();
+  },
+
+  async checkSession(): Promise<{ uid: string; email: string | null }> {
+    const res = await fetchWithSecurity(`${API_BASE}?route=auth-session`);
+    if (!res.ok) {
+      removeUser();
+      throw new Error('Sessão expirada');
+    }
+    const data = await res.json();
+    if (data.user) {
+      setUser(data.user);
+    }
+    return data.user;
   },
 
   getToken,
   getUid,
   isAuthenticated: (): boolean => {
-    try {
-      const token = getToken();
-      if (!token) return false;
-      const payload = decodeJwtPayload(token);
-      if (!payload) {
-        removeToken();
-        return false;
-      }
-      if (payload.exp && typeof payload.exp === 'number') {
-        if (Date.now() / 1000 > payload.exp) {
-          removeToken();
-          return false;
-        }
-      }
-      return true;
-    } catch {
-      removeToken();
-      return false;
-    }
+    return getUser() !== null;
   },
 };
 

@@ -19,10 +19,30 @@ const generateToken = (payload) => {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 };
 
+const getCookie = (req, name) => {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return null;
+  const cookies = cookieHeader.split(';').reduce((acc, c) => {
+    const [key, ...val] = c.trim().split('=');
+    acc[key] = val.join('=');
+    return acc;
+  }, {});
+  return cookies[name] || null;
+};
+
 const verifyToken = (req) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  const token = authHeader.split(' ')[1];
+  // Tenta obter o token do cookie HttpOnly
+  let token = getCookie(req, 'cn_jwt_token');
+
+  // Fallback para o header Authorization (legado/suporte a testes)
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
+  }
+
+  if (!token) return null;
   try {
     if (!JWT_SECRET) return null;
     return jwt.verify(token, JWT_SECRET);
@@ -62,6 +82,21 @@ export default async function handler(req, res) {
       try {
         await logSecurity(req, res, `Login bem-sucedido: ${email || APP_UID}`);
       } catch {}
+
+      // Grava o cookie HttpOnly e Secure
+      const isDev = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+      const cookieOptions = [
+        `cn_jwt_token=${token}`,
+        'Path=/',
+        'HttpOnly',
+        'SameSite=Strict',
+        'Max-Age=604800' // 7 dias em segundos
+      ];
+      if (!isDev) {
+        cookieOptions.push('Secure');
+      }
+      res.setHeader('Set-Cookie', cookieOptions.join('; '));
+
       return res.json({ token, user: { uid: APP_UID, email: email || APP_EMAIL || null } });
     }
 
@@ -148,6 +183,17 @@ export default async function handler(req, res) {
         case 'export-backup': { const m = await import('./_handlers/admin.js'); return m.handleExportBackup(req, res); }
         case 'fix-receitas-tipo': { const m = await import('./_handlers/transactions.js'); return m.handleFixReceitasTipo(req, res); }
         case 'folha-push': { const m = await import('./_handlers/folha.js'); return m.handleFolhaPush(req, res); }
+        case 'auth-session': {
+          const decoded = verifyToken(req);
+          if (!decoded) return res.status(401).json({ error: 'Sessão expirada' });
+          return res.json({ user: { uid: decoded.uid, email: decoded.email } });
+        }
+        case 'auth-logout':
+        case 'logout': {
+          const isDev = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+          res.setHeader('Set-Cookie', `cn_jwt_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT${!isDev ? '; Secure' : ''}`);
+          return res.json({ message: 'Logged out successfully' });
+        }
         default: return res.status(404).json({ error: 'Route not found' });
       }
     } catch (e) {
