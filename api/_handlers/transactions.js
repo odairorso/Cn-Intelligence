@@ -43,8 +43,15 @@ export async function handleTransactions(req, res) {
       if (tipo && tipo !== 'TODOS') query = sql`${query} AND tipo = ${tipo}`;
       if (empresa && empresa !== 'TODOS') query = sql`${query} AND upper(empresa) = upper(${empresa})`;
       if (status && status !== 'TODOS') {
-        if (status === 'NAO_PAGO') query = sql`${query} AND (status = 'PENDENTE' OR status = 'VENCIDO')`;
-        else query = sql`${query} AND status = ${status}`;
+        if (status === 'NAO_PAGO') {
+          query = sql`${query} AND (status = 'PENDENTE' OR status = 'VENCIDO')`;
+        } else if (status === 'VENCIDO') {
+          query = sql`${query} AND (status = 'VENCIDO' OR (status = 'PENDENTE' AND vencimento < CURRENT_DATE))`;
+        } else if (status === 'PENDENTE') {
+          query = sql`${query} AND status = 'PENDENTE' AND vencimento >= CURRENT_DATE`;
+        } else {
+          query = sql`${query} AND status = ${status}`;
+        }
       }
       if (conta_contabil_id) {
         const ccid = parseInt(String(conta_contabil_id));
