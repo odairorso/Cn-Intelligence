@@ -228,7 +228,22 @@ const LancamentosTab = React.memo(({
       );
 
       const matchesSearch = matchesTextSearch || matchesMoneySearch;
-      const matchesStatus = statusFilter === 'TODOS' || tx.status === statusFilter;
+      const matchesStatus = (() => {
+        if (statusFilter === 'TODOS') return true;
+        if (statusFilter === 'VENCIDO') {
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const due = parseTxDate(tx.vencimento);
+          const isOverdue = Boolean(due && due < today);
+          return tx.status === 'VENCIDO' || (tx.status === 'PENDENTE' && isOverdue);
+        }
+        if (statusFilter === 'PENDENTE') {
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const due = parseTxDate(tx.vencimento);
+          const isOverdue = Boolean(due && due < today);
+          return tx.status === 'PENDENTE' && !isOverdue;
+        }
+        return tx.status === statusFilter;
+      })();
 
       let matchesMonth = true;
       let matchesYear = true;
