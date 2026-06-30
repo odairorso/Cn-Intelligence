@@ -475,6 +475,24 @@ export async function handleTransactionsBatchUpdate(req, res) {
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'IDs missing' });
 
   try {
+    // Validação de ownership: só permite atualizar IDs que pertencem ao usuário
+    const ownedRows = await sql`
+      SELECT id FROM transactions 
+      WHERE (uid = ${uid} OR uid IS NULL) 
+        AND deleted_at IS NULL 
+        AND id = ANY(${ids}::uuid[])
+    `;
+    const ownedIds = new Set(ownedRows.map(r => r.id));
+
+    // Verifica se todos os IDs solicitados pertencem ao usuário
+    const unownedIds = ids.filter(id => !ownedIds.has(id));
+    if (unownedIds.length > 0) {
+      return res.status(403).json({ 
+        error: 'Acesso negado: alguns lançamentos não pertencem ao usuário.',
+        unowned_count: unownedIds.length
+      });
+    }
+
     const pDate = parseDateToPg(dataPagamento);
     await sql`UPDATE transactions SET status = 'PAGO', banco = ${banco}, pagamento = ${pDate}, updated_at = NOW() WHERE (uid = ${uid} OR uid IS NULL) AND id = ANY(${ids}::uuid[])`;
     return res.json({ message: 'Updated successfully' });

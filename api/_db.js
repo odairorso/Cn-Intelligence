@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from 'async_hooks';
 
 export const dbStorage = new AsyncLocalStorage();
 
-let connectionString = process.env.DATABASE_URL || process.env.URL_DO_BANCO_DE_DADOS || process.env.DATABASE_URLL;
+let connectionString = process.env.DATABASE_URL;
 // Remove any sslmode that might conflict with our manual ssl config
 if (connectionString) {
   connectionString = connectionString.replace(/sslmode=[^&?]+/g, 'sslmode=require');
@@ -166,6 +166,10 @@ sql.join = (queries, separator = '') => {
 
   return new SqlQuery(strings, values);
 };
+
+// Executa SQL raw (sem prepared statements) — usar APENAS para nomes de tabelas/colunas
+// que não podem ser parametrizados. Os valores continuam usando parameterized queries.
+sql.unsafe = (rawSql, params = []) => sql(rawSql, ...params);
 
 export const parseDateToPg = (val) => {
   if (!val) return null;
