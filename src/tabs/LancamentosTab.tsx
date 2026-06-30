@@ -171,12 +171,16 @@ const LancamentosTab = React.memo(({
     if (specialFilter === 'incomplete_registration') {
       return !supplier || supplier.includes('NAO IDENTIFICADO') || !String(tx.empresa || '').trim() || !tx.conta_contabil_id;
     }
-    if (specialFilter === 'due_soon') {
+    if (specialFilter === 'due_soon' || specialFilter === 'due_7' || specialFilter === 'due_15' || specialFilter === 'special_due_15' || specialFilter === 'due_30' || specialFilter === 'special_due_30') {
       if (tx.status === 'PAGO') return false;
+      let days = 7;
+      if (specialFilter.includes('15')) days = 15;
+      else if (specialFilter.includes('30')) days = 30;
+      
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const limit = new Date(today);
-      limit.setDate(today.getDate() + 7);
+      limit.setDate(today.getDate() + days);
       const due = parseTxDate(tx.vencimento);
       return Boolean(due && due >= today && due <= limit);
     }
@@ -364,6 +368,8 @@ const LancamentosTab = React.memo(({
           >
             <option value="TODOS" className="bg-surface text-on-surface font-normal">Sem Filtro Especial</option>
             <option value="due_soon" className="bg-surface text-on-surface font-normal">Vencem em 7 dias</option>
+            <option value="due_15" className="bg-surface text-on-surface font-normal">Vencem em 15 dias</option>
+            <option value="due_30" className="bg-surface text-on-surface font-normal">Vencem em 30 dias</option>
             <option value="missing_bank_paid" className="bg-surface text-on-surface font-normal">Pagos sem banco</option>
             <option value="missing_supplier" className="bg-surface text-on-surface font-normal">Fornecedor faltando</option>
             <option value="missing_company" className="bg-surface text-on-surface font-normal">Empresa faltando</option>

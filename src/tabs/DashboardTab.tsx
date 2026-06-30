@@ -445,11 +445,10 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
               </div>
               <div className="space-y-2">
                 {attentionData.overdue.slice(0, 5).map((tx) => (
-                  <button
+                  <div
                     key={tx.id}
-                    type="button"
                     onClick={() => onOpenLancamentos?.({ status: 'VENCIDO', search: tx.fornecedor })}
-                    className="w-full flex items-center justify-between gap-3 rounded-lg bg-surface-variant/20 border border-surface-variant/70 px-3 py-2 text-left hover:border-tertiary/50 hover:bg-tertiary/5 transition-all"
+                    className="w-full flex items-center justify-between gap-3 rounded-lg bg-surface-variant/20 border border-surface-variant/70 px-3 py-2 text-left hover:border-tertiary/50 hover:bg-tertiary/5 transition-all cursor-pointer"
                   >
                     <div className="min-w-0">
                       <p className="text-xs font-bold truncate">{tx.fornecedor || 'Sem fornecedor'}</p>
@@ -470,7 +469,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
                         <CheckCircle size={16} />
                       </button>
                     </div>
-                  </button>
+                  </div>
                 ))}
                 {attentionData.overdue.length === 0 && (
                   <div className="py-7 text-center text-xs text-on-surface-variant/60">Nenhum vencido nos registros carregados.</div>
@@ -514,7 +513,12 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
           </div>
           <div className="space-y-3">
             {attentionData.flowWindows.map((item) => (
-              <div key={item.days} className="rounded-xl border border-surface-variant bg-background/30 p-4">
+              <button
+                key={item.days}
+                type="button"
+                onClick={() => onOpenLancamentos?.({ status: 'PENDENTE', special: `due_${item.days}` })}
+                className="w-full text-left rounded-xl border border-surface-variant bg-background/30 p-4 hover:border-primary/60 hover:bg-surface-variant/10 transition-all cursor-pointer block"
+              >
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-black uppercase tracking-widest">Próximos {item.days} dias</span>
                   <span className={cn("text-xs font-black", item.saldo >= 0 ? "text-success" : "text-tertiary")}>{formatBRL(item.saldo)}</span>
@@ -529,7 +533,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
                     <p className="text-sm font-black text-tertiary">{formatBRL(item.despesas)}</p>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </motion.div>
