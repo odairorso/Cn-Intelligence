@@ -236,7 +236,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
           const user = await apiAuth.checkSession();
           setIsAuthorized(true);
           setUserEmail(user.email || null);
-          setDisplayName(user.display_name || user.email || null);
+          setDisplayName(((user as any)?.display_name) || user.email || null);
         } catch {
           setIsAuthorized(false);
           setUserEmail(null);

@@ -193,14 +193,62 @@ export default function App() {
       showNotification('Selecione um arquivo de imagem válido.', 'error');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result || '');
-      setBrandLogo(dataUrl);
-      try { localStorage.setItem('cn_brand_logo', dataUrl); } catch { /* ignore */ }
-      showNotification('Logo atualizada com sucesso!', 'success');
-    };
-    reader.readAsDataURL(file);
+    // Compress image before storing to localStorage to avoid large base64 payloads
+    const compressAndStore = (file: File, maxDim = 200, quality = 0.7) => new Promise<void>((resolve, reject) => {
+      const imgReader = new FileReader();
+      imgReader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let { width, height } = img;
+          if (width > height) {
+            if (width > maxDim) {
+              height *= maxDim / width;
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width *= maxDim / height;
+              height = maxDim;
+            }
+          }
+          canvas.width = Math.round(width);
+          canvas.height = Math.round(height);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error('Canvas not supported'));
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          // Export as JPEG to save space
+          canvas.toBlob((blob) => {
+            if (!blob) return reject(new Error('Failed to compress image'));
+            const fr = new FileReader();
+            fr.onload = () => {
+              const compressedDataUrl = String(fr.result || '');
+              try { localStorage.setItem('cn_brand_logo', compressedDataUrl); } catch { /* ignore */ }
+              setBrandLogo(compressedDataUrl);
+              resolve();
+            };
+            fr.onerror = reject;
+            fr.readAsDataURL(blob);
+          }, 'image/jpeg', quality);
+        };
+        img.onerror = reject;
+        img.src = String(imgReader.result || '');
+      };
+      imgReader.onerror = reject;
+      imgReader.readAsDataURL(file);
+    });
+
+    compressAndStore(file).then(() => showNotification('Logo atualizada com sucesso!', 'success')).catch(() => {
+      // Fallback to original if compression fails
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = String(reader.result || '');
+        setBrandLogo(dataUrl);
+        try { localStorage.setItem('cn_brand_logo', dataUrl); } catch { /* ignore */ }
+        showNotification('Logo atualizada com sucesso!', 'success');
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const clearLogo = () => {
