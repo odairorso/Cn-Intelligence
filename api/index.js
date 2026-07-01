@@ -58,11 +58,6 @@ export default async function handler(req, res) {
   // CORS Centralizado via _db.js
   setCors(req, res);
 
-  // Security headers (minimal, non-invasive)
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-
   if (req.method === 'OPTIONS') return res.status(200).end();
 
 
