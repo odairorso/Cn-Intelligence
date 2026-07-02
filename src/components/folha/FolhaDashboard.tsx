@@ -47,59 +47,59 @@ export default function FolhaDashboard() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1 */}
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-surface border-surface-variant">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Professores Ativos</CardTitle>
+            <CardTitle className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Professores Ativos</CardTitle>
             <Users className="w-4 h-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-zinc-50">{ativos}</div>
-            <p className="text-xs text-zinc-500 mt-1">{professores.length} cadastrados</p>
+            <div className="text-2xl font-bold text-on-surface">{ativos}</div>
+            <p className="text-xs text-on-surface-variant mt-1">{professores.length} cadastrados</p>
           </CardContent>
         </Card>
 
         {/* KPI 2 */}
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-surface border-surface-variant">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Total da Folha</CardTitle>
+            <CardTitle className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Total da Folha</CardTitle>
             <DollarSign className="w-4 h-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-zinc-50">{formatCurrency(totalFolha)}</div>
-            <p className="text-xs text-zinc-500 mt-1">Competência {formatCompetencia(comp)}</p>
+            <div className="text-2xl font-bold text-on-surface">{formatCurrency(totalFolha)}</div>
+            <p className="text-xs text-on-surface-variant mt-1">Competência {formatCompetencia(comp)}</p>
           </CardContent>
         </Card>
 
         {/* KPI 3 */}
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-surface border-surface-variant">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Total de Horas</CardTitle>
+            <CardTitle className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Total de Horas</CardTitle>
             <Clock className="w-4 h-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-zinc-50">{totalHoras.toFixed(1)}h</div>
-            <p className="text-xs text-zinc-500 mt-1">Horas estimadas semanais</p>
+            <div className="text-2xl font-bold text-on-surface">{totalHoras.toFixed(1)}h</div>
+            <p className="text-xs text-on-surface-variant mt-1">Horas estimadas semanais</p>
           </CardContent>
         </Card>
 
         {/* KPI 4 */}
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-surface border-surface-variant">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Turmas</CardTitle>
+            <CardTitle className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Turmas</CardTitle>
             <TrendingUp className="w-4 h-4 text-violet-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-zinc-50">{segmentos.length}</div>
-            <p className="text-xs text-zinc-500 mt-1">Níveis cadastrados</p>
+            <div className="text-2xl font-bold text-on-surface">{segmentos.length}</div>
+            <p className="text-xs text-on-surface-variant mt-1">Níveis cadastrados</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gráfico 1 */}
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-surface border-surface-variant">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold text-zinc-200">Custo Mensal por Turma/Segmento</CardTitle>
+            <CardTitle className="text-sm font-semibold text-on-surface">Custo Mensal por Turma/Segmento</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -119,9 +119,9 @@ export default function FolhaDashboard() {
         </Card>
 
         {/* Gráfico 2 */}
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-surface border-surface-variant">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold text-zinc-200">Distribuição Financeira</CardTitle>
+            <CardTitle className="text-sm font-semibold text-on-surface">Distribuição Financeira</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>

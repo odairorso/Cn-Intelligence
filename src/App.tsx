@@ -1428,7 +1428,7 @@ export default function App() {
                       theme === 'navy' ? "text-primary font-medium" : "text-on-surface"
                     )}
                   >
-                    <span>Azul Profundo</span>
+                    <span>Neon Premium (Exemplo)</span>
                     {theme === 'navy' && <Check size={14} />}
                   </button>
                 </div>

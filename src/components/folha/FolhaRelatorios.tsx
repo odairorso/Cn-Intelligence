@@ -275,15 +275,15 @@ export default function FolhaRelatorios() {
       {/* Filtros superiores */}
       <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-zinc-200">Relatórios e Demonstrativos</h3>
-          <p className="text-xs text-zinc-500 mt-0.5">Visualize estatísticas detalhadas e exporte os recibos em PDF/CSV</p>
+          <h3 className="text-sm font-semibold text-on-surface">Relatórios e Demonstrativos</h3>
+          <p className="text-xs text-on-surface-variant mt-0.5">Visualize estatísticas detalhadas e exporte os recibos em PDF/CSV</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Select value={professorId} onValueChange={setProfessorId}>
-            <SelectTrigger className="w-[200px] bg-zinc-900 border-zinc-800 text-zinc-200">
+            <SelectTrigger className="w-[200px] bg-surface border-surface-variant text-on-surface">
               <SelectValue placeholder="Todos os professores" />
             </SelectTrigger>
-            <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-300">
+            <SelectContent className="bg-surface border-surface-variant text-on-surface-variant">
               <SelectItem value={TODOS_PROFESSORES} className="cursor-pointer">Todos os professores</SelectItem>
               {professores.filter((p) => p.ativo).map((p) => (
                 <SelectItem key={p.id} value={p.id} className="cursor-pointer">
@@ -293,62 +293,62 @@ export default function FolhaRelatorios() {
             </SelectContent>
           </Select>
           <Select value={comp} onValueChange={setComp}>
-            <SelectTrigger className="w-[160px] bg-zinc-900 border-zinc-800 text-zinc-200">
+            <SelectTrigger className="w-[160px] bg-surface border-surface-variant text-on-surface">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-300">
+            <SelectContent className="bg-surface border-surface-variant text-on-surface-variant">
               {MESES.map(m => (
                 <SelectItem key={m.value} value={m.value} className="cursor-pointer">{m.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={exportPDF} className="bg-blue-600 hover:bg-blue-700 text-zinc-50 font-semibold">
+          <Button onClick={exportPDF} className="bg-blue-600 hover:bg-blue-700 text-on-surface font-semibold">
             <FileDown className="w-4 h-4 mr-2" />Exportar PDF
           </Button>
-          <Button onClick={exportCSV} variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+          <Button onClick={exportCSV} variant="outline" className="border-surface-variant text-on-surface-variant hover:bg-surface-variant/50">
             <Download className="w-4 h-4 mr-2" />CSV
           </Button>
         </div>
       </div>
 
       {/* Consolidado por Segmento */}
-      <Card className="bg-zinc-900 border-zinc-800">
-        <CardHeader className="border-b border-zinc-800">
-          <CardTitle className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
+      <Card className="bg-surface border-surface-variant">
+        <CardHeader className="border-b border-surface-variant">
+          <CardTitle className="text-sm font-semibold text-on-surface flex items-center gap-2">
             <FileText className="w-4 h-4 text-blue-500" />
             Resumo por Segmento de Ensino
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="border-zinc-800">
-              <TableRow className="border-zinc-800 hover:bg-zinc-900/50">
-                <TableHead className="text-zinc-400">Segmento</TableHead>
-                <TableHead className="text-zinc-400 text-right">Professores</TableHead>
-                <TableHead className="text-zinc-400 text-right">Carga Horária Total</TableHead>
-                <TableHead className="text-zinc-400 text-right text-zinc-300 font-semibold">Valor Acumulado</TableHead>
+            <TableHeader className="border-surface-variant">
+              <TableRow className="border-surface-variant hover:bg-surface/50">
+                <TableHead className="text-on-surface-variant">Segmento</TableHead>
+                <TableHead className="text-on-surface-variant text-right">Professores</TableHead>
+                <TableHead className="text-on-surface-variant text-right">Carga Horária Total</TableHead>
+                <TableHead className="text-on-surface-variant text-right text-on-surface-variant font-semibold">Valor Acumulado</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loadingLancs ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-6 text-zinc-500 animate-pulse">
+                  <TableCell colSpan={4} className="text-center py-6 text-on-surface-variant animate-pulse">
                     Carregando consolidados...
                   </TableCell>
                 </TableRow>
               ) : (
                 <>
                   {segData.map((s) => (
-                    <TableRow key={s.segmento} className="border-zinc-800 hover:bg-zinc-800/40">
+                    <TableRow key={s.segmento} className="border-surface-variant hover:bg-surface-variant/50/40">
                       <TableCell className="font-medium text-zinc-150">{s.segmento}</TableCell>
-                      <TableCell className="text-right text-zinc-400">{s.professores}</TableCell>
-                      <TableCell className="text-right text-zinc-400">{s.totalHoras.toFixed(2)}h</TableCell>
-                      <TableCell className="text-right font-bold text-zinc-100">{formatCurrency(s.totalPagar)}</TableCell>
+                      <TableCell className="text-right text-on-surface-variant">{s.professores}</TableCell>
+                      <TableCell className="text-right text-on-surface-variant">{s.totalHoras.toFixed(2)}h</TableCell>
+                      <TableCell className="text-right font-bold text-on-surface">{formatCurrency(s.totalPagar)}</TableCell>
                     </TableRow>
                   ))}
                   {segData.length > 0 && (
-                    <TableRow className="bg-zinc-900/50 font-bold border-zinc-800">
-                      <TableCell colSpan={3} className="text-right text-zinc-300 uppercase text-xs tracking-wider">Total Acumulado</TableCell>
+                    <TableRow className="bg-surface/50 font-bold border-surface-variant">
+                      <TableCell colSpan={3} className="text-right text-on-surface-variant uppercase text-xs tracking-wider">Total Acumulado</TableCell>
                       <TableCell className="text-right text-blue-400 text-sm font-extrabold">{formatCurrency(totalGeral)}</TableCell>
                     </TableRow>
                   )}
@@ -361,9 +361,9 @@ export default function FolhaRelatorios() {
 
       {/* Gráfico */}
       {segData.length > 0 && (
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-surface border-surface-variant">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold text-zinc-200">Custos por Turma</CardTitle>
+            <CardTitle className="text-sm font-semibold text-on-surface">Custos por Turma</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
@@ -383,28 +383,28 @@ export default function FolhaRelatorios() {
       )}
 
       {/* Detalhado */}
-      <Card className="bg-zinc-900 border-zinc-800">
-        <CardHeader className="border-b border-zinc-800">
-          <CardTitle className="text-sm font-semibold text-zinc-200">Demonstrativo por Lançamento</CardTitle>
+      <Card className="bg-surface border-surface-variant">
+        <CardHeader className="border-b border-surface-variant">
+          <CardTitle className="text-sm font-semibold text-on-surface">Demonstrativo por Lançamento</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="border-zinc-800">
-              <TableRow className="border-zinc-800 hover:bg-zinc-900/50">
-                <TableHead className="text-zinc-400">Professor</TableHead>
-                <TableHead className="text-zinc-400">Turma/Segmento</TableHead>
-                <TableHead className="text-zinc-400 text-right">Hrs Mensais</TableHead>
-                <TableHead className="text-zinc-400 text-right">Repouso</TableHead>
-                <TableHead className="text-zinc-400 text-right">H.A. (Atividade)</TableHead>
-                <TableHead className="text-zinc-400 text-right font-medium">Total Hrs</TableHead>
-                <TableHead className="text-zinc-400 text-right">Ajuda Custo</TableHead>
-                <TableHead className="text-zinc-400 text-right text-zinc-300 font-semibold">Total a Pagar</TableHead>
+            <TableHeader className="border-surface-variant">
+              <TableRow className="border-surface-variant hover:bg-surface/50">
+                <TableHead className="text-on-surface-variant">Professor</TableHead>
+                <TableHead className="text-on-surface-variant">Turma/Segmento</TableHead>
+                <TableHead className="text-on-surface-variant text-right">Hrs Mensais</TableHead>
+                <TableHead className="text-on-surface-variant text-right">Repouso</TableHead>
+                <TableHead className="text-on-surface-variant text-right">H.A. (Atividade)</TableHead>
+                <TableHead className="text-on-surface-variant text-right font-medium">Total Hrs</TableHead>
+                <TableHead className="text-on-surface-variant text-right">Ajuda Custo</TableHead>
+                <TableHead className="text-on-surface-variant text-right text-on-surface-variant font-semibold">Total a Pagar</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loadingLancs ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-6 text-zinc-500 animate-pulse">
+                  <TableCell colSpan={8} className="text-center py-6 text-on-surface-variant animate-pulse">
                     Carregando demonstrativo detalhado...
                   </TableCell>
                 </TableRow>
@@ -422,19 +422,19 @@ export default function FolhaRelatorios() {
                     const totalP = Number(l.total_pagar || l.totalPagar || 0);
 
                     return (
-                      <TableRow key={l.id} className="border-zinc-800 hover:bg-zinc-800/40">
+                      <TableRow key={l.id} className="border-surface-variant hover:bg-surface-variant/50/40">
                         <TableCell className="font-medium text-zinc-150">{prof?.nome || 'Professor não encontrado'}</TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className="bg-zinc-850 border-zinc-700 text-zinc-300 text-[10px] font-normal">
+                          <Badge variant="secondary" className="bg-surface-variant/40 border-surface-variant text-on-surface-variant text-[10px] font-normal">
                             {seg?.nome || 'Turma não encontrada'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right text-zinc-450">{isMon ? '-' : hsMensais.toFixed(2)}h</TableCell>
                         <TableCell className="text-right text-zinc-455">{isMon ? '-' : hsRepouso.toFixed(2)}h</TableCell>
                         <TableCell className="text-right text-zinc-455">{isMon ? '-' : hsAtividade.toFixed(2)}h</TableCell>
-                        <TableCell className="text-right font-medium text-zinc-300">{isMon ? '-' : `${hsTotal.toFixed(2)}h`}</TableCell>
+                        <TableCell className="text-right font-medium text-on-surface-variant">{isMon ? '-' : `${hsTotal.toFixed(2)}h`}</TableCell>
                         <TableCell className="text-right text-zinc-455">{ajudaC > 0 ? formatCurrency(ajudaC) : '-'}</TableCell>
-                        <TableCell className="text-right font-bold text-zinc-100">{formatCurrency(totalP)}</TableCell>
+                        <TableCell className="text-right font-bold text-on-surface">{formatCurrency(totalP)}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -447,38 +447,38 @@ export default function FolhaRelatorios() {
 
       {/* Resumos por Professor */}
       {totaisPorProfessor.length > 0 && (
-        <Card className="bg-zinc-900 border-zinc-800">
-          <CardHeader className="border-b border-zinc-800">
-            <CardTitle className="text-sm font-semibold text-zinc-200">Demonstrativo por Funcionário</CardTitle>
+        <Card className="bg-surface border-surface-variant">
+          <CardHeader className="border-b border-surface-variant">
+            <CardTitle className="text-sm font-semibold text-on-surface">Demonstrativo por Funcionário</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
-              <TableHeader className="border-zinc-800">
-                <TableRow className="border-zinc-800 hover:bg-zinc-900/50">
-                  <TableHead className="text-zinc-400">Professor</TableHead>
-                  <TableHead className="text-zinc-400 text-right">Total de Horas</TableHead>
-                  <TableHead className="text-zinc-400 text-right text-zinc-300 font-semibold">Valor Total a Receber</TableHead>
+              <TableHeader className="border-surface-variant">
+                <TableRow className="border-surface-variant hover:bg-surface/50">
+                  <TableHead className="text-on-surface-variant">Professor</TableHead>
+                  <TableHead className="text-on-surface-variant text-right">Total de Horas</TableHead>
+                  <TableHead className="text-on-surface-variant text-right text-on-surface-variant font-semibold">Valor Total a Receber</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loadingLancs ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-6 text-zinc-500 animate-pulse">
+                    <TableCell colSpan={3} className="text-center py-6 text-on-surface-variant animate-pulse">
                       Carregando totais...
                     </TableCell>
                   </TableRow>
                 ) : (
                   <>
                     {totaisPorProfessor.map((r) => (
-                      <TableRow key={r.nome} className="border-zinc-800 hover:bg-zinc-800/40">
+                      <TableRow key={r.nome} className="border-surface-variant hover:bg-surface-variant/50/40">
                         <TableCell className="font-medium text-zinc-150">{r.nome}</TableCell>
-                        <TableCell className="text-right text-zinc-400">{r.totalHoras.toFixed(2)}h</TableCell>
-                        <TableCell className="text-right font-bold text-zinc-100">{formatCurrency(r.totalPagar)}</TableCell>
+                        <TableCell className="text-right text-on-surface-variant">{r.totalHoras.toFixed(2)}h</TableCell>
+                        <TableCell className="text-right font-bold text-on-surface">{formatCurrency(r.totalPagar)}</TableCell>
                       </TableRow>
                     ))}
-                    <TableRow className="bg-zinc-900/50 font-bold border-zinc-800">
-                      <TableCell className="text-right text-zinc-300 uppercase text-xs tracking-wider">Total Geral</TableCell>
-                      <TableCell className="text-right text-zinc-400">
+                    <TableRow className="bg-surface/50 font-bold border-surface-variant">
+                      <TableCell className="text-right text-on-surface-variant uppercase text-xs tracking-wider">Total Geral</TableCell>
+                      <TableCell className="text-right text-on-surface-variant">
                         {totaisPorProfessor.reduce((s, r) => s + r.totalHoras, 0).toFixed(2)}h
                       </TableCell>
                       <TableCell className="text-right text-blue-400 text-sm font-extrabold">

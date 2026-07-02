@@ -63,12 +63,12 @@ export default function FolhaLancamentos() {
       {/* Cabeçalho de filtro */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-zinc-200">Lançamento de Horas e Turmas</h3>
-          <p className="text-xs text-zinc-500 mt-0.5">Visão tipo planilha das turmas e salários ativos</p>
+          <h3 className="text-sm font-semibold text-on-surface">Lançamento de Horas e Turmas</h3>
+          <p className="text-xs text-on-surface-variant mt-0.5">Visão tipo planilha das turmas e salários ativos</p>
         </div>
         <div className="flex items-center gap-3">
           {isFechado ? (
-            <Badge className="bg-zinc-800 text-zinc-400 border-zinc-700 font-normal">
+            <Badge className="bg-surface-variant/50 text-on-surface-variant border-surface-variant font-normal">
               Folha Fechada
             </Badge>
           ) : (
@@ -77,12 +77,12 @@ export default function FolhaLancamentos() {
             </Badge>
           )}
           <Select value={compFilter} onValueChange={setCompFilter}>
-            <SelectTrigger className="w-[180px] bg-zinc-900 border-zinc-800 text-zinc-200">
+            <SelectTrigger className="w-[180px] bg-surface border-surface-variant text-on-surface">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-zinc-900 border-zinc-800 text-zinc-300">
+            <SelectContent className="bg-surface border-surface-variant text-on-surface-variant">
               {MESES.map(m => (
-                <SelectItem key={m.value} value={m.value} className="hover:bg-zinc-800 cursor-pointer">{m.label}</SelectItem>
+                <SelectItem key={m.value} value={m.value} className="hover:bg-surface-variant/50 cursor-pointer">{m.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -90,27 +90,27 @@ export default function FolhaLancamentos() {
       </div>
 
       {/* Tabela de Planilha */}
-      <Card className="bg-zinc-900 border-zinc-800">
+      <Card className="bg-surface border-surface-variant">
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="border-zinc-800">
-              <TableRow className="border-zinc-800 hover:bg-zinc-900/50">
-                <TableHead className="text-zinc-400">Professor</TableHead>
-                <TableHead className="text-zinc-400">Turma/Segmento</TableHead>
-                <TableHead className="text-zinc-400 text-right">Horas Sem.</TableHead>
-                <TableHead className="text-zinc-400 text-right">Mensal (H×4,5)</TableHead>
-                <TableHead className="text-zinc-400 text-right">Repouso</TableHead>
-                <TableHead className="text-zinc-400 text-right">H.A. (Atividade)</TableHead>
-                <TableHead className="text-zinc-400 text-right font-medium">Total de Horas</TableHead>
-                <TableHead className="text-zinc-400 text-right">Ajuda Custo</TableHead>
-                <TableHead className="text-zinc-400 text-right">Valor Hora</TableHead>
-                <TableHead className="text-zinc-400 text-right text-zinc-300 font-semibold">Total a Pagar</TableHead>
+            <TableHeader className="border-surface-variant">
+              <TableRow className="border-surface-variant hover:bg-surface/50">
+                <TableHead className="text-on-surface-variant">Professor</TableHead>
+                <TableHead className="text-on-surface-variant">Turma/Segmento</TableHead>
+                <TableHead className="text-on-surface-variant text-right">Horas Sem.</TableHead>
+                <TableHead className="text-on-surface-variant text-right">Mensal (H×4,5)</TableHead>
+                <TableHead className="text-on-surface-variant text-right">Repouso</TableHead>
+                <TableHead className="text-on-surface-variant text-right">H.A. (Atividade)</TableHead>
+                <TableHead className="text-on-surface-variant text-right font-medium">Total de Horas</TableHead>
+                <TableHead className="text-on-surface-variant text-right">Ajuda Custo</TableHead>
+                <TableHead className="text-on-surface-variant text-right">Valor Hora</TableHead>
+                <TableHead className="text-on-surface-variant text-right text-on-surface-variant font-semibold">Total a Pagar</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loadingLancs ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-12 text-zinc-500 animate-pulse">
+                  <TableCell colSpan={10} className="text-center py-12 text-on-surface-variant animate-pulse">
                     Carregando lançamentos salvos do servidor...
                   </TableCell>
                 </TableRow>
@@ -137,27 +137,27 @@ export default function FolhaLancamentos() {
                     const totalP = Number(lanc.total_pagar ?? lanc.totalPagar ?? 0);
 
                     return (
-                      <TableRow key={lanc.id} className="border-zinc-800 hover:bg-zinc-800/40">
-                        <TableCell className="font-medium text-zinc-100">{prof?.nome || 'Professor não encontrado'}</TableCell>
+                      <TableRow key={lanc.id} className="border-surface-variant hover:bg-surface-variant/50/40">
+                        <TableCell className="font-medium text-on-surface">{prof?.nome || 'Professor não encontrado'}</TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className="bg-zinc-850 border-zinc-700 text-zinc-300 text-[10px] font-normal">
+                          <Badge variant="secondary" className="bg-surface-variant/40 border-surface-variant text-on-surface-variant text-[10px] font-normal">
                             {seg?.nome || 'Turma não encontrada'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right text-zinc-400">{isMon ? '-' : horasSemanais.toFixed(1)}</TableCell>
-                        <TableCell className="text-right text-zinc-400">{isMon ? '-' : hsMensais.toFixed(1)}</TableCell>
-                        <TableCell className="text-right text-zinc-400">{isMon ? '-' : hsRepouso.toFixed(1)}</TableCell>
-                        <TableCell className="text-right text-zinc-400">{isMon ? '-' : hsAtividade.toFixed(1)}</TableCell>
-                        <TableCell className="text-right font-medium text-zinc-300">{isMon ? '-' : hsTotal.toFixed(1)}</TableCell>
-                        <TableCell className="text-right text-zinc-400">{ajudaC > 0 ? formatCurrency(ajudaC) : '-'}</TableCell>
-                        <TableCell className="text-right text-zinc-400">{isMon ? '-' : formatCurrency(valorHora)}</TableCell>
-                        <TableCell className="text-right font-bold text-zinc-100">{formatCurrency(totalP)}</TableCell>
+                        <TableCell className="text-right text-on-surface-variant">{isMon ? '-' : horasSemanais.toFixed(1)}</TableCell>
+                        <TableCell className="text-right text-on-surface-variant">{isMon ? '-' : hsMensais.toFixed(1)}</TableCell>
+                        <TableCell className="text-right text-on-surface-variant">{isMon ? '-' : hsRepouso.toFixed(1)}</TableCell>
+                        <TableCell className="text-right text-on-surface-variant">{isMon ? '-' : hsAtividade.toFixed(1)}</TableCell>
+                        <TableCell className="text-right font-medium text-on-surface-variant">{isMon ? '-' : hsTotal.toFixed(1)}</TableCell>
+                        <TableCell className="text-right text-on-surface-variant">{ajudaC > 0 ? formatCurrency(ajudaC) : '-'}</TableCell>
+                        <TableCell className="text-right text-on-surface-variant">{isMon ? '-' : formatCurrency(valorHora)}</TableCell>
+                        <TableCell className="text-right font-bold text-on-surface">{formatCurrency(totalP)}</TableCell>
                       </TableRow>
                     );
                   })}
                   {displayLancs.length > 0 && (
-                    <TableRow className="bg-zinc-900/50 font-bold border-zinc-800">
-                      <TableCell colSpan={9} className="text-right text-zinc-300 uppercase text-xs tracking-wider">Total Geral da Folha</TableCell>
+                    <TableRow className="bg-surface/50 font-bold border-surface-variant">
+                      <TableCell colSpan={9} className="text-right text-on-surface-variant uppercase text-xs tracking-wider">Total Geral da Folha</TableCell>
                       <TableCell className="text-right text-blue-400 text-sm font-extrabold">{formatCurrency(totalGeral)}</TableCell>
                     </TableRow>
                   )}
@@ -166,7 +166,7 @@ export default function FolhaLancamentos() {
             </TableBody>
           </Table>
           {!loadingLancs && displayLancs.length === 0 && (
-            <div className="text-center py-12 text-zinc-500 text-sm">
+            <div className="text-center py-12 text-on-surface-variant text-sm">
               Nenhum lançamento ativo nesta competência.
             </div>
           )}

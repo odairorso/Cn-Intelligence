@@ -159,7 +159,7 @@ export default function FolhaProfessores() {
     });
 
     if (valid.length === 0) {
-      return <div className="text-zinc-500 text-xs py-2">Selecione ao menos 1 turma com horas para ver a simulação.</div>;
+      return <div className="text-on-surface-variant text-xs py-2">Selecione ao menos 1 turma com horas para ver a simulação.</div>;
     }
 
     let salario = 0;
@@ -194,12 +194,12 @@ export default function FolhaProfessores() {
     });
 
     return (
-      <div className="bg-zinc-950 border border-zinc-800 rounded p-3 text-xs space-y-1.5 text-zinc-300 mt-2 font-mono">
-        <div className="font-bold text-zinc-400 uppercase tracking-wider text-[10px]">Simulação Salarial</div>
+      <div className="bg-background border border-surface-variant rounded p-3 text-xs space-y-1.5 text-on-surface-variant mt-2 font-mono">
+        <div className="font-bold text-on-surface-variant uppercase tracking-wider text-[10px]">Simulação Salarial</div>
         {items.map((it, idx) => (
           <div key={idx}>{it}</div>
         ))}
-        <div className="border-t border-zinc-800 pt-1.5 font-bold text-zinc-50 flex justify-between">
+        <div className="border-t border-surface-variant pt-1.5 font-bold text-on-surface flex justify-between">
           <span>TOTAL ESTIMADO:</span>
           <span>{formatCurrency(salario)}</span>
         </div>
@@ -212,39 +212,39 @@ export default function FolhaProfessores() {
       {/* Barra de Pesquisa e Novo */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-on-surface-variant" />
           <Input
             placeholder="Pesquisar professor..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+            className="pl-9 bg-surface border-surface-variant text-on-surface placeholder:text-on-surface-variant"
           />
         </div>
-        <Button onClick={() => setDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-zinc-50">
+        <Button onClick={() => setDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-on-surface">
           <Plus className="w-4 h-4 mr-2" />Novo Professor
         </Button>
       </div>
 
       {/* Tabela */}
-      <Card className="bg-zinc-900 border-zinc-800">
+      <Card className="bg-surface border-surface-variant">
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="border-zinc-800">
-              <TableRow className="border-zinc-800 hover:bg-zinc-900/50">
-                <TableHead className="text-zinc-400">Professor</TableHead>
-                <TableHead className="text-zinc-400">CPF</TableHead>
-                <TableHead className="text-zinc-400">Admissão</TableHead>
-                <TableHead className="text-zinc-400">Turmas / Horas</TableHead>
-                <TableHead className="text-zinc-400 text-right">Status</TableHead>
-                <TableHead className="text-zinc-400 text-right w-[80px]">Ações</TableHead>
+            <TableHeader className="border-surface-variant">
+              <TableRow className="border-surface-variant hover:bg-surface/50">
+                <TableHead className="text-on-surface-variant">Professor</TableHead>
+                <TableHead className="text-on-surface-variant">CPF</TableHead>
+                <TableHead className="text-on-surface-variant">Admissão</TableHead>
+                <TableHead className="text-on-surface-variant">Turmas / Horas</TableHead>
+                <TableHead className="text-on-surface-variant text-right">Status</TableHead>
+                <TableHead className="text-on-surface-variant text-right w-[80px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((prof) => (
-                <TableRow key={prof.id} className="border-zinc-800 hover:bg-zinc-800/40">
-                  <TableCell className="font-semibold text-zinc-100">{prof.nome}</TableCell>
-                  <TableCell className="text-zinc-400">{prof.cpf}</TableCell>
-                  <TableCell className="text-zinc-400">{formatDateBR(prof.dataAdmissao)}</TableCell>
+                <TableRow key={prof.id} className="border-surface-variant hover:bg-surface-variant/50/40">
+                  <TableCell className="font-semibold text-on-surface">{prof.nome}</TableCell>
+                  <TableCell className="text-on-surface-variant">{prof.cpf}</TableCell>
+                  <TableCell className="text-on-surface-variant">{formatDateBR(prof.dataAdmissao)}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1.5">
                       {prof.segmentoIds.map((sid) => {
@@ -252,7 +252,7 @@ export default function FolhaProfessores() {
                         const hs = prof.segmentoHoras?.[sid] || 0;
                         const isMon = seg && isMonitora(seg.nome);
                         return (
-                          <Badge key={sid} variant="secondary" className="bg-zinc-850 border-zinc-700 text-zinc-300 text-[10px] py-0 px-2 font-normal">
+                          <Badge key={sid} variant="secondary" className="bg-surface-variant/40 border-surface-variant text-on-surface-variant text-[10px] py-0 px-2 font-normal">
                             {seg?.nome || '?'} {isMon ? '' : `(${hs}h)`}
                           </Badge>
                         );
@@ -260,22 +260,22 @@ export default function FolhaProfessores() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Badge variant={prof.ativo ? 'default' : 'secondary'} className={prof.ativo ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/10' : 'bg-zinc-800 text-zinc-400'}>
+                    <Badge variant={prof.ativo ? 'default' : 'secondary'} className={prof.ativo ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/10' : 'bg-surface-variant/50 text-on-surface-variant'}>
                       {prof.ativo ? 'Ativo' : 'Inativo'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800">
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800 text-zinc-300">
-                        <DropdownMenuItem onClick={() => openEdit(prof)} className="hover:bg-zinc-800 cursor-pointer">
+                      <DropdownMenuContent align="end" className="bg-surface border-surface-variant text-on-surface-variant">
+                        <DropdownMenuItem onClick={() => openEdit(prof)} className="hover:bg-surface-variant/50 cursor-pointer">
                           <Pencil className="w-4 h-4 mr-2" />Editar
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggleAtivo(prof)} className="hover:bg-zinc-800 cursor-pointer">
+                        <DropdownMenuItem onClick={() => handleToggleAtivo(prof)} className="hover:bg-surface-variant/50 cursor-pointer">
                           {prof.ativo ? (
                             <>
                               <UserX className="w-4 h-4 mr-2 text-amber-500" />Desativar
@@ -286,7 +286,7 @@ export default function FolhaProfessores() {
                             </>
                           )}
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDelete(prof.id)} className="hover:bg-zinc-800 text-red-400 cursor-pointer">
+                        <DropdownMenuItem onClick={() => handleDelete(prof.id)} className="hover:bg-surface-variant/50 text-red-400 cursor-pointer">
                           <Trash2 className="w-4 h-4 mr-2" />Excluir
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -296,7 +296,7 @@ export default function FolhaProfessores() {
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-zinc-500">
+                  <TableCell colSpan={6} className="text-center py-12 text-on-surface-variant">
                     Nenhum professor encontrado.
                   </TableCell>
                 </TableRow>
@@ -308,34 +308,34 @@ export default function FolhaProfessores() {
 
       {/* Modal de Cadastro */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="bg-surface border-surface-variant text-on-surface max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Cadastrar Professor</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="nome" className="text-zinc-300 text-xs">Nome Completo</Label>
-                <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} className="bg-zinc-950 border-zinc-800 text-zinc-100" />
+                <Label htmlFor="nome" className="text-on-surface-variant text-xs">Nome Completo</Label>
+                <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cpf" className="text-zinc-300 text-xs">CPF</Label>
-                <Input id="cpf" placeholder="000.000.000-00" value={cpf} onChange={(e) => setCpf(e.target.value)} className="bg-zinc-950 border-zinc-800 text-zinc-100" />
+                <Label htmlFor="cpf" className="text-on-surface-variant text-xs">CPF</Label>
+                <Input id="cpf" placeholder="000.000.000-00" value={cpf} onChange={(e) => setCpf(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dataAdmissao" className="text-zinc-300 text-xs">Data de Admissão</Label>
-              <Input id="dataAdmissao" type="date" value={dataAdmissao} onChange={(e) => setDataAdmissao(e.target.value)} className="bg-zinc-950 border-zinc-800 text-zinc-100" />
+              <Label htmlFor="dataAdmissao" className="text-on-surface-variant text-xs">Data de Admissão</Label>
+              <Input id="dataAdmissao" type="date" value={dataAdmissao} onChange={(e) => setDataAdmissao(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
             </div>
 
-            <div className="border-t border-zinc-800 pt-4">
-              <Label className="text-zinc-300 font-semibold text-xs block mb-3">Horas Semanais por Turma</Label>
+            <div className="border-t border-surface-variant pt-4">
+              <Label className="text-on-surface-variant font-semibold text-xs block mb-3">Horas Semanais por Turma</Label>
               <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 max-h-[200px] overflow-y-auto pr-1">
                 {slots.map((slot, index) => {
                   const seg = segmentos.find((s) => s.id === slot.segId);
                   return (
                     <div key={index} className="flex items-center justify-between gap-3">
-                      <span className="text-xs text-zinc-400 font-medium truncate flex-1">{seg?.nome}</span>
+                      <span className="text-xs text-on-surface-variant font-medium truncate flex-1">{seg?.nome}</span>
                       <Input
                         type="text"
                         placeholder="0"
@@ -344,7 +344,7 @@ export default function FolhaProfessores() {
                           const val = e.target.value;
                           setSlots(slots.map((s, idx) => (idx === index ? { ...s, horas: val } : s)));
                         }}
-                        className="w-20 text-right bg-zinc-950 border-zinc-800 text-zinc-100 h-8"
+                        className="w-20 text-right bg-background border-surface-variant text-on-surface h-8"
                       />
                     </div>
                   );
@@ -354,11 +354,11 @@ export default function FolhaProfessores() {
 
             {renderPreview(slots)}
           </div>
-          <DialogFooter className="border-t border-zinc-800 pt-4 mt-2">
-            <Button variant="ghost" onClick={() => setDialogOpen(false)} className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800">
+          <DialogFooter className="border-t border-surface-variant pt-4 mt-2">
+            <Button variant="ghost" onClick={() => setDialogOpen(false)} className="text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50">
               Cancelar
             </Button>
-            <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700 text-zinc-50">
+            <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700 text-on-surface">
               Cadastrar
             </Button>
           </DialogFooter>
@@ -367,34 +367,34 @@ export default function FolhaProfessores() {
 
       {/* Modal de Edição */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="bg-surface border-surface-variant text-on-surface max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Professor</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="editNome" className="text-zinc-300 text-xs">Nome Completo</Label>
-                <Input id="editNome" value={editNome} onChange={(e) => setEditNome(e.target.value)} className="bg-zinc-950 border-zinc-800 text-zinc-100" />
+                <Label htmlFor="editNome" className="text-on-surface-variant text-xs">Nome Completo</Label>
+                <Input id="editNome" value={editNome} onChange={(e) => setEditNome(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="editCpf" className="text-zinc-300 text-xs">CPF</Label>
-                <Input id="editCpf" value={editCpf} onChange={(e) => setEditCpf(e.target.value)} className="bg-zinc-950 border-zinc-800 text-zinc-100" />
+                <Label htmlFor="editCpf" className="text-on-surface-variant text-xs">CPF</Label>
+                <Input id="editCpf" value={editCpf} onChange={(e) => setEditCpf(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editDataAdmissao" className="text-zinc-300 text-xs">Data de Admissão</Label>
-              <Input id="editDataAdmissao" type="date" value={editDataAdmissao} onChange={(e) => setEditDataAdmissao(e.target.value)} className="bg-zinc-950 border-zinc-800 text-zinc-100" />
+              <Label htmlFor="editDataAdmissao" className="text-on-surface-variant text-xs">Data de Admissão</Label>
+              <Input id="editDataAdmissao" type="date" value={editDataAdmissao} onChange={(e) => setEditDataAdmissao(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
             </div>
 
-            <div className="border-t border-zinc-800 pt-4">
-              <Label className="text-zinc-300 font-semibold text-xs block mb-3">Horas Semanais por Turma</Label>
+            <div className="border-t border-surface-variant pt-4">
+              <Label className="text-on-surface-variant font-semibold text-xs block mb-3">Horas Semanais por Turma</Label>
               <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 max-h-[200px] overflow-y-auto pr-1">
                 {editSlots.map((slot, index) => {
                   const seg = segmentos.find((s) => s.id === slot.segId);
                   return (
                     <div key={index} className="flex items-center justify-between gap-3">
-                      <span className="text-xs text-zinc-400 font-medium truncate flex-1">{seg?.nome}</span>
+                      <span className="text-xs text-on-surface-variant font-medium truncate flex-1">{seg?.nome}</span>
                       <Input
                         type="text"
                         placeholder="0"
@@ -403,7 +403,7 @@ export default function FolhaProfessores() {
                           const val = e.target.value;
                           setEditSlots(editSlots.map((s, idx) => (idx === index ? { ...s, horas: val } : s)));
                         }}
-                        className="w-20 text-right bg-zinc-950 border-zinc-800 text-zinc-100 h-8"
+                        className="w-20 text-right bg-background border-surface-variant text-on-surface h-8"
                       />
                     </div>
                   );
@@ -413,11 +413,11 @@ export default function FolhaProfessores() {
 
             {renderPreview(editSlots)}
           </div>
-          <DialogFooter className="border-t border-zinc-800 pt-4 mt-2">
-            <Button variant="ghost" onClick={() => setEditOpen(false)} className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800">
+          <DialogFooter className="border-t border-surface-variant pt-4 mt-2">
+            <Button variant="ghost" onClick={() => setEditOpen(false)} className="text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50">
               Cancelar
             </Button>
-            <Button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-700 text-zinc-50">
+            <Button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-700 text-on-surface">
               Salvar Alterações
             </Button>
           </DialogFooter>

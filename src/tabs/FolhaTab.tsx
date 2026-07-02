@@ -26,7 +26,7 @@ export default function FolhaTab() {
     <FolhaProvider>
       <div className="space-y-6">
         {/* Sub-navegação */}
-        <div className="flex border-b border-zinc-800 gap-4 overflow-x-auto pb-px">
+        <div className="flex border-b border-surface-variant gap-4 overflow-x-auto pb-px">
           {subTabs.map((t) => (
             <button
               key={t.id}
@@ -35,7 +35,7 @@ export default function FolhaTab() {
                 "transition-all duration-200 font-medium text-xs md:text-sm pb-2.5 px-1 border-b-2 cursor-pointer whitespace-nowrap",
                 activeSubTab === t.id
                   ? "text-blue-500 border-blue-500 font-bold"
-                  : "text-zinc-500 border-transparent hover:text-zinc-350"
+                  : "text-on-surface-variant border-transparent hover:text-on-surface"
               )}
             >
               {t.label}

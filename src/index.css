@@ -53,20 +53,45 @@ html.theme-light {
   --color-success: #16a34a;       /* Emerald 600 */
 }
 
-/* Tema Azul Original (Exemplo Deep Blue) */
+/* Tema Azul Original (Exemplo Deep Blue + Neon Glow) */
 html.theme-navy {
-  --color-background: #0b132b;    /* Deep navy */
-  --color-surface: #1c2541;       /* Dark slate blue card */
-  --color-surface-variant: #3a506b; /* Slate blue borders */
+  --color-background: #060913;    /* Super deep neon dark blue */
+  --color-surface: #0f1326;       /* Card background */
+  --color-surface-variant: rgba(255, 255, 255, 0.08); /* Semi-transparent border */
   
-  --color-on-surface: #f4f4f5;    /* zinc-50 */
-  --color-on-surface-variant: #8da9c4; /* Soft slate blue text */
+  --color-on-surface: #f4f4f5;    
+  --color-on-surface-variant: #8fa0ca; 
   
-  --color-primary: #3b82f6;       /* Blue 500 */
-  --color-primary-dark: #1d4ed8;  /* Blue 700 */
-  --color-secondary: #f59e0b;     /* Amber 500 */
-  --color-tertiary: #ef4444;      /* Red 500 */
-  --color-success: #10b981;       /* Emerald 500 */
+  --color-primary: #06b6d4;       /* Cyan active accent */
+  --color-primary-dark: #0891b2;  
+  --color-secondary: #d946ef;     /* Fuchsia/Pink secondary */
+  --color-tertiary: #ef4444;      
+  --color-success: #10b981;       
+}
+
+/* Background Glowing blobs for Neon Theme */
+html.theme-navy body::before {
+  content: "";
+  position: fixed;
+  top: -10%;
+  left: 20%;
+  width: 50vw;
+  height: 50vh;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, rgba(0, 0, 0, 0) 70%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+html.theme-navy body::after {
+  content: "";
+  position: fixed;
+  bottom: 0%;
+  right: 10%;
+  width: 40vw;
+  height: 40vh;
+  background: radial-gradient(circle, rgba(217, 70, 239, 0.1) 0%, rgba(0, 0, 0, 0) 70%);
+  z-index: -1;
+  pointer-events: none;
 }
 
 @layer base {
@@ -80,6 +105,22 @@ html.theme-navy {
   @apply bg-surface border border-surface-variant rounded-xl;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
   transition: all 0.2s ease-in-out;
+}
+
+html.theme-navy .glass-card,
+html.theme-navy .card,
+html.theme-navy [role="dialog"] {
+  background: linear-gradient(#0f1326, #0f1326) padding-box,
+              linear-gradient(135deg, #06b6d4, #d946ef) border-box !important;
+  border: 1.5px solid transparent !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px 0 rgba(6, 182, 212, 0.08),
+              0 8px 32px 0 rgba(217, 70, 239, 0.08) !important;
+  backdrop-filter: blur(16px);
+}
+
+html.theme-navy tr:hover {
+  background: linear-gradient(90deg, rgba(6, 182, 212, 0.04) 0%, rgba(217, 70, 239, 0.03) 100%) !important;
 }
 
 .glass-card:hover {
