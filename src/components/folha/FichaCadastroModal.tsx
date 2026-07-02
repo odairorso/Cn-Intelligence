@@ -321,12 +321,11 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
             width: 100%;
             max-width: 800px;
             margin: 0 auto;
-            page-break-after: always;
-            position: relative;
+            background: white;
+            padding: 10px 0;
+            font-size: 11px;
+            color: #000;
             box-sizing: border-box;
-          }
-          .page:last-child {
-            page-break-after: avoid;
           }
           .header-table {
             width: 100%;
@@ -365,6 +364,7 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 10px;
+            page-break-inside: avoid;
           }
           .form-table td {
             border: 1px solid #ccc;
@@ -437,21 +437,30 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
           .bullet-list li {
             margin-bottom: 3px;
           }
+          @page {
+            size: A4 portrait;
+            margin: 8mm;
+          }
           @media print {
             body {
               padding: 0;
+              margin: 0;
             }
             .page {
               padding: 0;
               margin: 0;
-              min-height: 98vh;
+            }
+            .break-before {
+              page-break-before: always;
+              margin-top: 20px;
+            }
+            table, tr, td, .section-title, .signature-row {
+              page-break-inside: avoid;
             }
           }
         </style>
       </head>
       <body>
-
-        <!-- PÁGINA 1 -->
         <div class="page">
           <table class="header-table">
             <tr>
@@ -722,11 +731,6 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
             <span class="checkbox-label"><span class="checkbox-box">${checked(escolaridade, 'Doutorado')}</span> Doutorado</span>
           </div>
 
-          <div class="page-num">página 1/3</div>
-        </div>
-
-        <!-- PÁGINA 2 -->
-        <div class="page">
           <div class="section-title">4 - Informações Bancárias (caso a empresa pague por remessa bancária) <span style="float:right; font-size:8px; color:#888;">LGPD: 9</span></div>
           <table class="form-table">
             <tr>
@@ -943,17 +947,9 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
             </tr>
           </table>
 
-          <div class="signature-row" style="margin-top: 40px;">
-            <div class="signature-box">CIENTE: Empregado</div>
-            <div class="signature-box">COLÉGIO NAVIRAÍ</div>
           </div>
 
-          <div class="page-num">página 2/3</div>
-        </div>
-
-        <!-- PÁGINA 3 -->
-        <div class="page">
-          <div class="section-title">8 - Docs para Admissão (ENTREGAR COM ANTECEDÊNCIA DE 3 DIAS ÚTEIS DA DATA DE ADMISSÃO)</div>
+          <div class="section-title break-before">8 - Docs para Admissão (ENTREGAR COM ANTECEDÊNCIA DE 3 DIAS ÚTEIS DA DATA DE ADMISSÃO)</div>
           <ul class="bullet-list" style="font-size: 11px; line-height: 1.5;">
             <li><strong>CÓPIA CPF;</strong></li>
             <li><strong>CÓPIA CARTEIRA DE HABILITAÇÃO (Somente para motoristas);</strong></li>
@@ -1013,9 +1009,6 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
               </td>
             </tr>
           </table>
-
-          <div class="page-num">página 3/3</div>
-        </div>
 
       </body>
       <script>
