@@ -50,7 +50,7 @@ export default function FolhaProfessores() {
     return professores.filter((p) => p.nome.toLowerCase().includes(search.toLowerCase()));
   }, [professores, search]);
 
-  const handleCreate = async () => {
+  const handleCreate = async (openFicha = false) => {
     const validSlots = slots.filter((s) => {
       if (!s.segId) return false;
       return toNumberBR(s.horas) > 0;
@@ -77,7 +77,7 @@ export default function FolhaProfessores() {
       }
     });
 
-    await addProfessor({
+    const prof = await addProfessor({
       nome: nome.trim(),
       cpf: cpf.trim() || 'NÃO INFORMADO',
       dataAdmissao,
@@ -89,6 +89,11 @@ export default function FolhaProfessores() {
     setNome('');
     setCpf('');
     setDialogOpen(false);
+
+    if (openFicha && prof) {
+      setSelectedProfForFicha(prof as Professor);
+      setFichaOpen(true);
+    }
   };
 
   const openEdit = (p: Professor) => {
@@ -365,9 +370,15 @@ export default function FolhaProfessores() {
             <Button variant="ghost" onClick={() => setDialogOpen(false)} className="text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50">
               Cancelar
             </Button>
-            <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700 text-on-surface">
-              Cadastrar
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => handleCreate(false)} variant="outline" className="border-surface-variant text-on-surface hover:bg-surface-variant/50">
+                Apenas Cadastrar
+              </Button>
+              <Button onClick={() => handleCreate(true)} className="bg-blue-600 hover:bg-blue-700 text-on-surface">
+                <FileText className="w-4 h-4 mr-2" />
+                Cadastrar e Preencher Ficha Completa
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

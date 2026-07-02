@@ -115,9 +115,10 @@ export const FolhaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ativo: p.ativo,
       };
 
-      await api.createFolhaProfessor(body);
+      const data = await api.createFolhaProfessor(body);
       toast.success('Professor cadastrado com sucesso!');
       await refreshData();
+      return data;
     } catch (e: any) {
       console.error(e);
       toast.error('Erro ao cadastrar professor.');
