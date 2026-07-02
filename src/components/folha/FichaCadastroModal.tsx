@@ -16,7 +16,7 @@ interface FichaCadastroModalProps {
 }
 
 export default function FichaCadastroModal({ professor, open, onOpenChange }: FichaCadastroModalProps) {
-  const { refreshData } = useFolha();
+  const { segmentos, refreshData } = useFolha();
   const [activeTab, setActiveTab] = useState('pessoais');
   const [saving, setSaving] = useState(false);
 
