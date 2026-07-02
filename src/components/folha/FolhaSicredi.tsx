@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useFolha } from '../../contexts/FolhaContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -346,24 +347,28 @@ export default function FolhaSicredi() {
           }
         }
         @media print {
+          #root {
+            display: none !important;
+          }
           @page {
             size: A4 landscape;
             margin: 0;
           }
-          body * {
-            visibility: hidden;
-          }
-          .sicredi-print-area, .sicredi-print-area * {
-            visibility: visible;
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+            height: 100% !important;
+            overflow: hidden !important;
           }
           .sicredi-print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 297mm;
-            height: 210mm;
-            padding: 8mm 12mm;
-            box-sizing: border-box;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 297mm !important;
+            height: 210mm !important;
+            padding: 10mm 15mm !important;
+            box-sizing: border-box !important;
             display: block !important;
             font-family: Arial, sans-serif;
             color: #000;
@@ -448,120 +453,125 @@ export default function FolhaSicredi() {
             margin-top: 12px;
             display: flex;
             justify-content: space-between;
+            align-items: center;
             font-size: 6.5px;
-            color: #444;
+            color: #000;
             border-top: 1.5px solid #000;
             padding-top: 3px;
           }
         }
       `}</style>
 
-      <div className="sicredi-print-area">
-        {/* Cabeçalho idêntico */}
-        <div className="sicredi-header">
-          Relação de Beneficiários
-        </div>
-        <div className="sicredi-subheader">
-          Nos termos do que dispõe a legislação aplicável, segue a relação dos beneficiários que deverão dispor de conta de contas não movimentáveis por cheques destinadas ao registro e controle do fluxo de recursos.
-        </div>
+      {createPortal(
+        <div className="sicredi-print-area">
+          {/* Cabeçalho idêntico */}
+          <div className="sicredi-header">
+            Relação de Beneficiários
+          </div>
+          <div className="sicredi-subheader">
+            Nos termos do que dispõe a legislação aplicável, segue a relação dos beneficiários que deverão dispor de conta de contas não movimentáveis por cheques destinadas ao registro e controle do fluxo de recursos.
+          </div>
 
-        {/* Informações da Empresa */}
-        <div className="sicredi-meta-row">
-          <div className="sicredi-meta-label">Nome da Empresa:</div>
-          <div className="sicredi-meta-value">COLÉGIO NAVIRAÍ</div>
-        </div>
+          {/* Informações da Empresa */}
+          <div className="sicredi-meta-row">
+            <div className="sicredi-meta-label">Nome da Empresa:</div>
+            <div className="sicredi-meta-value">COLÉGIO NAVIRAÍ</div>
+          </div>
 
-        {/* Tabela Oficial Sicredi */}
-        <table className="sicredi-table">
-          <thead>
-            <tr>
-              <th style={{ width: '18%' }}>Nome Colaborador</th>
-              <th style={{ width: '8%' }}>NASCIMENTO</th>
-              <th style={{ width: '10%' }}>CPF</th>
-              <th style={{ width: '10%' }}>RG</th>
-              <th style={{ width: '8%' }}>ÓRGÃO EMISSOR / UF</th>
-              <th style={{ width: '8%' }}>DATA EMISSÃO</th>
-              <th style={{ width: '8%' }}>SALÁRIO</th>
-              <th style={{ width: '16%' }}>ENDEREÇO</th>
-              <th style={{ width: '8%' }}>BAIRRO</th>
-              <th style={{ width: '10%' }}>CIDADE/UF</th>
-              <th style={{ width: '7%' }}>CEP</th>
-              <th style={{ width: '6%' }}>Optante de TEC*</th>
-            </tr>
-          </thead>
-          <tbody>
-            {colaboradoresAtivos.filter(c => selectedIds.includes(c.id)).map((c) => {
-              const rowValues = localValues[c.id] || {};
-              const f = c.fichaCadastro || {};
-              const opta = f.optanteTec === 'Sim' ? 'Sim' : '';
-              
-              // Endereço formatado para impressão
-              const endImprimir = rowValues.endereco ? `${rowValues.endereco?.toUpperCase()}, ${rowValues.numero}` : '';
-              const cidadeImprimir = rowValues.municipio ? `${rowValues.municipio?.toUpperCase()}-${rowValues.estado || 'MS'}` : '';
-
-              const salarioFinal = parseFloat(rowValues.salario) || 0;
-
-              return (
-                <tr key={c.id}>
-                  <td style={{ fontWeight: 'bold' }}>{c.nome?.toUpperCase()}</td>
-                  <td style={{ textAlign: 'center' }}>{rowValues.dataNascimento ? formatDateBR(rowValues.dataNascimento) : ''}</td>
-                  <td style={{ textAlign: 'center' }}>{c.cpf}</td>
-                  <td style={{ textAlign: 'center' }}>{rowValues.rg || ''}</td>
-                  <td style={{ textAlign: 'center' }}>{rowValues.estadoEmissor?.toUpperCase() || ''}</td>
-                  <td style={{ textAlign: 'center' }}>{rowValues.dataEmissaoRg ? formatDateBR(rowValues.dataEmissaoRg) : ''}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
-                    {salarioFinal > 0 ? formatCurrency(salarioFinal) : ''}
-                  </td>
-                  <td>{endImprimir}</td>
-                  <td>{rowValues.bairro?.toUpperCase() || ''}</td>
-                  <td>{cidadeImprimir}</td>
-                  <td style={{ textAlign: 'center' }}>{rowValues.cep || ''}</td>
-                  <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{opta}</td>
-                </tr>
-              );
-            })}
-            {/* Linhas vazias para preenchimento se houver espaço/estilo */}
-            {Array.from({ length: Math.max(0, 10 - colaboradoresAtivos.filter(c => selectedIds.includes(c.id)).length) }).map((_, idx) => (
-              <tr key={`empty-${idx}`}>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
+          {/* Tabela Oficial Sicredi */}
+          <table className="sicredi-table">
+            <thead>
+              <tr>
+                <th style={{ width: '18%' }}>Nome Colaborador</th>
+                <th style={{ width: '8%' }}>NASCIMENTO</th>
+                <th style={{ width: '10%' }}>CPF</th>
+                <th style={{ width: '10%' }}>RG</th>
+                <th style={{ width: '8%' }}>ÓRGÃO EMISSOR / UF</th>
+                <th style={{ width: '8%' }}>DATA EMISSÃO</th>
+                <th style={{ width: '8%' }}>SALÁRIO</th>
+                <th style={{ width: '16%' }}>ENDEREÇO</th>
+                <th style={{ width: '8%' }}>BAIRRO</th>
+                <th style={{ width: '10%' }}>CIDADE/UF</th>
+                <th style={{ width: '7%' }}>CEP</th>
+                <th style={{ width: '6%' }}>Optante de TEC*</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {colaboradoresAtivos.filter(c => selectedIds.includes(c.id)).map((c) => {
+                const rowValues = localValues[c.id] || {};
+                const f = c.fichaCadastro || {};
+                const opta = f.optanteTec === 'Sim' ? 'Sim' : '';
+                
+                // Endereço formatado para impressão
+                const endImprimir = rowValues.endereco ? `${rowValues.endereco?.toUpperCase()}, ${rowValues.numero}` : '';
+                const cidadeImprimir = rowValues.municipio ? `${rowValues.municipio?.toUpperCase()}-${rowValues.estado || 'MS'}` : '';
 
-        {/* Nota Legal do Sicredi */}
-        <div className="sicredi-footer-note">
-          *TEC - Transferência Especial de Crédito: mecanismo que permitirá às empresas depositarem os salários nas contas correntes escolhidas por seus funcionários. A TEC poderá ser empregada em situações em que se tenha um pagador para diversos beneficiários, que podem ser correntistas de diferentes bancos, conforme esclarece a determinação do Banco Central. ( Necessário assinatura no TERMO DE AUTORIZAÇÃO PARA TRANSFERÊNCIA DE RECURSOS)
-        </div>
+                const salarioFinal = parseFloat(rowValues.salario) || 0;
 
-        {/* Rodapé da Empresa */}
-        <div style={{ marginTop: '15px', padding: '5px', fontSize: '9px' }}>
-          <strong>Empresa:</strong> COLÉGIO NAVIRAÍ <br />
-          <strong>CNPJ:</strong> 24.227.497/0001-43
-        </div>
+                return (
+                  <tr key={c.id}>
+                    <td style={{ fontWeight: 'bold' }}>{c.nome?.toUpperCase()}</td>
+                    <td style={{ textAlign: 'center' }}>{rowValues.dataNascimento ? formatDateBR(rowValues.dataNascimento) : ''}</td>
+                    <td style={{ textAlign: 'center' }}>{c.cpf}</td>
+                    <td style={{ textAlign: 'center' }}>{rowValues.rg || ''}</td>
+                    <td style={{ textAlign: 'center' }}>{rowValues.estadoEmissor?.toUpperCase() || ''}</td>
+                    <td style={{ textAlign: 'center' }}>{rowValues.dataEmissaoRg ? formatDateBR(rowValues.dataEmissaoRg) : ''}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
+                      {salarioFinal > 0 ? formatCurrency(salarioFinal) : ''}
+                    </td>
+                    <td>{endImprimir}</td>
+                    <td>{rowValues.bairro?.toUpperCase() || ''}</td>
+                    <td>{cidadeImprimir}</td>
+                    <td style={{ textAlign: 'center' }}>{rowValues.cep || ''}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{opta}</td>
+                  </tr>
+                );
+              })}
+              {/* Linhas vazias para preenchimento se houver espaço/estilo */}
+              {Array.from({ length: Math.max(0, 10 - colaboradoresAtivos.filter(c => selectedIds.includes(c.id)).length) }).map((_, idx) => (
+                <tr key={`empty-${idx}`}>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                  <td>&nbsp;</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-        {/* Assinatura eletrônica / ZapSign style */}
-        <div className="sicredi-signature-box">
-          Documento assinado eletronicamente por ELAINE CRISTINA CAMACHO CAVALCANTE
-        </div>
+          {/* Nota Legal do Sicredi */}
+          <div className="sicredi-footer-note">
+            *TEC - Transferência Especial de Crédito: mecanismo que permitirá às empresas depositarem os salários nas contas correntes escolhidas por seus funcionários. A TEC poderá ser empregada em situações em que se tenha um pagador para diversos beneficiários, que podem ser correntistas de diferentes bancos, conforme esclarece a determinação do Banco Central. ( Necessário assinatura no TERMO DE AUTORIZAÇÃO PARA TRANSFERÊNCIA DE RECURSOS)
+          </div>
 
-        {/* Metadados de Rodapé do Documento */}
-        <div className="sicredi-footer-meta">
-          <span>RQ-004.04 (12/14) Classificação da Informação: Uso Irrestrito</span>
-          <span>ZapSign - Documento assinado eletronicamente, conforme MP 2.200-2/2001 e Lei 14.063/2020.</span>
-        </div>
-      </div>
+          {/* Rodapé da Empresa */}
+          <div style={{ marginTop: '10px', padding: '5px', fontSize: '8px', lineHeight: '1.3' }}>
+            <strong>Empresa:</strong> COLÉGIO NAVIRAÍ <br />
+            <strong>CNPJ:</strong> 24.227.497/0001-43
+          </div>
+
+          {/* Assinatura eletrônica / ZapSign style */}
+          <div className="sicredi-signature-box">
+            Documento assinado eletronicamente por ELAINE CRISTINA CAMACHO CAVALCANTE
+          </div>
+
+          {/* Metadados de Rodapé do Documento */}
+          <div className="sicredi-footer-meta">
+            <span style={{ flex: '1', textAlign: 'left' }}>RQ-004.04 (12/14)</span>
+            <span style={{ flex: '1', textAlign: 'center' }}>Classificação da Informação: <strong>Uso Irrestrito</strong></span>
+            <span style={{ flex: '1.5', textAlign: 'right' }}>ZapSign - Documento assinado eletronicamente, conforme MP 2.200-2/2001 e Lei 14.063/2020.</span>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
