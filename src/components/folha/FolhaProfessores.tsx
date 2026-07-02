@@ -8,10 +8,11 @@ import { Label } from '../ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Badge } from '../ui/badge';
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, UserX, UserCheck } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Pencil, Trash2, UserX, UserCheck, FileText } from 'lucide-react';
 import { Professor, gerarLancamento, isMonitora, isEstagiaria } from '../../lib/folhaTypes';
 import { formatDateBR, formatCurrency, toNumberBR, formatNumberBR } from '../../lib/folhaUtils';
 import { toast } from 'sonner';
+import FichaCadastroModal from './FichaCadastroModal';
 
 interface SegSlot {
   segId: string;
@@ -33,6 +34,9 @@ export default function FolhaProfessores() {
   const [editCpf, setEditCpf] = useState('');
   const [editDataAdmissao, setEditDataAdmissao] = useState('');
   const [editSlots, setEditSlots] = useState<SegSlot[]>([]);
+
+  const [fichaOpen, setFichaOpen] = useState(false);
+  const [selectedProfForFicha, setSelectedProfForFicha] = useState<Professor | null>(null);
 
   // Prepara os slots ao abrir a criação
   useEffect(() => {
@@ -272,6 +276,9 @@ export default function FolhaProfessores() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-surface border-surface-variant text-on-surface-variant">
+                        <DropdownMenuItem onClick={() => { setSelectedProfForFicha(prof); setFichaOpen(true); }} className="hover:bg-surface-variant/50 cursor-pointer">
+                          <FileText className="w-4 h-4 mr-2 text-blue-500" />Ficha Cadastral (LGPD)
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => openEdit(prof)} className="hover:bg-surface-variant/50 cursor-pointer">
                           <Pencil className="w-4 h-4 mr-2" />Editar
                         </DropdownMenuItem>
@@ -423,6 +430,14 @@ export default function FolhaProfessores() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {selectedProfForFicha && (
+        <FichaCadastroModal 
+          professor={selectedProfForFicha} 
+          open={fichaOpen} 
+          onOpenChange={setFichaOpen} 
+        />
+      )}
     </div>
   );
 }

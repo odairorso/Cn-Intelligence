@@ -19,6 +19,7 @@ export interface Professor {
   ajudaCusto?: number;
   segmentoIds: string[];
   ativo: boolean;
+  fichaCadastro?: any;
 }
 
 export interface Lancamento {

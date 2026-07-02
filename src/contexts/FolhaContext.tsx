@@ -72,6 +72,7 @@ export const FolhaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           segmentoIds: p.segmentoIds || [],
           segmentoHoras,
           ativo: p.ativo !== false,
+          fichaCadastro: p.ficha_cadastro || {},
         } as Professor;
       });
 

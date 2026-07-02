@@ -120,15 +120,28 @@ export async function handleProfessores(req, res) {
 
   if (req.method === 'PATCH') {
     try {
-      const { id, nome, cpf, dataAdmissao, ativo, segmentos } = req.body;
-      const pRows = await sql`
-        UPDATE professores
-        SET nome = ${nome},
-            cpf = ${cpf},
-            data_admissao = ${dataAdmissao},
-            ativo = ${ativo !== false}
-        WHERE id = ${id} AND uid = ${uid}
-        RETURNING *`;
+      const { id, nome, cpf, dataAdmissao, ativo, segmentos, fichaCadastro } = req.body;
+      let pRows;
+      if (fichaCadastro !== undefined) {
+        pRows = await sql`
+          UPDATE professores
+          SET nome = ${nome},
+              cpf = ${cpf},
+              data_admissao = ${dataAdmissao},
+              ativo = ${ativo !== false},
+              ficha_cadastro = ${JSON.stringify(fichaCadastro)}
+          WHERE id = ${id} AND uid = ${uid}
+          RETURNING *`;
+      } else {
+        pRows = await sql`
+          UPDATE professores
+          SET nome = ${nome},
+              cpf = ${cpf},
+              data_admissao = ${dataAdmissao},
+              ativo = ${ativo !== false}
+          WHERE id = ${id} AND uid = ${uid}
+          RETURNING *`;
+      }
 
       if (pRows.length === 0) return res.status(404).json({ error: 'Professor não encontrado' });
       const prof = pRows[0];
