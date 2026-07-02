@@ -172,6 +172,7 @@ export async function handleTransactions(req, res) {
             SELECT id FROM transactions WHERE uid = ${uid}
             AND deleted_at IS NULL
             AND regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') = ${normalizedNumber}
+            AND upper(coalesce(fornecedor, '')) = upper(${fornecedor})
             LIMIT 1`
         : await sql`
             SELECT id FROM transactions
@@ -387,13 +388,13 @@ export async function handleTransactionsBatch(req, res) {
     const existingBoletos = new Set();
     if (boletoNumbers.length > 0) {
       const rows = await sql`
-        SELECT regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') AS num 
+        SELECT upper(coalesce(fornecedor, '')) AS forn, regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') AS num 
         FROM transactions 
         WHERE uid = ${uid} 
           AND deleted_at IS NULL 
           AND regexp_replace(upper(coalesce(numero_boleto, '')), '[^A-Z0-9]', '', 'g') = ANY(${boletoNumbers}::text[])
       `;
-      for (const r of rows) existingBoletos.add(r.num);
+      for (const r of rows) existingBoletos.add(`${r.forn}|${r.num}`);
     }
 
     // Also check composite-key duplicates for non-boleto rows against DB
@@ -415,9 +416,12 @@ export async function handleTransactionsBatch(req, res) {
     // Phase 3: Insert valid rows in bulk using a single multi-row INSERT
     const toInsert = [];
     for (const p of prepared) {
-      if (p.normalizedNumber && existingBoletos.has(p.normalizedNumber)) {
-        blocked++;
-        continue;
+      if (p.normalizedNumber) {
+        const key = `${String(p.tx.fornecedor || '').toUpperCase()}|${p.normalizedNumber}`;
+        if (existingBoletos.has(key)) {
+          blocked++;
+          continue;
+        }
       }
       if (!p.normalizedNumber) {
         const { tx, vDate } = p;

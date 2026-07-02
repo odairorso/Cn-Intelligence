@@ -330,7 +330,7 @@ export default function App() {
 
   const boletoDuplicateKey = (fornecedor: string, vencimento: string, valor: number, numeroBoleto?: string, descricao?: string, empresa?: string) => {
     const normalizedNumber = normalizeBoletoNumber(numeroBoleto);
-    if (normalizedNumber) return `BOLETO:${normalizedNumber}`;
+    if (normalizedNumber) return `BOLETO:${normalizeSupplierName(fornecedor)}|${normalizedNumber}`;
     const desc = normalizeSupplierName(descricao || '');
     const emp = normalizeSupplierName(empresa || '');
     return `BASE:${normalizeSupplierName(fornecedor)}|${vencimento}|${Number(valor || 0).toFixed(2)}|${desc}|${emp}`;
