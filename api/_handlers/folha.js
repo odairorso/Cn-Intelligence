@@ -121,6 +121,13 @@ export async function handleProfessores(req, res) {
   if (req.method === 'PATCH') {
     try {
       const { id, nome, cpf, dataAdmissao, ativo, segmentos, fichaCadastro, cargo, salarioFixo } = req.body;
+      const currentRows = await sql`SELECT cargo, salario_fixo FROM professores WHERE id = ${id} AND uid = ${uid}`;
+      if (currentRows.length === 0) return res.status(404).json({ error: 'Funcionário não encontrado' });
+      const current = currentRows[0];
+
+      const finalCargo = cargo !== undefined ? cargo : (current.cargo || '');
+      const finalSalarioFixo = salarioFixo !== undefined ? salarioFixo : (Number(current.salario_fixo) || 0);
+
       let pRows;
       if (fichaCadastro !== undefined) {
         pRows = await sql`
@@ -129,8 +136,8 @@ export async function handleProfessores(req, res) {
               cpf = ${cpf},
               data_admissao = ${dataAdmissao},
               ativo = ${ativo !== false},
-              cargo = ${cargo !== undefined ? cargo : sql`cargo`},
-              salario_fixo = ${salarioFixo !== undefined ? salarioFixo : sql`salario_fixo`},
+              cargo = ${finalCargo},
+              salario_fixo = ${finalSalarioFixo},
               ficha_cadastro = ${JSON.stringify(fichaCadastro)}
           WHERE id = ${id} AND uid = ${uid}
           RETURNING *`;
@@ -141,8 +148,8 @@ export async function handleProfessores(req, res) {
               cpf = ${cpf},
               data_admissao = ${dataAdmissao},
               ativo = ${ativo !== false},
-              cargo = ${cargo !== undefined ? cargo : sql`cargo`},
-              salario_fixo = ${salarioFixo !== undefined ? salarioFixo : sql`salario_fixo`}
+              cargo = ${finalCargo},
+              salario_fixo = ${finalSalarioFixo}
           WHERE id = ${id} AND uid = ${uid}
           RETURNING *`;
       }
