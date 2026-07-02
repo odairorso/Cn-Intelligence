@@ -60,7 +60,9 @@ export default function FolhaProfessores() {
       toast.error('Informe o nome do professor');
       return;
     }
-    if (validSlots.length === 0) {
+
+    // Exige turma apenas se NÃO for preencher ficha (para folha de pagamento)
+    if (!openFicha && validSlots.length === 0) {
       toast.error('Informe horas em pelo menos uma turma');
       return;
     }
@@ -77,26 +79,28 @@ export default function FolhaProfessores() {
       }
     });
 
+    // Captura antes de limpar os states
+    const nomeCriado = nome.trim();
+    const cpfCriado = cpf.trim() || 'NÃO INFORMADO';
+
     const profData = await addProfessor({
-      nome: nome.trim(),
-      cpf: cpf.trim() || 'NÃO INFORMADO',
+      nome: nomeCriado,
+      cpf: cpfCriado,
       dataAdmissao,
       segmentoIds,
       segmentoHoras,
       ativo: true,
     });
 
-    const nomeCriado = nome.trim();
     setNome('');
     setCpf('');
     setDialogOpen(false);
 
     if (openFicha && profData) {
-      // Construct a minimal professor object to open the ficha immediately
       const novoProfessor: Professor = {
         id: profData.id,
         nome: nomeCriado,
-        cpf: cpf.trim() || 'NÃO INFORMADO',
+        cpf: cpfCriado,
         dataAdmissao,
         segmentoIds,
         segmentoHoras,
