@@ -274,7 +274,7 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
         fichaCadastro: getFichaPayload()
       };
 
-      await api.patch('/api?route=folha-professores', payload);
+      await api.updateFolhaProfessor(payload);
       toast.success('Ficha cadastral salva com sucesso!');
       await refreshData();
       onOpenChange(false);
@@ -1026,7 +1026,7 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-surface border border-surface-variant text-on-surface max-w-4xl max-h-[90vh] overflow-y-auto p-6 rounded-xl">
+      <DialogContent className="bg-surface border border-surface-variant text-on-surface w-[98vw] max-w-5xl max-h-[95vh] overflow-y-auto p-6 rounded-xl">
         <DialogHeader className="border-b border-surface-variant pb-3 mb-4">
           <div className="flex justify-between items-center">
             <DialogTitle className="text-xl font-bold">Ficha de Admissão (LGPD) - {professor?.nome}</DialogTitle>

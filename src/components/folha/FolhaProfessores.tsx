@@ -77,7 +77,7 @@ export default function FolhaProfessores() {
       }
     });
 
-    const prof = await addProfessor({
+    const profData = await addProfessor({
       nome: nome.trim(),
       cpf: cpf.trim() || 'NÃO INFORMADO',
       dataAdmissao,
@@ -86,12 +86,24 @@ export default function FolhaProfessores() {
       ativo: true,
     });
 
+    const nomeCriado = nome.trim();
     setNome('');
     setCpf('');
     setDialogOpen(false);
 
-    if (openFicha && prof) {
-      setSelectedProfForFicha(prof as Professor);
+    if (openFicha && profData) {
+      // Construct a minimal professor object to open the ficha immediately
+      const novoProfessor: Professor = {
+        id: profData.id,
+        nome: nomeCriado,
+        cpf: cpf.trim() || 'NÃO INFORMADO',
+        dataAdmissao,
+        segmentoIds,
+        segmentoHoras,
+        ativo: true,
+        fichaCadastro: profData.ficha_cadastro || undefined,
+      };
+      setSelectedProfForFicha(novoProfessor);
       setFichaOpen(true);
     }
   };
@@ -320,7 +332,7 @@ export default function FolhaProfessores() {
 
       {/* Modal de Cadastro */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-surface border-surface-variant text-on-surface max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="bg-surface border-surface-variant text-on-surface w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Cadastrar Professor</DialogTitle>
           </DialogHeader>
@@ -342,7 +354,7 @@ export default function FolhaProfessores() {
 
             <div className="border-t border-surface-variant pt-4">
               <Label className="text-on-surface-variant font-semibold text-xs block mb-3">Horas Semanais por Turma</Label>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 max-h-[200px] overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 gap-x-8 gap-y-3 max-h-[240px] overflow-y-auto pr-1">
                 {slots.map((slot, index) => {
                   const seg = segmentos.find((s) => s.id === slot.segId);
                   return (
@@ -370,13 +382,13 @@ export default function FolhaProfessores() {
             <Button variant="ghost" onClick={() => setDialogOpen(false)} className="text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/50">
               Cancelar
             </Button>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap justify-end">
               <Button onClick={() => handleCreate(false)} variant="outline" className="border-surface-variant text-on-surface hover:bg-surface-variant/50">
                 Apenas Cadastrar
               </Button>
-              <Button onClick={() => handleCreate(true)} className="bg-blue-600 hover:bg-blue-700 text-on-surface">
-                <FileText className="w-4 h-4 mr-2" />
-                Cadastrar e Preencher Ficha Completa
+              <Button onClick={() => handleCreate(true)} className="bg-blue-600 hover:bg-blue-700 text-on-surface flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Cadastrar e Preencher Ficha
               </Button>
             </div>
           </DialogFooter>
@@ -385,7 +397,7 @@ export default function FolhaProfessores() {
 
       {/* Modal de Edição */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="bg-surface border-surface-variant text-on-surface max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="bg-surface border-surface-variant text-on-surface w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Professor</DialogTitle>
           </DialogHeader>
