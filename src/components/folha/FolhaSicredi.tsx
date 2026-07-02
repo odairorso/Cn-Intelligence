@@ -553,21 +553,10 @@ export default function FolhaSicredi() {
           </div>
 
           {/* Rodapé da Empresa */}
-          <div style={{ marginTop: '10px', padding: '5px', fontSize: '8px', lineHeight: '1.3' }}>
-            <strong>Empresa:</strong> COLÉGIO NAVIRAÍ <br />
-            <strong>CNPJ:</strong> 24.227.497/0001-43
-          </div>
-
-          {/* Assinatura eletrônica / ZapSign style */}
-          <div className="sicredi-signature-box">
-            Documento assinado eletronicamente por ELAINE CRISTINA CAMACHO CAVALCANTE
-          </div>
-
-          {/* Metadados de Rodapé do Documento */}
-          <div className="sicredi-footer-meta">
-            <span style={{ flex: '1', textAlign: 'left' }}>RQ-004.04 (12/14)</span>
-            <span style={{ flex: '1', textAlign: 'center' }}>Classificação da Informação: <strong>Uso Irrestrito</strong></span>
-            <span style={{ flex: '1.5', textAlign: 'right' }}>ZapSign - Documento assinado eletronicamente, conforme MP 2.200-2/2001 e Lei 14.063/2020.</span>
+          <div style={{ marginTop: '25px', padding: '5px', fontSize: '9px', lineHeight: '1.4', textAlign: 'center' }}>
+            <div style={{ borderTop: '1px solid #333', width: '280px', margin: '0 auto 8px auto' }}></div>
+            <strong>Empresa: COLÉGIO NAVIRAÍ</strong> <br />
+            <strong>CNPJ: 24.227.497/0001-43</strong>
           </div>
         </div>,
         document.body
