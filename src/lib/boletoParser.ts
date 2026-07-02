@@ -15,6 +15,7 @@ export type PdfImportDraft = {
   rawText: string;
   duplicate: boolean;
   ai_error?: string;
+  valorInput?: string;
 };
 
 export const normalizeBoletoNumber = (value?: string) => {

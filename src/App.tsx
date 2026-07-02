@@ -2075,11 +2075,15 @@ export default function App() {
                         <input
                           type="number"
                           step="0.01"
-                          value={Number.isFinite(row.valor) ? row.valor.toFixed(2) : ''}
+                          value={row.valorInput !== undefined ? row.valorInput : (Number.isFinite(row.valor) && row.valor !== 0 ? row.valor.toString() : '')}
                           onChange={(e) => {
-                            const raw = String(e.target.value || '').replace(',', '.');
+                            const valStr = e.target.value;
+                            const raw = String(valStr || '').replace(',', '.');
                             const n = Number(raw);
-                            updatePdfRow(index, { valor: Number.isFinite(n) ? n : 0 });
+                            updatePdfRow(index, { 
+                              valorInput: valStr,
+                              valor: Number.isFinite(n) ? n : 0 
+                            });
                           }}
                           className="w-full bg-surface-variant/30 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
