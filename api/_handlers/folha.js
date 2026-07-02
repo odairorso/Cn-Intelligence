@@ -157,15 +157,17 @@ export async function handleProfessores(req, res) {
       if (pRows.length === 0) return res.status(404).json({ error: 'Professor não encontrado' });
       const prof = pRows[0];
 
-      await sql`DELETE FROM professor_segmentos WHERE professor_id = ${id}`;
+      if (segmentos !== undefined) {
+        await sql`DELETE FROM professor_segmentos WHERE professor_id = ${id}`;
 
-      if (Array.isArray(segmentos)) {
-        for (const s of segmentos) {
-          if (!s.segmentoId) continue;
-          await sql`
-            INSERT INTO professor_segmentos (professor_id, segmento_id, horas_semanais)
-            VALUES (${id}, ${s.segmentoId}, ${s.horasSemanais || 0})
-          `;
+        if (Array.isArray(segmentos)) {
+          for (const s of segmentos) {
+            if (!s.segmentoId) continue;
+            await sql`
+              INSERT INTO professor_segmentos (professor_id, segmento_id, horas_semanais)
+              VALUES (${id}, ${s.segmentoId}, ${s.horasSemanais || 0})
+            `;
+          }
         }
       }
 

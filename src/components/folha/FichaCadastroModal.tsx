@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Professor } from '../../lib/folhaTypes';
+import { Professor, isEstagiaria, isMonitora } from '../../lib/folhaTypes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -248,10 +248,10 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
         professor.segmentoIds.forEach((sid) => {
           const seg = segmentos.find((s) => s.id === sid);
           if (seg) {
-            const isMon = seg.nome.toLowerCase().includes('monitora');
+            const isMon = isMonitora(seg.nome);
             const horasBaseSemanais = isMon ? 0 : (Number(professor.segmentoHoras?.[seg.id]) || Number(seg.horasSemanais) || 0);
             
-            if (seg.nome.toLowerCase().includes('estagiaria')) {
+            if (isEstagiaria(seg.nome)) {
               totalEstimado += Math.round(((1000 / 30) * horasBaseSemanais) * 100) / 100;
             } else {
               const horasMensais = horasBaseSemanais * 4.5;
@@ -314,7 +314,11 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
         cpf,
         dataAdmissao: dataAdmissaoFutura,
         ativo: professor.ativo,
-        fichaCadastro: getFichaPayload()
+        fichaCadastro: getFichaPayload(),
+        segmentos: professor.segmentoIds?.map(sid => ({
+          segmentoId: sid,
+          horasSemanais: professor.segmentoHoras?.[sid] || 0
+        })) || []
       };
 
       await api.updateFolhaProfessor(payload);
