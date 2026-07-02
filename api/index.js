@@ -184,6 +184,10 @@ export default async function handler(req, res) {
         case 'export-backup': { const m = await import('./_handlers/admin.js'); return m.handleExportBackup(req, res); }
         case 'fix-receitas-tipo': { const m = await import('./_handlers/transactions.js'); return m.handleFixReceitasTipo(req, res); }
         case 'folha-push': { const m = await import('./_handlers/folha.js'); return m.handleFolhaPush(req, res); }
+        case 'folha-segmentos': { const m = await import('./_handlers/folha.js'); return m.handleSegmentos(req, res); }
+        case 'folha-professores': { const m = await import('./_handlers/folha.js'); return m.handleProfessores(req, res); }
+        case 'folha-lancamentos': { const m = await import('./_handlers/folha.js'); return m.handleLancamentos(req, res); }
+        case 'folha-fechamentos': { const m = await import('./_handlers/folha.js'); return m.handleFechamentos(req, res); }
         case 'auth-session': {
           const decoded = verifyToken(req);
           if (!decoded) return res.status(401).json({ error: 'Sessão expirada' });

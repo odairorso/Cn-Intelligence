@@ -290,7 +290,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
       if (data.user) {
         setIsAuthorized(true);
         setUserEmail(data.user.email || null);
-        setDisplayName(data.user.display_name || data.user.email || null);
+        setDisplayName((data.user as any).display_name || data.user.email || null);
         return true;
       }
       return false;

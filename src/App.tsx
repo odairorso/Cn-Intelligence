@@ -44,6 +44,7 @@ const FornecedoresTab = lazy(() => import('./tabs/FornecedoresTab'));
 const RelatoriosTab = lazy(() => import('./tabs/RelatoriosTab'));
 const ReceitasTab = lazy(() => import('./tabs/ReceitasTab'));
 const BancosTab = lazy(() => import('./tabs/BancosTab'));
+const FolhaTab = lazy(() => import('./tabs/FolhaTab'));
 
 // Lazy-loaded modals
 const NewTxModal = lazy(() => import('./modals/NewTxModal'));
@@ -71,7 +72,7 @@ const ModalFallback = () => (
 const defaultBrandLogo = new URL('../Logo Cn/WhatsApp Image 2021-02-10 at 10.34.53.jpeg', import.meta.url).href;
 
 // --- Types ---
-type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'receitas' | 'bancos' | 'extrato' | 'configuracoes';
+type Tab = 'dashboard' | 'lancamentos' | 'fornecedores' | 'relatorios' | 'receitas' | 'bancos' | 'extrato' | 'configuracoes' | 'folha';
 
 // --- All tab & modal components extracted to tabs/ and modals/ ---
 // --- Main App ---
@@ -1344,6 +1345,12 @@ export default function App() {
             >
               Configurações
             </button>
+            <button
+              onClick={() => setActiveTab('folha')}
+              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'folha' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
+            >
+              Folha
+            </button>
           </nav>
         </div>
         <div className="flex items-center gap-2 md:gap-4">
@@ -1439,6 +1446,7 @@ export default function App() {
               {activeTab === 'receitas' && '💸 Receitas'}
               {activeTab === 'bancos' && '🏦 Bancos'}
               {activeTab === 'extrato' && '📄 Importar Extrato OFX'}
+              {activeTab === 'folha' && '📝 Folha de Pagamento'}
               {activeTab === 'configuracoes' && '⚙️ Configurações'}
             </h2>
             <div className="flex flex-wrap gap-3">
@@ -1572,6 +1580,11 @@ export default function App() {
                 showNotification={showNotification}
                 fetchTransactions={fetchTransactions}
               />
+            )}
+            {activeTab === 'folha' && (
+              <Suspense fallback={<ModalFallback />}>
+                <FolhaTab />
+              </Suspense>
             )}
             {activeTab === 'configuracoes' && (
               <div className="glass-card p-10 text-center space-y-6">

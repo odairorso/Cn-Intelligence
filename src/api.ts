@@ -476,9 +476,103 @@ export const api = {
   async exportBackup(): Promise<Blob> {
     if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     // O backup token é lido diretamente pelo backend via BACKUP_TOKEN (server-side).
-    // Não expomos o token no frontend para evitar riscos de XSS.
+    // Não expomos o token no frontend para evitar risks de XSS.
     const res = await fetchWithSecurity(`${API_BASE}?route=export-backup`);
     if (!res.ok) throw new Error('Failed to export backup');
     return res.blob();
+  },
+
+  // ─── Folha de Pagamento ────────────────────────────────────────────────────
+  async getFolhaSegmentos(): Promise<any[]> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=folha-segmentos`);
+    if (!res.ok) throw await buildHttpError(res, 'Failed to fetch folha segmentos');
+    return res.json();
+  },
+
+  async createFolhaSegmento(data: any): Promise<any> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=folha-segmentos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw await buildHttpError(res, 'Failed to create folha segmento');
+    return res.json();
+  },
+
+  async updateFolhaSegmento(data: any): Promise<any> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=folha-segmentos`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw await buildHttpError(res, 'Failed to update folha segmento');
+    return res.json();
+  },
+
+  async getFolhaProfessores(): Promise<any[]> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=folha-professores`);
+    if (!res.ok) throw await buildHttpError(res, 'Failed to fetch folha professores');
+    return res.json();
+  },
+
+  async createFolhaProfessor(data: any): Promise<any> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=folha-professores`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw await buildHttpError(res, 'Failed to create folha professor');
+    return res.json();
+  },
+
+  async updateFolhaProfessor(data: any): Promise<any> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=folha-professores`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw await buildHttpError(res, 'Failed to update folha professor');
+    return res.json();
+  },
+
+  async deleteFolhaProfessor(id: string): Promise<void> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=folha-professores`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) throw await buildHttpError(res, 'Failed to delete folha professor');
+  },
+
+  async getFolhaLancamentos(competencia: string): Promise<any[]> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=folha-lancamentos&competencia=${competencia}`);
+    if (!res.ok) throw await buildHttpError(res, 'Failed to fetch folha lancamentos');
+    return res.json();
+  },
+
+  async getFolhaFechamentos(): Promise<any[]> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=folha-fechamentos`);
+    if (!res.ok) throw await buildHttpError(res, 'Failed to fetch folha fechamentos');
+    return res.json();
+  },
+
+  async createFolhaFechamento(data: any): Promise<any> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=folha-fechamentos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw await buildHttpError(res, 'Failed to create folha fechamento');
+    return res.json();
   },
 };
