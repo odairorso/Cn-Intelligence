@@ -27,8 +27,8 @@ export default function FolhaParametros() {
         'Ed. Infantil': 3,
         'Fund. I': 4,
         'Fund. II': 5,
-        'Estagiária': 6,
-        'Ens. Médio': 7,
+        'Ens. Médio': 6,
+        'Estagiária': 7,
       };
 
       const monitora = segmentos.find((s) => isMonitora(s.nome));
