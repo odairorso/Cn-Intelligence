@@ -13,11 +13,21 @@ export default function FolhaSicredi() {
   const [printing, setPrinting] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
 
+  // Controle de seleção para impressão
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   // Estados locais para inputs em foco
   const [localValues, setLocalValues] = useState<Record<string, Record<string, string>>>({});
 
   // Filtra colaboradores ativos
   const colaboradoresAtivos = professores.filter(p => p.ativo);
+
+  // Inicializa a seleção com todos os ativos
+  useEffect(() => {
+    if (professores.length > 0 && selectedIds.length === 0) {
+      setSelectedIds(professores.filter(p => p.ativo).map(p => p.id));
+    }
+  }, [professores]);
 
   // Sincroniza dados iniciais locais
   useEffect(() => {
@@ -152,6 +162,20 @@ export default function FolhaSicredi() {
           <Table>
             <TableHeader className="border-surface-variant bg-surface-variant/20">
               <TableRow className="border-surface-variant hover:bg-transparent">
+                <TableHead className="text-on-surface-variant text-xs py-2 w-[40px] text-center">
+                  <input
+                    type="checkbox"
+                    checked={colaboradoresAtivos.length > 0 && selectedIds.length === colaboradoresAtivos.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(colaboradoresAtivos.map(c => c.id));
+                      } else {
+                        setSelectedIds([]);
+                      }
+                    }}
+                    className="w-4 h-4 rounded border-surface-variant text-green-600 focus:ring-green-500 bg-background accent-green-600 cursor-pointer"
+                  />
+                </TableHead>
                 <TableHead className="text-on-surface-variant text-xs py-2">Colaborador</TableHead>
                 <TableHead className="text-on-surface-variant text-xs py-2 w-[110px]">Nascimento</TableHead>
                 <TableHead className="text-on-surface-variant text-xs py-2 w-[220px]">CPF & Identidade (RG / UF / Emissão)</TableHead>
@@ -163,7 +187,7 @@ export default function FolhaSicredi() {
             <TableBody>
               {colaboradoresAtivos.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-on-surface-variant">
+                  <TableCell colSpan={7} className="text-center py-12 text-on-surface-variant">
                     Nenhum colaborador ativo cadastrado.
                   </TableCell>
                 </TableRow>
@@ -172,9 +196,28 @@ export default function FolhaSicredi() {
                   const f = c.fichaCadastro || {};
                   const opta = f.optanteTec === 'Sim';
                   const rowValues = localValues[c.id] || {};
+                  const isSelected = selectedIds.includes(c.id);
 
                   return (
                     <TableRow key={c.id} className="border-surface-variant hover:bg-surface-variant/20 py-1">
+                      {/* Checkbox de Seleção */}
+                      <TableCell className="text-center py-1">
+                        <div className="flex justify-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedIds(prev => [...prev, c.id]);
+                              } else {
+                                setSelectedIds(prev => prev.filter(id => id !== c.id));
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-surface-variant text-green-600 focus:ring-green-500 bg-background accent-green-600 cursor-pointer"
+                          />
+                        </div>
+                      </TableCell>
+
                       {/* Nome */}
                       <TableCell className="font-semibold text-on-surface text-xs py-1">
                         <div className="flex items-center gap-1.5">
@@ -439,7 +482,7 @@ export default function FolhaSicredi() {
             </tr>
           </thead>
           <tbody>
-            {colaboradoresAtivos.map((c) => {
+            {colaboradoresAtivos.filter(c => selectedIds.includes(c.id)).map((c) => {
               const rowValues = localValues[c.id] || {};
               const f = c.fichaCadastro || {};
               const opta = f.optanteTec === 'Sim' ? 'Sim' : '';
@@ -470,7 +513,7 @@ export default function FolhaSicredi() {
               );
             })}
             {/* Linhas vazias para preenchimento se houver espaço/estilo */}
-            {Array.from({ length: Math.max(0, 10 - colaboradoresAtivos.length) }).map((_, idx) => (
+            {Array.from({ length: Math.max(0, 10 - colaboradoresAtivos.filter(c => selectedIds.includes(c.id)).length) }).map((_, idx) => (
               <tr key={`empty-${idx}`}>
                 <td>&nbsp;</td>
                 <td>&nbsp;</td>
