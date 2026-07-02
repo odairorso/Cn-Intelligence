@@ -6,19 +6,21 @@ import FolhaLancamentos from '../components/folha/FolhaLancamentos';
 import FolhaFechamento from '../components/folha/FolhaFechamento';
 import FolhaRelatorios from '../components/folha/FolhaRelatorios';
 import FolhaParametros from '../components/folha/FolhaParametros';
+import FolhaSicredi from '../components/folha/FolhaSicredi';
 import { cn } from '../lib/utils';
 
-type SubTab = 'dashboard' | 'professores' | 'lancamentos' | 'fechamento' | 'relatorios' | 'parametros';
+type SubTab = 'dashboard' | 'professores' | 'lancamentos' | 'fechamento' | 'relatorios' | 'sicredi' | 'parametros';
 
 export default function FolhaTab() {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('dashboard');
 
   const subTabs = [
     { id: 'dashboard', label: 'Painel' },
-    { id: 'professores', label: 'Professores' },
+    { id: 'professores', label: 'Funcionários' },
     { id: 'lancamentos', label: 'Lançar Horas' },
     { id: 'fechamento', label: 'Fechamento' },
     { id: 'relatorios', label: 'Relatórios' },
+    { id: 'sicredi', label: 'Conta Sicredi' },
     { id: 'parametros', label: 'Parâmetros RH' },
   ] as const;
 
@@ -50,6 +52,7 @@ export default function FolhaTab() {
           {activeSubTab === 'lancamentos' && <FolhaLancamentos />}
           {activeSubTab === 'fechamento' && <FechamentoContainer />}
           {activeSubTab === 'relatorios' && <FolhaRelatorios />}
+          {activeSubTab === 'sicredi' && <FolhaSicredi />}
           {activeSubTab === 'parametros' && <FolhaParametros />}
         </div>
       </div>
