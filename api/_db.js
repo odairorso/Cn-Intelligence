@@ -1,6 +1,9 @@
 import pg from 'pg';
 import { AsyncLocalStorage } from 'async_hooks';
 
+// Evita mudança de fuso horário (timezone shift) em colunas do tipo DATE
+pg.types.setTypeParser(pg.types.builtins.DATE, (val) => val);
+
 export const dbStorage = new AsyncLocalStorage();
 
 let connectionString = process.env.DATABASE_URL;
