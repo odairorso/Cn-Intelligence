@@ -575,4 +575,32 @@ export const api = {
     if (!res.ok) throw await buildHttpError(res, 'Failed to create folha fechamento');
     return res.json();
   },
+
+  async getFolhaCargos(): Promise<any[]> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=folha-cargos`);
+    if (!res.ok) throw await buildHttpError(res, 'Failed to fetch folha cargos');
+    return res.json();
+  },
+
+  async createFolhaCargo(nome: string): Promise<any> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=folha-cargos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome }),
+    });
+    if (!res.ok) throw await buildHttpError(res, 'Failed to create folha cargo');
+    return res.json();
+  },
+
+  async deleteFolhaCargo(id: string): Promise<void> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=folha-cargos`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) throw await buildHttpError(res, 'Failed to delete folha cargo');
+  },
 };

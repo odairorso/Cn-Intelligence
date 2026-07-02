@@ -186,6 +186,7 @@ export default async function handler(req, res) {
         case 'folha-push': { const m = await import('./_handlers/folha.js'); return m.handleFolhaPush(req, res); }
         case 'folha-segmentos': { const m = await import('./_handlers/folha.js'); return m.handleSegmentos(req, res); }
         case 'folha-professores': { const m = await import('./_handlers/folha.js'); return m.handleProfessores(req, res); }
+        case 'folha-cargos': { const m = await import('./_handlers/folha.js'); return m.handleCargos(req, res); }
         case 'folha-lancamentos': { const m = await import('./_handlers/folha.js'); return m.handleLancamentos(req, res); }
         case 'folha-fechamentos': { const m = await import('./_handlers/folha.js'); return m.handleFechamentos(req, res); }
         case 'auth-session': {

@@ -1,20 +1,23 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../api';
-import { Segmento, Professor, Fechamento, Lancamento } from '../lib/folhaTypes';
+import { Segmento, Professor, Fechamento, Lancamento, Cargo } from '../lib/folhaTypes';
 import { toast } from 'sonner';
 
 interface FolhaContextType {
   segmentos: Segmento[];
   professores: Professor[];
   fechamentos: Fechamento[];
+  cargos: Cargo[];
   loading: boolean;
   refreshData: () => Promise<void>;
-  addProfessor: (p: Omit<Professor, 'id'>) => Promise<void>;
+  addProfessor: (p: Omit<Professor, 'id'>) => Promise<any>;
   updateProfessor: (id: string, patch: Partial<Professor>) => Promise<void>;
   deleteProfessor: (id: string) => Promise<void>;
   addFechamento: (f: Omit<Fechamento, 'id'>, lancs: Omit<Lancamento, 'id'>[], lancsFin: { nome: string; totalPagar: number }[]) => Promise<void>;
   updateSegmento: (seg: Segmento) => Promise<void>;
   createSegmento: (seg: Omit<Segmento, 'id'>) => Promise<void>;
+  createCargo: (nome: string) => Promise<void>;
+  deleteCargo: (id: string) => Promise<void>;
 }
 
 const FolhaContext = createContext<FolhaContextType | undefined>(undefined);
@@ -29,15 +32,17 @@ export const FolhaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [segmentos, setSegmentos] = useState<Segmento[]>([]);
   const [professores, setProfessores] = useState<Professor[]>([]);
   const [fechamentos, setFechamentos] = useState<Fechamento[]>([]);
+  const [cargos, setCargos] = useState<Cargo[]>([]);
   const [loading, setLoading] = useState(false);
 
   const refreshData = useCallback(async () => {
     setLoading(true);
     try {
-      const [segsData, profsData, fechsData] = await Promise.all([
+      const [segsData, profsData, fechsData, cargosData] = await Promise.all([
         api.getFolhaSegmentos(),
         api.getFolhaProfessores(),
         api.getFolhaFechamentos(),
+        api.getFolhaCargos(),
       ]);
 
       // Mapeia segmentos do backend para o formato do frontend
@@ -69,6 +74,8 @@ export const FolhaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           nome: p.nome,
           cpf: p.cpf,
           dataAdmissao: p.data_admissao ? p.data_admissao.split('T')[0] : '',
+          cargo: p.cargo || '',
+          salarioFixo: Number(p.salario_fixo) || 0,
           segmentoIds: p.segmentoIds || [],
           segmentoHoras,
           ativo: p.ativo !== false,
@@ -88,6 +95,7 @@ export const FolhaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setSegmentos(mappedSegs);
       setProfessores(mappedProfs);
       setFechamentos(mappedFechs);
+      setCargos(cargosData.map((c: any) => ({ id: c.id, nome: c.nome })));
     } catch (e: any) {
       console.error(e);
       toast.error('Erro ao sincronizar dados da folha de pagamento.');
@@ -132,6 +140,8 @@ export const FolhaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (patch.cpf !== undefined) body.cpf = patch.cpf;
       if (patch.dataAdmissao !== undefined) body.dataAdmissao = patch.dataAdmissao;
       if (patch.ativo !== undefined) body.ativo = patch.ativo;
+      if (patch.cargo !== undefined) body.cargo = patch.cargo;
+      if (patch.salarioFixo !== undefined) body.salarioFixo = patch.salarioFixo;
       if (patch.segmentoIds && patch.segmentoHoras) {
         body.segmentos = patch.segmentoIds.map(sid => ({
           segmentoId: sid,
@@ -238,12 +248,35 @@ export const FolhaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const createCargo = async (nome: string) => {
+    try {
+      await api.createFolhaCargo(nome);
+      toast.success('Cargo criado com sucesso!');
+      await refreshData();
+    } catch (e: any) {
+      console.error(e);
+      toast.error('Erro ao criar cargo.');
+    }
+  };
+
+  const deleteCargo = async (id: string) => {
+    try {
+      await api.deleteFolhaCargo(id);
+      toast.success('Cargo excluído!');
+      await refreshData();
+    } catch (e: any) {
+      console.error(e);
+      toast.error('Erro ao excluir cargo.');
+    }
+  };
+
   return (
     <FolhaContext.Provider
       value={{
         segmentos,
         professores,
         fechamentos,
+        cargos,
         loading,
         refreshData,
         addProfessor,
@@ -252,6 +285,8 @@ export const FolhaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addFechamento,
         updateSegmento,
         createSegmento,
+        createCargo,
+        deleteCargo,
       }}
     >
       {children}

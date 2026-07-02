@@ -223,11 +223,11 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
       setEmpresaOutroVinculo(f.empresaOutroVinculo || '');
       setCnpjOutroVinculo(f.cnpjOutroVinculo || '');
 
-      setCargoFuncao(f.cargoFuncao || '');
+      setCargoFuncao(f.cargoFuncao || professor.cargo || '');
       setHorarioTrabalho(f.horarioTrabalho || '');
       setServicoObra(f.servicoObra || '');
       setDiasSemana(f.diasSemana || []);
-      setSalario(f.salario || '');
+      setSalario(f.salario || (professor.salarioFixo ? String(professor.salarioFixo) : ''));
       setSalarioTipo(f.salarioTipo || 'mês');
       setValeTransporte(f.valeTransporte || 'Não');
       setPericulidade(f.periculidade || 'Não');

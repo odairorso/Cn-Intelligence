@@ -13,6 +13,8 @@ export interface Professor {
   nome: string;
   cpf: string;
   dataAdmissao: string;
+  cargo?: string;
+  salarioFixo?: number;
   horasSemanais?: number; // legacy
   segmentoHoras?: Record<string, number>; // segmentoId -> horas por semana
   valorHora?: number;
@@ -20,6 +22,11 @@ export interface Professor {
   segmentoIds: string[];
   ativo: boolean;
   fichaCadastro?: any;
+}
+
+export interface Cargo {
+  id: string;
+  nome: string;
 }
 
 export interface Lancamento {

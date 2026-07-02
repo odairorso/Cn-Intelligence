@@ -88,10 +88,10 @@ export async function handleProfessores(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const { nome, cpf, dataAdmissao, ativo, segmentos } = req.body;
+      const { nome, cpf, dataAdmissao, ativo, segmentos, cargo, salarioFixo } = req.body;
       const pRows = await sql`
-        INSERT INTO professores (uid, nome, cpf, data_admissao, ativo)
-        VALUES (${uid}, ${nome}, ${cpf}, ${dataAdmissao || new Date().toISOString().split('T')[0]}, ${ativo !== false})
+        INSERT INTO professores (uid, nome, cpf, data_admissao, ativo, cargo, salario_fixo)
+        VALUES (${uid}, ${nome}, ${cpf}, ${dataAdmissao || new Date().toISOString().split('T')[0]}, ${ativo !== false}, ${cargo || ''}, ${salarioFixo || 0})
         RETURNING *`;
 
       const prof = pRows[0];
@@ -120,7 +120,7 @@ export async function handleProfessores(req, res) {
 
   if (req.method === 'PATCH') {
     try {
-      const { id, nome, cpf, dataAdmissao, ativo, segmentos, fichaCadastro } = req.body;
+      const { id, nome, cpf, dataAdmissao, ativo, segmentos, fichaCadastro, cargo, salarioFixo } = req.body;
       let pRows;
       if (fichaCadastro !== undefined) {
         pRows = await sql`
@@ -129,6 +129,8 @@ export async function handleProfessores(req, res) {
               cpf = ${cpf},
               data_admissao = ${dataAdmissao},
               ativo = ${ativo !== false},
+              cargo = ${cargo !== undefined ? cargo : sql`cargo`},
+              salario_fixo = ${salarioFixo !== undefined ? salarioFixo : sql`salario_fixo`},
               ficha_cadastro = ${JSON.stringify(fichaCadastro)}
           WHERE id = ${id} AND uid = ${uid}
           RETURNING *`;
@@ -138,7 +140,9 @@ export async function handleProfessores(req, res) {
           SET nome = ${nome},
               cpf = ${cpf},
               data_admissao = ${dataAdmissao},
-              ativo = ${ativo !== false}
+              ativo = ${ativo !== false},
+              cargo = ${cargo !== undefined ? cargo : sql`cargo`},
+              salario_fixo = ${salarioFixo !== undefined ? salarioFixo : sql`salario_fixo`}
           WHERE id = ${id} AND uid = ${uid}
           RETURNING *`;
       }
@@ -386,4 +390,45 @@ export async function handleFolhaPush(req, res) {
   } catch (e) {
     return handleError(res, e, 'folha.js handleFolhaPush');
   }
+}
+
+// GET/POST/DELETE /api?route=folha-cargos
+export async function handleCargos(req, res) {
+  const uid = req.authUid;
+  if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+
+  if (req.method === 'GET') {
+    try {
+      const rows = await sql`SELECT * FROM cargos WHERE uid = ${uid} ORDER BY nome ASC`;
+      return res.json(rows);
+    } catch (e) {
+      return handleError(res, e, 'folha.js handleCargos GET');
+    }
+  }
+
+  if (req.method === 'POST') {
+    try {
+      const { nome } = req.body;
+      if (!nome?.trim()) return res.status(400).json({ error: 'Nome obrigatório' });
+      const rows = await sql`
+        INSERT INTO cargos (uid, nome) VALUES (${uid}, ${nome.trim()})
+        ON CONFLICT (uid, nome) DO UPDATE SET nome = EXCLUDED.nome
+        RETURNING *`;
+      return res.status(201).json(rows[0]);
+    } catch (e) {
+      return handleError(res, e, 'folha.js handleCargos POST');
+    }
+  }
+
+  if (req.method === 'DELETE') {
+    try {
+      const { id } = req.body;
+      await sql`DELETE FROM cargos WHERE id = ${id} AND uid = ${uid}`;
+      return res.json({ message: 'Cargo excluído' });
+    } catch (e) {
+      return handleError(res, e, 'folha.js handleCargos DELETE');
+    }
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
 }

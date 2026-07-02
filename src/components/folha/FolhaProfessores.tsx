@@ -20,11 +20,14 @@ interface SegSlot {
 }
 
 export default function FolhaProfessores() {
-  const { segmentos, professores, addProfessor, updateProfessor, deleteProfessor } = useFolha();
+  const { segmentos, professores, cargos, addProfessor, updateProfessor, deleteProfessor } = useFolha();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [nome, setNome] = useState('');
   const [cpf, setCpf] = useState('');
+  const [cargo, setCargo] = useState('');
+  const [cargoCustom, setCargoCustom] = useState('');
+  const [salarioFixo, setSalarioFixo] = useState('');
   const [dataAdmissao, setDataAdmissao] = useState(new Date().toISOString().split('T')[0]);
   const [slots, setSlots] = useState<SegSlot[]>([]);
 
@@ -32,6 +35,8 @@ export default function FolhaProfessores() {
   const [editing, setEditing] = useState<Professor | null>(null);
   const [editNome, setEditNome] = useState('');
   const [editCpf, setEditCpf] = useState('');
+  const [editCargo, setEditCargo] = useState('');
+  const [editSalarioFixo, setEditSalarioFixo] = useState('');
   const [editDataAdmissao, setEditDataAdmissao] = useState('');
   const [editSlots, setEditSlots] = useState<SegSlot[]>([]);
 
@@ -43,6 +48,9 @@ export default function FolhaProfessores() {
     if (dialogOpen && segmentos.length > 0) {
       setSlots(segmentos.map((s) => ({ segId: s.id, horas: '' })));
       setDataAdmissao(new Date().toISOString().split('T')[0]);
+      setCargo('');
+      setCargoCustom('');
+      setSalarioFixo('');
     }
   }, [dialogOpen, segmentos]);
 
@@ -82,10 +90,14 @@ export default function FolhaProfessores() {
     // Captura antes de limpar os states
     const nomeCriado = nome.trim();
     const cpfCriado = cpf.trim() || 'NÃO INFORMADO';
+    const cargoCriado = cargoCustom.trim() || cargo;
+    const salarioFixoCriado = parseFloat(salarioFixo.replace(',', '.')) || 0;
 
     const profData = await addProfessor({
       nome: nomeCriado,
       cpf: cpfCriado,
+      cargo: cargoCriado,
+      salarioFixo: salarioFixoCriado,
       dataAdmissao,
       segmentoIds,
       segmentoHoras,
@@ -94,6 +106,9 @@ export default function FolhaProfessores() {
 
     setNome('');
     setCpf('');
+    setCargo('');
+    setCargoCustom('');
+    setSalarioFixo('');
     setDialogOpen(false);
 
     if (openFicha && profData) {
@@ -101,6 +116,8 @@ export default function FolhaProfessores() {
         id: profData.id,
         nome: nomeCriado,
         cpf: cpfCriado,
+        cargo: cargoCriado,
+        salarioFixo: salarioFixoCriado,
         dataAdmissao,
         segmentoIds,
         segmentoHoras,
@@ -123,6 +140,8 @@ export default function FolhaProfessores() {
       return { segId: s.id, horas: (h !== undefined && h !== null) ? String(h) : '' };
     });
     setEditSlots(newSlots);
+    setEditCargo(p.cargo || '');
+    setEditSalarioFixo(p.salarioFixo ? String(p.salarioFixo) : '');
     setEditOpen(true);
   };
 
@@ -134,11 +153,13 @@ export default function FolhaProfessores() {
     });
 
     if (!editNome.trim()) {
-      toast.error('Informe o nome do professor');
+      toast.error('Informe o nome do funcionário');
       return;
     }
-    if (validSlots.length === 0) {
-      toast.error('Informe horas em pelo menos uma turma');
+    const editSalarioNum = parseFloat(editSalarioFixo.replace(',', '.')) || 0;
+    // Exige turma só se não tiver salário fixo
+    if (editSalarioNum === 0 && validSlots.length === 0) {
+      toast.error('Informe horas em pelo menos uma turma, ou um salário fixo');
       return;
     }
 
@@ -157,6 +178,8 @@ export default function FolhaProfessores() {
     await updateProfessor(editing.id, {
       nome: editNome.trim(),
       cpf: editCpf.trim() || 'NÃO INFORMADO',
+      cargo: editCargo,
+      salarioFixo: parseFloat(editSalarioFixo.replace(',', '.')) || 0,
       dataAdmissao: editDataAdmissao,
       segmentoIds,
       segmentoHoras,
@@ -256,10 +279,11 @@ export default function FolhaProfessores() {
           <Table>
             <TableHeader className="border-surface-variant">
               <TableRow className="border-surface-variant hover:bg-surface/50">
-                <TableHead className="text-on-surface-variant">Professor</TableHead>
+                <TableHead className="text-on-surface-variant">Funcionário</TableHead>
+                <TableHead className="text-on-surface-variant">Cargo</TableHead>
                 <TableHead className="text-on-surface-variant">CPF</TableHead>
                 <TableHead className="text-on-surface-variant">Admissão</TableHead>
-                <TableHead className="text-on-surface-variant">Turmas / Horas</TableHead>
+                <TableHead className="text-on-surface-variant">Turmas / Salário</TableHead>
                 <TableHead className="text-on-surface-variant text-right">Status</TableHead>
                 <TableHead className="text-on-surface-variant text-right w-[80px]">Ações</TableHead>
               </TableRow>
@@ -268,10 +292,20 @@ export default function FolhaProfessores() {
               {filtered.map((prof) => (
                 <TableRow key={prof.id} className="border-surface-variant hover:bg-surface-variant/50/40">
                   <TableCell className="font-semibold text-on-surface">{prof.nome}</TableCell>
+                  <TableCell className="text-on-surface-variant text-xs">
+                    {prof.cargo ? (
+                      <Badge variant="outline" className="border-blue-500/40 text-blue-400 text-[10px] py-0 px-2 font-normal">{prof.cargo}</Badge>
+                    ) : <span className="text-on-surface-variant/40">—</span>}
+                  </TableCell>
                   <TableCell className="text-on-surface-variant">{prof.cpf}</TableCell>
                   <TableCell className="text-on-surface-variant">{formatDateBR(prof.dataAdmissao)}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1.5">
+                      {prof.salarioFixo && prof.salarioFixo > 0 ? (
+                        <Badge variant="secondary" className="bg-green-500/20 border-green-500/40 text-green-400 text-[10px] py-0 px-2 font-normal">
+                          Fixo: {formatCurrency(prof.salarioFixo)}/mês
+                        </Badge>
+                      ) : null}
                       {prof.segmentoIds.map((sid) => {
                         const seg = segmentos.find((s) => s.id === sid);
                         const hs = prof.segmentoHoras?.[sid] || 0;
@@ -338,7 +372,7 @@ export default function FolhaProfessores() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-surface border-surface-variant text-on-surface w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Cadastrar Professor</DialogTitle>
+            <DialogTitle>Cadastrar Funcionário</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
@@ -351,9 +385,37 @@ export default function FolhaProfessores() {
                 <Input id="cpf" placeholder="000.000.000-00" value={cpf} onChange={(e) => setCpf(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="dataAdmissao" className="text-on-surface-variant text-xs">Data de Admissão</Label>
+                <Input id="dataAdmissao" type="date" value={dataAdmissao} onChange={(e) => setDataAdmissao(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="salarioFixo" className="text-on-surface-variant text-xs">Salário Fixo Mensal (R$) <span className="text-on-surface-variant/60">— deixe 0 para professores por hora</span></Label>
+                <Input id="salarioFixo" type="number" placeholder="0,00" value={salarioFixo} onChange={(e) => setSalarioFixo(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
+              </div>
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="dataAdmissao" className="text-on-surface-variant text-xs">Data de Admissão</Label>
-              <Input id="dataAdmissao" type="date" value={dataAdmissao} onChange={(e) => setDataAdmissao(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
+              <Label className="text-on-surface-variant text-xs">Cargo / Função</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={cargo}
+                  onChange={(e) => { setCargo(e.target.value); if (e.target.value !== '__outro__') setCargoCustom(''); }}
+                  className="h-9 rounded-md border border-surface-variant bg-background text-on-surface px-3 text-sm"
+                >
+                  <option value="">Selecione um cargo...</option>
+                  {cargos.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                  <option value="__outro__">✏️ Digitar outro cargo...</option>
+                </select>
+                {cargo === '__outro__' && (
+                  <Input
+                    placeholder="Digite o cargo..."
+                    value={cargoCustom}
+                    onChange={(e) => setCargoCustom(e.target.value)}
+                    className="bg-background border-surface-variant text-on-surface"
+                  />
+                )}
+              </div>
             </div>
 
             <div className="border-t border-surface-variant pt-4">
@@ -403,7 +465,7 @@ export default function FolhaProfessores() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="bg-surface border-surface-variant text-on-surface w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar Professor</DialogTitle>
+            <DialogTitle>Editar Funcionário</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
@@ -416,9 +478,35 @@ export default function FolhaProfessores() {
                 <Input id="editCpf" value={editCpf} onChange={(e) => setEditCpf(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="editDataAdmissao" className="text-on-surface-variant text-xs">Data de Admissão</Label>
+                <Input id="editDataAdmissao" type="date" value={editDataAdmissao} onChange={(e) => setEditDataAdmissao(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editSalarioFixo" className="text-on-surface-variant text-xs">Salário Fixo Mensal (R$)</Label>
+                <Input id="editSalarioFixo" type="number" placeholder="0,00" value={editSalarioFixo} onChange={(e) => setEditSalarioFixo(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
+              </div>
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="editDataAdmissao" className="text-on-surface-variant text-xs">Data de Admissão</Label>
-              <Input id="editDataAdmissao" type="date" value={editDataAdmissao} onChange={(e) => setEditDataAdmissao(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
+              <Label className="text-on-surface-variant text-xs">Cargo / Função</Label>
+              <div className="flex gap-3">
+                <select
+                  value={cargos.find(c => c.nome === editCargo) ? editCargo : (editCargo ? '__outro__' : '')}
+                  onChange={(e) => { if (e.target.value !== '__outro__') setEditCargo(e.target.value); else setEditCargo(''); }}
+                  className="flex-1 h-9 rounded-md border border-surface-variant bg-background text-on-surface px-3 text-sm"
+                >
+                  <option value="">Selecione um cargo...</option>
+                  {cargos.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+                  <option value="__outro__">✏️ Digitar outro cargo...</option>
+                </select>
+                <Input
+                  placeholder="Ou digite livremente..."
+                  value={editCargo}
+                  onChange={(e) => setEditCargo(e.target.value)}
+                  className="flex-1 bg-background border-surface-variant text-on-surface"
+                />
+              </div>
             </div>
 
             <div className="border-t border-surface-variant pt-4">
