@@ -5,7 +5,7 @@ import {
   HelpCircle, TrendingUp, TrendingDown, CheckCircle, Calendar,
   Upload, ChevronDown, Download, Plus, Trash2, Check, Search,
   BarChart3, PieChart as PieChartIcon, UserPlus, FileSpreadsheet,
-  X, Edit, RefreshCw, CreditCard, FileUp, Loader2, Printer, Merge
+  X, Edit, RefreshCw, CreditCard, FileUp, Loader2, Printer, Merge, Palette
 } from 'lucide-react';
 import readXlsxFile from 'read-excel-file/browser';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -102,6 +102,27 @@ export default function App() {
   const [brandLogo, setBrandLogo] = useState<string>(() => {
     try { return localStorage.getItem('cn_brand_logo') || ''; } catch { return ''; }
   });
+
+  const [theme, setTheme] = useState<'dark' | 'light' | 'navy'>(() => {
+    try {
+      return (localStorage.getItem('cn_app_theme') as 'dark' | 'light' | 'navy') || 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+  const [showThemeDropdown, setShowThemeDropdown] = useState(false);
+
+  // Aplica o tema na tag HTML
+  useEffect(() => {
+    try {
+      localStorage.setItem('cn_app_theme', theme);
+      const root = document.documentElement;
+      root.classList.remove('theme-dark', 'theme-light', 'theme-navy');
+      root.classList.add(`theme-${theme}`);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [theme]);
 
   const [showNewTxModal, setShowNewTxModal] = useState(false);
   const [newTxInitialTipo, setNewTxInitialTipo] = useState<'DESPESA' | 'RECEITA'>('DESPESA');
@@ -1360,6 +1381,61 @@ export default function App() {
             banks={banks}
             onNavigate={setActiveTab}
           />
+          
+          {/* Seletor de Tema Premium */}
+          <div className="relative">
+            <button
+              onClick={() => setShowThemeDropdown(!showThemeDropdown)}
+              className="p-2 text-on-surface-variant hover:bg-surface-variant/40 rounded-full transition-colors flex items-center justify-center"
+              title="Escolher Tema"
+            >
+              <Palette size={20} />
+            </button>
+            {showThemeDropdown && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowThemeDropdown(false)} 
+                />
+                <div className="absolute right-0 mt-2 w-48 bg-surface border border-surface-variant rounded-lg shadow-xl py-1 z-50">
+                  <div className="px-3 py-1.5 text-xs font-semibold text-on-surface-variant border-b border-surface-variant">
+                    Selecione o Tema
+                  </div>
+                  <button
+                    onClick={() => { setTheme('dark'); setShowThemeDropdown(false); }}
+                    className={cn(
+                      "w-full text-left px-4 py-2 text-sm transition-colors hover:bg-surface-variant/50 flex items-center justify-between",
+                      theme === 'dark' ? "text-primary font-medium" : "text-on-surface"
+                    )}
+                  >
+                    <span>Escuro (Padrão)</span>
+                    {theme === 'dark' && <Check size={14} />}
+                  </button>
+                  <button
+                    onClick={() => { setTheme('light'); setShowThemeDropdown(false); }}
+                    className={cn(
+                      "w-full text-left px-4 py-2 text-sm transition-colors hover:bg-surface-variant/50 flex items-center justify-between",
+                      theme === 'light' ? "text-primary font-medium" : "text-on-surface"
+                    )}
+                  >
+                    <span>Claro (Branco)</span>
+                    {theme === 'light' && <Check size={14} />}
+                  </button>
+                  <button
+                    onClick={() => { setTheme('navy'); setShowThemeDropdown(false); }}
+                    className={cn(
+                      "w-full text-left px-4 py-2 text-sm transition-colors hover:bg-surface-variant/50 flex items-center justify-between",
+                      theme === 'navy' ? "text-primary font-medium" : "text-on-surface"
+                    )}
+                  >
+                    <span>Azul Profundo</span>
+                    {theme === 'navy' && <Check size={14} />}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
           <button 
             onClick={logout}
             className="p-2 text-on-surface-variant hover:bg-tertiary/10 hover:text-tertiary rounded-full transition-colors hidden sm:block"

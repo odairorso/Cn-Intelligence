@@ -5,6 +5,23 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-headline: "Manrope", sans-serif;
   
+  --color-primary: var(--color-primary);
+  --color-primary-dark: var(--color-primary-dark);
+  --color-secondary: var(--color-secondary);
+  --color-tertiary: var(--color-tertiary);
+  --color-success: var(--color-success);
+  
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-surface-variant: var(--color-surface-variant);
+  
+  --color-on-surface: var(--color-on-surface);
+  --color-on-surface-variant: var(--color-on-surface-variant);
+  
+  --color-border-glow: rgba(59, 130, 246, 0.15);
+}
+
+:root {
   --color-primary: #3b82f6;       /* Blue 500 */
   --color-primary-dark: #2563eb;  /* Blue 600 */
   --color-secondary: #f59e0b;     /* Amber 500 */
@@ -18,8 +35,38 @@
   
   --color-on-surface: #f4f4f5;    /* zinc-50 */
   --color-on-surface-variant: #a1a1aa; /* zinc-400 */
+}
+
+/* Tema Claro (Branco) */
+html.theme-light {
+  --color-background: #f8fafc;    /* slate-50 */
+  --color-surface: #ffffff;       /* white */
+  --color-surface-variant: #e2e8f0; /* slate-200 */
   
-  --color-border-glow: rgba(59, 130, 246, 0.15);
+  --color-on-surface: #0f172a;    /* slate-900 */
+  --color-on-surface-variant: #64748b; /* slate-500 */
+  
+  --color-primary: #2563eb;       /* Blue 600 */
+  --color-primary-dark: #1d4ed8;  /* Blue 700 */
+  --color-secondary: #d97706;     /* Amber 600 */
+  --color-tertiary: #dc2626;      /* Red 600 */
+  --color-success: #16a34a;       /* Emerald 600 */
+}
+
+/* Tema Azul Original (Exemplo Deep Blue) */
+html.theme-navy {
+  --color-background: #0b132b;    /* Deep navy */
+  --color-surface: #1c2541;       /* Dark slate blue card */
+  --color-surface-variant: #3a506b; /* Slate blue borders */
+  
+  --color-on-surface: #f4f4f5;    /* zinc-50 */
+  --color-on-surface-variant: #8da9c4; /* Soft slate blue text */
+  
+  --color-primary: #3b82f6;       /* Blue 500 */
+  --color-primary-dark: #1d4ed8;  /* Blue 700 */
+  --color-secondary: #f59e0b;     /* Amber 500 */
+  --color-tertiary: #ef4444;      /* Red 500 */
+  --color-success: #10b981;       /* Emerald 500 */
 }
 
 @layer base {
