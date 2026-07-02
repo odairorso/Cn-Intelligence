@@ -64,6 +64,18 @@ export const parseMoneyToNumber = (value: unknown): number => {
 export const toInputDate = (value?: string | null): string => {
   if (!value) return '';
   const v = String(value).trim();
+  if (v.match(/^\d{8}$/)) {
+    const dd = v.slice(0, 2);
+    const mm = v.slice(2, 4);
+    const yyyy = v.slice(4, 8);
+    return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+  }
+  if (v.match(/^\d{6}$/)) {
+    const dd = v.slice(0, 2);
+    const mm = v.slice(2, 4);
+    const yyyy = '20' + v.slice(4, 6);
+    return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+  }
   if (v.includes('/')) {
     const [dd, mm, yyyy] = v.split('/');
     if (dd && mm && yyyy) return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;

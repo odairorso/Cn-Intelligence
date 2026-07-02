@@ -467,7 +467,7 @@ export default function App() {
           try {
             let pdf: any;
             try {
-              pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+              pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
             } catch {
               pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true } as any).promise;
             }
@@ -2066,6 +2066,16 @@ export default function App() {
                         <input
                           value={row.vencimento}
                           onChange={(e) => updatePdfRow(index, { vencimento: e.target.value })}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v.match(/^\d{8}$/)) {
+                              const formatted = `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4, 8)}`;
+                              updatePdfRow(index, { vencimento: formatted });
+                            } else if (v.match(/^\d{6}$/)) {
+                              const formatted = `${v.slice(0, 2)}/${v.slice(2, 4)}/20${v.slice(4, 6)}`;
+                              updatePdfRow(index, { vencimento: formatted });
+                            }
+                          }}
                           placeholder="DD/MM/AAAA"
                           className="w-full bg-surface-variant/30 border border-surface-variant rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
                         />
