@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useFolha } from '../../contexts/FolhaContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
-import { Printer, FileSpreadsheet, ShieldCheck } from 'lucide-react';
+import { Printer, FileSpreadsheet, ShieldCheck, Loader2 } from 'lucide-react';
 import { formatCurrency, formatDateBR } from '../../lib/folhaUtils';
 import { toast } from 'sonner';
 import { Professor } from '../../lib/folhaTypes';
@@ -11,9 +11,75 @@ import { Professor } from '../../lib/folhaTypes';
 export default function FolhaSicredi() {
   const { professores, updateProfessor } = useFolha();
   const [printing, setPrinting] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  // Estados locais para inputs em foco
+  const [localValues, setLocalValues] = useState<Record<string, Record<string, string>>>({});
 
   // Filtra colaboradores ativos
   const colaboradoresAtivos = professores.filter(p => p.ativo);
+
+  // Sincroniza dados iniciais locais
+  useEffect(() => {
+    const initialValues: Record<string, Record<string, string>> = {};
+    colaboradoresAtivos.forEach((c) => {
+      const f = c.fichaCadastro || {};
+      initialValues[c.id] = {
+        dataNascimento: f.dataNascimento || '',
+        rg: f.rg || '',
+        estadoEmissor: f.estadoEmissor || '',
+        dataEmissaoRg: f.dataEmissaoRg || '',
+        salario: f.salario || (c.salarioFixo ? String(c.salarioFixo) : ''),
+        endereco: f.endereco || '',
+        numero: f.numero || '',
+        bairro: f.bairro || '',
+        municipio: f.municipio || 'NAVIRAI',
+        estado: f.estado || 'MS',
+        cep: f.cep || ''
+      };
+    });
+    setLocalValues(initialValues);
+  }, [professores]);
+
+  const handleLocalChange = (colabId: string, field: string, value: string) => {
+    setLocalValues(prev => ({
+      ...prev,
+      [colabId]: {
+        ...(prev[colabId] || {}),
+        [field]: value
+      }
+    }));
+  };
+
+  const saveField = async (colabId: string, field: string, value: string) => {
+    const colab = professores.find(p => p.id === colabId);
+    if (!colab) return;
+
+    const currentFicha = colab.fichaCadastro || {};
+    // Evita salvar se o valor não mudou
+    if (currentFicha[field] === value) return;
+
+    setSavingId(colabId);
+    try {
+      const updatedFicha = {
+        ...currentFicha,
+        [field]: value
+      };
+
+      const patch: Partial<Professor> = { fichaCadastro: updatedFicha };
+      // Se alterou salário, também sincroniza com o salário fixo do professor
+      if (field === 'salario') {
+        patch.salarioFixo = parseFloat(value.replace(',', '.')) || 0;
+      }
+
+      await updateProfessor(colab.id, patch);
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao atualizar campo.');
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   const handleToggleTec = async (colabId: string, checked: boolean) => {
     const colab = professores.find(p => p.id === colabId);
@@ -65,10 +131,10 @@ export default function FolhaSicredi() {
         <CardContent className="p-4 flex gap-3 items-start text-xs text-on-surface-variant leading-relaxed">
           <ShieldCheck className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <p className="font-semibold text-on-surface">O que é a Relação de Beneficiários Sicredi?</p>
+            <p className="font-semibold text-on-surface">Dados Inteligentes e Edição Inline ⚡</p>
             <p>
-              Esta listagem reúne os dados cadastrais (CPF, RG, Salário, Endereço completo) exigidos pelo Sicredi para a abertura/vinculação das contas salário dos colaboradores.
-              A marcação <strong>Optante de TEC</strong> indica se o colaborador escolheu transferir automaticamente os recursos salariais para outro banco.
+              Todos os dados abaixo são extraídos do cadastro oficial. 
+              <strong> Você pode clicar e alterar qualquer valor direto na tabela</strong> — as alterações são salvas automaticamente assim que você clica fora da caixa de entrada!
             </p>
           </div>
         </CardContent>
@@ -79,19 +145,19 @@ export default function FolhaSicredi() {
         <CardHeader className="border-b border-surface-variant pb-3">
           <CardTitle className="text-sm font-semibold flex items-center gap-2 text-on-surface">
             <FileSpreadsheet className="w-4 h-4 text-green-500" />
-            Visualização dos Dados de Abertura de Conta
+            Visualização e Edição Rápida de Dados
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader className="border-surface-variant bg-surface-variant/20">
               <TableRow className="border-surface-variant hover:bg-transparent">
-                <TableHead className="text-on-surface-variant text-xs">Colaborador</TableHead>
-                <TableHead className="text-on-surface-variant text-xs">Nascimento</TableHead>
-                <TableHead className="text-on-surface-variant text-xs">CPF / RG</TableHead>
-                <TableHead className="text-on-surface-variant text-xs">Salário Base</TableHead>
-                <TableHead className="text-on-surface-variant text-xs">Endereço Completo</TableHead>
-                <TableHead className="text-on-surface-variant text-xs text-center">Optante TEC*</TableHead>
+                <TableHead className="text-on-surface-variant text-xs py-2">Colaborador</TableHead>
+                <TableHead className="text-on-surface-variant text-xs py-2 w-[110px]">Nascimento</TableHead>
+                <TableHead className="text-on-surface-variant text-xs py-2 w-[220px]">CPF & Identidade (RG / UF / Emissão)</TableHead>
+                <TableHead className="text-on-surface-variant text-xs py-2 w-[110px]">Salário (R$)</TableHead>
+                <TableHead className="text-on-surface-variant text-xs py-2">Endereço Completo (Rua, Nº, Bairro, CEP)</TableHead>
+                <TableHead className="text-on-surface-variant text-xs py-2 text-center w-[90px]">Optante TEC</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -105,30 +171,112 @@ export default function FolhaSicredi() {
                 colaboradoresAtivos.map((c) => {
                   const f = c.fichaCadastro || {};
                   const opta = f.optanteTec === 'Sim';
-                  const enderecoCompleto = [
-                    f.endereco ? `${f.endereco}, ${f.numero}` : '',
-                    f.bairro || '',
-                    f.municipio ? `${f.municipio}-${f.estado || 'MS'}` : '',
-                    f.cep || ''
-                  ].filter(Boolean).join(' - ');
-
-                  const salarioFinal = parseFloat(f.salario) || c.salarioFixo || 0;
+                  const rowValues = localValues[c.id] || {};
 
                   return (
-                    <TableRow key={c.id} className="border-surface-variant hover:bg-surface-variant/40">
-                      <TableCell className="font-semibold text-on-surface text-xs">{c.nome}</TableCell>
-                      <TableCell className="text-on-surface-variant text-xs">{f.dataNascimento ? formatDateBR(f.dataNascimento) : '—'}</TableCell>
-                      <TableCell className="text-on-surface-variant text-xs">
-                        <div className="font-mono">{c.cpf}</div>
-                        <div className="text-[10px] opacity-70">RG: {f.rg || '—'} {f.estadoEmissor ? `(${f.estadoEmissor})` : ''}</div>
+                    <TableRow key={c.id} className="border-surface-variant hover:bg-surface-variant/20 py-1">
+                      {/* Nome */}
+                      <TableCell className="font-semibold text-on-surface text-xs py-1">
+                        <div className="flex items-center gap-1.5">
+                          {savingId === c.id && <Loader2 className="w-3.5 h-3.5 animate-spin text-green-500" />}
+                          {c.nome}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-on-surface text-xs font-semibold">
-                        {salarioFinal > 0 ? formatCurrency(salarioFinal) : '—'}
+
+                      {/* Nascimento */}
+                      <TableCell className="py-1">
+                        <input
+                          type="date"
+                          value={rowValues.dataNascimento || ''}
+                          onChange={(e) => handleLocalChange(c.id, 'dataNascimento', e.target.value)}
+                          onBlur={(e) => saveField(c.id, 'dataNascimento', e.target.value)}
+                          className="w-full text-xs bg-transparent border-0 border-b border-transparent focus:border-green-500 focus:ring-0 text-on-surface p-1 rounded hover:bg-surface-variant/30"
+                        />
                       </TableCell>
-                      <TableCell className="text-on-surface-variant text-[11px] max-w-[250px] truncate" title={enderecoCompleto}>
-                        {enderecoCompleto || '—'}
+
+                      {/* CPF / RG */}
+                      <TableCell className="py-1 space-y-1">
+                        <div className="font-mono text-xs p-1">{c.cpf}</div>
+                        <div className="flex gap-1 items-center">
+                          <input
+                            type="text"
+                            placeholder="RG"
+                            value={rowValues.rg || ''}
+                            onChange={(e) => handleLocalChange(c.id, 'rg', e.target.value)}
+                            onBlur={(e) => saveField(c.id, 'rg', e.target.value)}
+                            className="w-20 text-[10px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded text-center"
+                          />
+                          <input
+                            type="text"
+                            placeholder="UF"
+                            value={rowValues.estadoEmissor || ''}
+                            onChange={(e) => handleLocalChange(c.id, 'estadoEmissor', e.target.value)}
+                            onBlur={(e) => saveField(c.id, 'estadoEmissor', e.target.value)}
+                            className="w-8 text-[10px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded text-center uppercase"
+                          />
+                          <input
+                            type="date"
+                            title="Data Emissão"
+                            value={rowValues.dataEmissaoRg || ''}
+                            onChange={(e) => handleLocalChange(c.id, 'dataEmissaoRg', e.target.value)}
+                            onBlur={(e) => saveField(c.id, 'dataEmissaoRg', e.target.value)}
+                            className="w-24 text-[9px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded"
+                          />
+                        </div>
                       </TableCell>
-                      <TableCell className="text-center">
+
+                      {/* Salário */}
+                      <TableCell className="py-1">
+                        <input
+                          type="text"
+                          placeholder="0,00"
+                          value={rowValues.salario || ''}
+                          onChange={(e) => handleLocalChange(c.id, 'salario', e.target.value)}
+                          onBlur={(e) => saveField(c.id, 'salario', e.target.value)}
+                          className="w-full text-xs font-semibold bg-transparent border-0 border-b border-transparent focus:border-green-500 focus:ring-0 text-on-surface p-1 rounded hover:bg-surface-variant/30 text-right"
+                        />
+                      </TableCell>
+
+                      {/* Endereço Completo */}
+                      <TableCell className="py-1">
+                        <div className="flex flex-wrap gap-1 items-center">
+                          <input
+                            type="text"
+                            placeholder="Endereço / Logradouro"
+                            value={rowValues.endereco || ''}
+                            onChange={(e) => handleLocalChange(c.id, 'endereco', e.target.value)}
+                            onBlur={(e) => saveField(c.id, 'endereco', e.target.value)}
+                            className="w-[180px] text-[10px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Nº"
+                            value={rowValues.numero || ''}
+                            onChange={(e) => handleLocalChange(c.id, 'numero', e.target.value)}
+                            onBlur={(e) => saveField(c.id, 'numero', e.target.value)}
+                            className="w-10 text-[10px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded text-center"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Bairro"
+                            value={rowValues.bairro || ''}
+                            onChange={(e) => handleLocalChange(c.id, 'bairro', e.target.value)}
+                            onBlur={(e) => saveField(c.id, 'bairro', e.target.value)}
+                            className="w-24 text-[10px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded"
+                          />
+                          <input
+                            type="text"
+                            placeholder="CEP"
+                            value={rowValues.cep || ''}
+                            onChange={(e) => handleLocalChange(c.id, 'cep', e.target.value)}
+                            onBlur={(e) => saveField(c.id, 'cep', e.target.value)}
+                            className="w-20 text-[10px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded text-center"
+                          />
+                        </div>
+                      </TableCell>
+
+                      {/* Optante TEC */}
+                      <TableCell className="text-center py-1">
                         <div className="flex justify-center">
                           <input
                             type="checkbox"
@@ -292,27 +440,31 @@ export default function FolhaSicredi() {
           </thead>
           <tbody>
             {colaboradoresAtivos.map((c) => {
+              const rowValues = localValues[c.id] || {};
               const f = c.fichaCadastro || {};
               const opta = f.optanteTec === 'Sim' ? 'Sim' : '';
-              const salarioFinal = parseFloat(f.salario) || c.salarioFixo || 0;
+              
+              // Endereço formatado para impressão
+              const endImprimir = rowValues.endereco ? `${rowValues.endereco?.toUpperCase()}, ${rowValues.numero}` : '';
+              const cidadeImprimir = rowValues.municipio ? `${rowValues.municipio?.toUpperCase()}-${rowValues.estado || 'MS'}` : '';
+
+              const salarioFinal = parseFloat(rowValues.salario) || 0;
 
               return (
                 <tr key={c.id}>
                   <td style={{ fontWeight: 'bold' }}>{c.nome?.toUpperCase()}</td>
-                  <td style={{ textAlign: 'center' }}>{f.dataNascimento ? formatDateBR(f.dataNascimento) : ''}</td>
+                  <td style={{ textAlign: 'center' }}>{rowValues.dataNascimento ? formatDateBR(rowValues.dataNascimento) : ''}</td>
                   <td style={{ textAlign: 'center' }}>{c.cpf}</td>
-                  <td style={{ textAlign: 'center' }}>{f.rg || ''}</td>
-                  <td style={{ textAlign: 'center' }}>
-                    {f.estadoEmissor ? `${f.estadoEmissor}` : ''}
-                  </td>
-                  <td style={{ textAlign: 'center' }}>{f.dataEmissaoRg ? formatDateBR(f.dataEmissaoRg) : ''}</td>
+                  <td style={{ textAlign: 'center' }}>{rowValues.rg || ''}</td>
+                  <td style={{ textAlign: 'center' }}>{rowValues.estadoEmissor?.toUpperCase() || ''}</td>
+                  <td style={{ textAlign: 'center' }}>{rowValues.dataEmissaoRg ? formatDateBR(rowValues.dataEmissaoRg) : ''}</td>
                   <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
                     {salarioFinal > 0 ? formatCurrency(salarioFinal) : ''}
                   </td>
-                  <td>{f.endereco ? `${f.endereco?.toUpperCase()}, ${f.numero}` : ''}</td>
-                  <td>{f.bairro?.toUpperCase() || ''}</td>
-                  <td>{f.municipio ? `${f.municipio?.toUpperCase()}-${f.estado || 'MS'}` : 'NAVIRAI-MS'}</td>
-                  <td style={{ textAlign: 'center' }}>{f.cep || ''}</td>
+                  <td>{endImprimir}</td>
+                  <td>{rowValues.bairro?.toUpperCase() || ''}</td>
+                  <td>{cidadeImprimir}</td>
+                  <td style={{ textAlign: 'center' }}>{rowValues.cep || ''}</td>
                   <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{opta}</td>
                 </tr>
               );
