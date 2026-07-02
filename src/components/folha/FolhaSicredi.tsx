@@ -346,6 +346,10 @@ export default function FolhaSicredi() {
           }
         }
         @media print {
+          @page {
+            size: A4 landscape;
+            margin: 0;
+          }
           body * {
             visibility: hidden;
           }
@@ -356,24 +360,29 @@ export default function FolhaSicredi() {
             position: absolute;
             left: 0;
             top: 0;
-            width: 100%;
+            width: 297mm;
+            height: 210mm;
+            padding: 8mm 12mm;
+            box-sizing: border-box;
             display: block !important;
             font-family: Arial, sans-serif;
             color: #000;
-            font-size: 9px;
+            font-size: 8px;
             background: white;
           }
           .sicredi-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
-            margin-bottom: 10px;
+            margin-top: 5px;
+            margin-bottom: 5px;
           }
           .sicredi-table th, .sicredi-table td {
             border: 1px solid #000;
-            padding: 4px 6px;
+            padding: 3px 4px;
             text-align: left;
-            font-size: 8px;
+            font-size: 7px;
+            line-height: 1.1;
+            height: 18px;
           }
           .sicredi-table th {
             background-color: #e2efda !important;
@@ -389,61 +398,60 @@ export default function FolhaSicredi() {
             print-color-adjust: exact;
             text-align: center;
             font-weight: bold;
-            font-size: 11px;
-            padding: 8px;
+            font-size: 10px;
+            padding: 5px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
           }
           .sicredi-subheader {
             border: 1px solid #000;
             border-top: none;
-            padding: 8px;
-            font-size: 9px;
-            line-height: 1.4;
+            padding: 5px;
+            font-size: 8px;
+            line-height: 1.2;
             text-align: center;
           }
           .sicredi-meta-row {
             display: flex;
             border: 1px solid #000;
             border-top: none;
-            font-size: 9px;
+            font-size: 8px;
           }
           .sicredi-meta-label {
             font-weight: bold;
-            padding: 6px;
+            padding: 4px 6px;
             border-right: 1px solid #000;
             background-color: #f2f2f2;
-            width: 150px;
+            width: 120px;
             text-transform: uppercase;
           }
           .sicredi-meta-value {
-            padding: 6px;
+            padding: 4px 6px;
             flex-grow: 1;
             font-weight: bold;
           }
           .sicredi-footer-note {
             border: 1px solid #000;
-            padding: 8px;
-            margin-top: 10px;
-            font-size: 8px;
-            line-height: 1.4;
+            padding: 6px;
+            margin-top: 5px;
+            font-size: 7px;
+            line-height: 1.3;
             text-align: justify;
           }
           .sicredi-signature-box {
-            margin-top: 25px;
+            margin-top: 15px;
             border-top: 1px solid #000;
-            padding-top: 4px;
-            font-size: 8px;
+            padding-top: 3px;
+            font-size: 7.5px;
             width: 250px;
           }
           .sicredi-footer-meta {
-            margin-top: 20px;
+            margin-top: 12px;
             display: flex;
             justify-content: space-between;
-            font-size: 7px;
-            color: #555;
-            border-top: 1px solid #eee;
-            padding-top: 4px;
+            font-size: 6.5px;
+            color: #444;
+            border-top: 1.5px solid #000;
+            padding-top: 3px;
           }
         }
       `}</style>
