@@ -31,6 +31,7 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
   const [nome, setNome] = useState('');
   const [dataNascimento, setDataNascimento] = useState('');
   const [municipioNascimento, setMunicipioNascimento] = useState('');
+  const [ufNascimento, setUfNascimento] = useState('');
   const [nomePai, setNomePai] = useState('');
   const [nomeMae, setNomeMae] = useState('');
   const [estadoCivil, setEstadoCivil] = useState('Solteiro');
@@ -146,6 +147,7 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
 
       setDataNascimento(f.dataNascimento || '');
       setMunicipioNascimento(f.municipioNascimento || '');
+      setUfNascimento(f.ufNascimento || '');
       setNomePai(f.nomePai || '');
       setNomeMae(f.nomeMae || '');
       setEstadoCivil(f.estadoCivil || 'Solteiro');
@@ -223,11 +225,52 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
       setEmpresaOutroVinculo(f.empresaOutroVinculo || '');
       setCnpjOutroVinculo(f.cnpjOutroVinculo || '');
 
-      setCargoFuncao(f.cargoFuncao || professor.cargo || '');
+      // Fallback inteligente para Cargo/Função se estiver vazio
+      let fallbackCargo = f.cargoFuncao || professor.cargo || '';
+      if (!fallbackCargo && professor.segmentoIds && professor.segmentoIds.length > 0) {
+        const segNames = professor.segmentoIds
+          .map(sid => segmentos.find(s => s.id === sid)?.nome)
+          .filter(Boolean);
+        if (segNames.length > 0) {
+          fallbackCargo = segNames.join(' / ');
+        }
+      }
+      setCargoFuncao(fallbackCargo);
+
       setHorarioTrabalho(f.horarioTrabalho || '');
       setServicoObra(f.servicoObra || '');
       setDiasSemana(f.diasSemana || []);
-      setSalario(f.salario || (professor.salarioFixo ? String(professor.salarioFixo) : ''));
+
+      // Fallback inteligente para Salário de Horista / Estagiária
+      let fallbackSalario = f.salario || (professor.salarioFixo ? String(professor.salarioFixo) : '');
+      if (!fallbackSalario && professor.segmentoIds && professor.segmentoIds.length > 0) {
+        let totalEstimado = 0;
+        professor.segmentoIds.forEach((sid) => {
+          const seg = segmentos.find((s) => s.id === sid);
+          if (seg) {
+            const isMon = seg.nome.toLowerCase().includes('monitora');
+            const horasBaseSemanais = isMon ? 0 : (Number(professor.segmentoHoras?.[seg.id]) || Number(seg.horasSemanais) || 0);
+            
+            if (seg.nome.toLowerCase().includes('estagiaria')) {
+              totalEstimado += Math.round(((1000 / 30) * horasBaseSemanais) * 100) / 100;
+            } else {
+              const horasMensais = horasBaseSemanais * 4.5;
+              const haPercent = Number(seg.horasAtividade) / (Number(seg.horasSemanais) * 4.5 || 1) || 0;
+              const horasAtividade = horasMensais * haPercent;
+              const repouso = (horasMensais + horasAtividade) / 6;
+              const totalHoras = horasMensais + repouso + horasAtividade;
+              const valorHora = Number(seg.valorHora) || 0;
+              const ajudaCusto = Number(seg.ajudaCusto) || 0;
+              totalEstimado += Math.round((totalHoras * valorHora + ajudaCusto) * 100) / 100;
+            }
+          }
+        });
+        if (totalEstimado > 0) {
+          fallbackSalario = String(totalEstimado);
+        }
+      }
+      setSalario(fallbackSalario);
+
       setSalarioTipo(f.salarioTipo || 'mês');
       setValeTransporte(f.valeTransporte || 'Não');
       setPericulidade(f.periculidade || 'Não');
@@ -237,13 +280,13 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
 
       setLgpdConcorda(f.lgpdConcorda !== false);
     }
-  }, [professor]);
+  }, [professor, segmentos]);
 
   // Coleta dados inseridos
   const getFichaPayload = () => {
     return {
       empresa, cnpj, encarregado, foneRamal,
-      dataNascimento, municipioNascimento, nomePai, nomeMae, estadoCivil, raca,
+      dataNascimento, municipioNascimento, ufNascimento, nomePai, nomeMae, estadoCivil, raca,
       pisPasep, rg, estadoEmissor, dataEmissaoRg, ctpsDigital, ctps, serieCtps, dataEmissaoCtps,
       cnh, categoriaCnh, validadeCnh, dataEmissaoCnh, dataPrimeiraHabilitacao,
       tituloEleitor, zona, secao, reservista, categoriaReservista, dataEmissaoReservista, observacoes,
@@ -526,8 +569,8 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
                 <span class="field-value">${formatBRDate(dataNascimento)}</span>
               </td>
               <td colspan="2" style="width: 65%;">
-                <span class="field-label">Município Nascimento: <span style="float:right; font-size:8px; color:#888;">LGPD: 3</span></span>
-                <span class="field-value">${municipioNascimento}</span>
+                <span class="field-label">Município Nascimento / UF: <span style="float:right; font-size:8px; color:#888;">LGPD: 3</span></span>
+                <span class="field-value">${municipioNascimento}${ufNascimento ? ' - ' + ufNascimento.toUpperCase() : ''}</span>
               </td>
             </tr>
             <tr>
@@ -1058,10 +1101,14 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="md:col-span-2">
                 <Label htmlFor="municipioNascimento">Município de Nascimento</Label>
                 <Input id="municipioNascimento" value={municipioNascimento} onChange={(e) => setMunicipioNascimento(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
+              </div>
+              <div>
+                <Label htmlFor="ufNascimento">UF Nascimento</Label>
+                <Input id="ufNascimento" placeholder="Ex: MS" maxLength={2} value={ufNascimento} onChange={(e) => setUfNascimento(e.target.value.toUpperCase())} className="bg-background border-surface-variant text-on-surface uppercase" />
               </div>
               <div>
                 <Label htmlFor="estadoCivil">Estado Civil</Label>
