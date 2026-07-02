@@ -24,6 +24,11 @@ describe('Boleto Parser and Utility Unit Tests', () => {
       expect(normalizeBoletoNumber('001-9')).toBe('0019');
       expect(normalizeBoletoNumber('')).toBe('');
       expect(normalizeBoletoNumber(undefined)).toBe('');
+      expect(normalizeBoletoNumber('CONSTATADO')).toBe('');
+      expect(normalizeBoletoNumber('CONTRATADO')).toBe('');
+      expect(normalizeBoletoNumber('ISENTO')).toBe('');
+      expect(normalizeBoletoNumber('ABCDEF')).toBe('');
+      expect(normalizeBoletoNumber('12345-ABC')).toBe('12345ABC');
     });
   });
 

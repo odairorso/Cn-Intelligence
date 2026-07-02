@@ -219,7 +219,8 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
       }
 
       const txValue = Number(tx.valor) + Number(tx.juros || 0);
-      const valueDateKey = `${txValue.toFixed(2)}|${tx.vencimento}`;
+      // Inclui o tipo na chave para evitar falsos duplicados entre RECEITA e DESPESA
+      const valueDateKey = `${txValue.toFixed(2)}|${tx.vencimento}|${tx.tipo || 'DESPESA'}`;
       if (!valueDateMap.has(valueDateKey)) {
         valueDateMap.set(valueDateKey, []);
       }
@@ -240,8 +241,9 @@ export const OFXImportTab: React.FC<OFXImportProps> = ({
       // Match by FITID - busca O(1) no Set
       if (fitidSet.has(row.fitid)) return true;
 
-      // Match by value + date + supplier name - busca O(1) no Map
-      const valueDateKey = `${rowValue.toFixed(2)}|${rowDate}`;
+      // Match by value + date + tipo + supplier name - busca O(1) no Map
+      // Tipo incluído para não confundir RECEITA vs DESPESA de mesmo valor/data
+      const valueDateKey = `${rowValue.toFixed(2)}|${rowDate}|${row.tipo || 'DESPESA'}`;
       const possibleMatches = valueDateMap.get(valueDateKey);
       if (!possibleMatches) return false;
 

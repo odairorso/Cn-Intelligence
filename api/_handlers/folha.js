@@ -96,7 +96,15 @@ export async function handleProfessores(req, res) {
 
       const prof = pRows[0];
 
-      if (Array.isArray(segmentos)) {
+      if (Array.isArray(segmentos) && segmentos.length > 0) {
+        // Valida que todos os segmentos pertencem ao inquilino logado (anti cross-tenant)
+        const uniqueSegIds = Array.from(new Set(segmentos.map(s => s.segmentoId).filter(Boolean)));
+        if (uniqueSegIds.length > 0) {
+          const ownedSegs = await sql`SELECT id FROM segmentos WHERE uid = ${uid} AND id = ANY(${uniqueSegIds}::uuid[])`;
+          if (ownedSegs.length !== uniqueSegIds.length) {
+            return res.status(403).json({ error: 'Um ou mais segmentos de RH fornecidos não pertencem a este usuário.' });
+          }
+        }
         for (const s of segmentos) {
           if (!s.segmentoId) continue;
           await sql`
@@ -104,6 +112,8 @@ export async function handleProfessores(req, res) {
             VALUES (${prof.id}, ${s.segmentoId}, ${s.horasSemanais || 0})
           `;
         }
+      } else if (Array.isArray(segmentos)) {
+        // Array vazio: limpa sem inserir
       }
 
       // Sincroniza automaticamente como Fornecedor (Supplier) no financeiro
@@ -158,6 +168,16 @@ export async function handleProfessores(req, res) {
       const prof = pRows[0];
 
       if (segmentos !== undefined) {
+        // Valida que todos os segmentos pertencem ao inquilino logado (anti cross-tenant)
+        if (Array.isArray(segmentos) && segmentos.length > 0) {
+          const uniqueSegIds = Array.from(new Set(segmentos.map(s => s.segmentoId).filter(Boolean)));
+          if (uniqueSegIds.length > 0) {
+            const ownedSegs = await sql`SELECT id FROM segmentos WHERE uid = ${uid} AND id = ANY(${uniqueSegIds}::uuid[])`;
+            if (ownedSegs.length !== uniqueSegIds.length) {
+              return res.status(403).json({ error: 'Um ou mais segmentos de RH fornecidos não pertencem a este usuário.' });
+            }
+          }
+        }
         await sql`DELETE FROM professor_segmentos WHERE professor_id = ${id}`;
 
         if (Array.isArray(segmentos)) {
@@ -239,6 +259,24 @@ export async function handleFechamentos(req, res) {
 
       if (!competencia || !lancamentos) {
         return res.status(400).json({ error: 'Dados insuficientes' });
+      }
+
+      // Validação de ownership dos funcionários e segmentos (anti cross-tenant)
+      const uniqueProfIds = Array.from(new Set((lancamentos || []).map(l => l.professorId).filter(Boolean)));
+      const uniqueSegIds = Array.from(new Set((lancamentos || []).map(l => l.segmentoId).filter(Boolean)));
+
+      if (uniqueProfIds.length > 0) {
+        const ownedProfs = await sql`SELECT id FROM professores WHERE uid = ${uid} AND id = ANY(${uniqueProfIds}::uuid[])`;
+        if (ownedProfs.length !== uniqueProfIds.length) {
+          return res.status(403).json({ error: 'Um ou mais funcionários fornecidos não pertencem a este usuário.' });
+        }
+      }
+
+      if (uniqueSegIds.length > 0) {
+        const ownedSegs = await sql`SELECT id FROM segmentos WHERE uid = ${uid} AND id = ANY(${uniqueSegIds}::uuid[])`;
+        if (ownedSegs.length !== uniqueSegIds.length) {
+          return res.status(403).json({ error: 'Um ou mais segmentos de RH fornecidos não pertencem a este usuário.' });
+        }
       }
 
       // 1. Registra o fechamento

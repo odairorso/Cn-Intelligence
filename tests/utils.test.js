@@ -28,6 +28,15 @@ test('normalizeBoletoNumber', () => {
   assert.strictEqual(normalizeBoletoNumber(undefined), '');
   assert.strictEqual(normalizeBoletoNumber(''), '');
   assert.strictEqual(normalizeBoletoNumber('UNDEFINED'), '');
+
+  // Valores puramente alfabéticos ou na blacklist (devem retornar vazio)
+  assert.strictEqual(normalizeBoletoNumber('CONSTATADO'), '');
+  assert.strictEqual(normalizeBoletoNumber('CONTRATADO'), '');
+  assert.strictEqual(normalizeBoletoNumber('ISENTO'), '');
+  assert.strictEqual(normalizeBoletoNumber('ABCDEF'), '');
+
+  // Valor alfanumérico contendo dígitos (deve ser preservado e normalizado)
+  assert.strictEqual(normalizeBoletoNumber('12345-ABC'), '12345ABC');
 });
 
 test('isValidCnpj', () => {

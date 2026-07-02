@@ -103,11 +103,15 @@ export const checkRateLimit = async (req, res) => {
 // --- Processamento de Boleto ---
 export const normalizeBoletoNumber = (value) => {
   if (value === null || value === undefined || value === '') return '';
+  const raw = String(value).toUpperCase();
+  const blacklist = ['CONSTATADO', 'CONTRATADO', 'CONTRATO', 'ISENTO', 'UNDEFINED', 'NULL', 'INVALID', 'CADASTRE', 'TELEFONE'];
+  if (blacklist.some(word => raw.includes(word)) || !/\d/.test(raw)) {
+    return '';
+  }
   const clean = String(value).replace(/[^A-Z0-9]/g, '');
   if (clean.length === 47 || clean.length === 48 || clean.length === 44) {
     return clean;
   }
-  const raw = String(value).toUpperCase();
   if (!raw || raw === 'UNDEFINED' || raw === 'NULL') return '';
   const tokens = raw
     .split(/[\s:;|,]+/)
@@ -155,7 +159,10 @@ export const extractLocalBoletoNumber = (text) => {
     const match = source.match(pattern);
     if (match?.[1]) {
       const raw = match[1].trim().replace(/\s+/g, ' ');
-      if (raw.length >= 4) return raw;
+      const blacklist = ['CONSTATADO', 'CONTRATADO', 'CONTRATO', 'ISENTO', 'UNDEFINED', 'NULL', 'INVALID', 'CADASTRE', 'TELEFONE'];
+      const isBlacklisted = blacklist.some(word => raw.includes(word));
+      const hasDigits = /\d/.test(raw);
+      if (raw.length >= 4 && !isBlacklisted && hasDigits) return raw;
     }
   }
   return '';

@@ -4,8 +4,17 @@ import { logSecurity, handleError } from '../_utils.js';
 // POST /api?route=setup-tables
 export async function handleSetupTables(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  // Somente o administrador master pode executar o setup de tabelas
+  const uid = req.authUid;
+  const MASTER_UID = process.env.APP_UID || 'odair';
+  if (!uid || uid !== MASTER_UID) {
+    return res.status(403).json({ error: 'Acesso negado: apenas administradores podem configurar tabelas.' });
+  }
+
   try {
     await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+
     
     // Tabela de usuários
     await sql`CREATE TABLE IF NOT EXISTS users (

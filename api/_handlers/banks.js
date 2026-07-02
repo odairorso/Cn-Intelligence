@@ -117,6 +117,12 @@ export async function handleContasContabeis(req, res) {
       const uid = req.authUid;
       if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
+      // Contas contábeis são globais: só o administrador master pode criar/editar
+      const MASTER_UID = process.env.APP_UID || 'odair';
+      if (uid !== MASTER_UID) {
+        return res.status(403).json({ error: 'Acesso negado: apenas o administrador pode gerenciar o plano de contas.' });
+      }
+
       await ensureContasTable();
       const result = ContaContabilSchema.safeParse({ ...(req.body || {}), uid });
       if (!result.success) {
@@ -140,6 +146,12 @@ export async function handleContasContabeis(req, res) {
       const uid = req.authUid;
       if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
+      // Contas contábeis são globais: só o administrador master pode criar/editar
+      const MASTER_UID = process.env.APP_UID || 'odair';
+      if (uid !== MASTER_UID) {
+        return res.status(403).json({ error: 'Acesso negado: apenas o administrador pode gerenciar o plano de contas.' });
+      }
+
       await ensureContasTable();
       const { id } = req.query;
       const { codigo, nome, tipo, ativo } = req.body;
@@ -161,6 +173,12 @@ export async function handleContasContabeis(req, res) {
     try {
       const uid = req.authUid;
       if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+
+      // Contas contábeis são globais: só o administrador master pode desativar
+      const MASTER_UID = process.env.APP_UID || 'odair';
+      if (uid !== MASTER_UID) {
+        return res.status(403).json({ error: 'Acesso negado: apenas o administrador pode gerenciar o plano de contas.' });
+      }
 
       await ensureContasTable();
       const { id } = req.query;
