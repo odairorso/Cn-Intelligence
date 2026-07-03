@@ -1,9 +1,6 @@
+import './setup.js';
 import test from 'node:test';
 import assert from 'node:assert';
-
-// Defina variáveis de ambiente de mock para evitar falhas na inicialização do pool do pg
-process.env.DATABASE_URL = 'postgresql://localhost:5432/mock';
-process.env.JWT_SECRET = 'mock-secret';
 
 // Agora podemos importar os arquivos com segurança
 import {
