@@ -89,9 +89,14 @@ export async function handleProfessores(req, res) {
   if (req.method === 'POST') {
     try {
       const { nome, cpf, dataAdmissao, ativo, segmentos, cargo, salarioFixo } = req.body;
+      const sanitizedNome = String(nome || '').trim();
+      const sanitizedCpf = String(cpf || '').trim();
+      if (!sanitizedNome || !sanitizedCpf) {
+        return res.status(400).json({ error: 'Nome e CPF são obrigatórios.' });
+      }
       const pRows = await sql`
         INSERT INTO professores (uid, nome, cpf, data_admissao, ativo, cargo, salario_fixo)
-        VALUES (${uid}, ${nome}, ${cpf}, ${dataAdmissao || new Date().toISOString().split('T')[0]}, ${ativo !== false}, ${cargo || ''}, ${salarioFixo || 0})
+        VALUES (${uid}, ${sanitizedNome}, ${sanitizedCpf}, ${dataAdmissao || new Date().toISOString().split('T')[0]}, ${ativo !== false}, ${cargo || ''}, ${salarioFixo || 0})
         RETURNING *`;
 
       const prof = pRows[0];
@@ -117,9 +122,9 @@ export async function handleProfessores(req, res) {
       }
 
       // Sincroniza automaticamente como Fornecedor (Supplier) no financeiro
-      const existing = await sql`SELECT id FROM suppliers WHERE uid = ${uid} AND upper(nome) = upper(${nome}) LIMIT 1`;
+      const existing = await sql`SELECT id FROM suppliers WHERE uid = ${uid} AND upper(nome) = upper(${sanitizedNome}) LIMIT 1`;
       if (existing.length === 0) {
-        await sql`INSERT INTO suppliers (uid, nome) VALUES (${uid}, ${nome})`;
+        await sql`INSERT INTO suppliers (uid, nome) VALUES (${uid}, ${sanitizedNome})`;
       }
 
       return res.status(201).json(prof);
@@ -135,15 +140,25 @@ export async function handleProfessores(req, res) {
       if (currentRows.length === 0) return res.status(404).json({ error: 'Funcionário não encontrado' });
       const current = currentRows[0];
 
+      if (nome !== undefined && !String(nome || '').trim()) {
+        return res.status(400).json({ error: 'Nome não pode ficar vazio.' });
+      }
+      if (cpf !== undefined && !String(cpf || '').trim()) {
+        return res.status(400).json({ error: 'CPF não pode ficar vazio.' });
+      }
+
       const finalCargo = cargo !== undefined ? cargo : (current.cargo || '');
       const finalSalarioFixo = salarioFixo !== undefined ? salarioFixo : (Number(current.salario_fixo) || 0);
+
+      const safeNome = nome !== undefined ? String(nome).trim() : undefined;
+      const safeCpf = cpf !== undefined ? String(cpf).trim() : undefined;
 
       let pRows;
       if (fichaCadastro !== undefined) {
         pRows = await sql`
           UPDATE professores
-          SET nome = ${nome},
-              cpf = ${cpf},
+          SET nome = ${safeNome},
+              cpf = ${safeCpf},
               data_admissao = ${dataAdmissao},
               ativo = ${ativo !== false},
               cargo = ${finalCargo},
@@ -154,8 +169,8 @@ export async function handleProfessores(req, res) {
       } else {
         pRows = await sql`
           UPDATE professores
-          SET nome = ${nome},
-              cpf = ${cpf},
+          SET nome = ${safeNome},
+              cpf = ${safeCpf},
               data_admissao = ${dataAdmissao},
               ativo = ${ativo !== false},
               cargo = ${finalCargo},
@@ -192,9 +207,9 @@ export async function handleProfessores(req, res) {
       }
 
       // Sincroniza automaticamente como Fornecedor (Supplier) no financeiro
-      const existing = await sql`SELECT id FROM suppliers WHERE uid = ${uid} AND upper(nome) = upper(${nome}) LIMIT 1`;
+      const existing = await sql`SELECT id FROM suppliers WHERE uid = ${uid} AND upper(nome) = upper(${safeNome ?? currentRows[0]?.nome}) LIMIT 1`;
       if (existing.length === 0) {
-        await sql`INSERT INTO suppliers (uid, nome) VALUES (${uid}, ${nome})`;
+        await sql`INSERT INTO suppliers (uid, nome) VALUES (${uid}, ${safeNome ?? currentRows[0]?.nome})`;
       }
 
       return res.json(prof);

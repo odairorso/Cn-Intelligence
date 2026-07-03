@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { CreditCard, Edit, Trash2, Plus } from 'lucide-react';
 import type { Bank, Transaction } from '../types';
+import { normalizeSupplierName } from '../lib/utils';
 
 interface BancosTabProps {
   banks: Bank[];
@@ -14,14 +15,15 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
   const bankTotals = useMemo(() => {
     const totals: Record<string, number> = {};
     banks.forEach(bank => {
-      totals[bank.nome] = 0;
+      totals[normalizeSupplierName(bank.nome)] = 0;
     });
     transactions.filter(tx => tx.status === 'PAGO' && tx.banco).forEach(tx => {
-      if (tx.banco && totals[tx.banco] !== undefined) {
+      const bankKey = normalizeSupplierName(tx.banco || '');
+      if (bankKey && totals[bankKey] !== undefined) {
         if (tx.tipo === 'RECEITA') {
-          totals[tx.banco] += tx.valor;
+          totals[bankKey] += tx.valor;
         } else {
-          totals[tx.banco] -= tx.valor;
+          totals[bankKey] -= tx.valor;
         }
       }
     });
@@ -83,15 +85,15 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-xs text-on-surface-variant">Total Pago</span>
-                <span className="text-sm font-bold text-tertiary" style={{ color: (bankTotals[bank.nome] || 0) < 0 ? '#ef4444' : undefined }}>
-                  {bankTotals[bank.nome]?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 'R$ 0,00'}
+                <span className="text-sm font-bold text-tertiary" style={{ color: (bankTotals[normalizeSupplierName(bank.nome)] || 0) < 0 ? '#ef4444' : undefined }}>
+                  {bankTotals[normalizeSupplierName(bank.nome)]?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }) || 'R$ 0,00'}
                 </span>
               </div>
               <div className="pt-2 border-t border-white/5">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-primary">Saldo Atual</span>
-                  <span className="text-lg font-black" style={{ color: (Number(bank.saldo) + (bankTotals[bank.nome] || 0)) < 0 ? '#ef4444' : '#3b82f6' }}>
-                    {(Number(bank.saldo) + (bankTotals[bank.nome] || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <span className="text-lg font-black" style={{ color: (Number(bank.saldo) + (bankTotals[normalizeSupplierName(bank.nome)] || 0)) < 0 ? '#ef4444' : '#3b82f6' }}>
+                    {(Number(bank.saldo) + (bankTotals[normalizeSupplierName(bank.nome)] || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
