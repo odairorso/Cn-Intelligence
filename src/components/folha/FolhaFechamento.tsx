@@ -44,7 +44,7 @@ export default function FolhaFechamento() {
     }
   }, [comp, isFechado]);
 
-  const profMap = useMemo(() => new Map(professores.map(p => [p.id, p])), [professores]);
+  const profMap = useMemo(() => new Map(professores.map(p => [String(p.id), p])), [professores]);
   const segMap = useMemo(() => new Map(segmentos.map(s => [s.id, s])), [segmentos]);
 
   // Lançamentos dinâmicos para a competência aberta
@@ -66,7 +66,7 @@ export default function FolhaFechamento() {
     // Agrupa salários por professor para criar os lançamentos individuais no contas a pagar
     const teacherTotalsMap = new Map<string, number>();
     compLancs.forEach((l) => {
-      const prof = profMap.get(l.professorId);
+      const prof = profMap.get(String(l.professorId));
       if (!prof) return;
       const current = teacherTotalsMap.get(prof.nome) || 0;
       teacherTotalsMap.set(prof.nome, current + Number(l.totalPagar));
@@ -156,7 +156,7 @@ export default function FolhaFechamento() {
               ) : (
                 <>
                   {displayLancs.map((l) => {
-                    const prof = profMap.get(l.professorId || l.professor_id);
+                    const prof = profMap.get(String(l.professorId || l.professor_id));
                     const seg = segMap.get(l.segmentoId || l.segmento_id);
                     const isMon = seg && isMonitora(seg.nome);
                     const hsTotal = Number(l.total_horas ?? l.totalHoras ?? 0);

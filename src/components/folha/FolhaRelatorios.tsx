@@ -7,6 +7,7 @@ import { Button } from '../ui/button';
 import { Download, FileText, FileDown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -44,8 +45,18 @@ export default function FolhaRelatorios() {
     }
   }, [comp, isFechado]);
 
-  const profMap = useMemo(() => new Map(professores.map(p => [p.id, p])), [professores]);
+  const profMap = useMemo(() => new Map(professores.map(p => [String(p.id), p])), [professores]);
   const segMap = useMemo(() => new Map(segmentos.map(s => [s.id, s])), [segmentos]);
+
+  const optionsProfessores = useMemo(() => {
+    const list = [{ value: TODOS_PROFESSORES, label: "Todos os professores" }];
+    professores
+      .filter((p) => p.ativo)
+      .forEach((p) => {
+        list.push({ value: String(p.id), label: p.nome });
+      });
+    return list;
+  }, [professores]);
 
   // Cálculo reativo para o mês aberto
   const dynamicLancs = useMemo((): any[] => {
@@ -65,12 +76,12 @@ export default function FolhaRelatorios() {
 
   const lancsFiltrados = useMemo(() => {
     if (professorId === TODOS_PROFESSORES) return compLancs;
-    return compLancs.filter((l) => (l.professorId || l.professor_id) === professorId);
+    return compLancs.filter((l) => String(l.professorId || l.professor_id || '') === String(professorId));
   }, [compLancs, professorId]);
 
   const professorSelecionado = useMemo(() => {
     if (professorId === TODOS_PROFESSORES) return null;
-    return profMap.get(professorId) ?? null;
+    return profMap.get(String(professorId)) ?? null;
   }, [professorId, profMap]);
 
   const segData = useMemo(() => {
@@ -91,11 +102,11 @@ export default function FolhaRelatorios() {
     const map = new Map<string, { nome: string; totalHoras: number; totalPagar: number }>();
     lancsFiltrados.forEach((l) => {
       const pId = l.professorId || l.professor_id;
-      const nome = profMap.get(pId)?.nome ?? pId;
-      const cur = map.get(pId) ?? { nome, totalHoras: 0, totalPagar: 0 };
+      const nome = profMap.get(String(pId))?.nome ?? pId;
+      const cur = map.get(String(pId)) ?? { nome, totalHoras: 0, totalPagar: 0 };
       cur.totalHoras += Number(l.total_horas || l.totalHoras || 0);
       cur.totalPagar += Number(l.total_pagar || l.totalPagar || 0);
-      map.set(pId, cur);
+      map.set(String(pId), cur);
     });
     return Array.from(map.values()).sort((a, b) => a.nome.localeCompare(b.nome));
   }, [lancsFiltrados, profMap]);
@@ -105,7 +116,7 @@ export default function FolhaRelatorios() {
     const rows1 = lancsFiltrados.map((l) => {
       const pId = l.professorId || l.professor_id;
       const sId = l.segmentoId || l.segmento_id;
-      const prof = profMap.get(pId);
+      const prof = profMap.get(String(pId));
       const seg = segMap.get(sId);
       return `${prof?.nome},${seg?.nome},${l.horas_mensais || l.horasMensais},${l.repouso},${l.horas_atividade || l.horasAtividade},${l.total_horas || l.totalHoras},${l.ajuda_custo || l.ajudaCusto},${l.total_pagar || l.totalPagar}`;
     }).join('\n');
@@ -246,7 +257,7 @@ export default function FolhaRelatorios() {
         body: lancsFiltrados.map((l) => {
           const pId = l.professorId || l.professor_id;
           const sId = l.segmentoId || l.segmento_id;
-          const p = profMap.get(pId);
+          const p = profMap.get(String(pId));
           const seg = segMap.get(sId);
           return [
             p?.nome ?? '',
@@ -279,19 +290,15 @@ export default function FolhaRelatorios() {
           <p className="text-xs text-on-surface-variant mt-0.5">Visualize estatísticas detalhadas e exporte os recibos em PDF/CSV</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Select value={professorId} onValueChange={setProfessorId}>
-            <SelectTrigger className="w-[200px] bg-surface border-surface-variant text-on-surface">
-              <SelectValue placeholder="Todos os professores" />
-            </SelectTrigger>
-            <SelectContent className="bg-surface border-surface-variant text-on-surface-variant">
-              <SelectItem value={TODOS_PROFESSORES} className="cursor-pointer">Todos os professores</SelectItem>
-              {professores.filter((p) => p.ativo).map((p) => (
-                <SelectItem key={p.id} value={p.id} className="cursor-pointer">
-                  {p.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={professorId}
+            onValueChange={setProfessorId}
+            options={optionsProfessores}
+            placeholder="Todos os professores"
+            searchPlaceholder="Pesquisar professor..."
+            emptyMessage="Nenhum professor encontrado."
+            className="w-[200px]"
+          />
           <Select value={comp} onValueChange={setComp}>
             <SelectTrigger className="w-[160px] bg-surface border-surface-variant text-on-surface">
               <SelectValue />
@@ -411,7 +418,7 @@ export default function FolhaRelatorios() {
               ) : (
                 <>
                   {lancsFiltrados.map((l) => {
-                    const prof = profMap.get(l.professorId || l.professor_id);
+                    const prof = profMap.get(String(l.professorId || l.professor_id));
                     const seg = segMap.get(l.segmentoId || l.segmento_id);
                     const isMon = seg && isMonitora(seg.nome);
                     const hsMensais = Number(l.horas_mensais || l.horasMensais || 0);

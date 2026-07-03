@@ -33,14 +33,14 @@ async function ensureRateLimitTable() {
   if (rateLimitTableChecked) return;
   rateLimitTableChecked = true;
   try {
-    await sql`
-      CREATE TABLE IF NOT EXISTS ${sql.unsafe(RATE_LIMIT_TABLE)} (
+    await sql.unsafe(`
+      CREATE TABLE IF NOT EXISTS rate_limits (
         key VARCHAR(255) PRIMARY KEY,
         count INTEGER NOT NULL DEFAULT 1,
         reset_at BIGINT NOT NULL
       )
-    `;
-    await sql`CREATE INDEX IF NOT EXISTS idx_rate_limits_reset ON ${sql.unsafe(RATE_LIMIT_TABLE)} (reset_at)`;
+    `);
+    await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_rate_limits_reset ON rate_limits (reset_at)`);
   } catch (e) {
     console.error('[rateLimit] Falha ao criar tabela:', e.message);
     rateLimitTableChecked = false; // Tenta de novo na próxima requisição
@@ -64,15 +64,15 @@ export const checkRateLimit = async (req, res) => {
 
   try {
     // Limpa entradas expiradas antes de checar
-    await sql`DELETE FROM ${sql.unsafe(RATE_LIMIT_TABLE)} WHERE reset_at < ${now}`;
+    await sql.unsafe(`DELETE FROM rate_limits WHERE reset_at < $1`, [now]);
 
     // Tenta pegar registro existente
-    const existing = await sql`SELECT count, reset_at FROM ${sql.unsafe(RATE_LIMIT_TABLE)} WHERE key = ${ip}`;
+    const existing = await sql.unsafe(`SELECT count, reset_at FROM rate_limits WHERE key = $1`, [ip]);
 
     if (!existing.length) {
       // Primeira requisição na janela: insere e permite
       const resetAt = now + RATE_LIMIT_WINDOW_MS;
-      await sql`INSERT INTO ${sql.unsafe(RATE_LIMIT_TABLE)} (key, count, reset_at) VALUES (${ip}, 1, ${resetAt})`;
+      await sql.unsafe(`INSERT INTO rate_limits (key, count, reset_at) VALUES ($1, 1, $2)`, [ip, resetAt]);
       return true;
     }
 
@@ -80,7 +80,7 @@ export const checkRateLimit = async (req, res) => {
     if (record.reset_at <= now) {
       // Janela expirou: reseta contador
       const resetAt = now + RATE_LIMIT_WINDOW_MS;
-      await sql`UPDATE ${sql.unsafe(RATE_LIMIT_TABLE)} SET count = 1, reset_at = ${resetAt} WHERE key = ${ip}`;
+      await sql.unsafe(`UPDATE rate_limits SET count = 1, reset_at = $1 WHERE key = $2`, [resetAt, ip]);
       return true;
     }
 
@@ -90,7 +90,7 @@ export const checkRateLimit = async (req, res) => {
     }
 
     // Incrementa contador
-    await sql`UPDATE ${sql.unsafe(RATE_LIMIT_TABLE)} SET count = count + 1 WHERE key = ${ip}`;
+    await sql.unsafe(`UPDATE rate_limits SET count = count + 1 WHERE key = $1`, [ip]);
     return true;
   } catch (e) {
     // Se o DB falhar, permite a requisição (fail-open)
@@ -207,15 +207,11 @@ export async function logSecurity(req, res, event) {
   const ua = req.headers['user-agent'] || 'unknown';
   const { route } = req.query || {};
   const method = req.method || 'GET';
-  const uid = req.authUid || null;
-  const eventType = event.toLowerCase().includes('falhou') || event.toLowerCase().includes('injeção')
-    ? 'SECURITY_WARNING'
-    : 'SECURITY_INFO';
   
   try {
     await sql`
-      INSERT INTO security_logs (event_type, description, ip_address, user_agent, uid, route)
-      VALUES (${eventType}, ${event}, ${ip}, ${ua}, ${uid}, ${route || 'unknown'})
+      INSERT INTO security_logs (ip, user_agent, route, method, event)
+      VALUES (${ip}, ${ua}, ${route || 'unknown'}, ${method}, ${event})
     `;
   } catch (e) {
     console.error('[security_log] erro', e);

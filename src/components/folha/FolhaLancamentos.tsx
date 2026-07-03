@@ -38,7 +38,7 @@ export default function FolhaLancamentos() {
   }, [compFilter, isFechado]);
 
   // Maps para lookup rápido
-  const profMap = useMemo(() => new Map(professores.map(p => [p.id, p])), [professores]);
+  const profMap = useMemo(() => new Map(professores.map(p => [String(p.id), p])), [professores]);
   const segMap = useMemo(() => new Map(segmentos.map(s => [s.id, s])), [segmentos]);
 
   // Cálculo dinâmico das horas/valores para o mês aberto
@@ -117,7 +117,7 @@ export default function FolhaLancamentos() {
               ) : (
                 <>
                   {displayLancs.map((lanc) => {
-                    const prof = profMap.get(lanc.professorId || lanc.professor_id);
+                    const prof = profMap.get(String(lanc.professorId || lanc.professor_id));
                     const seg = segMap.get(lanc.segmentoId || lanc.segmento_id);
                     const isMon = seg && isMonitora(seg.nome);
 

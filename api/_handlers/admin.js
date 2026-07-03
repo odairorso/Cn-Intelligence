@@ -238,8 +238,8 @@ export async function logRequest(req, res, startTime, responseSize = 0) {
   const duration = Date.now() - startTime;
   try {
     await sql`
-      INSERT INTO api_logs (route, method, status_code, duration_ms, response_size, uid)
-      VALUES (${req.query.route || "unknown"}, ${req.method}, ${res.statusCode}, ${duration}, ${responseSize}, ${req.authUid || null})
+      INSERT INTO api_logs (route, method, status_code, duration_ms, response_size_bytes)
+      VALUES (${req.query.route || "unknown"}, ${req.method}, ${res.statusCode}, ${duration}, ${responseSize})
     `;
   } catch (e) {
     console.error("[logRequest] Error:", e.message);
