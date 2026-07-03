@@ -182,8 +182,7 @@ export default function FolhaSicredi() {
                 <TableHead className="text-on-surface-variant text-xs py-2 w-[110px]">Nascimento</TableHead>
                 <TableHead className="text-on-surface-variant text-xs py-2 w-[220px]">CPF & Identidade (RG / UF / Emissão)</TableHead>
                 <TableHead className="text-on-surface-variant text-xs py-2 w-[110px]">Salário (R$)</TableHead>
-                <TableHead className="text-on-surface-variant text-xs py-2">Endereço Completo (Rua, Nº, Bairro, CEP)</TableHead>
-                <TableHead className="text-on-surface-variant text-xs py-2 text-center w-[90px]">Optante TEC</TableHead>
+                <TableHead className="text-on-surface-variant text-xs py-2 w-[420px]">Endereço Completo (Rua, Nº, Bairro, CEP)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -320,17 +319,7 @@ export default function FolhaSicredi() {
                         </div>
                       </TableCell>
 
-                      {/* Optante TEC */}
-                      <TableCell className="text-center py-1">
-                        <div className="flex justify-center">
-                          <input
-                            type="checkbox"
-                            checked={opta}
-                            onChange={(e) => handleToggleTec(c.id, e.target.checked)}
-                            className="w-4 h-4 rounded border-surface-variant text-green-600 focus:ring-green-500 bg-background accent-green-600 cursor-pointer"
-                          />
-                        </div>
-                      </TableCell>
+
                     </TableRow>
                   );
                 })
@@ -483,18 +472,17 @@ export default function FolhaSicredi() {
           <table className="sicredi-table">
             <thead>
               <tr>
-                <th style={{ width: '18%' }}>Nome Colaborador</th>
+                <th style={{ width: '20%' }}>Nome Colaborador</th>
                 <th style={{ width: '8%' }}>NASCIMENTO</th>
                 <th style={{ width: '10%' }}>CPF</th>
                 <th style={{ width: '10%' }}>RG</th>
                 <th style={{ width: '8%' }}>ÓRGÃO EMISSOR / UF</th>
                 <th style={{ width: '8%' }}>DATA EMISSÃO</th>
                 <th style={{ width: '8%' }}>SALÁRIO</th>
-                <th style={{ width: '16%' }}>ENDEREÇO</th>
+                <th style={{ width: '18%' }}>ENDEREÇO</th>
                 <th style={{ width: '8%' }}>BAIRRO</th>
-                <th style={{ width: '10%' }}>CIDADE/UF</th>
-                <th style={{ width: '7%' }}>CEP</th>
-                <th style={{ width: '6%' }}>Optante de TEC*</th>
+                <th style={{ width: '8%' }}>CIDADE/UF</th>
+                <th style={{ width: '4%' }}>CEP</th>
               </tr>
             </thead>
             <tbody>
@@ -524,14 +512,12 @@ export default function FolhaSicredi() {
                     <td>{rowValues.bairro?.toUpperCase() || ''}</td>
                     <td>{cidadeImprimir}</td>
                     <td style={{ textAlign: 'center' }}>{rowValues.cep || ''}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{opta}</td>
                   </tr>
                 );
               })}
               {/* Linhas vazias para preenchimento se houver espaço/estilo */}
               {Array.from({ length: Math.max(0, 10 - colaboradoresAtivos.filter(c => selectedIds.includes(c.id)).length) }).map((_, idx) => (
                 <tr key={`empty-${idx}`}>
-                  <td>&nbsp;</td>
                   <td>&nbsp;</td>
                   <td>&nbsp;</td>
                   <td>&nbsp;</td>
