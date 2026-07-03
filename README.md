@@ -40,7 +40,7 @@ npm audit --audit-level=high
 
 - `APP_PASSWORD`: senha de login do sistema.
 - `JWT_SECRET`: segredo usado para assinar tokens JWT. Use um valor longo e aleatorio.
-- `SECURITY_TOKEN` e `VITE_CN_SECURITY_TOKEN`: devem ser iguais.
+- `SECURITY_TOKEN` e `VITE_CN_SECURITY_TOKEN`: devem ser iguais apenas se `ENABLE_LEGACY_SECURITY_TOKEN=true`.
 - `BACKUP_TOKEN` e `VITE_CN_BACKUP_TOKEN`: devem ser iguais para exportacao de backup.
 - `ALLOWED_ORIGINS`: dominios autorizados pelo CORS, separados por virgula.
 

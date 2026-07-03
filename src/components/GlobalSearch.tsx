@@ -30,7 +30,10 @@ export function GlobalSearch({ transactions, suppliers, banks, onNavigate }: Glo
   }, []);
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 50);
+    if (open) {
+      const timer = window.setTimeout(() => inputRef.current?.focus(), 50);
+      return () => window.clearTimeout(timer);
+    }
     else setQuery('');
   }, [open]);
 

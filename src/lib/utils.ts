@@ -121,6 +121,17 @@ export const dateSortKey = (value?: string | null): number => {
   return new Date(v).getTime() || 0;
 };
 
+/** Normaliza datas vindas de qualquer formato conhecido para comparação segura. */
+export const normalizeDateKey = (value?: string | null): string => {
+  const display = toDisplayDate(value);
+  if (!display) return '';
+  if (display.includes('/')) {
+    const [dd, mm, yyyy] = display.split('/');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return display.slice(0, 10);
+};
+
 // ─── LRU Cache ────────────────────────────────────────────────────────────────
 
 class LRUCache<K, V> {

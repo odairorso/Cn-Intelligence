@@ -176,7 +176,10 @@ export async function handleSetupTables(req, res) {
       ['Monitora', 0, 0, 0, 0, 1621.00]
     ];
 
-    const uid = req.authUid || 'odair';
+    const uid = req.authUid;
+    if (!uid) {
+      return res.status(401).json({ error: 'Autenticação necessária para seed de tabelas.' });
+    }
     for (const [nome, hs, pr, ha, vh, aj] of defaultSegments) {
       await sql`
         INSERT INTO segmentos (uid, nome, horas_semanais, perc_repouso, ha_percent, valor_hora, ajuda_custo)
@@ -222,6 +225,19 @@ export async function handleExportBackup(req, res) {
   }
 
   try {
+    const hasApiLogs = await sql`SELECT to_regclass('public.api_logs') AS exists`;
+    if (!hasApiLogs?.[0]?.exists) {
+      await sql`CREATE TABLE IF NOT EXISTS api_logs (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        route TEXT NOT NULL,
+        method TEXT NOT NULL,
+        status_code INTEGER NOT NULL,
+        duration_ms INTEGER NOT NULL,
+        response_size_bytes INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_api_logs_route_created ON api_logs(route, created_at DESC)`;
+    }
     const [txs, sups, banks] = await Promise.all([
       sql`SELECT * FROM transactions`,
       sql`SELECT * FROM suppliers`,
@@ -237,6 +253,15 @@ export async function handleExportBackup(req, res) {
 export async function logRequest(req, res, startTime, responseSize = 0) {
   const duration = Date.now() - startTime;
   try {
+    await sql`CREATE TABLE IF NOT EXISTS api_logs (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      route TEXT NOT NULL,
+      method TEXT NOT NULL,
+      status_code INTEGER NOT NULL,
+      duration_ms INTEGER NOT NULL,
+      response_size_bytes INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )`;
     await sql`
       INSERT INTO api_logs (route, method, status_code, duration_ms, response_size_bytes)
       VALUES (${req.query.route || "unknown"}, ${req.method}, ${res.statusCode}, ${duration}, ${responseSize})

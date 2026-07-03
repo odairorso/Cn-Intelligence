@@ -36,10 +36,37 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [manualMergeTarget, setManualMergeTarget] = useState('');
   const [manualMergeAlias, setManualMergeAlias] = useState('');
-  const [manualMergeTargetSearch, setManualMergeTargetSearch] = useState('');
-  const [manualMergeAliasSearch, setManualMergeAliasSearch] = useState('');
+  const [showTargetDropdown, setShowTargetDropdown] = useState(false);
+  const [showAliasDropdown, setShowAliasDropdown] = useState(false);
   const [merging, setMerging] = useState(false);
   const [autoMerging, setAutoMerging] = useState(false);
+
+  const allSupplierNames = useMemo(() => {
+    return [...new Set([
+      ...suppliers.map(s => s.nome),
+      ...transactions.map(t => t.fornecedor)
+    ])]
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [suppliers, transactions]);
+
+  const filteredTargetSuppliers = useMemo(() => {
+    const q = normalizeSupplierName(manualMergeTarget);
+    return allSupplierNames.filter(n => {
+      if (!q) return true;
+      return normalizeSupplierName(n).includes(q);
+    });
+  }, [allSupplierNames, manualMergeTarget]);
+
+  const filteredAliasSuppliers = useMemo(() => {
+    const q = normalizeSupplierName(manualMergeAlias);
+    const targetNorm = normalizeSupplierName(manualMergeTarget);
+    return allSupplierNames.filter(n => {
+      if (targetNorm && normalizeSupplierName(n) === targetNorm) return false;
+      if (!q) return true;
+      return normalizeSupplierName(n).includes(q);
+    });
+  }, [allSupplierNames, manualMergeAlias, manualMergeTarget]);
 
   // Pre-calculate transaction count per supplier (optimized O(n) instead of O(n*m))
   const supplierTransactionCount = useMemo(() => {
@@ -158,7 +185,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
             <Merge size={14} /> {autoMerging ? 'Unificando...' : 'Unificar Auto'}
           </button>
           <button
-            onClick={() => { setManualMergeTarget(''); setManualMergeAlias(''); setManualMergeTargetSearch(''); setManualMergeAliasSearch(''); setShowMergeModal(true); }}
+            onClick={() => { setManualMergeTarget(''); setManualMergeAlias(''); setShowMergeModal(true); }}
             className="bg-secondary/10 text-secondary px-4 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-secondary/20 transition-colors"
             title="Unificar dois fornecedores manualmente"
           >
@@ -194,10 +221,10 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
                 <select
                   value={mergeTarget && g.names.includes(mergeTarget) ? mergeTarget : g.names[0]}
                   onChange={(e) => setMergeTarget(e.target.value)}
-                  className="bg-surface-variant/20 border border-white/10 rounded px-2 py-1 text-xs"
+                  className="bg-surface-variant/20 border border-white/10 rounded px-2 py-1 text-xs text-on-surface"
                 >
                   {g.names.map((n) => (
-                    <option key={n} value={n}>{n}</option>
+                    <option key={n} value={n} className="bg-[#161b2a] text-on-surface">{n}</option>
                   ))}
                 </select>
                 <span className="text-[10px] font-bold text-on-surface-variant uppercase">← manter</span>
@@ -311,58 +338,81 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
             <div className="space-y-4 mb-6">
               <div>
                 <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Nome final (manter)</label>
-                <input
-                  value={manualMergeTargetSearch}
-                  onChange={e => setManualMergeTargetSearch(e.target.value)}
-                  placeholder="Buscar fornecedor..."
-                  className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-primary mb-2"
-                />
-                <select
-                  value={manualMergeTarget}
-                  onChange={e => setManualMergeTarget(e.target.value)}
-                  className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-primary"
-                >
-                  <option value="">Selecione o fornecedor...</option>
-                  {[...new Set([...suppliers.map(s => s.nome), ...transactions.map(t => t.fornecedor)])]
-                    .filter(Boolean)
-                    .sort((a, b) => a.localeCompare(b, 'pt-BR'))
-                    .filter(n => {
-                      const q = normalizeSupplierName(manualMergeTargetSearch);
-                      if (!q) return true;
-                      return normalizeSupplierName(n).includes(q);
-                    })
-                    .map(n => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={manualMergeTarget}
+                    onChange={e => {
+                      setManualMergeTarget(e.target.value);
+                      setShowTargetDropdown(true);
+                    }}
+                    onFocus={() => setShowTargetDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowTargetDropdown(false), 200)}
+                    placeholder="Buscar ou digitar fornecedor final..."
+                    className="w-full bg-[#161b2a] border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-primary text-on-surface"
+                  />
+                  {showTargetDropdown && (
+                    <div className="absolute z-[110] w-full mt-1 bg-[#161b2a] border border-white/10 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                      {filteredTargetSuppliers.length > 0 ? (
+                        filteredTargetSuppliers.map(n => (
+                          <div
+                            key={n}
+                            className="px-4 py-2.5 text-sm hover:bg-white/5 cursor-pointer text-on-surface border-b border-white/5 last:border-0"
+                            onMouseDown={() => {
+                              setManualMergeTarget(n);
+                              setShowTargetDropdown(false);
+                            }}
+                          >
+                            {n}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-4 py-2.5 text-sm text-on-surface-variant italic">
+                          Nenhum fornecedor encontrado (será criado um novo)
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor a remover (alias)</label>
-                <input
-                  value={manualMergeAliasSearch}
-                  onChange={e => setManualMergeAliasSearch(e.target.value)}
-                  placeholder="Buscar fornecedor..."
-                  className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-primary mb-2"
-                />
-                <select
-                  value={manualMergeAlias}
-                  onChange={e => setManualMergeAlias(e.target.value)}
-                  className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-primary"
-                >
-                  <option value="">Selecione o fornecedor...</option>
-                  {[...new Set([...suppliers.map(s => s.nome), ...transactions.map(t => t.fornecedor)])]
-                    .filter(Boolean)
-                    .sort((a, b) => a.localeCompare(b, 'pt-BR'))
-                    .filter(n => n !== manualMergeTarget)
-                    .filter(n => {
-                      const q = normalizeSupplierName(manualMergeAliasSearch);
-                      if (!q) return true;
-                      return normalizeSupplierName(n).includes(q);
-                    })
-                    .map(n => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={manualMergeAlias}
+                    onChange={e => {
+                      setManualMergeAlias(e.target.value);
+                      setShowAliasDropdown(true);
+                    }}
+                    onFocus={() => setShowAliasDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowAliasDropdown(false), 200)}
+                    placeholder="Buscar ou digitar fornecedor a remover..."
+                    className="w-full bg-[#161b2a] border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-primary text-on-surface"
+                  />
+                  {showAliasDropdown && (
+                    <div className="absolute z-[110] w-full mt-1 bg-[#161b2a] border border-white/10 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                      {filteredAliasSuppliers.length > 0 ? (
+                        filteredAliasSuppliers.map(n => (
+                          <div
+                            key={n}
+                            className="px-4 py-2.5 text-sm hover:bg-white/5 cursor-pointer text-on-surface border-b border-white/5 last:border-0"
+                            onMouseDown={() => {
+                              setManualMergeAlias(n);
+                              setShowAliasDropdown(false);
+                            }}
+                          >
+                            {n}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-4 py-2.5 text-sm text-on-surface-variant italic">
+                          Nenhum fornecedor encontrado
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -387,8 +437,6 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
                   try {
                     await mergeSuppliers(manualMergeTarget, [manualMergeAlias]);
                     setShowMergeModal(false);
-                    setManualMergeTargetSearch('');
-                    setManualMergeAliasSearch('');
                     await syncSuppliers();
                   } catch (e) {
                     console.error(e);

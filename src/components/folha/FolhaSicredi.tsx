@@ -115,10 +115,11 @@ export default function FolhaSicredi() {
 
   const handlePrint = () => {
     setPrinting(true);
-    setTimeout(() => {
+    const timer = window.setTimeout(() => {
       window.print();
       setPrinting(false);
     }, 300);
+    return () => window.clearTimeout(timer);
   };
 
   return (

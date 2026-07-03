@@ -37,9 +37,12 @@ export default defineConfig(({mode}) => {
             pdfjs: ['pdfjs-dist'],
             'read-excel': ['read-excel-file/browser'],
             motion: ['motion'],
+            icons: ['lucide-react'],
+            vendor: ['react', 'react-dom'],
           },
         },
       },
+      chunkSizeWarningLimit: 1200,
     },
   };
 });

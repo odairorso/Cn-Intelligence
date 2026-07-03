@@ -47,9 +47,10 @@ export function SearchableSelect({
   // Foca no input de busca ao abrir o dropdown
   React.useEffect(() => {
     if (open && inputRef.current) {
-      setTimeout(() => {
+      const timer = window.setTimeout(() => {
         inputRef.current?.focus();
       }, 50);
+      return () => window.clearTimeout(timer);
     } else {
       setSearchQuery("");
     }

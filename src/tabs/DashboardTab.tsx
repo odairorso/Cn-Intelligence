@@ -81,7 +81,8 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
     }
     const set = new Set<number>();
     transactions.forEach((tx) => {
-      const parts = String(tx.vencimento || '').split('/');
+      const normalized = String(tx.vencimento || '').includes('/') ? String(tx.vencimento || '') : String(tx.vencimento || '').slice(0, 10).replace(/-/g, '/');
+      const parts = normalized.split('/');
       if (parts.length === 3) {
         const y = Number(parts[2]);
         if (Number.isFinite(y) && y >= 1990 && y <= 2100) set.add(y);
@@ -101,7 +102,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
   const filteredTx = useMemo(() => {
     return transactions.filter((tx) => {
       if (periodoFilter === 'TODOS') return true;
-      const parts = String(tx.vencimento || '').split('/');
+      const parts = String(tx.vencimento || '').includes('/') ? String(tx.vencimento || '').split('/') : String(tx.vencimento || '').slice(0, 10).split('-').reverse();
       if (parts.length !== 3) return false;
       const y = Number(parts[2]);
       if (!Number.isFinite(y)) return false;

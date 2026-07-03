@@ -25,10 +25,11 @@ export function authMiddleware(req, res, next) {
   }
 
   // 2. Fallback: token legado x-cn-security (compatibilidade durante transição)
+  const legacyEnabled = String(process.env.ENABLE_LEGACY_SECURITY_TOKEN || 'false').toLowerCase() === 'true';
   const securityToken = req.headers['x-cn-security'];
   const EXPECTED_TOKEN = process.env.SECURITY_TOKEN;
 
-  if (EXPECTED_TOKEN && securityToken === EXPECTED_TOKEN) {
+  if (legacyEnabled && EXPECTED_TOKEN && securityToken === EXPECTED_TOKEN) {
     // Token legado aceito somente como ponte para rotas antigas.
     req.authUid = process.env.APP_UID || 'odair';
     if (typeof next === 'function') next();
