@@ -2,6 +2,7 @@
 import jwt from 'jsonwebtoken';
 import { setCors, dbStorage } from './_db.js';
 import { checkRateLimit, sanitizeObject } from './_utils.js';
+import { authMiddleware, verifyToken } from './_middlewares/auth.js';
 
 // --- Configurações de Autenticação ---
 const APP_PASSWORD = process.env.APP_PASSWORD;
@@ -17,36 +18,6 @@ if (!APP_PASSWORD) {
 const generateToken = (payload) => {
   if (!JWT_SECRET) return null;
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-};
-
-const getCookie = (req, name) => {
-  const cookieHeader = req.headers.cookie;
-  if (!cookieHeader) return null;
-  const cookies = cookieHeader.split(';').reduce((acc, c) => {
-    const [key, ...val] = c.trim().split('=');
-    acc[key] = val.join('=');
-    return acc;
-  }, {});
-  return cookies[name] || null;
-};
-
-const verifyToken = (req) => {
-  // Tenta obter o token do cookie HttpOnly
-  let token = getCookie(req, 'cn_jwt_token');
-
-  // Fallback para o header Authorization (legado/suporte a testes)
-  if (!token) {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.split(' ')[1];
-    }
-  }
-
-  if (!token) return null;
-  try {
-    if (!JWT_SECRET) return null;
-    return jwt.verify(token, JWT_SECRET);
-  } catch { return null; }
 };
 
 // --- Rotas que NÃO devem ser logadas (saúde, internas) ---
@@ -110,14 +81,18 @@ export default async function handler(req, res) {
   }
 
   // ── Verificação de Token (OBRIGATÓRIA para todas as rotas exceto login) ──
-  const decoded = verifyToken(req);
+  const publicRoutes = new Set(['health', 'folha-push']);
+  if (!publicRoutes.has(route)) {
+    let authorized = false;
+    authMiddleware(req, res, () => {
+      authorized = true;
+    });
+    if (!authorized) return;
 
-  if (!decoded) {
-    // Sem JWT válido — apenas rotas públicas podem continuar
-    const publicRoutes = new Set(['health', 'folha-push']);
-    if (!publicRoutes.has(route)) {
-      return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
+    if (req.authUid === 'guest') {
+      return res.status(403).json({ error: 'Usuário guest não autorizado.' });
     }
+  } else {
     if (route === 'folha-push') {
       let targetUid = req.query.uid || (req.body && typeof req.body === 'object' ? req.body.uid : null);
       if (!targetUid && req.body && typeof req.body === 'string') {
@@ -131,15 +106,6 @@ export default async function handler(req, res) {
       }
       req.authUid = targetUid;
     }
-  } else {
-    // Temos token válido
-    if (!decoded.uid) {
-      return res.status(401).json({ error: 'Token inválido: campo uid ausente.' });
-    }
-    if (decoded.uid === 'guest') {
-      return res.status(403).json({ error: 'Usuário guest não autorizado.' });
-    }
-    req.authUid = decoded.uid;
   }
 
   // BLOQUEAR qualquer tentativa de injeção de uid via query param

@@ -114,11 +114,30 @@ export const toDisplayDate = (value?: string | null): string => {
 export const dateSortKey = (value?: string | null): number => {
   if (!value) return 0;
   const v = String(value).trim();
+  let yyyy = 0, mm = 0, dd = 0;
+
   if (v.includes('/')) {
-    const [dd, mm, yyyy] = v.split('/');
-    return new Date(`${yyyy}-${mm}-${dd}`).getTime();
+    const parts = v.split('/');
+    if (parts.length === 3) {
+      dd = parseInt(parts[0], 10);
+      mm = parseInt(parts[1], 10) - 1;
+      yyyy = parseInt(parts[2], 10);
+    }
+  } else if (v.includes('-')) {
+    const parts = v.split('T')[0].split('-');
+    if (parts.length === 3) {
+      yyyy = parseInt(parts[0], 10);
+      mm = parseInt(parts[1], 10) - 1;
+      dd = parseInt(parts[2], 10);
+    }
   }
-  return new Date(v).getTime() || 0;
+
+  if (yyyy > 0 && dd > 0 && mm >= 0 && mm < 12) {
+    return Date.UTC(yyyy, mm, dd);
+  }
+
+  const parsed = new Date(v);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 };
 
 /** Normaliza datas vindas de qualquer formato conhecido para comparação segura. */
@@ -185,11 +204,16 @@ export const normalizeSupplierName = (value: string): string => {
   const cacheKey = String(value || '');
   if (normalizeCache.has(cacheKey)) return normalizeCache.get(cacheKey)!;
 
-  const normalized = String(value || '')
+  let normalized = String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, ' ')
+    .trim();
+
+  // Remove common corporate suffixes to improve matches
+  normalized = normalized
+    .replace(/\b(LTDA|S\s*A|EIRELI|ME|EPP|CORP|COMPANY|CORPORATION|CNPJ)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -224,8 +248,13 @@ export const isSupplierMatch = (transactionSupplier: string, supplierName: strin
     result = false;
   } else if (tx === sp) {
     result = true;
-  } else if (tx.length >= 5 && sp.length >= 5) {
-    result = tx.substring(0, 5) === sp.substring(0, 5);
+  } else {
+    // Se um contém o outro exatamente (ex: "DIPEBRAL DISTRIBUIDORA" e "DIPEBRAL")
+    // E o termo menor tem pelo menos 8 caracteres (para evitar falsos positivos como "MATRI" ou "BANCO")
+    const minLen = Math.min(tx.length, sp.length);
+    if (minLen >= 8) {
+      result = tx.includes(sp) || sp.includes(tx);
+    }
   }
 
   matchCache.set(cacheKey, result);

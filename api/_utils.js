@@ -47,12 +47,7 @@ async function ensureRateLimitTable() {
   }
 }
 
-// Cleanup periódico das entradas expiradas (a cada 5 min)
-setInterval(async () => {
-  try {
-    await sql`DELETE FROM ${sql.unsafe(RATE_LIMIT_TABLE)} WHERE reset_at < ${Date.now() - RATE_LIMIT_WINDOW_MS}`;
-  } catch {}
-}, 300_000).unref();
+
 
 export const checkRateLimit = async (req, res) => {
   await ensureRateLimitTable();

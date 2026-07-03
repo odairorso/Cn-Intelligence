@@ -2,41 +2,64 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+const getCookie = (req, name) => {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return null;
+  const cookies = cookieHeader.split(';').reduce((acc, c) => {
+    const [key, ...val] = c.trim().split('=');
+    acc[key] = val.join('=');
+    return acc;
+  }, {});
+  return cookies[name] || null;
+};
+
+export const verifyToken = (req) => {
+  // Tenta obter o token do cookie HttpOnly
+  let token = getCookie(req, 'cn_jwt_token');
+
+  // Fallback para o header Authorization (legado/suporte a testes)
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
+  }
+
+  if (!token) return null;
+  try {
+    if (!JWT_SECRET) return null;
+    return jwt.verify(token, JWT_SECRET);
+  } catch { return null; }
+};
+
 /**
  * Middleware de autenticação JWT.
  * Injeta req.authUid se o token for válido.
  * Suporte a token legado x-cn-security para compatibilidade.
  */
 export function authMiddleware(req, res, next) {
-  // 1. Tenta JWT via Authorization: Bearer <token>
-  const authHeader = req.headers['authorization'];
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  const decoded = verifyToken(req);
 
-  if (token) {
-    try {
-      if (!JWT_SECRET) throw new Error('JWT_SECRET not configured');
-      const decoded = jwt.verify(token, JWT_SECRET);
+  if (decoded) {
+    if (decoded.uid) {
       req.authUid = decoded.uid;
       if (typeof next === 'function') next();
       return;
-    } catch {
-      // Token inválido ou expirado — cai no fallback abaixo
     }
   }
 
-  // 2. Fallback: token legado x-cn-security (compatibilidade durante transição)
+  // Fallback: token legado x-cn-security (compatibilidade durante transição)
   const legacyEnabled = String(process.env.ENABLE_LEGACY_SECURITY_TOKEN || 'false').toLowerCase() === 'true';
   const securityToken = req.headers['x-cn-security'];
   const EXPECTED_TOKEN = process.env.SECURITY_TOKEN;
 
   if (legacyEnabled && EXPECTED_TOKEN && securityToken === EXPECTED_TOKEN) {
-    // Token legado aceito somente como ponte para rotas antigas.
     req.authUid = process.env.APP_UID || 'odair';
     if (typeof next === 'function') next();
     return;
   }
 
-  // 3. Sem autenticação válida — bloqueia
+  // Sem autenticação válida — bloqueia
   res.status(401).json({ error: 'Não autorizado. Faça login novamente.' });
 }
 
