@@ -518,6 +518,7 @@ const LancamentosTab = React.memo(({
                   />
                 </th>
                 <th className="px-6 py-4 whitespace-nowrap min-w-[180px]">Fornecedor</th>
+                <th className="px-6 py-4 whitespace-nowrap w-40">Número / Título</th>
                 <th className="px-6 py-4 whitespace-nowrap w-[320px]">Descrição</th>
                 <th className="px-6 py-4 whitespace-nowrap w-36 text-right">Valor</th>
                 <th className="px-6 py-4 whitespace-nowrap w-28 hidden lg:table-cell">Status</th>
@@ -545,12 +546,10 @@ const LancamentosTab = React.memo(({
                     )}
                   </td>
                   <td className="px-6 py-4 font-semibold max-w-[220px] truncate" title={tx.fornecedor}>
-                    <div>{tx.fornecedor}</div>
-                    {tx.numero_boleto && (
-                      <div className="text-[10px] text-on-surface-variant font-mono font-normal mt-0.5" title="Número do Boleto/Título">
-                        Doc: {tx.numero_boleto}
-                      </div>
-                    )}
+                    {tx.fornecedor}
+                  </td>
+                  <td className="px-6 py-4 text-on-surface-variant font-mono text-xs max-w-[160px] truncate" title={tx.numero_boleto || ''}>
+                    {tx.numero_boleto || '-'}
                   </td>
                   <td className="px-6 py-4 text-on-surface-variant max-w-[320px] truncate" title={tx.descricao}>{tx.descricao}</td>
                   <td className={cn(
