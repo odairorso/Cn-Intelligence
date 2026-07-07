@@ -29,6 +29,8 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
     banco: '',
     tipo: initialTipo as 'RECEITA' | 'DESPESA',
     conta_contabil_id: undefined as number | undefined,
+    numero_boleto: '',
+    ocorrencia: '',
   });
   const [searchConta, setSearchConta] = useState('');
   const [showContaDropdown, setShowContaDropdown] = useState(false);
@@ -110,6 +112,9 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           ? (formData.pagamento ? addMonthsToInputDate(formData.pagamento, i) : todayInputDate())
           : '';
 
+        const rawNumero = String(formData.numero_boleto || '').trim();
+        const occSuffix = formData.ocorrencia ? `-${formData.ocorrencia.trim()}` : '';
+
         return {
           uid: apiAuth.getUid() || 'guest',
           fornecedor: fornecedorFinal,
@@ -121,7 +126,10 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           status: formData.status,
           banco: formData.status === 'PAGO' ? formData.banco : null,
           tipo: formData.tipo,
-          conta_contabil_id: formData.conta_contabil_id
+          conta_contabil_id: formData.conta_contabil_id,
+          numero_boleto: rawNumero
+            ? (parcelas > 1 ? `${rawNumero}-${i + 1}` : `${rawNumero}${occSuffix}`)
+            : null
         };
       });
 
@@ -214,6 +222,33 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
               value={formData.descricao}
               onChange={e => setFormData({ ...formData, descricao: e.target.value })}
             />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Número / Título</label>
+              <input
+                type="text"
+                placeholder="Ex: 123456"
+                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+                style={{ backgroundColor: '#161b2a' }}
+                value={formData.numero_boleto}
+                onChange={e => setFormData({ ...formData, numero_boleto: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">
+                Ocorrência {Number(formData.parcelas) > 1 && <span className="text-[10px] text-primary">(Auto)</span>}
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: 01"
+                disabled={Number(formData.parcelas) > 1}
+                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface disabled:opacity-50"
+                style={{ backgroundColor: '#161b2a' }}
+                value={Number(formData.parcelas) > 1 ? 'Auto' : formData.ocorrencia}
+                onChange={e => setFormData({ ...formData, ocorrencia: e.target.value })}
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

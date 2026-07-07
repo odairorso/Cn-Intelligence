@@ -5,6 +5,31 @@ import { Transaction, Supplier, Bank, TransactionStatus, ContaContabil } from '.
 import { cn, normalizeSupplierName, normalizeCompanyKey, todayInputDate, toInputDate, parseMoneyToNumber, matchesAccountType } from '../lib/utils';
 import { api } from '../api';
 
+const parseNumeroBoleto = (num?: string) => {
+  if (!num) return { numero: '', ocorrencia: '' };
+  const parts = num.split('-');
+  if (parts.length > 1) {
+    const last = parts[parts.length - 1];
+    if (last.length <= 4 && /^[0-9a-zA-Z]+$/.test(last)) {
+      return {
+        numero: parts.slice(0, parts.length - 1).join('-'),
+        ocorrencia: last
+      };
+    }
+  }
+  const slashParts = num.split('/');
+  if (slashParts.length > 1) {
+    const last = slashParts[slashParts.length - 1];
+    if (last.length <= 4 && /^[0-9a-zA-Z]+$/.test(last)) {
+      return {
+        numero: slashParts.slice(0, slashParts.length - 1).join('/'),
+        ocorrencia: last
+      };
+    }
+  }
+  return { numero: num, ocorrencia: '' };
+};
+
 interface EditTxModalProps {
   transaction: Transaction;
   suppliers: Supplier[];
@@ -16,6 +41,8 @@ interface EditTxModalProps {
 }
 
 const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOptions, onClose, onSave }: EditTxModalProps) => {
+  const initialNumInfo = parseNumeroBoleto(transaction.numero_boleto);
+
   const [formData, setFormData] = useState({
     ...transaction,
     vencimento: toInputDate(transaction.vencimento),
@@ -25,6 +52,8 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
     tipo: transaction.tipo || 'DESPESA',
     juros: transaction.juros || 0,
     valorPago: transaction.status === 'PAGO' ? String(Number(transaction.valor || 0) + Number(transaction.juros || 0)) : '',
+    numero_boleto_base: initialNumInfo.numero,
+    ocorrencia: initialNumInfo.ocorrencia,
   });
   const [searchConta, setSearchConta] = useState('');
   const [showContaDropdown, setShowContaDropdown] = useState(false);
@@ -69,6 +98,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
   }, [suppliers, searchSupplier]);
 
   useEffect(() => {
+    const numInfo = parseNumeroBoleto(transaction.numero_boleto);
     setFormData({
       ...transaction,
       vencimento: toInputDate(transaction.vencimento),
@@ -78,18 +108,30 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
       tipo: transaction.tipo || 'DESPESA',
       juros: transaction.juros || 0,
       valorPago: transaction.status === 'PAGO' ? String(Number(transaction.valor || 0) + Number(transaction.juros || 0)) : '',
+      numero_boleto_base: numInfo.numero,
+      ocorrencia: numInfo.ocorrencia,
     });
   }, [transaction]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const rawNumero = String(formData.numero_boleto_base || '').trim();
+    const occSuffix = formData.ocorrencia ? `-${formData.ocorrencia.trim()}` : '';
+    const numeroBoletoFinal = rawNumero ? `${rawNumero}${occSuffix}` : null;
+
     const { id, ...rest } = {
       ...transaction,
       ...formData,
       vencimento: toInputDate(formData.vencimento),
       pagamento: formData.status === 'PAGO' && formData.pagamento ? toInputDate(formData.pagamento) : null,
-      valor: parseMoneyToNumber(formData.valor)
+      valor: parseMoneyToNumber(formData.valor),
+      numero_boleto: numeroBoletoFinal
     };
+    
+    delete (rest as any).numero_boleto_base;
+    delete (rest as any).ocorrencia;
+    delete (rest as any).valorPago;
+
     onSave(String(id), rest);
     onClose();
   };
@@ -142,7 +184,30 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               value={formData.descricao}
               onChange={e => setFormData({ ...formData, descricao: e.target.value })}
             />
-
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Número / Título</label>
+              <input
+                type="text"
+                placeholder="Ex: 123456"
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface"
+                style={{ backgroundColor: '#161b2a' }}
+                value={formData.numero_boleto_base || ''}
+                onChange={e => setFormData({ ...formData, numero_boleto_base: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Ocorrência</label>
+              <input
+                type="text"
+                placeholder="Ex: 01"
+                className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface"
+                style={{ backgroundColor: '#161b2a' }}
+                value={formData.ocorrencia || ''}
+                onChange={e => setFormData({ ...formData, ocorrencia: e.target.value })}
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

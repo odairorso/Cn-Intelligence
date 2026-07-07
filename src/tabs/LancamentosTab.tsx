@@ -443,7 +443,14 @@ const LancamentosTab = React.memo(({
                     className="mt-1 accent-primary cursor-pointer"
                   />
                 )}
-                <span className="font-semibold text-sm leading-tight flex-1">{tx.fornecedor}</span>
+                <span className="font-semibold text-sm leading-tight flex-1">
+                  <div>{tx.fornecedor}</div>
+                  {tx.numero_boleto && (
+                    <div className="text-[10px] text-on-surface-variant font-mono font-normal mt-0.5" title="Número do Boleto/Título">
+                      Doc: {tx.numero_boleto}
+                    </div>
+                  )}
+                </span>
                 <div className="flex flex-col items-end">
                   <span className={cn(
                     "font-bold text-sm whitespace-nowrap",
@@ -537,7 +544,14 @@ const LancamentosTab = React.memo(({
                       />
                     )}
                   </td>
-                  <td className="px-6 py-4 font-semibold max-w-[220px] truncate" title={tx.fornecedor}>{tx.fornecedor}</td>
+                  <td className="px-6 py-4 font-semibold max-w-[220px] truncate" title={tx.fornecedor}>
+                    <div>{tx.fornecedor}</div>
+                    {tx.numero_boleto && (
+                      <div className="text-[10px] text-on-surface-variant font-mono font-normal mt-0.5" title="Número do Boleto/Título">
+                        Doc: {tx.numero_boleto}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-on-surface-variant max-w-[320px] truncate" title={tx.descricao}>{tx.descricao}</td>
                   <td className={cn(
                     "px-6 py-4 font-bold text-right",
