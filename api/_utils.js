@@ -273,7 +273,7 @@ export async function getContaContabilId(fornecedor, descricao, tipo = 'DESPESA'
       targetCodigo = '3.2';
     } else if (text.includes('ENERGISA') || text.includes('SANESUL') || text.includes('AGUA') || text.includes('ÁGUA') || text.includes('LUZ') || text.includes('TELEFONE') || text.includes('CLARO') || text.includes('VIVO') || text.includes('TIM') || text.includes('TELECOM')) {
       targetCodigo = '3.3';
-    } else if (text.includes('PAPELARIA') || text.includes('ESCRITÓRIO') || text.includes('ESCRITORIO') || text.includes('MATERIAL') || text.includes('IMPRESSÃO') || text.includes('IMPRESSAO')) {
+    } else if (text.includes('PAPELARIA') || text.includes('ESCRITÓRIO') || text.includes('ESCRITORIO') || text.includes('EXPEDIENTE') || text.includes('MATERIAL') || text.includes('IMPRESSÃO') || text.includes('IMPRESSAO')) {
       targetCodigo = '3.4';
     } else if (text.includes('INVIOLAVEL') || text.includes('SEGURANÇA') || text.includes('SEGURANCA') || text.includes('VIGILANCIA') || text.includes('VIGILÂNCIA')) {
       targetCodigo = '3.5';
