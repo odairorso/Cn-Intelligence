@@ -168,7 +168,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
 
       >
         <h3 className="text-xl font-bold font-headline mb-6">Novo Lançamento</h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor</label>
@@ -176,6 +176,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                 <input
                   type="text" required
                   placeholder="Buscar fornecedor..."
+                  autoComplete="chrome-off"
                   className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface"
                   style={{ backgroundColor: '#161b2a' }}
                   value={formData.fornecedor}
@@ -228,6 +229,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Descrição</label>
             <input
               type="text" required
+              autoComplete="chrome-off"
               className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
               value={formData.descricao}
               onChange={e => setFormData({ ...formData, descricao: e.target.value })}
@@ -239,6 +241,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
               <input
                 type="text"
                 placeholder="Ex: 123456"
+                autoComplete="chrome-off"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.numero_boleto}
@@ -253,6 +256,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                 type="text"
                 placeholder="Ex: 01"
                 disabled={Number(formData.parcelas) > 1}
+                autoComplete="chrome-off"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface disabled:opacity-50"
                 style={{ backgroundColor: '#161b2a' }}
                 value={Number(formData.parcelas) > 1 ? 'Auto' : formData.ocorrencia}
@@ -380,6 +384,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Vencimento</label>
               <input
                 type="date" required
+                autoComplete="chrome-off"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.vencimento}
                 onChange={e => setFormData({ ...formData, vencimento: e.target.value })}
@@ -389,6 +394,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor (R$)</label>
               <input
                 type="number" step="0.01" required
+                autoComplete="chrome-off"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.valor}
                 onChange={e => setFormData({ ...formData, valor: e.target.value })}
@@ -400,6 +406,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                 type="number"
                 min={1}
                 step={1}
+                autoComplete="chrome-off"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.parcelas}
                 onChange={e => setFormData({ ...formData, parcelas: e.target.value })}
@@ -444,6 +451,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                 <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Data de Pagamento</label>
                 <input
                   type="date" required
+                  autoComplete="chrome-off"
                   className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                   value={formData.pagamento}
                   onChange={e => setFormData({ ...formData, pagamento: e.target.value })}
