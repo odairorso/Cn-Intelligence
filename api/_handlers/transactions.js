@@ -200,7 +200,7 @@ export async function handleTransactions(req, res) {
       const rows = await sql`
         INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
         VALUES (${uid}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'},
-                ${vDate}, ${pDate}, ${valorNumber}, ${status || 'PENDENTE'}, ${banco ?? null}, ${tipo}, ${normalizedNumber || null}, ${resolvedContaContabilId ?? null}, ${uid})
+                ${vDate}, ${pDate}, ${valorNumber}, ${status || 'PENDENTE'}, ${banco ?? null}, ${tipo}, ${numero_boleto || null}, ${resolvedContaContabilId ?? null}, ${uid})
         RETURNING *`;
       await auditLog(uid, 'CREATE', rows[0].id, null, rows[0]);
       return res.status(201).json(rows[0]);
@@ -439,8 +439,8 @@ export async function handleTransactionsBatch(req, res) {
       try {
         // Build a single bulk INSERT with multiple value rows
         const values = toInsert.map(p => {
-          const { tx, vDate, pDate, normalizedNumber, resolvedCcId } = p;
-          return sql`(${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(tx.valor)}, ${tx.status || 'PENDENTE'}, ${tx.banco ?? null}, ${tx.tipo}, ${normalizedNumber || null}, ${resolvedCcId ?? null}, ${uid})`;
+          const { tx, vDate, pDate, resolvedCcId } = p;
+          return sql`(${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(tx.valor)}, ${tx.status || 'PENDENTE'}, ${tx.banco ?? null}, ${tx.tipo}, ${tx.numero_boleto || null}, ${resolvedCcId ?? null}, ${uid})`;
         });
 
         const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
@@ -457,9 +457,9 @@ export async function handleTransactionsBatch(req, res) {
         // Fallback: if multi-row INSERT fails, try individual inserts
         for (const p of toInsert) {
           try {
-            const { tx, vDate, pDate, normalizedNumber, resolvedCcId } = p;
+            const { tx, vDate, pDate, resolvedCcId } = p;
             const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
-              VALUES (${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(tx.valor)}, ${tx.status || 'PENDENTE'}, ${tx.banco ?? null}, ${tx.tipo}, ${normalizedNumber || null}, ${resolvedCcId ?? null}, ${uid})
+              VALUES (${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(tx.valor)}, ${tx.status || 'PENDENTE'}, ${tx.banco ?? null}, ${tx.tipo}, ${tx.numero_boleto || null}, ${resolvedCcId ?? null}, ${uid})
               RETURNING id`;
             await auditLog(uid, 'CREATE', inserted[0]?.id, null, { fornecedor: tx.fornecedor, valor: tx.valor, empresa: tx.empresa, vencimento: vDate, tipo: tx.tipo });
             created++;
