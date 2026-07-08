@@ -164,6 +164,12 @@ export default function App() {
     }
   }, [activeTab, isAuthorized, fetchTransactions]);
 
+  useEffect(() => {
+    if (activeTab === 'bancos' && isAuthorized) {
+      fetchBanks(true);
+    }
+  }, [activeTab, isAuthorized, fetchBanks]);
+
 
   const addContaContabil = async () => {
     if (!newContaContabil.codigo || !newContaContabil.nome) {

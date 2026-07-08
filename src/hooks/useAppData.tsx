@@ -538,20 +538,10 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   const fetchBanks = useCallback(async (force = false) => {
     if (!apiAuth.isAuthenticated()) return;
     try {
-      const cacheKey = `banks_${apiAuth.getUid()}`;
-      if (!force) {
-        const cached = getCache<Bank[]>(cacheKey);
-        if (cached) {
-          setBanks(cached);
-          setBalance(cached.reduce((acc: number, b: Bank) => acc + (Number(b.saldo) || 0), 0));
-          return;
-        }
-      }
-      const data = await api.getBanks(force);
+      const data = await api.getBanks(true); // force fresh data
       const list = Array.isArray(data) ? data : [];
       setBanks(list);
       setBalance(list.reduce((acc, b) => acc + (Number(b.saldo) || 0), 0));
-      setCache(cacheKey, list);
     } catch (err: any) {
       if (err.message?.includes('Autenticação')) setIsAuthorized(false);
       else showNotification(err.message || 'Erro ao carregar bancos.', 'error');
