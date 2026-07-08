@@ -15,6 +15,18 @@ interface NewTxModalProps {
   initialTipo?: 'DESPESA' | 'RECEITA';
 }
 
+function incrementDocumentNumber(base: string, offset: number): string {
+  if (!base) return '';
+  if (offset === 0) return base;
+  const match = base.match(/(\d+)(?!.*\d)/);
+  if (!match) return base;
+  const numStr = match[1];
+  const numVal = parseInt(numStr, 10) + offset;
+  const paddedNumStr = String(numVal).padStart(numStr.length, '0');
+  const index = match.index ?? 0;
+  return base.slice(0, index) + paddedNumStr + base.slice(index + numStr.length);
+}
+
 const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShowNewTxModal, onSuccess, initialTipo = 'DESPESA' }: NewTxModalProps) => {
   const [formData, setFormData] = useState({
     fornecedor: '',
@@ -113,7 +125,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           : '';
 
         const rawNumero = String(formData.numero_boleto || '').trim();
-        const occSuffix = formData.ocorrencia ? `-${formData.ocorrencia.trim()}` : '';
+        const baseNumber = formData.ocorrencia ? `${rawNumero}-${formData.ocorrencia.trim()}` : rawNumero;
 
         return {
           uid: apiAuth.getUid() || 'guest',
@@ -127,9 +139,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           banco: formData.status === 'PAGO' ? formData.banco : null,
           tipo: formData.tipo,
           conta_contabil_id: formData.conta_contabil_id,
-          numero_boleto: rawNumero
-            ? (parcelas > 1 ? `${rawNumero}-${i + 1}` : `${rawNumero}${occSuffix}`)
-            : null
+          numero_boleto: baseNumber ? incrementDocumentNumber(baseNumber, i) : null
         };
       });
 
