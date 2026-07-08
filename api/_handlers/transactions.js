@@ -312,6 +312,7 @@ export async function handleTransactionById(req, res) {
         WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)
       `;
       await auditLog(uid, 'DELETE', id, existing[0], null);
+      return res.status(200).json({ success: true });
     } catch (e) {
       return handleError(res, e, 'transactions.js handleTransactionById DELETE');
     }
