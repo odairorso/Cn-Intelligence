@@ -265,6 +265,8 @@ export async function getContaContabilId(fornecedor, descricao, tipo = 'DESPESA'
       targetCodigo = '3.14';
     } else if (text.includes('IPTU')) {
       targetCodigo = '3.15';
+    } else if (text.includes('MULTA RESCISORIA') || text.includes('MULTA RESCISÓRIA') || text.includes('GRRF')) {
+      targetCodigo = '3.16';
     } else if (text.includes('FOLHA') || text.includes('FOPAG') || text.includes('SALARIO') || text.includes('SALÁRIO') || text.includes('CONTRIBUIÇÃO SINDICAL') || text.includes('RESCISÃO') || text.includes('13º') || text.includes('DECIMO')) {
       targetCodigo = '3.1';
     } else if (text.includes('ALUGUEL') || text.includes('LOCAÇÃO') || text.includes('LOCACAO')) {
