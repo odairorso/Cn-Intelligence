@@ -9,8 +9,43 @@ export async function handleBanks(req, res) {
   if (req.method === 'GET') {
     try {
       if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
-      const rows = await sql`SELECT * FROM banks WHERE uid = ${uid} ORDER BY nome ASC`;
-      return res.json(rows);
+      const rows = await sql`
+        SELECT 
+          b.id,
+          b.uid,
+          b.nome,
+          b.agencia,
+          b.conta,
+          b.saldo,
+          b.ativo,
+          COALESCE(
+            (
+              SELECT SUM(
+                CASE 
+                  WHEN t.valor = 'NaN'::numeric THEN 0 
+                  ELSE (CASE WHEN t.tipo = 'RECEITA' THEN t.valor ELSE -t.valor END)
+                END
+              )
+              FROM transactions t
+              WHERE t.uid = b.uid
+                AND t.deleted_at IS NULL
+                AND t.status = 'PAGO'
+                AND regexp_replace(upper(coalesce(t.banco, '')), '[^A-Z0-9]', '', 'g') = regexp_replace(upper(coalesce(b.nome, '')), '[^A-Z0-9]', '', 'g')
+            ), 
+            0
+          ) AS total_pago
+        FROM banks b
+        WHERE b.uid = ${uid}
+        ORDER BY b.nome ASC
+      `;
+      
+      const formatted = rows.map(b => ({
+        ...b,
+        saldo: Number(b.saldo),
+        total_pago: Number(b.total_pago)
+      }));
+      
+      return res.json(formatted);
     } catch (e) {
       return handleError(res, e, 'banks.js handleBanks GET');
     }

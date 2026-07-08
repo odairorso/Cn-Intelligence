@@ -55,6 +55,7 @@ export interface Bank {
   conta?: string;
   saldo: number;
   ativo: boolean;
+  total_pago?: number;
 }
 
 export interface ContaContabil {
