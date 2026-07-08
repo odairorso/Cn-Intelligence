@@ -130,7 +130,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
         return {
           uid: apiAuth.getUid() || 'guest',
           fornecedor: fornecedorFinal,
-          descricao: parcelas > 1 ? `${formData.descricao} (${i + 1}/${parcelas})` : formData.descricao,
+          descricao: formData.descricao,
           empresa: formData.empresa,
           vencimento: toInputDate(vencimentoParcela),
           pagamento: formData.status === 'PAGO' ? toInputDate(pagamentoParcela) : null,
