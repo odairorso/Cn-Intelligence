@@ -49,23 +49,36 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
   const [searchSupplier, setSearchSupplier] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const getDefaultContaKey = (empresa: string, tipo: string) =>
-    `cn_default_conta_contabil:${normalizeCompanyKey(empresa)}:${String(tipo || '').toUpperCase()}`;
+  const GLOBAL_CONTA_KEY = 'cn_last_selected_conta_contabil';
 
   useEffect(() => {
     const allowed = contasContabeis.filter((c) => c.ativo !== false).filter((c) => matchesAccountType(c, formData.tipo));
     const hasSelected = typeof formData.conta_contabil_id === 'number' && allowed.some((c) => c.id === formData.conta_contabil_id);
 
-    const key = getDefaultContaKey(formData.empresa, formData.tipo);
-    const stored = (() => {
-      try { return localStorage.getItem(key); } catch { return null; }
+    // 1. Tentar carregar a última selecionada globalmente
+    const storedGlobal = (() => {
+      try { return localStorage.getItem(GLOBAL_CONTA_KEY); } catch { return null; }
     })();
-    const storedId = stored ? Number(stored) : NaN;
-    const storedValid = Number.isFinite(storedId) && allowed.some((c) => c.id === storedId);
+    const globalId = storedGlobal ? Number(storedGlobal) : NaN;
+    const globalValid = Number.isFinite(globalId) && allowed.some((c) => c.id === globalId);
+
+    // 2. Se não houver global, tenta por empresa (legado)
+    const companyKey = `cn_default_conta_contabil:${normalizeCompanyKey(formData.empresa)}:${String(formData.tipo || '').toUpperCase()}`;
+    const storedCompany = (() => {
+      try { return localStorage.getItem(companyKey); } catch { return null; }
+    })();
+    const companyId = storedCompany ? Number(storedCompany) : NaN;
+    const companyValid = Number.isFinite(companyId) && allowed.some((c) => c.id === companyId);
 
     if (hasSelected) return;
-    if (storedValid) {
-      setFormData((prev) => ({ ...prev, conta_contabil_id: storedId }));
+
+    if (globalValid) {
+      setFormData((prev) => ({ ...prev, conta_contabil_id: globalId }));
+      return;
+    }
+
+    if (companyValid) {
+      setFormData((prev) => ({ ...prev, conta_contabil_id: companyId }));
       return;
     }
 
@@ -349,7 +362,11 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                           onClick={() => {
                             setFormData({ ...formData, conta_contabil_id: c.id });
                             try {
-                              localStorage.setItem(getDefaultContaKey(formData.empresa, formData.tipo), String(c.id));
+                              localStorage.setItem(GLOBAL_CONTA_KEY, String(c.id));
+                              localStorage.setItem(
+                                `cn_default_conta_contabil:${normalizeCompanyKey(formData.empresa)}:${String(formData.tipo || '').toUpperCase()}`,
+                                String(c.id)
+                              );
                             } catch {}
                             setShowContaDropdown(false);
                             setSearchConta('');
