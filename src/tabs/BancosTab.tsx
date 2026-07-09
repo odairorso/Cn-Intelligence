@@ -51,8 +51,13 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
                 </div>
                 <div>
                   <h4 className="font-bold text-on-surface">{bank.nome}</h4>
-                  <p className="text-[10px] text-on-surface-variant/60">
-                    {bank.ativo ? 'Ativo' : 'Inativo'}
+                  <p className="text-[10px] text-on-surface-variant/60 flex items-center gap-1.5 mt-0.5">
+                    <span>{bank.ativo ? 'Ativo' : 'Inativo'}</span>
+                    {saldoAtualVal < 0 && (
+                      <span className="text-[8px] bg-red-500/10 text-red-400 border border-red-500/20 px-1 py-0.2 rounded-xs font-black uppercase tracking-wider">
+                        Usando Limite
+                      </span>
+                    )}
                   </p>
                   {(bank.agencia || bank.conta) && (
                     <p className="text-[10px] text-on-surface-variant/60 mt-1">
