@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Supplier } from '../types';
+import { formatCnpjCpf } from '../lib/utils';
 
 interface EditSupplierModalProps {
   supplier: Supplier;
@@ -11,7 +12,7 @@ interface EditSupplierModalProps {
 const EditSupplierModal = ({ supplier, onClose, onSave }: EditSupplierModalProps) => {
   const [formData, setFormData] = useState({
     nome: supplier.nome || '',
-    cnpj: supplier.cnpj || '',
+    cnpj: formatCnpjCpf(supplier.cnpj || ''),
     email: supplier.email || '',
     telefone: supplier.telefone || '',
   });
@@ -54,7 +55,7 @@ const EditSupplierModal = ({ supplier, onClose, onSave }: EditSupplierModalProps
                 type="text"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.cnpj}
-                onChange={e => setFormData({ ...formData, cnpj: e.target.value })}
+                onChange={e => setFormData({ ...formData, cnpj: formatCnpjCpf(e.target.value) })}
               />
             </div>
           </div>

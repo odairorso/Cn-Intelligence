@@ -317,3 +317,25 @@ export const matchesAccountType = (acc: ContaContabil, tipo: 'RECEITA' | 'DESPES
 // ─── Currency formatter ───────────────────────────────────────────────────────
 export const formatBRL = (value: number): string =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// ─── CPF/CNPJ Formatter ───────────────────────────────────────────────────────
+export const formatCnpjCpf = (value: string): string => {
+  const clean = value.replace(/\D/g, '');
+  
+  if (clean.length <= 11) {
+    // CPF
+    let formatted = clean;
+    if (clean.length > 3) formatted = clean.slice(0, 3) + '.' + clean.slice(3);
+    if (clean.length > 6) formatted = formatted.slice(0, 7) + '.' + formatted.slice(7);
+    if (clean.length > 9) formatted = formatted.slice(0, 11) + '-' + formatted.slice(11, 13);
+    return formatted.slice(0, 14);
+  } else {
+    // CNPJ
+    let formatted = clean;
+    if (clean.length > 2) formatted = clean.slice(0, 2) + '.' + clean.slice(2);
+    if (clean.length > 5) formatted = formatted.slice(0, 6) + '.' + formatted.slice(6);
+    if (clean.length > 8) formatted = formatted.slice(0, 10) + '/' + formatted.slice(10);
+    if (clean.length > 12) formatted = formatted.slice(0, 15) + '-' + formatted.slice(15, 17);
+    return formatted.slice(0, 18);
+  }
+};
