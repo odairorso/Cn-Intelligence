@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Transaction, TransactionStatus, ContaContabil } from '../types';
-import { cn, isRevenueTransaction, normalizeCompanyKey, dateSortKey, formatBRL } from '../lib/utils';
+import { cn, isRevenueTransaction, normalizeCompanyKey, dateSortKey, formatBRL, stripAccents } from '../lib/utils';
 import { api } from '../api';
-import { Printer, Search } from 'lucide-react';
+import { Printer, Search, ChevronDown } from 'lucide-react';
 
 interface RelatoriosTabProps {
   transactions: Transaction[];
@@ -50,6 +50,8 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
   const [selectedTipo, setSelectedTipo] = useState<string>('TODOS');
   const [selectedStatus, setSelectedStatus] = useState<string>('TODOS');
   const [selectedContaContabil, setSelectedContaContabil] = useState<string>('TODOS');
+  const [showContaDropdown, setShowContaDropdown] = useState(false);
+  const [searchConta, setSearchConta] = useState('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const [filterType, setFilterType] = useState<'MES' | 'PERIODO'>('MES');
@@ -601,24 +603,72 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
             <option value="NAO_PAGO" className="bg-surface text-on-surface">Não Pagos (Pendentes + Vencidos)</option>
           </select>
         </div>
-        <div className="space-y-1 min-w-[240px]">
+        <div className="space-y-1 min-w-[240px] relative">
           <label className="text-[10px] font-bold text-on-surface-variant uppercase">Conta Contábil</label>
-          <select
-            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+          <div
+            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-primary text-on-surface flex justify-between items-center cursor-pointer select-none"
             style={{ backgroundColor: '#1e1e2e' }}
-            value={selectedContaContabil}
-            onChange={e => setSelectedContaContabil(e.target.value)}
+            onClick={() => setShowContaDropdown(!showContaDropdown)}
           >
-            <option value="TODOS" className="bg-surface text-on-surface">Todas</option>
-            {contasContabeis
-              .filter((c) => c.ativo !== false)
-              .sort((a, b) => String(a.codigo || '').localeCompare(String(b.codigo || ''), 'pt-BR'))
-              .map((c) => (
-                <option key={c.id} value={String(c.id)} className="bg-surface text-on-surface">
-                  {c.codigo} - {c.nome}
-                </option>
-              ))}
-          </select>
+            <span>
+              {selectedContaContabil === 'TODOS'
+                ? 'Todas'
+                : contasContabeis.find(c => String(c.id) === selectedContaContabil)?.nome || `${selectedContaContabil} - Conta`}
+            </span>
+            <ChevronDown size={14} className="text-on-surface-variant" />
+          </div>
+          {showContaDropdown && (
+            <div className="absolute z-50 w-full mt-1 bg-[#1e1e2e] border border-white/10 rounded-lg shadow-xl max-h-60 overflow-hidden">
+              <div className="p-2 border-b border-white/10">
+                <div className="relative flex items-center">
+                  <Search className="absolute left-2 text-on-surface-variant/60" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Buscar conta..."
+                    value={searchConta}
+                    onChange={(e) => setSearchConta(e.target.value)}
+                    className="w-full bg-surface-variant/20 border border-white/10 rounded pl-8 pr-3 py-1.5 text-sm outline-none focus:border-primary text-on-surface"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className="max-h-44 overflow-y-auto">
+                <div
+                  className="px-3 py-2 text-sm text-on-surface-variant hover:bg-white/5 cursor-pointer"
+                  onClick={() => {
+                    setSelectedContaContabil('TODOS');
+                    setShowContaDropdown(false);
+                    setSearchConta('');
+                  }}
+                >
+                  Todas
+                </div>
+                {contasContabeis
+                  .filter((c) => c.ativo !== false)
+                  .filter((c) => {
+                    const q = stripAccents(searchConta).toLowerCase();
+                    if (!q) return true;
+                    return stripAccents(c.codigo).toLowerCase().includes(q) || stripAccents(c.nome).toLowerCase().includes(q);
+                  })
+                  .sort((a, b) => String(a.codigo || '').localeCompare(String(b.codigo || ''), 'pt-BR'))
+                  .map((c) => (
+                    <div
+                      key={c.id}
+                      className="px-3 py-2 text-sm hover:bg-white/5 cursor-pointer flex items-center gap-2 text-on-surface"
+                      style={{ backgroundColor: selectedContaContabil === String(c.id) ? 'rgba(59, 130, 246, 0.2)' : 'transparent' }}
+                      onClick={() => {
+                        setSelectedContaContabil(String(c.id));
+                        setShowContaDropdown(false);
+                        setSearchConta('');
+                      }}
+                    >
+                      <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">{c.codigo}</span>
+                      <span>{c.nome}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex-grow">
           <div className="bg-surface-variant/20 flex items-center px-4 py-2 rounded-lg border border-white/10 focus-within:border-primary transition-all">
