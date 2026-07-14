@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Transaction, TransactionStatus, ContaContabil } from '../types';
-import { cn, isRevenueTransaction, normalizeCompanyKey, dateSortKey, formatBRL, stripAccents } from '../lib/utils';
+import { cn, isRevenueTransaction, normalizeCompanyKey, dateSortKey, formatBRL, stripAccents, matchesAccountType } from '../lib/utils';
 import { api } from '../api';
 import { Printer, Search, ChevronDown } from 'lucide-react';
 
@@ -143,6 +143,16 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
     selectedContaContabil,
     fetchStats
   ]);
+
+  // Reset conta contabil filter if it doesn't match the new selectedTipo
+  useEffect(() => {
+    if (selectedContaContabil === 'TODOS') return;
+    const conta = contasContabeis.find(c => String(c.id) === selectedContaContabil);
+    if (!conta) return;
+    if (selectedTipo !== 'TODOS' && !matchesAccountType(conta, selectedTipo as 'RECEITA' | 'DESPESA')) {
+      setSelectedContaContabil('TODOS');
+    }
+  }, [selectedTipo, contasContabeis, selectedContaContabil]);
 
   const companies = useMemo(() => {
     const map = new Map<string, string>();
@@ -645,6 +655,10 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
                 </div>
                 {contasContabeis
                   .filter((c) => c.ativo !== false)
+                  .filter((c) => {
+                    if (selectedTipo === 'TODOS') return true;
+                    return matchesAccountType(c, selectedTipo as 'RECEITA' | 'DESPESA');
+                  })
                   .filter((c) => {
                     const q = stripAccents(searchConta).toLowerCase();
                     if (!q) return true;
