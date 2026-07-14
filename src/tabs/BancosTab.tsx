@@ -13,6 +13,8 @@ interface BancosTabProps {
 const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEditingBank, deleteBank }: BancosTabProps) => {
   const [selectedBankForExtract, setSelectedBankForExtract] = useState<Bank | null>(null);
   const [extractFilter, setExtractFilter] = useState<'PAGO' | 'TODOS'>('PAGO');
+  const [extractMonth, setExtractMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
+  const [extractYear, setExtractYear] = useState<string>(() => String(new Date().getFullYear()));
 
   const normalizeName = (name: string) => String(name || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
@@ -128,6 +130,19 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
             }
             return true;
           })
+          .filter(tx => {
+            const dateStr = tx.pagamento || tx.vencimento;
+            if (!dateStr) return true;
+            
+            const parts = dateStr.includes('-') ? dateStr.split('-') : dateStr.split('/');
+            const year = dateStr.includes('-') ? parts[0] : parts[2];
+            const month = dateStr.includes('-') ? parts[1] : parts[1];
+            
+            const matchesYear = extractYear === 'TODOS' || year === extractYear;
+            const matchesMonth = extractMonth === 'TODOS' || month === extractMonth;
+            
+            return matchesYear && matchesMonth;
+          })
           .sort((a, b) => {
             const dateA = a.pagamento || a.vencimento;
             const dateB = b.pagamento || b.vencimento;
@@ -162,6 +177,8 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                   onClick={() => {
                     setSelectedBankForExtract(null);
                     setExtractFilter('PAGO');
+                    setExtractMonth(String(new Date().getMonth() + 1).padStart(2, '0'));
+                    setExtractYear(String(new Date().getFullYear()));
                   }}
                   className="p-1.5 hover:bg-white/10 rounded-full text-on-surface-variant transition-all"
                 >
@@ -169,28 +186,73 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                 </button>
               </div>
 
-              {/* Filtros rápidos */}
-              <div className="flex gap-2 mb-4 bg-surface-variant/20 p-1 rounded-lg w-fit">
-                <button
-                  onClick={() => setExtractFilter('PAGO')}
-                  className={`px-4 py-1.5 rounded text-xs font-bold transition-all ${
-                    extractFilter === 'PAGO'
-                      ? 'bg-primary text-background'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  Apenas Pagos (Afetam o Saldo)
-                </button>
-                <button
-                  onClick={() => setExtractFilter('TODOS')}
-                  className={`px-4 py-1.5 rounded text-xs font-bold transition-all ${
-                    extractFilter === 'TODOS'
-                      ? 'bg-primary text-background'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  Todos os Lançamentos
-                </button>
+              {/* Filtros rápidos e data */}
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                <div className="flex gap-2 bg-surface-variant/20 p-1 rounded-lg w-fit">
+                  <button
+                    onClick={() => setExtractFilter('PAGO')}
+                    className={`px-4 py-1.5 rounded text-xs font-bold transition-all ${
+                      extractFilter === 'PAGO'
+                        ? 'bg-primary text-background'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    Apenas Pagos (Afetam o Saldo)
+                  </button>
+                  <button
+                    onClick={() => setExtractFilter('TODOS')}
+                    className={`px-4 py-1.5 rounded text-xs font-bold transition-all ${
+                      extractFilter === 'TODOS'
+                        ? 'bg-primary text-background'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    Todos os Lançamentos
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-on-surface-variant uppercase font-black tracking-wider">Mês:</span>
+                    <select
+                      value={extractMonth}
+                      onChange={(e) => setExtractMonth(e.target.value)}
+                      className="bg-surface border border-white/10 rounded px-2.5 py-1.5 text-xs outline-none focus:border-primary text-on-surface"
+                      style={{ backgroundColor: '#1e1e2e' }}
+                    >
+                      <option value="TODOS">Todos</option>
+                      <option value="01">Janeiro</option>
+                      <option value="02">Fevereiro</option>
+                      <option value="03">Março</option>
+                      <option value="04">Abril</option>
+                      <option value="05">Maio</option>
+                      <option value="06">Junho</option>
+                      <option value="07">Julho</option>
+                      <option value="08">Agosto</option>
+                      <option value="09">Setembro</option>
+                      <option value="10">Outubro</option>
+                      <option value="11">Novembro</option>
+                      <option value="12">Dezembro</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-on-surface-variant uppercase font-black tracking-wider">Ano:</span>
+                    <select
+                      value={extractYear}
+                      onChange={(e) => setExtractYear(e.target.value)}
+                      className="bg-surface border border-white/10 rounded px-2.5 py-1.5 text-xs outline-none focus:border-primary text-on-surface"
+                      style={{ backgroundColor: '#1e1e2e' }}
+                    >
+                      <option value="TODOS">Todos</option>
+                      {Array.from({ length: 7 }, (_, i) => String(2020 + i))
+                        .reverse()
+                        .map(y => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
               </div>
 
               {/* Tabela de Lançamentos */}
