@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { motion } from 'motion/react';
 import { Search, ChevronDown } from 'lucide-react';
 import { Transaction, Supplier, Bank, TransactionStatus, ContaContabil } from '../types';
-import { cn, normalizeSupplierName, normalizeCompanyKey, todayInputDate, toInputDate, parseMoneyToNumber, matchesAccountType } from '../lib/utils';
+import { cn, normalizeSupplierName, normalizeCompanyKey, todayInputDate, toInputDate, parseMoneyToNumber, matchesAccountType, stripAccents } from '../lib/utils';
 import { api, apiAuth } from '../api';
 
 interface NewTxModalProps {
@@ -350,9 +350,9 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                       .filter(c => c.ativo !== false)
                       .filter(c => matchesAccountType(c, formData.tipo))
                       .filter(c => {
-                        const q = searchConta.toLowerCase();
+                        const q = stripAccents(searchConta).toLowerCase();
                         if (!q) return true;
-                        return c.codigo.toLowerCase().includes(q) || c.nome.toLowerCase().includes(q);
+                        return stripAccents(c.codigo).toLowerCase().includes(q) || stripAccents(c.nome).toLowerCase().includes(q);
                       })
                       .map(c => (
                         <div

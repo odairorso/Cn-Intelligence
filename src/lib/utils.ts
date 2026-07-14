@@ -339,3 +339,10 @@ export const formatCnpjCpf = (value: string): string => {
     return formatted.slice(0, 18);
   }
 };
+
+// ─── Accent Stripper ─────────────────────────────────────────────────────────
+export const stripAccents = (str: string): string => {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+};
