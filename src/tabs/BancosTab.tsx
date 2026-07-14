@@ -1,5 +1,5 @@
-import React from 'react';
-import { CreditCard, Edit, Trash2, Plus } from 'lucide-react';
+import React, { useState } from 'react';
+import { CreditCard, Edit, Trash2, Plus, X } from 'lucide-react';
 import type { Bank, Transaction } from '../types';
 
 interface BancosTabProps {
@@ -10,7 +10,12 @@ interface BancosTabProps {
   deleteBank: (id: string) => void;
 }
 
-const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, deleteBank }: BancosTabProps) => {
+const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEditingBank, deleteBank }: BancosTabProps) => {
+  const [selectedBankForExtract, setSelectedBankForExtract] = useState<Bank | null>(null);
+  const [extractFilter, setExtractFilter] = useState<'PAGO' | 'TODOS'>('PAGO');
+
+  const normalizeName = (name: string) => String(name || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -32,16 +37,26 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
           const saldoAtualVal = Number(bank.saldo) + totalPagoVal;
 
           return (
-            <div key={bank.id} className="glass-card p-6 relative group">
+            <div
+              key={bank.id}
+              className="glass-card p-6 relative group cursor-pointer hover:border-primary/30 transition-all hover:shadow-lg"
+              onClick={() => setSelectedBankForExtract(bank)}
+            >
               <button
-                onClick={() => setEditingBank(bank)}
-                className="absolute top-4 right-14 p-2 text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10 rounded-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingBank(bank);
+                }}
+                className="absolute top-4 right-14 p-2 text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10 rounded-sm z-10"
               >
                 <Edit size={16} />
               </button>
               <button
-                onClick={() => deleteBank(bank.id)}
-                className="absolute top-4 right-4 p-2 text-tertiary opacity-0 group-hover:opacity-100 transition-opacity hover:bg-tertiary/10 rounded-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteBank(bank.id);
+                }}
+                className="absolute top-4 right-4 p-2 text-tertiary opacity-0 group-hover:opacity-100 transition-opacity hover:bg-tertiary/10 rounded-sm z-10"
               >
                 <Trash2 size={16} />
               </button>
@@ -87,6 +102,9 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
                     </span>
                   </div>
                 </div>
+                <p className="text-[10px] text-primary/70 mt-2 opacity-0 group-hover:opacity-100 transition-opacity text-right font-bold">
+                  Clique para ver lançamentos →
+                </p>
               </div>
             </div>
           );
@@ -99,8 +117,177 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
           </div>
         )}
       </div>
+
+      {selectedBankForExtract && (() => {
+        const bankNameNormalized = normalizeName(selectedBankForExtract.nome);
+        const bankTransactions = transactions
+          .filter(tx => tx.banco && normalizeName(tx.banco) === bankNameNormalized)
+          .filter(tx => {
+            if (extractFilter === 'PAGO') {
+              return tx.status === 'PAGO';
+            }
+            return true;
+          })
+          .sort((a, b) => {
+            const dateA = a.pagamento || a.vencimento;
+            const dateB = b.pagamento || b.vencimento;
+            return dateB.localeCompare(dateA);
+          });
+
+        // Totais do período filtrado
+        const totalReceitas = bankTransactions
+          .filter(tx => tx.status === 'PAGO' && tx.tipo === 'RECEITA')
+          .reduce((sum, tx) => sum + Number(tx.valor || 0), 0);
+
+        const totalDespesas = bankTransactions
+          .filter(tx => tx.status === 'PAGO' && tx.tipo === 'DESPESA')
+          .reduce((sum, tx) => sum + Number(tx.valor || 0), 0);
+
+        return (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+            <div className="glass-card p-6 w-full max-w-4xl border border-white/10 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-xl font-bold font-headline flex items-center gap-2 text-on-surface">
+                    <CreditCard className="text-primary" size={22} />
+                    Extrato de Lançamentos - {selectedBankForExtract.nome}
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-1">
+                    {selectedBankForExtract.agencia && `Agência: ${selectedBankForExtract.agencia}`}
+                    {selectedBankForExtract.agencia && selectedBankForExtract.conta && ' • '}
+                    {selectedBankForExtract.conta && `Conta: ${selectedBankForExtract.conta}`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedBankForExtract(null);
+                    setExtractFilter('PAGO');
+                  }}
+                  className="p-1.5 hover:bg-white/10 rounded-full text-on-surface-variant transition-all"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Filtros rápidos */}
+              <div className="flex gap-2 mb-4 bg-surface-variant/20 p-1 rounded-lg w-fit">
+                <button
+                  onClick={() => setExtractFilter('PAGO')}
+                  className={`px-4 py-1.5 rounded text-xs font-bold transition-all ${
+                    extractFilter === 'PAGO'
+                      ? 'bg-primary text-background'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Apenas Pagos (Afetam o Saldo)
+                </button>
+                <button
+                  onClick={() => setExtractFilter('TODOS')}
+                  className={`px-4 py-1.5 rounded text-xs font-bold transition-all ${
+                    extractFilter === 'TODOS'
+                      ? 'bg-primary text-background'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Todos os Lançamentos
+                </button>
+              </div>
+
+              {/* Tabela de Lançamentos */}
+              <div className="flex-grow overflow-y-auto mb-6 border border-white/5 rounded-lg">
+                {bankTransactions.length === 0 ? (
+                  <div className="p-12 text-center text-on-surface-variant">
+                    Nenhum lançamento encontrado para os filtros selecionados neste banco.
+                  </div>
+                ) : (
+                  <table className="w-full text-left text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-surface-variant/40 border-b border-white/10 text-on-surface-variant font-bold text-xs uppercase">
+                        <th className="p-3">Data</th>
+                        <th className="p-3">Fornecedor</th>
+                        <th className="p-3">Descrição</th>
+                        <th className="p-3 text-center">Tipo</th>
+                        <th className="p-3 text-right">Valor</th>
+                        <th className="p-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {bankTransactions.map(tx => {
+                        const isRevenue = tx.tipo === 'RECEITA';
+                        const displayDate = tx.pagamento || tx.vencimento;
+                        
+                        const formattedDate = displayDate.includes('-')
+                          ? displayDate.split('-').reverse().join('/')
+                          : displayDate;
+
+                        return (
+                          <tr key={tx.id} className="hover:bg-white/5 transition-colors">
+                            <td className="p-3 text-xs text-on-surface-variant">{formattedDate}</td>
+                            <td className="p-3 font-medium text-on-surface">{tx.fornecedor || '-'}</td>
+                            <td className="p-3 text-xs text-on-surface-variant">{tx.descricao || '-'}</td>
+                            <td className="p-3 text-center">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                isRevenue ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                              }`}>
+                                {isRevenue ? 'Receita' : 'Despesa'}
+                              </span>
+                            </td>
+                            <td className={`p-3 text-right font-bold ${isRevenue ? 'text-green-400' : 'text-red-400'}`}>
+                              {isRevenue ? '+' : '-'}{Math.abs(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </td>
+                            <td className="p-3 text-center">
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                tx.status === 'PAGO'
+                                  ? 'bg-green-500/10 text-green-400'
+                                  : tx.status === 'VENCIDO'
+                                  ? 'bg-red-500/10 text-red-400'
+                                  : 'bg-yellow-500/10 text-yellow-400'
+                              }`}>
+                                {tx.status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* Resumo de Conciliação */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-surface-variant/10 rounded-lg border border-white/5">
+                <div>
+                  <p className="text-[10px] text-on-surface-variant uppercase font-bold">Saldo Inicial</p>
+                  <p className="text-sm font-bold text-on-surface mt-0.5">
+                    {Number(selectedBankForExtract.saldo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-green-400 uppercase font-bold">Total Receitas Pagas</p>
+                  <p className="text-sm font-bold text-green-400 mt-0.5">
+                    +{totalReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-red-400 uppercase font-bold">Total Despesas Pagas</p>
+                  <p className="text-sm font-bold text-red-400 mt-0.5">
+                    -{totalDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
+                </div>
+                <div className="border-l border-white/10 pl-4">
+                  <p className="text-[10px] text-primary uppercase font-bold">Saldo Atual Calculado</p>
+                  <p className="text-base font-black text-primary mt-0.5">
+                    {(Number(selectedBankForExtract.saldo) + (totalReceitas - totalDespesas)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 });
 
+BancosTab.displayName = 'BancosTab';
 export default BancosTab;
