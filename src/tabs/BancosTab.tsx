@@ -29,19 +29,11 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
     const loadExtract = async () => {
       setLoadingExtract(true);
       try {
-        const queryYear = extractYear === 'TODOS' ? undefined : extractYear;
-        const queryMonth = extractMonth === 'TODOS' ? undefined : extractMonth;
-        
-        // Buscamos com limite alto para abranger todos os lançamentos do período do banco
+        // NÃO passamos queryYear e queryMonth para a API!
+        // Carregamos todos os registros para permitir filtragem por pagamento ou vencimento no frontend.
         const data = await api.getTransactions(
           5000,
-          0,
-          queryYear,
-          queryMonth,
-          undefined,
-          undefined,
-          undefined,
-          extractFilter === 'PAGO' ? 'PAGO' : undefined
+          0
         );
         
         setExtractTransactions(Array.isArray(data) ? data : []);
@@ -53,13 +45,11 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
     };
 
     loadExtract();
-  }, [selectedBankForExtract, extractFilter, extractMonth, extractYear]);
+  }, [selectedBankForExtract]); // Apenas recarrega se o banco mudar
 
   const formatCreatedAt = (dateTimeStr?: string) => {
     if (!dateTimeStr) return '-';
     try {
-      // O formato retornado do Postgres é UTC "YYYY-MM-DD HH:MM:SS" ou ISO string.
-      // Vamos converter para o horário local brasileiro
       const date = new Date(dateTimeStr);
       if (isNaN(date.getTime())) return '-';
       return date.toLocaleDateString('pt-BR');
@@ -174,6 +164,27 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
         const bankNameNormalized = normalizeName(selectedBankForExtract.nome);
         const bankTransactions = extractTransactions
           .filter(tx => tx.banco && normalizeName(tx.banco) === bankNameNormalized)
+          .filter(tx => {
+            if (extractFilter === 'PAGO') {
+              return tx.status === 'PAGO';
+            }
+            return true;
+          })
+          .filter(tx => {
+            // Regra crucial: se o lançamento está pago, a data de movimentação real é a data de PAGAMENTO.
+            // Se está pendente/vencido, a data de movimentação estimada é a data de VENCIMENTO.
+            const dateStr = tx.status === 'PAGO' && tx.pagamento ? tx.pagamento : tx.vencimento;
+            if (!dateStr) return true;
+            
+            const parts = dateStr.includes('-') ? dateStr.split('-') : dateStr.split('/');
+            const year = dateStr.includes('-') ? parts[0] : parts[2];
+            const month = dateStr.includes('-') ? parts[1] : parts[1];
+            
+            const matchesYear = extractYear === 'TODOS' || year === extractYear;
+            const matchesMonth = extractMonth === 'TODOS' || month === extractMonth;
+            
+            return matchesYear && matchesMonth;
+          })
           .sort((a, b) => {
             const dateA = a.pagamento || a.vencimento;
             const dateB = b.pagamento || b.vencimento;
@@ -306,7 +317,7 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
                   <table className="w-full text-left text-sm border-collapse">
                     <thead>
                       <tr className="bg-surface-variant/40 border-b border-white/10 text-on-surface-variant font-bold text-xs uppercase">
-                        <th className="p-3">Data Lanc.</th>
+                        <th className="p-3">Data Mov.</th>
                         <th className="p-3">Cadastrado em</th>
                         <th className="p-3">Fornecedor</th>
                         <th className="p-3">Descrição</th>
@@ -318,7 +329,7 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
                     <tbody className="divide-y divide-white/5">
                       {bankTransactions.map(tx => {
                         const isRevenue = tx.tipo === 'RECEITA';
-                        const displayDate = tx.pagamento || tx.vencimento;
+                        const displayDate = tx.status === 'PAGO' && tx.pagamento ? tx.pagamento : tx.vencimento;
                         
                         const formattedDate = displayDate.includes('-')
                           ? displayDate.split('-').reverse().join('/')
@@ -326,7 +337,7 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
 
                         return (
                           <tr key={tx.id} className="hover:bg-white/5 transition-colors">
-                            <td className="p-3 text-xs text-on-surface">{formattedDate}</td>
+                            <td className="p-3 text-xs text-on-surface font-semibold">{formattedDate}</td>
                             <td className="p-3 text-xs text-on-surface-variant">{formatCreatedAt(tx.created_at)}</td>
                             <td className="p-3 font-medium text-on-surface">{tx.fornecedor || '-'}</td>
                             <td className="p-3 text-xs text-on-surface-variant">{tx.descricao || '-'}</td>
@@ -368,21 +379,21 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-green-400 uppercase font-bold">Total Receitas Pagas</p>
+                  <p className="text-[10px] text-green-400 uppercase font-bold">Total Receitas Pagas (Período)</p>
                   <p className="text-sm font-bold text-green-400 mt-0.5">
                     +{totalReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-red-400 uppercase font-bold">Total Despesas Pagas</p>
+                  <p className="text-[10px] text-red-400 uppercase font-bold">Total Despesas Pagas (Período)</p>
                   <p className="text-sm font-bold text-red-400 mt-0.5">
                     -{totalDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
                 </div>
                 <div className="border-l border-white/10 pl-4">
-                  <p className="text-[10px] text-primary uppercase font-bold">Saldo Atual Calculado</p>
+                  <p className="text-[10px] text-primary uppercase font-bold">Saldo Atual da Conta</p>
                   <p className="text-base font-black text-primary mt-0.5">
-                    {(Number(selectedBankForExtract.saldo) + (totalReceitas - totalDespesas)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {((Number(selectedBankForExtract.saldo) + (selectedBankForExtract.total_pago || 0))).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
                 </div>
               </div>
