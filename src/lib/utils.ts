@@ -270,6 +270,7 @@ export const isRevenueTransaction = (tx: { fornecedor?: string; descricao?: stri
   const tipo = String(tx.tipo || '').toUpperCase();
   if (tipo === 'RECEITA') return true;
   if (tipo === 'DESPESA') return false;
+  if (tipo === 'TRANSFERENCIA') return typeof tx.valor === 'number' && tx.valor > 0;
 
   const desc = normalizeSupplierName(tx.descricao ?? '');
   const forn = normalizeSupplierName(tx.fornecedor ?? '');

@@ -193,12 +193,12 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
 
         // Totais do período filtrado
         const totalReceitas = bankTransactions
-          .filter(tx => tx.status === 'PAGO' && tx.tipo === 'RECEITA')
-          .reduce((sum, tx) => sum + Number(tx.valor || 0) + Number(tx.juros || 0), 0);
+          .filter(tx => tx.status === 'PAGO' && (tx.tipo === 'RECEITA' || (tx.tipo === 'TRANSFERENCIA' && Number(tx.valor || 0) > 0)))
+          .reduce((sum, tx) => sum + Math.abs(Number(tx.valor || 0)) + Number(tx.juros || 0), 0);
 
         const totalDespesas = bankTransactions
-          .filter(tx => tx.status === 'PAGO' && tx.tipo === 'DESPESA')
-          .reduce((sum, tx) => sum + Number(tx.valor || 0) + Number(tx.juros || 0), 0);
+          .filter(tx => tx.status === 'PAGO' && (tx.tipo === 'DESPESA' || (tx.tipo === 'TRANSFERENCIA' && Number(tx.valor || 0) < 0)))
+          .reduce((sum, tx) => sum + Math.abs(Number(tx.valor || 0)) + Number(tx.juros || 0), 0);
 
         return (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
@@ -328,7 +328,7 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {bankTransactions.map(tx => {
-                        const isRevenue = tx.tipo === 'RECEITA';
+                        const isRevenue = tx.tipo === 'RECEITA' || (tx.tipo === 'TRANSFERENCIA' && Number(tx.valor || 0) > 0);
                         const displayDate = tx.status === 'PAGO' && tx.pagamento ? tx.pagamento : tx.vencimento;
                         
                         const formattedDate = displayDate.includes('-')

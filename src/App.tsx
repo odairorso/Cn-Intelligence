@@ -321,7 +321,7 @@ export default function App() {
           empresa: data.originCompany,
           vencimento: isoDate,
           pagamento: isoDate,
-          valor: data.value,
+          valor: -data.value, // Origem/Saída de dinheiro: valor negativo
           status: 'PAGO' as TransactionStatus,
           banco: data.originBank,
           tipo: 'TRANSFERENCIA' as any
@@ -333,7 +333,7 @@ export default function App() {
           empresa: data.destCompany,
           vencimento: isoDate,
           pagamento: isoDate,
-          valor: data.value,
+          valor: data.value, // Destino/Entrada de dinheiro: valor positivo
           status: 'PAGO' as TransactionStatus,
           banco: data.destBank,
           tipo: 'TRANSFERENCIA' as any

@@ -23,10 +23,10 @@ export async function handleBanks(req, res) {
               SELECT SUM(
                 CASE 
                   WHEN t.valor = 'NaN'::numeric THEN 0 
-                  ELSE (CASE WHEN t.tipo = 'RECEITA' 
-                             THEN (t.valor + COALESCE(t.juros, 0)) 
-                             ELSE -(t.valor + COALESCE(t.juros, 0)) 
-                        END)
+                  WHEN t.tipo = 'RECEITA' THEN (t.valor + COALESCE(t.juros, 0))
+                  WHEN t.tipo = 'DESPESA' THEN -(t.valor + COALESCE(t.juros, 0))
+                  WHEN t.tipo = 'TRANSFERENCIA' THEN t.valor
+                  ELSE -(t.valor + COALESCE(t.juros, 0))
                 END
               )
               FROM transactions t
