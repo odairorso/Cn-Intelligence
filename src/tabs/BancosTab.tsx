@@ -1,22 +1,72 @@
-import React, { useState } from 'react';
-import { CreditCard, Edit, Trash2, Plus, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CreditCard, Edit, Trash2, Plus, X, Loader2 } from 'lucide-react';
 import type { Bank, Transaction } from '../types';
+import { api } from '../api';
 
 interface BancosTabProps {
   banks: Bank[];
-  transactions: Transaction[];
+  transactions: Transaction[]; // Mantido para compatibilidade de tipos
   setShowNewBankModal: (show: boolean) => void;
   setEditingBank: (bank: Bank) => void;
   deleteBank: (id: string) => void;
 }
 
-const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEditingBank, deleteBank }: BancosTabProps) => {
+const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, deleteBank }: BancosTabProps) => {
   const [selectedBankForExtract, setSelectedBankForExtract] = useState<Bank | null>(null);
   const [extractFilter, setExtractFilter] = useState<'PAGO' | 'TODOS'>('PAGO');
   const [extractMonth, setExtractMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
   const [extractYear, setExtractYear] = useState<string>(() => String(new Date().getFullYear()));
 
+  const [extractTransactions, setExtractTransactions] = useState<Transaction[]>([]);
+  const [loadingExtract, setLoadingExtract] = useState(false);
+
   const normalizeName = (name: string) => String(name || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
+  // Busca lançamentos na API dinamicamente de acordo com filtros e banco
+  useEffect(() => {
+    if (!selectedBankForExtract) return;
+
+    const loadExtract = async () => {
+      setLoadingExtract(true);
+      try {
+        const queryYear = extractYear === 'TODOS' ? undefined : extractYear;
+        const queryMonth = extractMonth === 'TODOS' ? undefined : extractMonth;
+        
+        // Buscamos com limite alto para abranger todos os lançamentos do período do banco
+        const data = await api.getTransactions(
+          5000,
+          0,
+          queryYear,
+          queryMonth,
+          undefined,
+          undefined,
+          undefined,
+          extractFilter === 'PAGO' ? 'PAGO' : undefined
+        );
+        
+        setExtractTransactions(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Erro ao buscar extrato do banco:', err);
+      } finally {
+        setLoadingExtract(false);
+      }
+    };
+
+    loadExtract();
+  }, [selectedBankForExtract, extractFilter, extractMonth, extractYear]);
+
+  const formatCreatedAt = (dateTimeStr?: string) => {
+    if (!dateTimeStr) return '-';
+    try {
+      // O formato retornado do Postgres é UTC "YYYY-MM-DD HH:MM:SS" ou ISO string.
+      // Vamos converter para o horário local brasileiro
+      const date = new Date(dateTimeStr);
+      if (isNaN(date.getTime())) return '-';
+      return date.toLocaleDateString('pt-BR');
+    } catch {
+      return '-';
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -122,27 +172,8 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
 
       {selectedBankForExtract && (() => {
         const bankNameNormalized = normalizeName(selectedBankForExtract.nome);
-        const bankTransactions = transactions
+        const bankTransactions = extractTransactions
           .filter(tx => tx.banco && normalizeName(tx.banco) === bankNameNormalized)
-          .filter(tx => {
-            if (extractFilter === 'PAGO') {
-              return tx.status === 'PAGO';
-            }
-            return true;
-          })
-          .filter(tx => {
-            const dateStr = tx.pagamento || tx.vencimento;
-            if (!dateStr) return true;
-            
-            const parts = dateStr.includes('-') ? dateStr.split('-') : dateStr.split('/');
-            const year = dateStr.includes('-') ? parts[0] : parts[2];
-            const month = dateStr.includes('-') ? parts[1] : parts[1];
-            
-            const matchesYear = extractYear === 'TODOS' || year === extractYear;
-            const matchesMonth = extractMonth === 'TODOS' || month === extractMonth;
-            
-            return matchesYear && matchesMonth;
-          })
           .sort((a, b) => {
             const dateA = a.pagamento || a.vencimento;
             const dateB = b.pagamento || b.vencimento;
@@ -160,7 +191,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
 
         return (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-            <div className="glass-card p-6 w-full max-w-4xl border border-white/10 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="glass-card p-6 w-full max-w-5xl border border-white/10 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
               <div className="flex justify-between items-start mb-6">
                 <div>
                   <h3 className="text-xl font-bold font-headline flex items-center gap-2 text-on-surface">
@@ -179,6 +210,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                     setExtractFilter('PAGO');
                     setExtractMonth(String(new Date().getMonth() + 1).padStart(2, '0'));
                     setExtractYear(String(new Date().getFullYear()));
+                    setExtractTransactions([]);
                   }}
                   className="p-1.5 hover:bg-white/10 rounded-full text-on-surface-variant transition-all"
                 >
@@ -190,6 +222,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
               <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                 <div className="flex gap-2 bg-surface-variant/20 p-1 rounded-lg w-fit">
                   <button
+                    disabled={loadingExtract}
                     onClick={() => setExtractFilter('PAGO')}
                     className={`px-4 py-1.5 rounded text-xs font-bold transition-all ${
                       extractFilter === 'PAGO'
@@ -200,6 +233,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                     Apenas Pagos (Afetam o Saldo)
                   </button>
                   <button
+                    disabled={loadingExtract}
                     onClick={() => setExtractFilter('TODOS')}
                     className={`px-4 py-1.5 rounded text-xs font-bold transition-all ${
                       extractFilter === 'TODOS'
@@ -215,6 +249,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] text-on-surface-variant uppercase font-black tracking-wider">Mês:</span>
                     <select
+                      disabled={loadingExtract}
                       value={extractMonth}
                       onChange={(e) => setExtractMonth(e.target.value)}
                       className="bg-surface border border-white/10 rounded px-2.5 py-1.5 text-xs outline-none focus:border-primary text-on-surface"
@@ -239,6 +274,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] text-on-surface-variant uppercase font-black tracking-wider">Ano:</span>
                     <select
+                      disabled={loadingExtract}
                       value={extractYear}
                       onChange={(e) => setExtractYear(e.target.value)}
                       className="bg-surface border border-white/10 rounded px-2.5 py-1.5 text-xs outline-none focus:border-primary text-on-surface"
@@ -256,8 +292,13 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
               </div>
 
               {/* Tabela de Lançamentos */}
-              <div className="flex-grow overflow-y-auto mb-6 border border-white/5 rounded-lg">
-                {bankTransactions.length === 0 ? (
+              <div className="flex-grow overflow-y-auto mb-6 border border-white/5 rounded-lg relative min-h-[250px]">
+                {loadingExtract ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/50 backdrop-blur-xs">
+                    <Loader2 className="animate-spin text-primary mb-2" size={32} />
+                    <p className="text-xs text-on-surface-variant">Carregando dados diretamente do servidor...</p>
+                  </div>
+                ) : bankTransactions.length === 0 ? (
                   <div className="p-12 text-center text-on-surface-variant">
                     Nenhum lançamento encontrado para os filtros selecionados neste banco.
                   </div>
@@ -265,7 +306,8 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                   <table className="w-full text-left text-sm border-collapse">
                     <thead>
                       <tr className="bg-surface-variant/40 border-b border-white/10 text-on-surface-variant font-bold text-xs uppercase">
-                        <th className="p-3">Data</th>
+                        <th className="p-3">Data Lanc.</th>
+                        <th className="p-3">Cadastrado em</th>
                         <th className="p-3">Fornecedor</th>
                         <th className="p-3">Descrição</th>
                         <th className="p-3 text-center">Tipo</th>
@@ -284,7 +326,8 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
 
                         return (
                           <tr key={tx.id} className="hover:bg-white/5 transition-colors">
-                            <td className="p-3 text-xs text-on-surface-variant">{formattedDate}</td>
+                            <td className="p-3 text-xs text-on-surface">{formattedDate}</td>
+                            <td className="p-3 text-xs text-on-surface-variant">{formatCreatedAt(tx.created_at)}</td>
                             <td className="p-3 font-medium text-on-surface">{tx.fornecedor || '-'}</td>
                             <td className="p-3 text-xs text-on-surface-variant">{tx.descricao || '-'}</td>
                             <td className="p-3 text-center">
