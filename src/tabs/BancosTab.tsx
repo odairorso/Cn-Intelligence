@@ -194,11 +194,11 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
         // Totais do período filtrado
         const totalReceitas = bankTransactions
           .filter(tx => tx.status === 'PAGO' && tx.tipo === 'RECEITA')
-          .reduce((sum, tx) => sum + Number(tx.valor || 0), 0);
+          .reduce((sum, tx) => sum + Number(tx.valor || 0) + Number(tx.juros || 0), 0);
 
         const totalDespesas = bankTransactions
           .filter(tx => tx.status === 'PAGO' && tx.tipo === 'DESPESA')
-          .reduce((sum, tx) => sum + Number(tx.valor || 0), 0);
+          .reduce((sum, tx) => sum + Number(tx.valor || 0) + Number(tx.juros || 0), 0);
 
         return (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
@@ -349,7 +349,15 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
                               </span>
                             </td>
                             <td className={`p-3 text-right font-bold ${isRevenue ? 'text-green-400' : 'text-red-400'}`}>
-                              {isRevenue ? '+' : '-'}{Math.abs(tx.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              <div>
+                                {isRevenue ? '+' : '-'}{Math.abs(Number(tx.valor || 0) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </div>
+                              {Number(tx.juros || 0) !== 0 && (
+                                <div className="text-[10px] text-on-surface-variant/70 font-normal">
+                                  {Number(tx.juros || 0) > 0 ? 'Juros: ' : 'Desconto: '}
+                                  {Math.abs(Number(tx.juros)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                </div>
+                              )}
                             </td>
                             <td className="p-3 text-center">
                               <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
