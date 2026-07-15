@@ -11,6 +11,8 @@ interface LocalUser {
   uid: string;
   email: string | null;
   display_name?: string | null;
+  name?: string;
+  role?: string;
 }
 
 const getUser = (): LocalUser | null => {
@@ -96,11 +98,11 @@ export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
 // API Auth
 // --------------------------------------------------------------
 export const apiAuth = {
-  async login(password: string): Promise<{ token: string; user: { uid: string; email: string | null } }> {
+  async login(email: string, password: string): Promise<{ token: string; user: LocalUser }> {
     const res = await fetchWithSecurity(`${API_BASE}?route=auth-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
       const error = await buildHttpError(res, 'Falha no login');
@@ -120,7 +122,7 @@ export const apiAuth = {
     removeUser();
   },
 
-  async checkSession(): Promise<{ uid: string; email: string | null }> {
+  async checkSession(): Promise<LocalUser> {
     const res = await fetchWithSecurity(`${API_BASE}?route=auth-session`);
     if (!res.ok) {
       removeUser();
@@ -135,8 +137,13 @@ export const apiAuth = {
 
   getToken,
   getUid,
+  getUser,
   isAuthenticated: (): boolean => {
     return getUser() !== null;
+  },
+  isAdmin: (): boolean => {
+    const user = getUser();
+    return user ? user.role === 'admin' : false;
   },
 };
 
@@ -602,5 +609,31 @@ export const api = {
       body: JSON.stringify({ id }),
     });
     if (!res.ok) throw await buildHttpError(res, 'Failed to delete folha cargo');
+  },
+
+  // ─── Gerenciamento de Usuários (Portal) ────────────────────────────────────
+  async getUsers(): Promise<Array<{ id: string; email: string; name: string; role: string; created_at: string }>> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=auth-users`);
+    if (!res.ok) throw await buildHttpError(res, 'Erro ao carregar usuários');
+    return res.json();
+  },
+
+  async createUser(data: Record<string, string>): Promise<void> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=auth-users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw await buildHttpError(res, 'Erro ao cadastrar usuário');
+  },
+
+  async deleteUser(id: string): Promise<void> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=auth-users&id=${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw await buildHttpError(res, 'Erro ao excluir usuário');
   },
 };

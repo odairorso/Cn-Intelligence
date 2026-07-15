@@ -1,5 +1,6 @@
 import { sql } from '../_db.js';
 import { logSecurity, handleError } from '../_utils.js';
+import bcrypt from 'bcryptjs';
 
 // POST /api?route=setup-tables
 export async function handleSetupTables(req, res) {
@@ -27,6 +28,32 @@ export async function handleSetupTables(req, res) {
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`;
+
+    // Tabela de usuários do portal
+    await sql`CREATE TABLE IF NOT EXISTS portal_users (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      name VARCHAR(255),
+      role VARCHAR(50) DEFAULT 'user',
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_portal_users_email ON portal_users(email)`;
+
+    // Seeder de usuário admin do portal se vazio
+    const checkUsers = await sql`SELECT COUNT(*)::int as count FROM portal_users`;
+    if (checkUsers[0].count === 0) {
+      const defaultEmail = process.env.APP_EMAIL || 'user@cn.com';
+      const defaultPassword = process.env.APP_PASSWORD;
+      if (defaultPassword) {
+        const hash = bcrypt.hashSync(defaultPassword, 10);
+        await sql`
+          INSERT INTO portal_users (email, password_hash, name, role)
+          VALUES (${defaultEmail}, ${hash}, 'Administrador', 'admin')
+        `;
+      }
+    }
 
     // Tabela de contas contábeis
     await sql`CREATE TABLE IF NOT EXISTS contas_contabeis (

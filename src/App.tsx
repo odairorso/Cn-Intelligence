@@ -112,6 +112,72 @@ export default function App() {
   });
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
 
+  // Estados para Gerenciamento de Usuários (Portal)
+  const [portalUsers, setPortalUsers] = useState<any[]>([]);
+  const [loadingPortalUsers, setLoadingPortalUsers] = useState(false);
+  const [newPortalUserName, setNewPortalUserName] = useState('');
+  const [newPortalUserEmail, setNewPortalUserEmail] = useState('');
+  const [newPortalUserPassword, setNewPortalUserPassword] = useState('');
+  const [newPortalUserRole, setNewPortalUserRole] = useState('user');
+  const [creatingPortalUser, setCreatingPortalUser] = useState(false);
+
+  const fetchPortalUsers = async () => {
+    if (!apiAuth.isAuthenticated() || !apiAuth.isAdmin()) return;
+    setLoadingPortalUsers(true);
+    try {
+      const data = await api.getUsers();
+      setPortalUsers(data);
+    } catch (err: any) {
+      showNotification(err.message || 'Erro ao buscar gestores.', 'error');
+    } finally {
+      setLoadingPortalUsers(false);
+    }
+  };
+
+  const handleCreatePortalUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPortalUserName || !newPortalUserEmail || !newPortalUserPassword) {
+      showNotification('Preencha todos os campos obrigatórios.', 'error');
+      return;
+    }
+    setCreatingPortalUser(true);
+    try {
+      await api.createUser({
+        name: newPortalUserName,
+        email: newPortalUserEmail,
+        password: newPortalUserPassword,
+        role: newPortalUserRole
+      });
+      showNotification('Gestor cadastrado com sucesso!', 'success');
+      setNewPortalUserName('');
+      setNewPortalUserEmail('');
+      setNewPortalUserPassword('');
+      setNewPortalUserRole('user');
+      fetchPortalUsers();
+    } catch (err: any) {
+      showNotification(err.message || 'Erro ao cadastrar gestor.', 'error');
+    } finally {
+      setCreatingPortalUser(false);
+    }
+  };
+
+  const handleDeletePortalUser = async (id: string) => {
+    if (!window.confirm('Tem certeza de que deseja excluir este gestor? O acesso dele será revogado imediatamente.')) return;
+    try {
+      await api.deleteUser(id);
+      showNotification('Gestor excluído com sucesso.', 'success');
+      fetchPortalUsers();
+    } catch (err: any) {
+      showNotification(err.message || 'Erro ao excluir gestor.', 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'configuracoes' && apiAuth.isAuthenticated() && apiAuth.isAdmin()) {
+      fetchPortalUsers();
+    }
+  }, [activeTab]);
+
   // Aplica o tema na tag HTML
   useEffect(() => {
     try {
@@ -1677,6 +1743,110 @@ export default function App() {
                     Aqui você poderá gerenciar usuários, permissões e integrações bancárias em futuras atualizações.
                   </p>
                 </div>
+
+                {apiAuth.isAdmin() && (
+                  <div className="pt-8 border-t border-surface-variant text-left">
+                    <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest text-center">👥 Gerenciamento de Gestores</h4>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
+                      {/* Formulário de Cadastro */}
+                      <div className="glass-card p-6 space-y-4">
+                        <h5 className="text-xs font-bold uppercase tracking-widest text-on-surface">Novo Gestor</h5>
+                        <form onSubmit={handleCreatePortalUser} className="space-y-4">
+                          <div>
+                            <label className="block text-[10px] uppercase font-bold text-on-surface-variant mb-1">Nome Completo</label>
+                            <input
+                              type="text"
+                              className="w-full bg-surface-variant/40 border border-surface-variant rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-primary/50"
+                              placeholder="Ex: João Silva"
+                              value={newPortalUserName}
+                              onChange={(e) => setNewPortalUserName(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] uppercase font-bold text-on-surface-variant mb-1">E-mail de Acesso</label>
+                            <input
+                              type="email"
+                              className="w-full bg-surface-variant/40 border border-surface-variant rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-primary/50"
+                              placeholder="Ex: joao@grupocn.com.br"
+                              value={newPortalUserEmail}
+                              onChange={(e) => setNewPortalUserEmail(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] uppercase font-bold text-on-surface-variant mb-1">Senha de Acesso</label>
+                            <input
+                              type="password"
+                              className="w-full bg-surface-variant/40 border border-surface-variant rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-primary/50"
+                              placeholder="Senha provisória"
+                              value={newPortalUserPassword}
+                              onChange={(e) => setNewPortalUserPassword(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] uppercase font-bold text-on-surface-variant mb-1">Papel / Permissão</label>
+                            <select
+                              className="w-full bg-surface-variant/40 border border-surface-variant rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-primary/50"
+                              value={newPortalUserRole}
+                              onChange={(e) => setNewPortalUserRole(e.target.value)}
+                            >
+                              <option value="user" className="bg-[#111420]">Gestor (Apenas visualiza/lança dados)</option>
+                              <option value="admin" className="bg-[#111420]">Administrador (Pode gerenciar gestores)</option>
+                            </select>
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={creatingPortalUser}
+                            className="w-full bg-primary text-background py-3 rounded-xl text-xs font-black uppercase tracking-[0.1em] hover:bg-primary-dark transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            {creatingPortalUser ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus size={16} />}
+                            {creatingPortalUser ? 'Salvando...' : 'Cadastrar Gestor'}
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* Lista de Usuários Cadastrados */}
+                      <div className="glass-card p-6 space-y-4">
+                        <h5 className="text-xs font-bold uppercase tracking-widest text-on-surface">Gestores Autorizados</h5>
+                        {loadingPortalUsers ? (
+                          <div className="flex items-center justify-center py-12 text-on-surface-variant gap-2 text-xs">
+                            <Loader2 className="w-4 h-4 animate-spin text-primary" /> Carregando gestores...
+                          </div>
+                        ) : portalUsers.length === 0 ? (
+                          <div className="text-center py-12 text-on-surface-variant text-xs font-semibold">
+                            Nenhum gestor adicional cadastrado.
+                          </div>
+                        ) : (
+                          <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                            {portalUsers.map((u) => (
+                              <div key={u.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-variant/20 border border-surface-variant/40 hover:border-surface-variant transition-all">
+                                <div className="space-y-0.5">
+                                  <p className="text-xs font-bold text-white flex items-center gap-2">
+                                    {u.name}
+                                    {u.role === 'admin' && (
+                                      <span className="bg-primary/20 text-primary border border-primary/20 text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase">Admin</span>
+                                    )}
+                                  </p>
+                                  <p className="text-[10px] text-on-surface-variant">{u.email}</p>
+                                </div>
+                                <button
+                                  onClick={() => handleDeletePortalUser(u.id)}
+                                  className="text-tertiary/60 hover:text-tertiary hover:bg-tertiary/10 p-2 rounded-lg transition-all"
+                                  title="Excluir gestor"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="pt-8 border-t border-surface-variant">
                   <h4 className="text-sm font-bold text-primary mb-4 uppercase tracking-widest">Identidade Visual</h4>

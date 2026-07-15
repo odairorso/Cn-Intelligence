@@ -30,6 +30,7 @@ export interface Transaction {
   juros?: number;
   numero_boleto?: string;
   conta_contabil_id?: number;
+  created_at?: string;
 }
 
 

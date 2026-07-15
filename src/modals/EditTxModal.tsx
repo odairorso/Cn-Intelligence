@@ -145,7 +145,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
 
       >
         <h3 className="text-xl font-bold font-headline mb-6">Editar Lançamento</h3>
-        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="new-transaction">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Fornecedor</label>
@@ -180,7 +180,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
             <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Descrição</label>
             <input
               type="text" required
-              autoComplete="chrome-off"
+              autoComplete="new-transaction"
               className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all"
               value={formData.descricao}
               onChange={e => setFormData({ ...formData, descricao: e.target.value })}
@@ -192,7 +192,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               <input
                 type="text"
                 placeholder="Ex: 123456"
-                autoComplete="chrome-off"
+                autoComplete="new-transaction"
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.numero_boleto_base || ''}
@@ -204,7 +204,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               <input
                 type="text"
                 placeholder="Ex: 01"
-                autoComplete="chrome-off"
+                autoComplete="new-transaction"
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.ocorrencia || ''}
@@ -342,7 +342,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Vencimento</label>
               <input
                 type="date" required
-                autoComplete="chrome-off"
+                autoComplete="new-transaction"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.vencimento}
                 onChange={e => setFormData({ ...formData, vencimento: e.target.value })}
@@ -352,7 +352,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor (R$)</label>
               <input
                 type="number" step="0.01" required
-                autoComplete="chrome-off"
+                autoComplete="new-transaction"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.valor}
                 onChange={e => setFormData({ ...formData, valor: e.target.value })}
@@ -363,7 +363,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                 <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor Pago (R$)</label>
                 <input
                   type="number" step="0.01"
-                  autoComplete="chrome-off"
+                  autoComplete="new-transaction"
                   className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                   value={formData.valorPago || ''}
                   placeholder={formData.valor}

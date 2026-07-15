@@ -22,6 +22,21 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_uid ON users(uid);
 
 -- ============================================
+-- Tabela de Usuários do Portal (Login Multi-usuário)
+-- ============================================
+CREATE TABLE IF NOT EXISTS portal_users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(255),
+    role VARCHAR(50) DEFAULT 'user', -- 'admin' ou 'user'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_portal_users_email ON portal_users(email);
+
+-- ============================================
 -- Tabela de Fornecedores
 -- ============================================
 CREATE TABLE IF NOT EXISTS suppliers (
@@ -137,10 +152,15 @@ DROP TRIGGER IF EXISTS update_user_settings_updated_at ON user_settings;
 CREATE TRIGGER update_user_settings_updated_at BEFORE UPDATE ON user_settings
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_portal_users_updated_at ON portal_users;
+CREATE TRIGGER update_portal_users_updated_at BEFORE UPDATE ON portal_users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- ============================================
 -- Comentários das tabelas
 -- ============================================
 COMMENT ON TABLE users IS 'Usuários do sistema CN Intelligence';
+COMMENT ON TABLE portal_users IS 'Usuários do portal para controle de acesso';
 COMMENT ON TABLE suppliers IS 'Fornecedores cadastrados';
 COMMENT ON TABLE transactions IS 'Lançamentos financeiros (contas a pagar/receber)';
 COMMENT ON TABLE banks IS 'Contas bancárias para controle de saldo';

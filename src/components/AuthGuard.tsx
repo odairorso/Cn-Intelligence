@@ -6,10 +6,11 @@ import { Lock, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 interface AuthGuardProps {
   children: React.ReactNode;
   isAuthorized: boolean;
-  onLogin: (password: string) => Promise<boolean>;
+  onLogin: (email: string, password: string) => Promise<boolean>;
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, onLogin }) => {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(false);
@@ -19,20 +20,25 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
   useEffect(() => {
     const savedLogo = localStorage.getItem('cn_brand_logo');
     if (savedLogo) setLogo(savedLogo);
+
+    const savedEmail = localStorage.getItem('cn_last_logged_email');
+    if (savedEmail) setEmail(savedEmail);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password) return;
+    if (!email || !password) return;
     
     setLoading(true);
     setError(false);
     
     try {
-      const success = await onLogin(password);
+      const success = await onLogin(email, password);
       if (!success) {
         setError(true);
         setPassword('');
+      } else {
+        localStorage.setItem('cn_last_logged_email', email);
       }
     } catch (err) {
       setError(true);
@@ -81,13 +87,34 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="w-full space-y-5">
+            <form onSubmit={handleSubmit} className="w-full space-y-4">
+              <div className="space-y-2">
+                <input
+                  type="email"
+                  placeholder="E-mail de Acesso"
+                  className={cn(
+                    "w-full bg-white/5 border rounded-2xl px-4 py-4 text-center text-lg text-white outline-none transition-all placeholder:text-white/20",
+                    error 
+                      ? "border-tertiary shadow-[0_0_25px_rgba(239,68,68,0.15)] ring-1 ring-tertiary/50" 
+                      : "border-white/10 focus:border-primary/50 focus:bg-white/10"
+                  )}
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (error) setError(false);
+                  }}
+                  autoFocus={!email}
+                  disabled={loading}
+                  required
+                />
+              </div>
+
               <div className="space-y-2 relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="Senha de Acesso"
                   className={cn(
-                    "w-full bg-white/5 border rounded-2xl px-4 py-5 text-center text-xl font-bold text-white outline-none transition-all placeholder:text-white/20",
+                    "w-full bg-white/5 border rounded-2xl px-4 py-4 text-center text-lg text-white outline-none transition-all placeholder:text-white/20",
                     error 
                       ? "border-tertiary shadow-[0_0_25px_rgba(239,68,68,0.15)] ring-1 ring-tertiary/50" 
                       : "border-white/10 focus:border-primary/50 focus:bg-white/10"
@@ -97,8 +124,9 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
                     setPassword(e.target.value);
                     if (error) setError(false);
                   }}
-                  autoFocus
+                  autoFocus={!!email}
                   disabled={loading}
+                  required
                 />
                 
                 <button
@@ -108,17 +136,17 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
-
-                {error && (
-                  <motion.p 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-tertiary text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2"
-                  >
-                    <AlertCircle size={12} /> Senha Inválida. Tente Novamente.
-                  </motion.p>
-                )}
               </div>
+
+              {error && (
+                <motion.p 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-tertiary text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2"
+                >
+                  <AlertCircle size={12} /> E-mail ou Senha incorretos.
+                </motion.p>
+              )}
 
               <button
                 type="submit"

@@ -1,8 +1,9 @@
 // --- Inicialização super rápida sem dependências externas ---
 import jwt from 'jsonwebtoken';
-import { setCors, dbStorage } from './_db.js';
+import { setCors, dbStorage, sql } from './_db.js';
 import { checkRateLimit, sanitizeObject } from './_utils.js';
 import { authMiddleware, verifyToken } from './_middlewares/auth.js';
+import bcrypt from 'bcryptjs';
 
 // --- Configurações de Autenticação ---
 const APP_PASSWORD = process.env.APP_PASSWORD;
@@ -45,14 +46,45 @@ export default async function handler(req, res) {
 
     const { password, email } = bodyData;
 
-    if (!APP_PASSWORD || !JWT_SECRET) {
-      return res.status(503).json({ error: 'Servidor: autenticação não configurada. Defina APP_PASSWORD e JWT_SECRET nas variáveis de ambiente.' });
+    if (!JWT_SECRET) {
+      return res.status(503).json({ error: 'Servidor: autenticação não configurada. Defina JWT_SECRET nas variáveis de ambiente.' });
     }
 
-    if (password === APP_PASSWORD) {
-      const token = generateToken({ uid: APP_UID, email: email || APP_EMAIL || null });
+    if (!email || !password) {
+      return res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
+    }
+
+    let user = null;
+    try {
+      const users = await sql`SELECT * FROM portal_users WHERE LOWER(email) = ${email.toLowerCase().trim()}`;
+      if (users && users.length > 0) {
+        user = users[0];
+      }
+    } catch (dbErr) {
+      console.warn('[AUTH] Erro ao buscar usuário no banco, usando fallback:', dbErr.message);
+    }
+
+    let isValid = false;
+    let userPayload = null;
+
+    if (user) {
+      isValid = bcrypt.compareSync(password, user.password_hash);
+      if (isValid) {
+        userPayload = { uid: APP_UID, email: user.email, name: user.name, role: user.role };
+      }
+    } else {
+      // Fallback para admin padrão via env
+      const defaultEmail = APP_EMAIL || 'user@cn.com';
+      if (APP_PASSWORD && email.toLowerCase().trim() === defaultEmail.toLowerCase().trim() && password === APP_PASSWORD) {
+        isValid = true;
+        userPayload = { uid: APP_UID, email: defaultEmail, name: 'Administrador', role: 'admin' };
+      }
+    }
+
+    if (isValid && userPayload) {
+      const token = generateToken(userPayload);
       try {
-        await logSecurity(req, res, `Login bem-sucedido: ${email || APP_UID}`);
+        await logSecurity(req, res, `Login bem-sucedido: ${userPayload.email} (${userPayload.role})`);
       } catch {}
 
       // Grava o cookie HttpOnly e Secure
@@ -69,7 +101,7 @@ export default async function handler(req, res) {
       }
       res.setHeader('Set-Cookie', cookieOptions.join('; '));
 
-      return res.json({ token, user: { uid: APP_UID, email: email || APP_EMAIL || null } });
+      return res.json({ token, user: userPayload });
     }
 
     try {
@@ -77,7 +109,7 @@ export default async function handler(req, res) {
     } catch {}
 
     await new Promise((r) => setTimeout(r, 1000));
-    return res.status(401).json({ error: 'Senha incorreta' });
+    return res.status(401).json({ error: 'E-mail ou senha incorretos' });
   }
 
   // ── Verificação de Token (OBRIGATÓRIA para todas as rotas exceto login) ──
@@ -147,6 +179,7 @@ export default async function handler(req, res) {
         case 'save-boleto-pattern': { const m = await import('./_handlers/boleto.js'); return m.handleSaveBoletoPattern(req, res); }
         case 'boleto-patterns': { const m = await import('./_handlers/boleto.js'); return id ? m.handleDeleteBoletoPattern(req, res) : m.handleBoletoPatterns(req, res); }
         case 'setup-tables': { const m = await import('./_handlers/admin.js'); return m.handleSetupTables(req, res); }
+        case 'auth-users': { const m = await import('./_handlers/users.js'); return m.handleUsers(req, res); }
         case 'export-backup': { const m = await import('./_handlers/admin.js'); return m.handleExportBackup(req, res); }
         case 'fix-receitas-tipo': { const m = await import('./_handlers/transactions.js'); return m.handleFixReceitasTipo(req, res); }
         case 'folha-push': { const m = await import('./_handlers/folha.js'); return m.handleFolhaPush(req, res); }

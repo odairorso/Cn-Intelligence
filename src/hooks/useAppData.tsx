@@ -81,7 +81,7 @@ interface AppDataProviderProps {
 }
 
 type AppDataActions = {
-  login: (password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string, tipo?: string, options?: any) => Promise<void>;
   addTransaction: (tx: Partial<Transaction>) => Promise<void>;
@@ -236,7 +236,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
           const user = await apiAuth.checkSession();
           setIsAuthorized(true);
           setUserEmail(user.email || null);
-          setDisplayName(((user as any)?.display_name) || user.email || null);
+          setDisplayName(user.name || user.email || null);
         } catch {
           setIsAuthorized(false);
           setUserEmail(null);
@@ -284,13 +284,13 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   // --------------------------------------------------------------
   // Auth actions
   // --------------------------------------------------------------
-  const login = useCallback(async (password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     try {
-      const data = await apiAuth.login(password);
+      const data = await apiAuth.login(email, password);
       if (data.user) {
         setIsAuthorized(true);
         setUserEmail(data.user.email || null);
-        setDisplayName((data.user as any).display_name || data.user.email || null);
+        setDisplayName(data.user.name || data.user.email || null);
         return true;
       }
       return false;
