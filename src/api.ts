@@ -34,7 +34,20 @@ const setUser = (user: LocalUser) => {
 const removeUser = () => {
   try {
     localStorage.removeItem('cn_user');
+    localStorage.removeItem('cn_jwt_token_local');
   } catch { /* ignore */ }
+};
+
+const saveTokenLocal = (token: string) => {
+  try {
+    localStorage.setItem('cn_jwt_token_local', token);
+  } catch { /* ignore */ }
+};
+
+const getTokenLocal = (): string | null => {
+  try {
+    return localStorage.getItem('cn_jwt_token_local');
+  } catch { return null; }
 };
 
 // Mantido apenas para compatibilidade de tipos no frontend
@@ -87,10 +100,17 @@ export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
   };
   const securityToken = import.meta.env.VITE_CN_SECURITY_TOKEN;
   if (securityToken) headers['x-cn-security'] = securityToken;
+
+  // Fallback: se tiver token salvo localmente, envia como Bearer
+  const localToken = getTokenLocal();
+  if (localToken && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${localToken}`;
+  }
+
   return fetch(url, { 
     ...options, 
     headers,
-    credentials: 'same-origin' // Habilita o envio automático de cookies HttpOnly
+    credentials: 'same-origin'
   });
 };
 
@@ -109,9 +129,8 @@ export const apiAuth = {
       throw error;
     }
     const data = await res.json();
-    if (data.user) {
-      setUser(data.user);
-    }
+    if (data.user) setUser(data.user);
+    if (data.token) saveTokenLocal(data.token); // salva token localmente
     return data;
   },
 
@@ -159,9 +178,8 @@ export const apiAuth = {
       throw error;
     }
     const data = await res.json();
-    if (data.user) {
-      setUser(data.user);
-    }
+    if (data.user) setUser(data.user);
+    if (data.token) saveTokenLocal(data.token); // salva token localmente
     return data;
   },
 
@@ -176,9 +194,8 @@ export const apiAuth = {
       throw error;
     }
     const data = await res.json();
-    if (data.user) {
-      setUser(data.user);
-    }
+    if (data.user) setUser(data.user);
+    if (data.token) saveTokenLocal(data.token); // salva token localmente
     return true;
   },
 

@@ -147,7 +147,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           empresa: formData.empresa,
           vencimento: toInputDate(vencimentoParcela),
           pagamento: formData.status === 'PAGO' ? toInputDate(pagamentoParcela) : null,
-          valor: formData.valorTipo === 'total' ? Number((parseMoneyToNumber(formData.valor) / parcelas).toFixed(2)) : parseMoneyToNumber(formData.valor),
+          valor: Math.round(((formData.valorTipo === 'total' ? (parseMoneyToNumber(formData.valor) / parcelas) : parseMoneyToNumber(formData.valor))) * 100) / 100,
           status: formData.status,
           banco: formData.status === 'PAGO' ? formData.banco : null,
           tipo: formData.tipo,
@@ -481,9 +481,8 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                   style={{ backgroundColor: '#161b2a' }}
                   value={formData.banco}
                   onChange={e => setFormData({ ...formData, banco: e.target.value })}
-                  required
                 >
-                  <option value="" className="bg-[#161b2a] text-on-surface">Selecione...</option>
+                  <option value="" className="bg-[#161b2a] text-on-surface">Não informado (Não passa pelo banco)</option>
                   {banks.filter(b => b.ativo).map(b => (
                     <option key={b.id} value={b.nome} className="bg-[#161b2a] text-on-surface">{b.nome}</option>
                   ))}

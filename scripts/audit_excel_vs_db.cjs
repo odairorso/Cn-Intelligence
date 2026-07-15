@@ -153,7 +153,7 @@ async function main() {
       fornecedor: String(row.fornecedor || '').trim(),
       empresa: String(row.empresa || 'CN').trim(),
       vencimento: String(row.vencimento || '').slice(0, 10),
-      valor: Number(Number(row.valor).toFixed(2)),
+      valor: Math.round(Number(row.valor) * 100) / 100,
     }));
 
     const dbSummary = buildSummary(dbRows);

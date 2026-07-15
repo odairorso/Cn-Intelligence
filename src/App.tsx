@@ -427,7 +427,7 @@ export default function App() {
     if (normalizedNumber) return `BOLETO:${normalizeSupplierName(fornecedor)}|${normalizedNumber}`;
     const desc = normalizeSupplierName(descricao || '');
     const emp = normalizeSupplierName(empresa || '');
-    return `BASE:${normalizeSupplierName(fornecedor)}|${vencimento}|${Number(valor || 0).toFixed(2)}|${desc}|${emp}`;
+    return `BASE:${normalizeSupplierName(fornecedor)}|${vencimento}|${(Math.round(Number(valor || 0) * 100) / 100).toFixed(2)}|${desc}|${emp}`;
   };
 
   const getExistingBoletoKeys = () =>

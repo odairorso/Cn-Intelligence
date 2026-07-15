@@ -14,7 +14,7 @@ interface SelectBankModalProps {
 }
 
 const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, onConfirm }: SelectBankModalProps) => {
-  const [selectedBank, setSelectedBank] = useState('');
+  const [selectedBank, setSelectedBank] = useState<string | null>(null);
   const [paymentDate, setPaymentDate] = useState(initialDate || todayInputDate());
   const [dateError, setDateError] = useState('');
   const paymentDateRef = useRef<HTMLInputElement | null>(null);
@@ -22,6 +22,7 @@ const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, on
   useEffect(() => {
     setPaymentDate(initialDate || todayInputDate());
     setDateError('');
+    setSelectedBank(null);
   }, [transactionId, initialDate]);
 
   return (
@@ -53,7 +54,23 @@ const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, on
           )}
         </div>
 
-        <div className="space-y-3 mb-6">
+        <div className="space-y-3 mb-6 max-h-60 overflow-y-auto pr-1">
+          <button
+            onClick={() => setSelectedBank('')}
+            className={cn(
+              "w-full p-4 rounded-lg border text-left transition-all",
+              selectedBank === ''
+                ? "border-primary bg-primary/10"
+                : "border-white/10 hover:border-primary/40"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <CreditCard size={20} className={selectedBank === '' ? "text-primary" : "text-on-surface-variant"} />
+              <span className={selectedBank === '' ? "text-primary font-bold" : "text-on-surface"}>
+                Não informado (Dinheiro / Fora do Banco)
+              </span>
+            </div>
+          </button>
           {banks.filter(b => b.ativo).map(bank => (
             <button
               key={bank.id}
@@ -84,7 +101,7 @@ const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, on
           </button>
           <button
             onClick={() => {
-              if (!selectedBank) return;
+              if (selectedBank === null) return;
               const normalized = paymentDateRef.current?.value || paymentDate;
               if (!normalized) {
                 setDateError('Informe uma data válida.');
@@ -92,7 +109,7 @@ const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, on
               }
               onConfirm(selectedBank, normalized);
             }}
-            disabled={!selectedBank}
+            disabled={selectedBank === null}
             className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Confirmar

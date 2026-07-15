@@ -124,7 +124,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
       ...formData,
       vencimento: toInputDate(formData.vencimento),
       pagamento: formData.status === 'PAGO' && formData.pagamento ? toInputDate(formData.pagamento) : null,
-      valor: parseMoneyToNumber(formData.valor),
+      valor: Number(parseMoneyToNumber(formData.valor).toFixed(2)),
       numero_boleto: numeroBoletoFinal
     };
     

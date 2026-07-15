@@ -162,7 +162,8 @@ export async function handleTransactions(req, res) {
       const vDate = vencimento;
       const pDate = pagamento ? parseDateToPg(pagamento) : null;
       const normalizedNumber = normalizeBoletoNumber(numero_boleto);
-      const valorNumber = Number(valor);
+      const valorNumber = Math.round(Number(valor) * 100) / 100;
+      const bancoValue = (banco && String(banco).trim() !== '') ? String(banco).trim() : null;
 
       if (!vDate) return res.status(400).json({ error: 'Data de vencimento inválida. Use o formato YYYY-MM-DD.' });
 
@@ -200,7 +201,7 @@ export async function handleTransactions(req, res) {
       const rows = await sql`
         INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
         VALUES (${uid}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'},
-                ${vDate}, ${pDate}, ${valorNumber}, ${status || 'PENDENTE'}, ${banco ?? null}, ${tipo}, ${numero_boleto || null}, ${resolvedContaContabilId ?? null}, ${uid})
+                ${vDate}, ${pDate}, ${valorNumber}, ${status || 'PENDENTE'}, ${bancoValue}, ${tipo}, ${numero_boleto || null}, ${resolvedContaContabilId ?? null}, ${uid})
         RETURNING *`;
       await auditLog(uid, 'CREATE', rows[0].id, null, rows[0]);
       return res.status(201).json(rows[0]);
@@ -264,9 +265,12 @@ export async function handleTransactionById(req, res) {
       if (body.empresa !== undefined) fields.push(sql`empresa = ${body.empresa}`);
       if (body.vencimento !== undefined) fields.push(sql`vencimento = ${parseDateToPg(body.vencimento)}`);
       if (body.pagamento !== undefined) fields.push(sql`pagamento = ${parseDateToPg(body.pagamento)}`);
-      if (body.valor !== undefined) fields.push(sql`valor = ${body.valor === null ? null : Number(body.valor)}`);
+      if (body.valor !== undefined) fields.push(sql`valor = ${body.valor === null ? null : Math.round(Number(body.valor) * 100) / 100}`);
       if (body.status !== undefined) fields.push(sql`status = ${body.status}`);
-      if (body.banco !== undefined) fields.push(sql`banco = ${body.banco}`);
+      if (body.banco !== undefined) {
+        const bancoValue = (body.banco && String(body.banco).trim() !== '') ? String(body.banco).trim() : null;
+        fields.push(sql`banco = ${bancoValue}`);
+      }
       if (body.juros !== undefined) fields.push(sql`juros = ${body.juros === null ? null : Number(body.juros)}`);
       if (body.tipo !== undefined) fields.push(sql`tipo = ${body.tipo}`);
       if (body.numero_boleto !== undefined) fields.push(sql`numero_boleto = ${body.numero_boleto}`);
@@ -368,7 +372,7 @@ export async function handleTransactionsBatch(req, res) {
       const empKey = String(empresa || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       const localKey = normalizedNumber
         ? `BOLETO:${uid}:${normalizedNumber}`
-        : `BASE:${uid}:${String(fornecedor || '').toUpperCase()}|${vDate}|${Number(valor || 0).toFixed(2)}|${descKey}|${empKey}`;
+        : `BASE:${uid}:${String(fornecedor || '').toUpperCase()}|${vDate}|${Math.round(Number(valor || 0) * 100) / 100}|${descKey}|${empKey}`;
 
       if (seenKeys.has(localKey)) {
         blocked++;
@@ -440,7 +444,9 @@ export async function handleTransactionsBatch(req, res) {
         // Build a single bulk INSERT with multiple value rows
         const values = toInsert.map(p => {
           const { tx, vDate, pDate, resolvedCcId } = p;
-          return sql`(${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(tx.valor)}, ${tx.status || 'PENDENTE'}, ${tx.banco ?? null}, ${tx.tipo}, ${tx.numero_boleto || null}, ${resolvedCcId ?? null}, ${uid})`;
+          const bancoVal = tx.banco && String(tx.banco).trim() !== '' ? String(tx.banco).trim() : null;
+          const roundedVal = Math.round(Number(tx.valor) * 100) / 100;
+          return sql`(${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${roundedVal}, ${tx.status || 'PENDENTE'}, ${bancoVal}, ${tx.tipo}, ${tx.numero_boleto || null}, ${resolvedCcId ?? null}, ${uid})`;
         });
 
         const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
@@ -458,8 +464,10 @@ export async function handleTransactionsBatch(req, res) {
         for (const p of toInsert) {
           try {
             const { tx, vDate, pDate, resolvedCcId } = p;
+            const bancoVal = tx.banco && String(tx.banco).trim() !== '' ? String(tx.banco).trim() : null;
+            const roundedVal = Math.round(Number(tx.valor) * 100) / 100;
             const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
-              VALUES (${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${Number(tx.valor)}, ${tx.status || 'PENDENTE'}, ${tx.banco ?? null}, ${tx.tipo}, ${tx.numero_boleto || null}, ${resolvedCcId ?? null}, ${uid})
+              VALUES (${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${roundedVal}, ${tx.status || 'PENDENTE'}, ${bancoVal}, ${tx.tipo}, ${tx.numero_boleto || null}, ${resolvedCcId ?? null}, ${uid})
               RETURNING id`;
             await auditLog(uid, 'CREATE', inserted[0]?.id, null, { fornecedor: tx.fornecedor, valor: tx.valor, empresa: tx.empresa, vencimento: vDate, tipo: tx.tipo });
             created++;
@@ -506,7 +514,8 @@ export async function handleTransactionsBatchUpdate(req, res) {
     }
 
     const pDate = parseDateToPg(dataPagamento);
-    await sql`UPDATE transactions SET status = 'PAGO', banco = ${banco}, pagamento = ${pDate}, updated_at = NOW() WHERE (uid = ${uid} OR uid IS NULL) AND id = ANY(${ids}::uuid[])`;
+    const bancoValue = (banco && String(banco).trim() !== '') ? String(banco).trim() : null;
+    await sql`UPDATE transactions SET status = 'PAGO', banco = ${bancoValue}, pagamento = ${pDate}, updated_at = NOW() WHERE (uid = ${uid} OR uid IS NULL) AND id = ANY(${ids}::uuid[])`;
     return res.json({ message: 'Updated successfully' });
   } catch (e) {
     return handleError(res, e, 'transactions.js handleTransactionsBatchUpdate');

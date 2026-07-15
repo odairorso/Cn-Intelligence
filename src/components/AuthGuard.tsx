@@ -24,57 +24,91 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
   const [registerName, setRegisterName] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
-  const [registerCompanyPassword, setRegisterCompanyPassword] = useState('');
 
   // Google registration states
   const [googleRegistrationRequired, setGoogleRegistrationRequired] = useState(false);
   const [googleEmail, setGoogleEmail] = useState('');
   const [googleName, setGoogleName] = useState('');
   const [googleCredential, setGoogleCredential] = useState('');
-  const [googleCompanyPassword, setGoogleCompanyPassword] = useState('');
+
+  const [googleReady, setGoogleReady] = useState(false);
 
   useEffect(() => {
     const savedLogo = localStorage.getItem('cn_brand_logo');
     if (savedLogo) setLogo(savedLogo);
-
     const savedEmail = localStorage.getItem('cn_last_logged_email');
     if (savedEmail) setEmail(savedEmail);
+    const savedPassword = localStorage.getItem('cn_last_logged_pw');
+    if (savedPassword) setPassword(savedPassword);
+
+    // Processar retorno do OAuth do Google (redirect flow)
+    const hash = window.location.hash;
+    if (hash && hash.includes('id_token=')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const idToken = params.get('id_token');
+      if (idToken) {
+        window.history.replaceState(null, '', window.location.pathname);
+        setLoading(true);
+        apiAuth.googleLogin(idToken).then(res => {
+          if (res.success) {
+            if (res.user?.email) localStorage.setItem('cn_last_logged_email', res.user.email);
+            window.location.reload();
+          } else if (res.registrationRequired) {
+            apiAuth.googleRegister(res.email!, res.name || '', '', idToken).then(() => {
+              if (res.email) localStorage.setItem('cn_last_logged_email', res.email);
+              window.location.reload();
+            }).catch(err => setError(err.message || 'Erro ao cadastrar com Google.'));
+          } else {
+            setError('Falha na autenticação com Google.');
+          }
+        }).catch(err => setError(err.message || 'Erro ao autenticar com Google.'))
+          .finally(() => setLoading(false));
+      }
+    }
   }, []);
 
   // Google Sign-In initialization
   useEffect(() => {
     if (isAuthorized) return;
-    
-    // Client ID padrão para rodar local e na Vercel (pode ser sobrescrito com env)
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "1015694292102-kbgmlq6pcf1eafcrh5g2kcrer6s6u2ig.apps.googleusercontent.com";
-    
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "139195051788-6l3qj8v9a20r1d6ii6u3edukvshh4ebn.apps.googleusercontent.com";
+
     const initializeGoogle = () => {
       const g = (window as any).google;
-      if (g) {
+      if (g?.accounts?.id) {
         g.accounts.id.initialize({
           client_id: clientId,
           callback: handleGoogleCallback,
+          auto_select: false,
+          cancel_on_tap_outside: true,
         });
-        
-        const btnElement = document.getElementById("google-signin-btn");
-        if (btnElement) {
-          g.accounts.id.renderButton(
-            btnElement,
-            { theme: "outline", size: "large", width: 384, text: "signin_with" }
-          );
-        }
+        setGoogleReady(true);
       }
     };
 
     const timer = setInterval(() => {
-      if ((window as any).google) {
+      if ((window as any).google?.accounts?.id) {
         initializeGoogle();
         clearInterval(timer);
       }
-    }, 500);
+    }, 300);
 
     return () => clearInterval(timer);
-  }, [isAuthorized, isRegistering, googleRegistrationRequired]);
+  }, [isAuthorized]);
+
+  const handleGoogleButtonClick = () => {
+    const g = (window as any).google;
+    if (g?.accounts?.id) {
+      // SDK disponível — usa One-Tap
+      g.accounts.id.prompt();
+    } else {
+      // SDK bloqueado (Kaspersky/CSP) — usa redirect OAuth
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '139195051788-6l3qj8v9a20r1d6ii6u3edukvshh4ebn.apps.googleusercontent.com';
+      const redirectUri = encodeURIComponent(window.location.origin);
+      const nonce = Math.random().toString(36).substring(2, 15);
+      const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=id_token&scope=openid+email+profile&nonce=${nonce}&prompt=select_account`;
+      window.location.href = url;
+    }
+  };
 
   const handleGoogleCallback = async (response: any) => {
     setLoading(true);
@@ -85,10 +119,19 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
         localStorage.setItem('cn_last_logged_email', res.user.email);
         window.location.reload();
       } else if (res.registrationRequired) {
-        setGoogleRegistrationRequired(true);
-        setGoogleEmail(res.email);
-        setGoogleName(res.name);
-        setGoogleCredential(response.credential);
+        // Auto-registrar direto sem pedir senha da empresa
+        const success = await apiAuth.googleRegister(
+          res.email,
+          res.name,
+          '', // sem senha da empresa
+          response.credential
+        );
+        if (success) {
+          localStorage.setItem('cn_last_logged_email', res.email);
+          window.location.reload();
+        } else {
+          setError('Não foi possível completar o cadastro com Google. Tente novamente.');
+        }
       } else {
         setError('Falha na autenticação do Google.');
       }
@@ -126,7 +169,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!registerName || !registerEmail || !registerPassword || !registerCompanyPassword) return;
+    if (!registerName || !registerEmail || !registerPassword) return;
     
     setLoading(true);
     setError(false);
@@ -135,18 +178,19 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
         registerName,
         registerEmail,
         registerPassword,
-        registerCompanyPassword
+        '' // companyPassword não é mais necessária
       );
       if (success) {
         const loginSuccess = await onLogin(registerEmail, registerPassword);
         if (loginSuccess) {
           localStorage.setItem('cn_last_logged_email', registerEmail);
+          localStorage.setItem('cn_last_logged_pw', registerPassword); // Salva a senha para preenchimento automático
         } else {
           setError('Cadastro realizado, mas falha ao logar automaticamente. Tente logar manualmente.');
           setIsRegistering(false);
         }
       } else {
-        setError('Senha da empresa inválida.');
+        setError('Erro ao realizar cadastro. Tente novamente.');
       }
     } catch (err: any) {
       setError(err.message || 'Erro ao realizar cadastro.');
@@ -167,8 +211,10 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
       if (!success) {
         setError('E-mail ou Senha incorretos.');
         setPassword('');
+        localStorage.removeItem('cn_last_logged_pw');
       } else {
         localStorage.setItem('cn_last_logged_email', email);
+        localStorage.setItem('cn_last_logged_pw', password); // salva senha para próximo acesso
       }
     } catch (err) {
       setError('Erro ao conectar com o servidor.');
@@ -213,63 +259,14 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
               <div className="flex items-center justify-center gap-2">
                 <span className="h-px w-6 bg-white/10"></span>
                 <p className="text-[9px] text-primary font-black uppercase tracking-[0.3em]">
-                  {googleRegistrationRequired ? 'Vincular Google' : isRegistering ? 'Primeiro Acesso' : 'Acesso Restrito'}
+                  {isRegistering ? 'Primeiro Acesso' : 'Acesso Restrito'}
                 </p>
                 <span className="h-px w-6 bg-white/10"></span>
               </div>
             </div>
 
-            {/* FLOW 1: Google Registration (Needs Company Password to activate) */}
-            {googleRegistrationRequired ? (
-              <form onSubmit={handleGoogleRegisterSubmit} className="w-full space-y-4 text-left">
-                <p className="text-xs text-on-surface-variant text-center bg-white/5 p-3.5 rounded-2xl border border-white/5">
-                  Olá <strong>{googleName}</strong> ({googleEmail})! <br />
-                  Este e-mail do Google não está cadastrado. Para liberá-lo no sistema, insira a <strong>Senha da Empresa</strong> abaixo:
-                </p>
-                
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Senha da Empresa</label>
-                  <input
-                    type="password"
-                    placeholder="Chave de segurança mestre"
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-center text-sm text-white outline-none focus:border-primary/50"
-                    value={googleCompanyPassword}
-                    onChange={(e) => setGoogleCompanyPassword(e.target.value)}
-                    required
-                    disabled={loading}
-                    autoFocus
-                  />
-                </div>
-
-                {error && (
-                  <p className="text-tertiary text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
-                    <AlertCircle size={12} /> {error}
-                  </p>
-                )}
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGoogleRegistrationRequired(false);
-                      setError(false);
-                    }}
-                    className="w-1/3 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-2xl py-3.5 text-xs font-bold transition-all"
-                  >
-                    Voltar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-2/3 bg-primary text-background py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-primary-dark transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                    Confirmar Acesso
-                  </button>
-                </div>
-              </form>
-            ) : isRegistering ? (
-              /* FLOW 2: Standard Signup */
+            {isRegistering ? (
+              /* FLOW: Standard Signup */
               <form onSubmit={handleRegisterSubmit} className="w-full space-y-4 text-left">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Nome Completo</label>
@@ -310,19 +307,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Senha da Empresa (Segurança)</label>
-                  <input
-                    type="password"
-                    placeholder="Chave de segurança mestre"
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:border-primary/50"
-                    value={registerCompanyPassword}
-                    onChange={(e) => setRegisterCompanyPassword(e.target.value)}
-                    required
-                    disabled={loading}
-                  />
-                </div>
-
                 {error && (
                   <p className="text-tertiary text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
                     <AlertCircle size={12} /> {error}
@@ -336,6 +320,28 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
                 >
                   {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                   Finalizar Cadastro
+                </button>
+
+                {/* Botão Google no Cadastro */}
+                <div className="flex items-center gap-3">
+                  <span className="flex-1 h-px bg-white/10" />
+                  <span className="text-[10px] text-white/30 uppercase font-bold tracking-widest">ou</span>
+                  <span className="flex-1 h-px bg-white/10" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleButtonClick}
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-3 bg-white text-gray-700 font-semibold py-3 rounded-2xl hover:bg-gray-100 transition-all shadow-md disabled:opacity-50 text-sm"
+                >
+                  <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <path fill="#4285F4" d="M47.532 24.552c0-1.636-.147-3.2-.422-4.701H24.48v8.89h12.984c-.56 3.018-2.26 5.578-4.817 7.29v6.055h7.796c4.56-4.202 7.09-10.396 7.09-17.534z"/>
+                    <path fill="#34A853" d="M24.48 48c6.516 0 11.982-2.161 15.976-5.865l-7.796-6.055c-2.161 1.447-4.927 2.303-8.18 2.303-6.294 0-11.624-4.25-13.528-9.963H2.87v6.253C6.845 42.938 15.076 48 24.48 48z"/>
+                    <path fill="#FBBC05" d="M10.952 28.42A14.558 14.558 0 0 1 10.2 24c0-1.534.264-3.026.752-4.42V13.327H2.87A23.997 23.997 0 0 0 .48 24c0 3.868.925 7.527 2.39 10.673l8.082-6.253z"/>
+                    <path fill="#EA4335" d="M24.48 9.617c3.546 0 6.727 1.22 9.231 3.617l6.922-6.922C36.457 2.43 30.992 0 24.48 0 15.076 0 6.845 5.062 2.87 13.327l8.082 6.253c1.904-5.713 7.234-9.963 13.528-9.963z"/>
+                  </svg>
+                  {googleReady ? 'Cadastrar com Google' : 'Carregando Google...'}
                 </button>
 
                 <button
@@ -356,6 +362,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
                   <input
                     type="email"
                     placeholder="E-mail de Acesso"
+                    autoComplete="email"
+                    name="email"
                     className={cn(
                       "w-full bg-white/5 border rounded-2xl px-4 py-4 text-center text-lg text-white outline-none transition-all placeholder:text-white/20",
                       error 
@@ -377,6 +385,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
                   <input
                     type={showPassword ? "text" : "password"}
                     placeholder="Senha de Acesso"
+                    autoComplete="current-password"
+                    name="password"
                     className={cn(
                       "w-full bg-white/5 border rounded-2xl px-4 py-4 text-center text-lg text-white outline-none transition-all placeholder:text-white/20",
                       error 
@@ -388,7 +398,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
                       setPassword(e.target.value);
                       if (error) setError(false);
                     }}
-                    autoFocus={!!email}
                     disabled={loading}
                     required
                   />
@@ -417,11 +426,25 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
                   {loading ? 'Autenticando...' : 'Autenticar Sistema'}
                 </button>
 
-                {/* Google Sign-in Button Wrapper */}
+                {/* Botão Google no Login */}
                 <div className="pt-2 border-t border-white/5 flex flex-col items-center gap-3">
-                  <div id="google-signin-btn" className="w-full flex justify-center"></div>
-                  
-                  <div className="flex justify-between w-full text-[10px] font-bold tracking-widest uppercase pt-1">
+
+                  <button
+                    type="button"
+                    onClick={handleGoogleButtonClick}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-3 bg-white text-gray-700 font-semibold py-3 rounded-2xl hover:bg-gray-100 transition-all shadow-md disabled:opacity-50 text-sm"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                      <path fill="#4285F4" d="M47.532 24.552c0-1.636-.147-3.2-.422-4.701H24.48v8.89h12.984c-.56 3.018-2.26 5.578-4.817 7.29v6.055h7.796c4.56-4.202 7.09-10.396 7.09-17.534z"/>
+                      <path fill="#34A853" d="M24.48 48c6.516 0 11.982-2.161 15.976-5.865l-7.796-6.055c-2.161 1.447-4.927 2.303-8.18 2.303-6.294 0-11.624-4.25-13.528-9.963H2.87v6.253C6.845 42.938 15.076 48 24.48 48z"/>
+                      <path fill="#FBBC05" d="M10.952 28.42A14.558 14.558 0 0 1 10.2 24c0-1.534.264-3.026.752-4.42V13.327H2.87A23.997 23.997 0 0 0 .48 24c0 3.868.925 7.527 2.39 10.673l8.082-6.253z"/>
+                      <path fill="#EA4335" d="M24.48 9.617c3.546 0 6.727 1.22 9.231 3.617l6.922-6.922C36.457 2.43 30.992 0 24.48 0 15.076 0 6.845 5.062 2.87 13.327l8.082 6.253c1.904-5.713 7.234-9.963 13.528-9.963z"/>
+                    </svg>
+                    {googleReady ? 'Entrar com Google' : 'Carregando Google...'}
+                  </button>
+
+                  <div className="flex justify-between w-full text-[10px] font-bold tracking-widest uppercase">
                     <button
                       type="button"
                       onClick={() => {

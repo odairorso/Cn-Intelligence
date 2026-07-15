@@ -121,14 +121,10 @@ export default async function handler(req, res) {
       try { bodyData = JSON.parse(bodyData); } catch (e) {}
     }
 
-    const { name, email, password, companyPassword } = bodyData;
+    const { name, email, password } = bodyData;
 
-    if (!name || !email || !password || !companyPassword) {
-      return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
-    }
-
-    if (companyPassword !== APP_PASSWORD) {
-      return res.status(400).json({ error: 'Senha da empresa incorreta.' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Nome, e-mail e senha são obrigatórios.' });
     }
 
     try {
@@ -221,15 +217,13 @@ export default async function handler(req, res) {
       try { bodyData = JSON.parse(bodyData); } catch (e) {}
     }
 
-    const { email, name, companyPassword, credential } = bodyData;
+    const { email, name, credential } = bodyData;
 
-    if (!email || !companyPassword || !credential) {
-      return res.status(400).json({ error: 'E-mail, senha da empresa e credential são obrigatórios.' });
+    if (!email || !credential) {
+      return res.status(400).json({ error: 'E-mail e credential do Google são obrigatórios.' });
     }
 
-    if (companyPassword !== APP_PASSWORD) {
-      return res.status(400).json({ error: 'Senha da empresa incorreta.' });
-    }
+    const safeName = (name || 'Usuário Google').trim();
 
     try {
       const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
@@ -246,14 +240,14 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Este e-mail já está cadastrado.' });
       }
 
-      const role = 'admin'; // Autocadastro com senha da empresa é admin
+      const role = 'user'; // Autocadastro via Google
 
       await sql`
         INSERT INTO portal_users (name, email, password_hash, role)
-        VALUES (${name.trim()}, ${email.toLowerCase().trim()}, NULL, ${role})
+        VALUES (${safeName}, ${email.toLowerCase().trim()}, NULL, ${role})
       `;
 
-      const userPayload = { uid: APP_UID, email: email.toLowerCase().trim(), name: name.trim(), role };
+      const userPayload = { uid: APP_UID, email: email.toLowerCase().trim(), name: safeName, role };
       const token = generateToken(userPayload);
 
       await logSecurity(req, res, `Novo usuário Google cadastrado via Primeiro Acesso: ${email}`);
