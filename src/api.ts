@@ -135,6 +135,53 @@ export const apiAuth = {
     return data.user;
   },
 
+  async register(name: string, email: string, password: string, companyPassword: string): Promise<boolean> {
+    const res = await fetchWithSecurity(`${API_BASE}?route=auth-register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password, companyPassword }),
+    });
+    if (!res.ok) {
+      const error = await buildHttpError(res, 'Erro no cadastro');
+      throw error;
+    }
+    return true;
+  },
+
+  async googleLogin(credential: string): Promise<{ success: boolean; registrationRequired?: boolean; email?: string; name?: string; user?: any }> {
+    const res = await fetchWithSecurity(`${API_BASE}?route=auth-google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential }),
+    });
+    if (!res.ok && res.status !== 400) {
+      const error = await buildHttpError(res, 'Falha no login com Google');
+      throw error;
+    }
+    const data = await res.json();
+    if (data.user) {
+      setUser(data.user);
+    }
+    return data;
+  },
+
+  async googleRegister(email: string, name: string, companyPassword: string, credential: string): Promise<boolean> {
+    const res = await fetchWithSecurity(`${API_BASE}?route=auth-google-register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, name, companyPassword, credential }),
+    });
+    if (!res.ok) {
+      const error = await buildHttpError(res, 'Erro no cadastro com Google');
+      throw error;
+    }
+    const data = await res.json();
+    if (data.user) {
+      setUser(data.user);
+    }
+    return true;
+  },
+
   getToken,
   getUid,
   getUser,

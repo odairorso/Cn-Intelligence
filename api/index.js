@@ -112,7 +112,173 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'E-mail ou senha incorretos' });
   }
 
-  // ── Verificação de Token (OBRIGATÓRIA para todas as rotas exceto login) ──
+  // ── Rota de Cadastro de Usuário (Primeiro Acesso) ───────
+  if (route === 'auth-register') {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+    let bodyData = req.body || {};
+    if (typeof bodyData === 'string') {
+      try { bodyData = JSON.parse(bodyData); } catch (e) {}
+    }
+
+    const { name, email, password, companyPassword } = bodyData;
+
+    if (!name || !email || !password || !companyPassword) {
+      return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
+    }
+
+    if (companyPassword !== APP_PASSWORD) {
+      return res.status(400).json({ error: 'Senha da empresa incorreta.' });
+    }
+
+    try {
+      const existing = await sql`SELECT id FROM portal_users WHERE LOWER(email) = ${email.toLowerCase().trim()}`;
+      if (existing && existing.length > 0) {
+        return res.status(400).json({ error: 'Este e-mail já está cadastrado.' });
+      }
+
+      const passwordHash = bcrypt.hashSync(password, 10);
+      const role = 'admin'; // Primeiro acesso com senha de empresa é sempre admin
+
+      await sql`
+        INSERT INTO portal_users (name, email, password_hash, role)
+        VALUES (${name.trim()}, ${email.toLowerCase().trim()}, ${passwordHash}, ${role})
+      `;
+
+      await logSecurity(req, res, `Novo usuário admin cadastrado via Primeiro Acesso: ${email}`);
+      return res.json({ success: true });
+    } catch (dbErr) {
+      console.error('[AUTH] Erro ao cadastrar usuário:', dbErr);
+      return res.status(500).json({ error: 'Erro interno ao realizar cadastro.' });
+    }
+  }
+
+  // ── Rota de Login com o Google ─────────────────────────
+  if (route === 'auth-google') {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+    let bodyData = req.body || {};
+    if (typeof bodyData === 'string') {
+      try { bodyData = JSON.parse(bodyData); } catch (e) {}
+    }
+
+    const { credential } = bodyData;
+    if (!credential) {
+      return res.status(400).json({ error: 'Google credential é obrigatória.' });
+    }
+
+    try {
+      const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+      if (!googleRes.ok) {
+        return res.status(400).json({ error: 'Token do Google inválido ou expirado.' });
+      }
+      const googleData = await googleRes.json();
+      const googleEmail = googleData.email;
+      const googleName = googleData.name || googleData.given_name || 'Usuário Google';
+
+      if (!googleEmail) {
+        return res.status(400).json({ error: 'Não foi possível obter o e-mail da conta Google.' });
+      }
+
+      const users = await sql`SELECT * FROM portal_users WHERE LOWER(email) = ${googleEmail.toLowerCase().trim()}`;
+      
+      if (users && users.length > 0) {
+        const user = users[0];
+        const userPayload = { uid: APP_UID, email: user.email, name: user.name, role: user.role };
+        const token = generateToken(userPayload);
+
+        await logSecurity(req, res, `Login com Google bem-sucedido: ${user.email} (${user.role})`);
+
+        const isDev = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+        const cookieOptions = [
+          `cn_jwt_token=${token}`,
+          'Path=/',
+          'HttpOnly',
+          'SameSite=Strict',
+          'Max-Age=604800'
+        ];
+        if (!isDev) {
+          cookieOptions.push('Secure');
+        }
+        res.setHeader('Set-Cookie', cookieOptions.join('; '));
+
+        return res.json({ success: true, token, user: userPayload });
+      } else {
+        return res.json({ registrationRequired: true, email: googleEmail, name: googleName });
+      }
+    } catch (err) {
+      console.error('[AUTH] Erro no login com Google:', err);
+      return res.status(500).json({ error: 'Erro interno ao autenticar com o Google.' });
+    }
+  }
+
+  // ── Rota de Cadastro de Google com Senha de Empresa ─────
+  if (route === 'auth-google-register') {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+    let bodyData = req.body || {};
+    if (typeof bodyData === 'string') {
+      try { bodyData = JSON.parse(bodyData); } catch (e) {}
+    }
+
+    const { email, name, companyPassword, credential } = bodyData;
+
+    if (!email || !companyPassword || !credential) {
+      return res.status(400).json({ error: 'E-mail, senha da empresa e credential são obrigatórios.' });
+    }
+
+    if (companyPassword !== APP_PASSWORD) {
+      return res.status(400).json({ error: 'Senha da empresa incorreta.' });
+    }
+
+    try {
+      const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+      if (!googleRes.ok) {
+        return res.status(400).json({ error: 'Token do Google inválido ou expirado.' });
+      }
+      const googleData = await googleRes.json();
+      if (googleData.email.toLowerCase().trim() !== email.toLowerCase().trim()) {
+        return res.status(400).json({ error: 'E-mail informado não corresponde à conta do Google.' });
+      }
+
+      const existing = await sql`SELECT id FROM portal_users WHERE LOWER(email) = ${email.toLowerCase().trim()}`;
+      if (existing && existing.length > 0) {
+        return res.status(400).json({ error: 'Este e-mail já está cadastrado.' });
+      }
+
+      const role = 'admin'; // Autocadastro com senha da empresa é admin
+
+      await sql`
+        INSERT INTO portal_users (name, email, password_hash, role)
+        VALUES (${name.trim()}, ${email.toLowerCase().trim()}, NULL, ${role})
+      `;
+
+      const userPayload = { uid: APP_UID, email: email.toLowerCase().trim(), name: name.trim(), role };
+      const token = generateToken(userPayload);
+
+      await logSecurity(req, res, `Novo usuário Google cadastrado via Primeiro Acesso: ${email}`);
+
+      const isDev = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+      const cookieOptions = [
+        `cn_jwt_token=${token}`,
+        'Path=/',
+        'HttpOnly',
+        'SameSite=Strict',
+        'Max-Age=604800'
+      ];
+      if (!isDev) {
+        cookieOptions.push('Secure');
+      }
+      res.setHeader('Set-Cookie', cookieOptions.join('; '));
+
+      return res.json({ success: true, token, user: userPayload });
+    } catch (err) {
+      console.error('[AUTH] Erro ao cadastrar via Google:', err);
+      return res.status(500).json({ error: 'Erro interno ao cadastrar com o Google.' });
+    }
+  }
+
+  // ── Verificação de Token (OBRIGATÓRIA para todas as rotas exceto login e cadastros) ──
   const publicRoutes = new Set(['health', 'folha-push']);
   if (!publicRoutes.has(route)) {
     let authorized = false;
@@ -191,7 +357,7 @@ export default async function handler(req, res) {
         case 'auth-session': {
           const decoded = verifyToken(req);
           if (!decoded) return res.status(401).json({ error: 'Sessão expirada' });
-          return res.json({ user: { uid: decoded.uid, email: decoded.email } });
+          return res.json({ user: { uid: decoded.uid, email: decoded.email, name: decoded.name, role: decoded.role } });
         }
         case 'auth-logout':
         case 'logout': {
