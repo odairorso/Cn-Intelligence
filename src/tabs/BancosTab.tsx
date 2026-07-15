@@ -162,7 +162,8 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
       </div>
 
       {selectedBankForExtract && (() => {
-        const bankNameNormalized = normalizeName(selectedBankForExtract.nome);
+        const currentBank = banks.find(b => b.id === selectedBankForExtract.id) || selectedBankForExtract;
+        const bankNameNormalized = normalizeName(currentBank.nome);
         const bankTransactions = extractTransactions
           .filter(tx => tx.banco && normalizeName(tx.banco) === bankNameNormalized)
           .filter(tx => {
@@ -208,12 +209,12 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                 <div>
                   <h3 className="text-xl font-bold font-headline flex items-center gap-2 text-on-surface">
                     <CreditCard className="text-primary" size={22} />
-                    Extrato de Lançamentos - {selectedBankForExtract.nome}
+                    Extrato de Lançamentos - {currentBank.nome}
                   </h3>
                   <p className="text-xs text-on-surface-variant mt-1">
-                    {selectedBankForExtract.agencia && `Agência: ${selectedBankForExtract.agencia}`}
-                    {selectedBankForExtract.agencia && selectedBankForExtract.conta && ' • '}
-                    {selectedBankForExtract.conta && `Conta: ${selectedBankForExtract.conta}`}
+                    {currentBank.agencia && `Agência: ${currentBank.agencia}`}
+                    {currentBank.agencia && currentBank.conta && ' • '}
+                    {currentBank.conta && `Conta: ${currentBank.conta}`}
                   </p>
                 </div>
                 <button
@@ -396,7 +397,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                 <div>
                   <p className="text-[10px] text-on-surface-variant uppercase font-bold">Saldo Inicial</p>
                   <p className="text-sm font-bold text-on-surface mt-0.5">
-                    {Number(selectedBankForExtract.saldo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {Number(currentBank.saldo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
                 </div>
                 <div>
@@ -414,7 +415,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                 <div className="border-l border-white/10 pl-4">
                   <p className="text-[10px] text-primary uppercase font-bold">Saldo Atual da Conta</p>
                   <p className="text-base font-black text-primary mt-0.5">
-                    {((Number(selectedBankForExtract.saldo) + (selectedBankForExtract.total_pago || 0))).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {((Number(currentBank.saldo) + (currentBank.total_pago || 0))).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
                 </div>
               </div>
