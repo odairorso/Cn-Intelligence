@@ -1717,6 +1717,7 @@ export default function App() {
                 setShowNewBankModal={setShowNewBankModal}
                 setEditingBank={setEditingBank}
                 deleteBank={deleteBank}
+                onEditTransaction={setEditingTx}
               />
             )}
             {activeTab === 'extrato' && (

@@ -9,9 +9,10 @@ interface BancosTabProps {
   setShowNewBankModal: (show: boolean) => void;
   setEditingBank: (bank: Bank) => void;
   deleteBank: (id: string) => void;
+  onEditTransaction?: (tx: Transaction) => void;
 }
 
-const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, deleteBank }: BancosTabProps) => {
+const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEditingBank, deleteBank, onEditTransaction }: BancosTabProps) => {
   const [selectedBankForExtract, setSelectedBankForExtract] = useState<Bank | null>(null);
   const [extractFilter, setExtractFilter] = useState<'PAGO' | 'TODOS'>('PAGO');
   const [extractMonth, setExtractMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
@@ -45,7 +46,7 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
     };
 
     loadExtract();
-  }, [selectedBankForExtract]); // Apenas recarrega se o banco mudar
+  }, [selectedBankForExtract, transactions]); // Recarrega se o banco ou as transações mudarem
 
   const formatCreatedAt = (dateTimeStr?: string) => {
     if (!dateTimeStr) return '-';
@@ -324,6 +325,7 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
                         <th className="p-3 text-center">Tipo</th>
                         <th className="p-3 text-right">Valor</th>
                         <th className="p-3 text-center">Status</th>
+                        {onEditTransaction && <th className="p-3 text-center w-16">Ações</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
@@ -370,6 +372,17 @@ const BancosTab = React.memo(({ banks, setShowNewBankModal, setEditingBank, dele
                                 {tx.status}
                               </span>
                             </td>
+                            {onEditTransaction && (
+                              <td className="p-3 text-center">
+                                <button
+                                  onClick={() => onEditTransaction(tx)}
+                                  className="p-1 text-primary hover:bg-primary/10 rounded transition-all inline-flex items-center justify-center"
+                                  title="Editar Lançamento"
+                                >
+                                  <Edit size={14} />
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
