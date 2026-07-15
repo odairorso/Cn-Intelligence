@@ -261,7 +261,7 @@ export async function getContaContabilId(fornecedor, descricao, tipo = 'DESPESA'
     // DESPESA
     if (text.includes('FGTS')) {
       targetCodigo = '3.13';
-    } else if (text.includes('GPS') || text.includes('INSS')) {
+    } else if (text.includes('GPS') || text.includes('INSS') || text.includes('PREVIDENCIA') || text.includes('PREVIDÊNCIA')) {
       targetCodigo = '3.14';
     } else if (text.includes('IPTU')) {
       targetCodigo = '3.15';
