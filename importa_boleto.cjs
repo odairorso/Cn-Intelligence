@@ -490,7 +490,13 @@ async function getContaContabilId(client, fornecedor, descricao, tipo = 'DESPESA
     }
   } else {
     // DESPESA
-    if (text.includes('FOLHA') || text.includes('FOPAG') || text.includes('SALARIO') || text.includes('SALÁRIO') || text.includes('GPS') || text.includes('INSS') || text.includes('FGTS') || text.includes('CONTRIBUIÇÃO SINDICAL') || text.includes('RESCISÃO') || text.includes('13º') || text.includes('DECIMO')) {
+    if (text.includes('FGTS')) {
+      targetCodigo = '3.13';
+    } else if (text.includes('GPS') || text.includes('INSS')) {
+      targetCodigo = '3.14';
+    } else if (text.includes('MULTA RESCISORIA') || text.includes('MULTA RESCISÓRIA') || text.includes('GRRF')) {
+      targetCodigo = '3.16';
+    } else if (text.includes('FOLHA') || text.includes('FOPAG') || text.includes('SALARIO') || text.includes('SALÁRIO') || text.includes('CONTRIBUIÇÃO SINDICAL') || text.includes('RESCISÃO') || text.includes('13º') || text.includes('DECIMO')) {
       targetCodigo = '3.1';
     } else if (text.includes('ALUGUEL') || text.includes('LOCAÇÃO') || text.includes('LOCACAO')) {
       targetCodigo = '3.2';
