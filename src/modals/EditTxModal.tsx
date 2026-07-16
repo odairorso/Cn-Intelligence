@@ -351,28 +351,35 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor (R$)</label>
               <input
-                type="number" step="0.01" required
+                type="text"
+                inputMode="decimal"
+                required
+                placeholder="0,00"
                 autoComplete="new-transaction"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.valor}
-                onChange={e => setFormData({ ...formData, valor: e.target.value })}
+                onChange={e => {
+                  const raw = e.target.value.replace(/[^0-9.,]/g, '');
+                  setFormData({ ...formData, valor: raw });
+                }}
               />
             </div>
             {formData.status === 'PAGO' && (
               <div>
                 <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor Pago (R$)</label>
                 <input
-                  type="number" step="0.01"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={formData.valor}
                   autoComplete="new-transaction"
                   className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                   value={formData.valorPago || ''}
-                  placeholder={formData.valor}
                   onChange={e => {
-                    const val = e.target.value;
-                    const valorPago = val === '' ? 0 : Number(val);
-                    const valorOriginal = Number(formData.valor) || 0;
-                    const jurosCalculado = val === '' ? 0 : (valorPago - valorOriginal);
-                    setFormData({ ...formData, valorPago: val, juros: jurosCalculado });
+                    const raw = e.target.value.replace(/[^0-9.,]/g, '');
+                    const valorPago = raw === '' ? 0 : parseMoneyToNumber(raw);
+                    const valorOriginal = parseMoneyToNumber(formData.valor);
+                    const jurosCalculado = raw === '' ? 0 : Math.round((valorPago - valorOriginal) * 100) / 100;
+                    setFormData({ ...formData, valorPago: raw, juros: jurosCalculado });
                   }}
                 />
                 {formData.juros > 0 && (

@@ -410,11 +410,18 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor (R$)</label>
               <input
-                type="number" step="0.01" required
+                type="text"
+                inputMode="decimal"
+                required
+                placeholder="0,00"
                 autoComplete="new-transaction"
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
                 value={formData.valor}
-                onChange={e => setFormData({ ...formData, valor: e.target.value })}
+                onChange={e => {
+                  // Permite apenas dígitos, vírgula e ponto
+                  const raw = e.target.value.replace(/[^0-9.,]/g, '');
+                  setFormData({ ...formData, valor: raw });
+                }}
               />
             </div>
             <div>
