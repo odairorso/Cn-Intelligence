@@ -273,7 +273,7 @@ export default async function handler(req, res) {
   }
 
   // ── Verificação de Token (OBRIGATÓRIA para todas as rotas exceto login e cadastros) ──
-  const publicRoutes = new Set(['health', 'folha-push', 'fix-rounding']);
+  const publicRoutes = new Set(['health', 'folha-push']);
   if (!publicRoutes.has(route)) {
     let authorized = false;
     authMiddleware(req, res, () => {

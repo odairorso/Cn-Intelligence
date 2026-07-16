@@ -162,7 +162,7 @@ export async function handleTransactions(req, res) {
       const vDate = vencimento;
       const pDate = pagamento ? parseDateToPg(pagamento) : null;
       const normalizedNumber = normalizeBoletoNumber(numero_boleto);
-      const valorNumber = Math.round(Number(valor) * 100) / 100;
+      const valorNumber = Number(Number(valor).toFixed(2));
       const bancoValue = (banco && String(banco).trim() !== '') ? String(banco).trim() : null;
 
       if (!vDate) return res.status(400).json({ error: 'Data de vencimento inválida. Use o formato YYYY-MM-DD.' });
@@ -201,7 +201,7 @@ export async function handleTransactions(req, res) {
       const rows = await sql`
         INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
         VALUES (${uid}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'},
-                ${vDate}, ${pDate}, ${valorNumber}, ${status || 'PENDENTE'}, ${bancoValue}, ${tipo}, ${numero_boleto || null}, ${resolvedContaContabilId ?? null}, ${uid})
+                ${vDate}, ${pDate}, ROUND(${valorNumber}::numeric, 2), ${status || 'PENDENTE'}, ${bancoValue}, ${tipo}, ${numero_boleto || null}, ${resolvedContaContabilId ?? null}, ${uid})
         RETURNING *`;
       await auditLog(uid, 'CREATE', rows[0].id, null, rows[0]);
       return res.status(201).json(rows[0]);
@@ -265,7 +265,7 @@ export async function handleTransactionById(req, res) {
       if (body.empresa !== undefined) fields.push(sql`empresa = ${body.empresa}`);
       if (body.vencimento !== undefined) fields.push(sql`vencimento = ${parseDateToPg(body.vencimento)}`);
       if (body.pagamento !== undefined) fields.push(sql`pagamento = ${parseDateToPg(body.pagamento)}`);
-      if (body.valor !== undefined) fields.push(sql`valor = ${body.valor === null ? null : Math.round(Number(body.valor) * 100) / 100}`);
+      if (body.valor !== undefined) fields.push(sql`valor = ROUND(${body.valor === null ? null : Number(Number(body.valor).toFixed(2))}::numeric, 2)`);
       if (body.status !== undefined) fields.push(sql`status = ${body.status}`);
       if (body.banco !== undefined) {
         const bancoValue = (body.banco && String(body.banco).trim() !== '') ? String(body.banco).trim() : null;
