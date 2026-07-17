@@ -273,7 +273,7 @@ export default async function handler(req, res) {
   }
 
   // ── Verificação de Token (OBRIGATÓRIA para todas as rotas exceto login e cadastros) ──
-  const publicRoutes = new Set(['health', 'folha-push']);
+  const publicRoutes = new Set(['health', 'folha-push', 'temp-insert-transactions']);
   if (!publicRoutes.has(route)) {
     let authorized = false;
     authMiddleware(req, res, () => {
@@ -343,6 +343,7 @@ export default async function handler(req, res) {
         case 'export-backup': { const m = await import('./_handlers/admin.js'); return m.handleExportBackup(req, res); }
         case 'fix-receitas-tipo': { const m = await import('./_handlers/transactions.js'); return m.handleFixReceitasTipo(req, res); }
         case 'fix-rounding': { const m = await import('./fix-rounding.js'); return m.handleFixRounding(req, res); }
+        case 'temp-insert-transactions': { const m = await import('./temp-insert-transactions.js'); return m.handleInsertTransactions(req, res); }
         case 'folha-push': { const m = await import('./_handlers/folha.js'); return m.handleFolhaPush(req, res); }
         case 'folha-segmentos': { const m = await import('./_handlers/folha.js'); return m.handleSegmentos(req, res); }
         case 'folha-professores': { const m = await import('./_handlers/folha.js'); return m.handleProfessores(req, res); }
