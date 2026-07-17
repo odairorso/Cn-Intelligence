@@ -388,7 +388,14 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }}
                 value={formData.status}
-                onChange={e => setFormData({ ...formData, status: e.target.value as TransactionStatus })}
+                onChange={e => {
+                  const newStatus = e.target.value as TransactionStatus;
+                  setFormData({
+                    ...formData,
+                    status: newStatus,
+                    pagamento: newStatus === 'PAGO' && !formData.pagamento ? todayInputDate() : formData.pagamento
+                  });
+                }}
               >
                 <option value="PENDENTE" className="bg-[#161b2a] text-on-surface">PENDENTE</option>
                 <option value="PAGO" className="bg-[#161b2a] text-on-surface">PAGO</option>

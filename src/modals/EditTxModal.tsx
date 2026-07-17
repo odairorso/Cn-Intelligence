@@ -324,9 +324,13 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                 onChange={e => {
                   const newStatus = e.target.value as TransactionStatus;
                   if (newStatus !== 'PAGO') {
-                    setFormData({ ...formData, status: newStatus, juros: 0, valorPago: '' });
+                    setFormData({ ...formData, status: newStatus, juros: 0, valorPago: '', pagamento: '' });
                   } else {
-                    setFormData({ ...formData, status: newStatus });
+                    setFormData({
+                      ...formData,
+                      status: newStatus,
+                      pagamento: formData.pagamento || todayInputDate()
+                    });
                   }
                 }}
               >
