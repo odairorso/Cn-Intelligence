@@ -290,7 +290,7 @@ export async function getContaContabilId(fornecedor, descricao, tipo = 'DESPESA'
     } else if (text.includes('CONTABILIDADE') || text.includes('ASSESSORIA') || text.includes('VSC') || text.includes('HONORÁRIOS') || text.includes('HONORARIOS')) {
       targetCodigo = '3.11';
     } else if (text.includes('COMBUSTIVEL') || text.includes('COMBUSTÍVEL') || text.includes('POSTO') || text.includes('GASOLINA') || text.includes('ETANOL') || text.includes('DIESEL') || text.includes('ABASTECIMENTO')) {
-      targetCodigo = '3.17';
+      targetCodigo = '3.28';
     }
   }
 
