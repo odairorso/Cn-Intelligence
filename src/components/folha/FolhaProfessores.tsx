@@ -206,15 +206,33 @@ export default function FolhaProfessores() {
 
   const handleToggleAtivo = async (p: Professor) => {
     if (p.ativo) {
-      const dataHoje = new Date().toISOString().split('T')[0];
-      const dataInput = prompt(`Desativar ${p.nome}\nInforme a data de desligamento (AAAA-MM-DD):`, dataHoje);
+      const dataHojeIso = new Date().toISOString().split('T')[0];
+      const dataHojeBr = formatDateBR(dataHojeIso);
+      const dataInput = prompt(`Desativar ${p.nome}\nInforme a data de desligamento (DD/MM/AAAA):`, dataHojeBr);
       if (dataInput === null) return; // Cancelou
-      const finalData = dataInput.trim() || dataHoje;
+
+      let finalDataIso = dataHojeIso;
+      const trimmed = dataInput.trim();
+      if (trimmed) {
+        if (trimmed.includes('/')) {
+          const parts = trimmed.split('/');
+          if (parts.length === 3) {
+            let [d, m, y] = parts;
+            d = d.padStart(2, '0');
+            m = m.padStart(2, '0');
+            if (y.length === 2) y = '20' + y;
+            finalDataIso = `${y}-${m}-${d}`;
+          }
+        } else if (trimmed.includes('-')) {
+          finalDataIso = trimmed;
+        }
+      }
+
       await updateProfessor(p.id, {
         ativo: false,
-        dataDesligamento: finalData,
+        dataDesligamento: finalDataIso,
       });
-      toast.success(`${p.nome} foi desativado(a) em ${formatDateBR(finalData)}.`);
+      toast.success(`${p.nome} foi desativado(a) em ${formatDateBR(finalDataIso)}.`);
     } else {
       await updateProfessor(p.id, {
         ativo: true,
