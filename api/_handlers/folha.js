@@ -136,7 +136,7 @@ export async function handleProfessores(req, res) {
   if (req.method === 'PATCH') {
     try {
       const { id, nome, cpf, dataAdmissao, dataDesligamento, ativo, segmentos, fichaCadastro, cargo, salarioFixo } = req.body;
-      const currentRows = await sql`SELECT cargo, salario_fixo FROM professores WHERE id = ${id} AND uid = ${uid}`;
+      const currentRows = await sql`SELECT * FROM professores WHERE id = ${id} AND uid = ${uid}`;
       if (currentRows.length === 0) return res.status(404).json({ error: 'Funcionário não encontrado' });
       const current = currentRows[0];
 
@@ -147,23 +147,35 @@ export async function handleProfessores(req, res) {
         return res.status(400).json({ error: 'CPF não pode ficar vazio.' });
       }
 
+      const finalNome = nome !== undefined ? String(nome).trim() : current.nome;
+      const finalCpf = cpf !== undefined ? String(cpf).trim() : current.cpf;
+      const finalDataAdmissao = dataAdmissao !== undefined ? dataAdmissao : (current.data_admissao ? String(current.data_admissao).split('T')[0] : new Date().toISOString().split('T')[0]);
+
+      let finalDataDesligamento = null;
+      if (dataDesligamento !== undefined) {
+        finalDataDesligamento = dataDesligamento || null;
+      } else {
+        finalDataDesligamento = current.data_desligamento ? String(current.data_desligamento).split('T')[0] : null;
+      }
+
+      let finalAtivo = current.ativo;
+      if (finalDataDesligamento) {
+        finalAtivo = false;
+      } else if (ativo !== undefined) {
+        finalAtivo = ativo !== false;
+      }
+
       const finalCargo = cargo !== undefined ? cargo : (current.cargo || '');
       const finalSalarioFixo = salarioFixo !== undefined ? salarioFixo : (Number(current.salario_fixo) || 0);
-      // Se informou data de desligamento, sempre inativo
-      const finalAtivo = dataDesligamento ? false : (ativo !== false);
-
-      const safeNome = nome !== undefined ? String(nome).trim() : undefined;
-      const safeCpf = cpf !== undefined ? String(cpf).trim() : undefined;
-      const safeDesligamento = dataDesligamento || null;
 
       let pRows;
       if (fichaCadastro !== undefined) {
         pRows = await sql`
           UPDATE professores
-          SET nome = ${safeNome},
-              cpf = ${safeCpf},
-              data_admissao = ${dataAdmissao},
-              data_desligamento = ${safeDesligamento},
+          SET nome = ${finalNome},
+              cpf = ${finalCpf},
+              data_admissao = ${finalDataAdmissao},
+              data_desligamento = ${finalDataDesligamento},
               ativo = ${finalAtivo},
               cargo = ${finalCargo},
               salario_fixo = ${finalSalarioFixo},
@@ -173,10 +185,10 @@ export async function handleProfessores(req, res) {
       } else {
         pRows = await sql`
           UPDATE professores
-          SET nome = ${safeNome},
-              cpf = ${safeCpf},
-              data_admissao = ${dataAdmissao},
-              data_desligamento = ${safeDesligamento},
+          SET nome = ${finalNome},
+              cpf = ${finalCpf},
+              data_admissao = ${finalDataAdmissao},
+              data_desligamento = ${finalDataDesligamento},
               ativo = ${finalAtivo},
               cargo = ${finalCargo},
               salario_fixo = ${finalSalarioFixo}
