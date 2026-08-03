@@ -38,6 +38,7 @@ export default function FolhaProfessores() {
   const [editCargo, setEditCargo] = useState('');
   const [editSalarioFixo, setEditSalarioFixo] = useState('');
   const [editDataAdmissao, setEditDataAdmissao] = useState('');
+  const [editDataDesligamento, setEditDataDesligamento] = useState('');
   const [editSlots, setEditSlots] = useState<SegSlot[]>([]);
 
   const [fichaOpen, setFichaOpen] = useState(false);
@@ -134,14 +135,26 @@ export default function FolhaProfessores() {
     setEditNome(p.nome);
     setEditCpf(p.cpf);
     setEditDataAdmissao(p.dataAdmissao || '');
+    setEditDataDesligamento(p.dataDesligamento || '');
 
     const newSlots = segmentos.map((s) => {
       const h = p.segmentoHoras?.[s.id];
-      return { segId: s.id, horas: (h !== undefined && h !== null) ? String(h) : '' };
+      // Convert to BR decimal format: 22.5 -> '22,5' so toNumberBR works correctly
+      const horasStr = (h !== undefined && h !== null && Number(h) > 0)
+        ? String(Number(h)).replace('.', ',')
+        : '';
+      return { segId: s.id, horas: horasStr };
     });
     setEditSlots(newSlots);
     setEditCargo(p.cargo || '');
-    setEditSalarioFixo(p.salarioFixo ? String(p.salarioFixo) : '');
+
+    // Preenche o salário fixo com o valor estimado caso p.salarioFixo seja 0
+    const salEst = calcularSalarioEstimado(newSlots);
+    const salInicial = (p.salarioFixo && p.salarioFixo > 0)
+      ? String(p.salarioFixo)
+      : (salEst > 0 ? String(salEst) : '');
+
+    setEditSalarioFixo(salInicial);
     setEditOpen(true);
   };
 
@@ -181,6 +194,8 @@ export default function FolhaProfessores() {
       cargo: editCargo,
       salarioFixo: parseFloat(editSalarioFixo.replace(',', '.')) || 0,
       dataAdmissao: editDataAdmissao,
+      dataDesligamento: editDataDesligamento || undefined,
+      ativo: editDataDesligamento ? false : (editing.ativo),
       segmentoIds,
       segmentoHoras,
     });
@@ -190,13 +205,83 @@ export default function FolhaProfessores() {
   };
 
   const handleToggleAtivo = async (p: Professor) => {
-    await updateProfessor(p.id, { ativo: !p.ativo });
+    if (p.ativo) {
+      const dataHoje = new Date().toISOString().split('T')[0];
+      const dataInput = prompt(`Desativar ${p.nome}\nInforme a data de desligamento (AAAA-MM-DD):`, dataHoje);
+      if (dataInput === null) return; // Cancelou
+      const finalData = dataInput.trim() || dataHoje;
+      await updateProfessor(p.id, {
+        ativo: false,
+        dataDesligamento: finalData,
+      });
+      toast.success(`${p.nome} foi desativado(a) em ${formatDateBR(finalData)}.`);
+    } else {
+      await updateProfessor(p.id, {
+        ativo: true,
+        dataDesligamento: undefined,
+      });
+      toast.success(`${p.nome} foi reativado(a).`);
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('Deseja realmente excluir este professor? Todos os históricos e turmas dele serão apagados.')) {
       await deleteProfessor(id);
     }
+  };
+
+  // Calcula o salário estimado baseado nas horas das turmas (recebe slots em formato BR)
+  const calcularSalarioEstimado = (currentSlots: SegSlot[]) => {
+    const valid = currentSlots.filter((s) => s.segId && toNumberBR(s.horas) > 0);
+    if (valid.length === 0) return 0;
+
+    let salario = 0;
+    const dummyProf: Professor = {
+      id: 'preview',
+      nome: '',
+      cpf: '',
+      dataAdmissao: '',
+      segmentoIds: [],
+      segmentoHoras: {},
+      ativo: true,
+    };
+
+    valid.forEach((s) => {
+      const seg = segmentos.find((x) => x.id === s.segId);
+      if (!seg) return;
+      const hs = toNumberBR(s.horas); // toNumberBR handles comma as decimal
+
+      if (isMonitora(seg.nome)) {
+        salario += Number(seg.ajudaCusto) || 0;
+        return;
+      }
+
+      dummyProf.segmentoHoras![seg.id] = hs;
+      const l = gerarLancamento(dummyProf, seg, '');
+      salario += l.totalPagar;
+    });
+
+    return Math.round(salario * 100) / 100;
+  };
+
+  // Calcula o salário estimado de um professor a partir dos dados do banco (números diretos)
+  const calcularSalarioProfessor = (prof: Professor) => {
+    if (prof.salarioFixo && prof.salarioFixo > 0) return prof.salarioFixo;
+    if (!prof.segmentoIds || prof.segmentoIds.length === 0) return 0;
+    let total = 0;
+    prof.segmentoIds.forEach((sid) => {
+      const seg = segmentos.find((s) => s.id === sid);
+      if (!seg) return;
+      const hs = Number(prof.segmentoHoras?.[sid]) || 0;
+      if (hs === 0 && !isMonitora(seg.nome)) return;
+      if (isMonitora(seg.nome)) {
+        total += Number(seg.ajudaCusto) || 0;
+        return;
+      }
+      const l = gerarLancamento(prof, seg, '');
+      total += l.totalPagar;
+    });
+    return Math.round(total * 100) / 100;
   };
 
   // Renderiza o preview salarial em tempo real
@@ -301,11 +386,14 @@ export default function FolhaProfessores() {
                   <TableCell className="text-on-surface-variant">{formatDateBR(prof.dataAdmissao)}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1.5">
-                      {prof.salarioFixo && prof.salarioFixo > 0 ? (
-                        <Badge variant="secondary" className="bg-green-500/20 border-green-500/40 text-green-400 text-[10px] py-0 px-2 font-normal">
-                          Fixo: {formatCurrency(prof.salarioFixo)}/mês
-                        </Badge>
-                      ) : null}
+                      {(() => {
+                        const salEst = calcularSalarioProfessor(prof);
+                        return salEst > 0 ? (
+                          <Badge variant="secondary" className="bg-green-500/20 border-green-500/40 text-green-400 text-[10px] py-0 px-2 font-normal">
+                            {formatCurrency(salEst)}/mês
+                          </Badge>
+                        ) : null;
+                      })()}
                       {prof.segmentoIds.map((sid) => {
                         const seg = segmentos.find((s) => s.id === sid);
                         const hs = prof.segmentoHoras?.[sid] || 0;
@@ -316,6 +404,11 @@ export default function FolhaProfessores() {
                           </Badge>
                         );
                       })}
+                      {prof.dataDesligamento && (
+                        <Badge variant="secondary" className="bg-red-500/20 border-red-500/40 text-red-400 text-[10px] py-0 px-2 font-normal">
+                          Saiu: {formatDateBR(prof.dataDesligamento)}
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
@@ -432,7 +525,12 @@ export default function FolhaProfessores() {
                         value={slot.horas}
                         onChange={(e) => {
                           const val = e.target.value;
-                          setSlots(slots.map((s, idx) => (idx === index ? { ...s, horas: val } : s)));
+                          const newSlots = slots.map((s, idx) => (idx === index ? { ...s, horas: val } : s));
+                          setSlots(newSlots);
+                          const est = calcularSalarioEstimado(newSlots);
+                          if (est > 0) {
+                            setSalarioFixo(String(est));
+                          }
                         }}
                         className="w-20 text-right bg-background border-surface-variant text-on-surface h-8"
                       />
@@ -484,9 +582,27 @@ export default function FolhaProfessores() {
                 <Input id="editDataAdmissao" type="date" value={editDataAdmissao} onChange={(e) => setEditDataAdmissao(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="editSalarioFixo" className="text-on-surface-variant text-xs">Salário Fixo Mensal (R$)</Label>
-                <Input id="editSalarioFixo" type="number" placeholder="0,00" value={editSalarioFixo} onChange={(e) => setEditSalarioFixo(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
+                <Label htmlFor="editDataDesligamento" className="text-on-surface-variant text-xs">
+                  Data de Desligamento <span className="text-on-surface-variant/50">(deixe vazio se ainda ativo)</span>
+                </Label>
+                <Input
+                  id="editDataDesligamento"
+                  type="date"
+                  value={editDataDesligamento}
+                  onChange={(e) => setEditDataDesligamento(e.target.value)}
+                  className={`bg-background border-surface-variant text-on-surface ${editDataDesligamento ? 'border-red-500/60 text-red-400' : ''}`}
+                />
               </div>
+            </div>
+            {editDataDesligamento && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
+                <UserX className="w-3.5 h-3.5 shrink-0" />
+                Ao salvar, este funcionário será marcado como <strong>Inativo</strong> automaticamente.
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="editSalarioFixo" className="text-on-surface-variant text-xs">Salário Fixo Mensal (R$)</Label>
+              <Input id="editSalarioFixo" type="number" placeholder="0,00" value={editSalarioFixo} onChange={(e) => setEditSalarioFixo(e.target.value)} className="bg-background border-surface-variant text-on-surface" />
             </div>
             <div className="space-y-2">
               <Label className="text-on-surface-variant text-xs">Cargo / Função</Label>
@@ -523,7 +639,12 @@ export default function FolhaProfessores() {
                         value={slot.horas}
                         onChange={(e) => {
                           const val = e.target.value;
-                          setEditSlots(editSlots.map((s, idx) => (idx === index ? { ...s, horas: val } : s)));
+                          const newSlots = editSlots.map((s, idx) => (idx === index ? { ...s, horas: val } : s));
+                          setEditSlots(newSlots);
+                          const est = calcularSalarioEstimado(newSlots);
+                          if (est > 0) {
+                            setEditSalarioFixo(String(est));
+                          }
                         }}
                         className="w-20 text-right bg-background border-surface-variant text-on-surface h-8"
                       />

@@ -74,6 +74,7 @@ export const FolhaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           nome: p.nome,
           cpf: p.cpf,
           dataAdmissao: p.data_admissao ? p.data_admissao.split('T')[0] : '',
+          dataDesligamento: p.data_desligamento ? p.data_desligamento.split('T')[0] : undefined,
           cargo: p.cargo || '',
           salarioFixo: Number(p.salario_fixo) || 0,
           segmentoIds: p.segmentoIds || [],
@@ -139,6 +140,7 @@ export const FolhaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (patch.nome !== undefined) body.nome = patch.nome;
       if (patch.cpf !== undefined) body.cpf = patch.cpf;
       if (patch.dataAdmissao !== undefined) body.dataAdmissao = patch.dataAdmissao;
+      if (patch.dataDesligamento !== undefined) body.dataDesligamento = patch.dataDesligamento;
       if (patch.ativo !== undefined) body.ativo = patch.ativo;
       if (patch.cargo !== undefined) body.cargo = patch.cargo;
       if (patch.salarioFixo !== undefined) body.salarioFixo = patch.salarioFixo;

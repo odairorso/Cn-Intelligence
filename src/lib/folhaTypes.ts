@@ -13,6 +13,7 @@ export interface Professor {
   nome: string;
   cpf: string;
   dataAdmissao: string;
+  dataDesligamento?: string;
   cargo?: string;
   salarioFixo?: number;
   horasSemanais?: number; // legacy

@@ -74,6 +74,7 @@ const getUid = (): string | null => {
 
 const buildHttpError = async (res: Response, fallback: string) => {
   const contentType = res.headers.get('content-type') || '';
+  let err: Error;
   try {
     if (contentType.includes('application/json')) {
       const data = await res.json().catch(() => null);
@@ -81,14 +82,17 @@ const buildHttpError = async (res: Response, fallback: string) => {
         (data && typeof data === 'object' && 'message' in data && typeof (data as any).message === 'string' && (data as any).message) ||
         (data && typeof data === 'object' && 'error' in data && typeof (data as any).error === 'string' && (data as any).error) ||
         null;
-      return new Error(message ? `${fallback}: ${message}` : `${fallback} (HTTP ${res.status})`);
+      err = new Error(message ? `${fallback}: ${message}` : `${fallback} (HTTP ${res.status})`);
+    } else {
+      const text = await res.text().catch(() => '');
+      const compact = String(text || '').trim().slice(0, 400);
+      err = new Error(compact ? `${fallback}: ${compact}` : `${fallback} (HTTP ${res.status})`);
     }
-    const text = await res.text().catch(() => '');
-    const compact = String(text || '').trim().slice(0, 400);
-    return new Error(compact ? `${fallback}: ${compact}` : `${fallback} (HTTP ${res.status})`);
   } catch {
-    return new Error(`${fallback} (HTTP ${res.status})`);
+    err = new Error(`${fallback} (HTTP ${res.status})`);
   }
+  (err as any).status = res.status;
+  return err;
 };
 
 // --------------------------------------------------------------
@@ -111,6 +115,21 @@ export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
     ...options, 
     headers,
     credentials: 'same-origin'
+  }).then((response) => {
+    const isAuthRoute = url.includes('route=auth-login') || 
+                        url.includes('route=login') || 
+                        url.includes('route=auth-google') || 
+                        url.includes('route=auth-register') ||
+                        url.includes('route=auth-google-register');
+
+    if (response.status === 401 && !isAuthRoute) {
+      try {
+        localStorage.removeItem('cn_user');
+        localStorage.removeItem('cn_jwt_token_local');
+      } catch { /* ignore */ }
+      window.dispatchEvent(new CustomEvent('cn-unauthorized'));
+    }
+    return response;
   });
 };
 

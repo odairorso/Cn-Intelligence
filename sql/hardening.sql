@@ -326,6 +326,9 @@ CREATE POLICY "users_update_own"
     ON users FOR UPDATE
     USING (uid = current_setting('app.current_uid', true));
 
+-- ─── portal_users ─────────────────────────────────────────────
+ALTER TABLE portal_users ENABLE ROW LEVEL SECURITY;
+
 -- ---------------------------------------------------------------
 -- 12. DADOS PADRÃO (se não existirem)
 -- ---------------------------------------------------------------
