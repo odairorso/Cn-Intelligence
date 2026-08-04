@@ -505,10 +505,10 @@ const LancamentosTab = React.memo(({
       {/* Desktop: table */}
       <div className="glass-card overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[1200px]">
+          <table className="w-full text-left min-w-[1100px]">
             <thead>
               <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-surface-variant">
-                <th className="px-4 py-4 w-10 whitespace-nowrap">
+                <th className="px-3 py-3 w-8 whitespace-nowrap text-center">
                   <input
                     type="checkbox"
                     checked={allPagePendingSelected}
@@ -517,25 +517,22 @@ const LancamentosTab = React.memo(({
                     title="Selecionar todos pendentes desta página"
                   />
                 </th>
-                <th className="px-6 py-4 whitespace-nowrap min-w-[180px]">Fornecedor</th>
-                <th className="px-6 py-4 whitespace-nowrap w-40">Número / Título</th>
-                <th className="px-6 py-4 whitespace-nowrap w-[320px]">Descrição</th>
-                <th className="px-6 py-4 whitespace-nowrap w-36 text-right">Valor</th>
-                <th className="px-6 py-4 whitespace-nowrap w-28 hidden lg:table-cell">Status</th>
-                <th className="px-6 py-4 whitespace-nowrap w-28">Empresa</th>
-                <th className="px-6 py-4 whitespace-nowrap w-32">
-                  <span className="lg:hidden">Venc.</span>
-                  <span className="hidden lg:inline">Vencimento</span>
-                </th>
-                <th className="px-6 py-4 whitespace-nowrap w-32 hidden xl:table-cell">Pagamento</th>
-                <th className="px-6 py-4 whitespace-nowrap w-28 hidden xl:table-cell">Conta</th>
-                <th className="px-8 py-4 whitespace-nowrap w-24 sticky right-0 bg-surface z-10 border-l border-surface-variant shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)]">Ações</th>
+                <th className="px-3 py-3 whitespace-nowrap min-w-[140px] max-w-[180px]">Fornecedor</th>
+                <th className="px-3 py-3 whitespace-nowrap w-28">Número / Título</th>
+                <th className="px-3 py-3 whitespace-nowrap max-w-[200px]">Descrição</th>
+                <th className="px-3 py-3 whitespace-nowrap w-32 text-right">Valor</th>
+                <th className="px-3 py-3 whitespace-nowrap w-24 text-center">Status</th>
+                <th className="px-3 py-3 whitespace-nowrap w-20 text-center">Empresa</th>
+                <th className="px-3 py-3 whitespace-nowrap w-28 text-center">Vencimento</th>
+                <th className="px-3 py-3 whitespace-nowrap w-28 text-center">Pagamento</th>
+                <th className="px-3 py-3 whitespace-nowrap w-24 text-center">Conta</th>
+                <th className="px-3 py-3 whitespace-nowrap w-20 sticky right-0 bg-surface z-10 border-l border-surface-variant shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-surface-variant">
               {paginated.map((tx) => (
                 <tr key={tx.id} className={cn("hover:bg-surface-variant/40 transition-colors", selectedMap.has(tx.id) && "bg-primary/5")}>
-                  <td className="px-4 py-4">
+                  <td className="px-3 py-3 text-center">
                     {tx.status !== 'PAGO' && (
                       <input
                         type="checkbox"
@@ -545,15 +542,15 @@ const LancamentosTab = React.memo(({
                       />
                     )}
                   </td>
-                  <td className="px-6 py-4 font-semibold max-w-[220px] truncate" title={tx.fornecedor}>
+                  <td className="px-3 py-3 font-semibold max-w-[180px] truncate" title={tx.fornecedor}>
                     {tx.fornecedor}
                   </td>
-                  <td className="px-6 py-4 text-on-surface-variant font-mono text-xs max-w-[160px] truncate" title={tx.numero_boleto || ''}>
+                  <td className="px-3 py-3 text-on-surface-variant font-mono text-xs max-w-[120px] truncate" title={tx.numero_boleto || ''}>
                     {tx.numero_boleto || '-'}
                   </td>
-                  <td className="px-6 py-4 text-on-surface-variant max-w-[320px] truncate" title={tx.descricao}>{tx.descricao}</td>
+                  <td className="px-3 py-3 text-on-surface-variant max-w-[200px] truncate" title={tx.descricao}>{tx.descricao}</td>
                   <td className={cn(
-                    "px-6 py-4 font-bold text-right",
+                    "px-3 py-3 font-bold text-right whitespace-nowrap",
                     tx.valor < 0 ? "text-tertiary" : (isRevenueTransaction(tx) ? "text-success" : "text-primary")
                   )}>
                     {(Number(tx.valor) + Number(tx.juros || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -564,9 +561,9 @@ const LancamentosTab = React.memo(({
                       <p className="text-[9px] text-success font-normal">(desconto de {Number(Math.abs(tx.juros)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })})</p>
                     )}
                   </td>
-                  <td className="px-6 py-4 hidden lg:table-cell">
+                  <td className="px-3 py-3 text-center">
                     <span className={cn(
-                      "text-[10px] font-bold px-3 py-1 rounded-full border",
+                      "text-[10px] font-bold px-2.5 py-0.5 rounded-full border inline-block whitespace-nowrap",
                       tx.status === 'PAGO' && "bg-success/20 text-success border-success/30",
                       tx.status === 'PENDENTE' && "bg-secondary/20 text-secondary border-secondary/30",
                       tx.status === 'VENCIDO' && "bg-tertiary/20 text-tertiary border-tertiary/30"
@@ -574,16 +571,22 @@ const LancamentosTab = React.memo(({
                       {tx.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="bg-primary/10 text-primary text-[10px] px-2 py-1 rounded truncate max-w-[80px] inline-block text-center" title={tx.empresa}>
+                  <td className="px-3 py-3 text-center">
+                    <span className="bg-primary/10 text-primary text-[10px] px-2 py-0.5 rounded truncate max-w-[80px] inline-block text-center" title={tx.empresa}>
                       {tx.empresa}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">{toDisplayDate(tx.vencimento)}</td>
-                  <td className="px-6 py-4 text-on-surface-variant whitespace-nowrap hidden xl:table-cell">{toDisplayDate(tx.pagamento) || '-'}</td>
-                  <td className="px-6 py-4 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold truncate max-w-[120px] hidden xl:table-cell" title={tx.banco}>{tx.banco || '-'}</td>
-                  <td className="px-6 py-4 sticky right-0 bg-surface z-10 border-l border-surface-variant shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] group-hover:bg-surface-variant/20 transition-colors">
-                    <div className="flex gap-2 justify-end">
+                  <td className="px-3 py-3 text-center font-mono text-xs whitespace-nowrap">{toDisplayDate(tx.vencimento)}</td>
+                  <td className="px-3 py-3 text-center font-mono text-xs whitespace-nowrap">
+                    {tx.pagamento ? (
+                      <span className="text-emerald-400 font-semibold">{toDisplayDate(tx.pagamento)}</span>
+                    ) : (
+                      <span className="text-on-surface-variant/40">-</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-center text-[11px] uppercase tracking-wider text-on-surface-variant font-bold truncate max-w-[100px]" title={tx.banco}>{tx.banco || '-'}</td>
+                  <td className="px-3 py-3 sticky right-0 bg-surface z-10 border-l border-surface-variant shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] group-hover:bg-surface-variant/20 transition-colors">
+                    <div className="flex gap-1.5 justify-end">
                       {tx.status !== 'PAGO' && (
                         <button
                           onClick={() => onMarkAsPaid(tx)}
