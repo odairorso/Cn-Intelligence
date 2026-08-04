@@ -224,9 +224,9 @@ export async function handleProfessores(req, res) {
       }
 
       // Sincroniza automaticamente como Fornecedor (Supplier) no financeiro
-      const existing = await sql`SELECT id FROM suppliers WHERE uid = ${uid} AND upper(nome) = upper(${safeNome ?? currentRows[0]?.nome}) LIMIT 1`;
+      const existing = await sql`SELECT id FROM suppliers WHERE uid = ${uid} AND upper(nome) = upper(${finalNome}) LIMIT 1`;
       if (existing.length === 0) {
-        await sql`INSERT INTO suppliers (uid, nome) VALUES (${uid}, ${safeNome ?? currentRows[0]?.nome})`;
+        await sql`INSERT INTO suppliers (uid, nome) VALUES (${uid}, ${finalNome})`;
       }
 
       return res.json(prof);
