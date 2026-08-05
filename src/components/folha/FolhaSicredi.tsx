@@ -164,7 +164,7 @@ export default function FolhaSicredi() {
           <Table>
             <TableHeader className="border-surface-variant bg-surface-variant/20">
               <TableRow className="border-surface-variant hover:bg-transparent">
-                <TableHead className="text-on-surface-variant text-xs py-2 w-[40px] text-center">
+                <TableHead className="text-on-surface-variant text-xs py-3 w-[40px] text-center">
                   <input
                     type="checkbox"
                     checked={colaboradoresAtivos.length > 0 && selectedIds.length === colaboradoresAtivos.length}
@@ -178,11 +178,11 @@ export default function FolhaSicredi() {
                     className="w-4 h-4 rounded border-surface-variant text-green-600 focus:ring-green-500 bg-background accent-green-600 cursor-pointer"
                   />
                 </TableHead>
-                <TableHead className="text-on-surface-variant text-xs py-2">Colaborador</TableHead>
-                <TableHead className="text-on-surface-variant text-xs py-2 w-[110px]">Nascimento</TableHead>
-                <TableHead className="text-on-surface-variant text-xs py-2 w-[220px]">CPF & Identidade (RG / UF / Emissão)</TableHead>
-                <TableHead className="text-on-surface-variant text-xs py-2 w-[110px]">Salário (R$)</TableHead>
-                <TableHead className="text-on-surface-variant text-xs py-2 w-[420px]">Endereço Completo (Rua, Nº, Bairro, CEP)</TableHead>
+                <TableHead className="text-on-surface-variant text-xs font-semibold py-3 min-w-[160px]">Colaborador</TableHead>
+                <TableHead className="text-on-surface-variant text-xs font-semibold py-3 w-[135px]">Nascimento</TableHead>
+                <TableHead className="text-on-surface-variant text-xs font-semibold py-3 min-w-[280px]">CPF & RG (UF / Emissão)</TableHead>
+                <TableHead className="text-on-surface-variant text-xs font-semibold py-3 w-[120px] text-right">Salário (R$)</TableHead>
+                <TableHead className="text-on-surface-variant text-xs font-semibold py-3 min-w-[340px]">Endereço Completo (Rua, Nº, Bairro, CEP)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -200,9 +200,9 @@ export default function FolhaSicredi() {
                   const isSelected = selectedIds.includes(c.id);
 
                   return (
-                    <TableRow key={c.id} className="border-surface-variant hover:bg-surface-variant/20 py-1">
+                    <TableRow key={c.id} className="border-surface-variant hover:bg-surface-variant/20 transition-colors">
                       {/* Checkbox de Seleção */}
-                      <TableCell className="text-center py-1">
+                      <TableCell className="text-center py-2.5">
                         <div className="flex justify-center">
                           <input
                             type="checkbox"
@@ -220,105 +220,119 @@ export default function FolhaSicredi() {
                       </TableCell>
 
                       {/* Nome */}
-                      <TableCell className="font-semibold text-on-surface text-xs py-1">
+                      <TableCell className="font-semibold text-on-surface text-xs py-2.5">
                         <div className="flex items-center gap-1.5">
-                          {savingId === c.id && <Loader2 className="w-3.5 h-3.5 animate-spin text-green-500" />}
-                          {c.nome}
+                          {savingId === c.id && <Loader2 className="w-3.5 h-3.5 animate-spin text-green-500 shrink-0" />}
+                          <span className="truncate max-w-[180px]" title={c.nome}>{c.nome}</span>
                         </div>
                       </TableCell>
 
                       {/* Nascimento */}
-                      <TableCell className="py-1">
+                      <TableCell className="py-2.5">
                         <input
                           type="date"
                           value={rowValues.dataNascimento || ''}
                           onChange={(e) => handleLocalChange(c.id, 'dataNascimento', e.target.value)}
                           onBlur={(e) => saveField(c.id, 'dataNascimento', e.target.value)}
-                          className="w-full text-xs bg-transparent border-0 border-b border-transparent focus:border-green-500 focus:ring-0 text-on-surface p-1 rounded hover:bg-surface-variant/30"
+                          className="w-full text-xs bg-background/50 border border-surface-variant/40 hover:border-surface-variant focus:border-green-500 focus:bg-background text-on-surface px-2 py-1 rounded transition-colors"
                         />
                       </TableCell>
 
                       {/* CPF / RG */}
-                      <TableCell className="py-1 space-y-1">
-                        <div className="font-mono text-xs p-1">{c.cpf}</div>
-                        <div className="flex gap-1 items-center">
-                          <input
-                            type="text"
-                            placeholder="RG"
-                            value={rowValues.rg || ''}
-                            onChange={(e) => handleLocalChange(c.id, 'rg', e.target.value)}
-                            onBlur={(e) => saveField(c.id, 'rg', e.target.value)}
-                            className="w-20 text-[10px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded text-center"
-                          />
-                          <input
-                            type="text"
-                            placeholder="UF"
-                            value={rowValues.estadoEmissor || ''}
-                            onChange={(e) => handleLocalChange(c.id, 'estadoEmissor', e.target.value)}
-                            onBlur={(e) => saveField(c.id, 'estadoEmissor', e.target.value)}
-                            className="w-8 text-[10px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded text-center uppercase"
-                          />
-                          <input
-                            type="date"
-                            title="Data Emissão"
-                            value={rowValues.dataEmissaoRg || ''}
-                            onChange={(e) => handleLocalChange(c.id, 'dataEmissaoRg', e.target.value)}
-                            onBlur={(e) => saveField(c.id, 'dataEmissaoRg', e.target.value)}
-                            className="w-24 text-[9px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded"
-                          />
+                      <TableCell className="py-2.5">
+                        <div className="space-y-1.5">
+                          <div className="font-mono text-xs font-semibold text-green-400 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20 inline-block">
+                            {c.cpf}
+                          </div>
+                          <div className="flex gap-1.5 items-center">
+                            <input
+                              type="text"
+                              placeholder="RG"
+                              title="Número do RG"
+                              value={rowValues.rg || ''}
+                              onChange={(e) => handleLocalChange(c.id, 'rg', e.target.value)}
+                              onBlur={(e) => saveField(c.id, 'rg', e.target.value)}
+                              className="w-24 text-xs bg-background/50 border border-surface-variant/40 hover:border-surface-variant focus:border-green-500 focus:bg-background text-on-surface px-1.5 py-1 rounded text-center"
+                            />
+                            <input
+                              type="text"
+                              placeholder="UF"
+                              title="UF Emissora"
+                              maxLength={2}
+                              value={rowValues.estadoEmissor || ''}
+                              onChange={(e) => handleLocalChange(c.id, 'estadoEmissor', e.target.value)}
+                              onBlur={(e) => saveField(c.id, 'estadoEmissor', e.target.value)}
+                              className="w-10 text-xs font-bold uppercase bg-background/50 border border-surface-variant/40 hover:border-surface-variant focus:border-green-500 focus:bg-background text-on-surface px-1 py-1 rounded text-center"
+                            />
+                            <input
+                              type="date"
+                              title="Data de Emissão do RG"
+                              value={rowValues.dataEmissaoRg || ''}
+                              onChange={(e) => handleLocalChange(c.id, 'dataEmissaoRg', e.target.value)}
+                              onBlur={(e) => saveField(c.id, 'dataEmissaoRg', e.target.value)}
+                              className="w-32 text-xs bg-background/50 border border-surface-variant/40 hover:border-surface-variant focus:border-green-500 focus:bg-background text-on-surface px-1.5 py-1 rounded"
+                            />
+                          </div>
                         </div>
                       </TableCell>
 
                       {/* Salário */}
-                      <TableCell className="py-1">
+                      <TableCell className="py-2.5">
                         <input
                           type="text"
                           placeholder="0,00"
                           value={rowValues.salario || ''}
                           onChange={(e) => handleLocalChange(c.id, 'salario', e.target.value)}
                           onBlur={(e) => saveField(c.id, 'salario', e.target.value)}
-                          className="w-full text-xs font-semibold bg-transparent border-0 border-b border-transparent focus:border-green-500 focus:ring-0 text-on-surface p-1 rounded hover:bg-surface-variant/30 text-right"
+                          className="w-full text-xs font-bold bg-background/50 border border-surface-variant/40 hover:border-surface-variant focus:border-green-500 focus:bg-background text-green-400 px-2 py-1 rounded text-right transition-colors"
                         />
                       </TableCell>
 
                       {/* Endereço Completo */}
-                      <TableCell className="py-1">
-                        <div className="flex flex-wrap gap-1 items-center">
-                          <input
-                            type="text"
-                            placeholder="Endereço / Logradouro"
-                            value={rowValues.endereco || ''}
-                            onChange={(e) => handleLocalChange(c.id, 'endereco', e.target.value)}
-                            onBlur={(e) => saveField(c.id, 'endereco', e.target.value)}
-                            className="w-[180px] text-[10px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Nº"
-                            value={rowValues.numero || ''}
-                            onChange={(e) => handleLocalChange(c.id, 'numero', e.target.value)}
-                            onBlur={(e) => saveField(c.id, 'numero', e.target.value)}
-                            className="w-10 text-[10px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded text-center"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Bairro"
-                            value={rowValues.bairro || ''}
-                            onChange={(e) => handleLocalChange(c.id, 'bairro', e.target.value)}
-                            onBlur={(e) => saveField(c.id, 'bairro', e.target.value)}
-                            className="w-24 text-[10px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded"
-                          />
-                          <input
-                            type="text"
-                            placeholder="CEP"
-                            value={rowValues.cep || ''}
-                            onChange={(e) => handleLocalChange(c.id, 'cep', e.target.value)}
-                            onBlur={(e) => saveField(c.id, 'cep', e.target.value)}
-                            className="w-20 text-[10px] bg-transparent border border-transparent hover:border-surface-variant focus:border-green-500 focus:ring-0 text-on-surface p-0.5 rounded text-center"
-                          />
+                      <TableCell className="py-2.5">
+                        <div className="space-y-1">
+                          <div className="flex gap-1.5 items-center">
+                            <input
+                              type="text"
+                              placeholder="Endereço / Logradouro"
+                              title="Logradouro"
+                              value={rowValues.endereco || ''}
+                              onChange={(e) => handleLocalChange(c.id, 'endereco', e.target.value)}
+                              onBlur={(e) => saveField(c.id, 'endereco', e.target.value)}
+                              className="flex-1 min-w-[180px] text-xs bg-background/50 border border-surface-variant/40 hover:border-surface-variant focus:border-green-500 focus:bg-background text-on-surface px-2 py-1 rounded"
+                            />
+                            <input
+                              type="text"
+                              placeholder="Nº"
+                              title="Número"
+                              value={rowValues.numero || ''}
+                              onChange={(e) => handleLocalChange(c.id, 'numero', e.target.value)}
+                              onBlur={(e) => saveField(c.id, 'numero', e.target.value)}
+                              className="w-16 text-xs bg-background/50 border border-surface-variant/40 hover:border-surface-variant focus:border-green-500 focus:bg-background text-on-surface px-1.5 py-1 rounded text-center"
+                            />
+                          </div>
+                          <div className="flex gap-1.5 items-center">
+                            <input
+                              type="text"
+                              placeholder="Bairro"
+                              title="Bairro"
+                              value={rowValues.bairro || ''}
+                              onChange={(e) => handleLocalChange(c.id, 'bairro', e.target.value)}
+                              onBlur={(e) => saveField(c.id, 'bairro', e.target.value)}
+                              className="flex-1 min-w-[120px] text-xs bg-background/50 border border-surface-variant/40 hover:border-surface-variant focus:border-green-500 focus:bg-background text-on-surface px-2 py-1 rounded"
+                            />
+                            <input
+                              type="text"
+                              placeholder="CEP"
+                              title="CEP"
+                              value={rowValues.cep || ''}
+                              onChange={(e) => handleLocalChange(c.id, 'cep', e.target.value)}
+                              onBlur={(e) => saveField(c.id, 'cep', e.target.value)}
+                              className="w-24 text-xs font-mono bg-background/50 border border-surface-variant/40 hover:border-surface-variant focus:border-green-500 focus:bg-background text-on-surface px-1.5 py-1 rounded text-center"
+                            />
+                          </div>
                         </div>
                       </TableCell>
-
 
                     </TableRow>
                   );
