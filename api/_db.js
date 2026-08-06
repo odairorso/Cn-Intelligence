@@ -39,11 +39,16 @@ export async function transaction(callback) {
   const client = await pool.connect();
   const store = dbStorage.getStore();
   const uid = store && typeof store === 'object' ? store.uid : store;
+  const role = store && typeof store === 'object' ? store.role : null;
   try {
     await client.query('BEGIN');
     const currentUid = uid || '';
-    await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, true]);
-    const result = await dbStorage.run({ uid, client }, async () => {
+    const currentRole = role || 'user';
+    await client.query(
+      "SELECT set_config('app.current_uid', $1, true), set_config('app.current_role', $2, true)",
+      [currentUid, currentRole]
+    );
+    const result = await dbStorage.run({ uid, role, client }, async () => {
       return await callback(client);
     });
     await client.query('COMMIT');
@@ -68,6 +73,7 @@ export class SqlQuery {
     const { query, params } = this.build();
     const store = dbStorage.getStore();
     const uid = store && typeof store === 'object' ? store.uid : store;
+    const role = store && typeof store === 'object' ? store.role : null;
     const clientFromTx = store && typeof store === 'object' ? store.client : null;
 
     if (clientFromTx) {
@@ -83,7 +89,11 @@ export class SqlQuery {
         .then(async client => {
           try {
             const currentUid = uid || '';
-            await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, true]);
+            const currentRole = role || 'user';
+            await client.query(
+              "SELECT set_config('app.current_uid', $1, true), set_config('app.current_role', $2, true)",
+              [currentUid, currentRole]
+            );
             const res = await client.query(query, params);
             resolve(res.rows);
           } catch (err) {
@@ -127,6 +137,7 @@ export const sql = (strings, ...values) => {
   if (!Array.isArray(strings)) {
     const store = dbStorage.getStore();
     const uid = store && typeof store === 'object' ? store.uid : store;
+    const role = store && typeof store === 'object' ? store.role : null;
     const clientFromTx = store && typeof store === 'object' ? store.client : null;
 
     if (clientFromTx) {
@@ -136,7 +147,11 @@ export const sql = (strings, ...values) => {
     return pool.connect().then(async client => {
       try {
         const currentUid = uid || '';
-        await client.query('SELECT set_config($1, $2, $3)', ['app.current_uid', currentUid, true]);
+        const currentRole = role || 'user';
+        await client.query(
+          "SELECT set_config('app.current_uid', $1, true), set_config('app.current_role', $2, true)",
+          [currentUid, currentRole]
+        );
         const res = await client.query(strings, values);
         return res.rows;
       } finally {

@@ -3,8 +3,13 @@
  * Mínimo possível: CORS + rate limiting + delega tudo para api/index.js
  * Em produção (Vercel), api/index.js é usado diretamente como Serverless Function
  */
+import dotenv from 'dotenv';
+// Carrega .env.local primeiro (padrão do Vercel CLI)
+dotenv.config({ path: '.env.local' });
+// Carrega .env (padrão geral)
+dotenv.config();
+
 import express from 'express';
-import { createServer } from 'http';
 
 // --------------------------------------------------------------
 // CORS — headers permitidos (devem bater com fetchWithSecurity no frontend)

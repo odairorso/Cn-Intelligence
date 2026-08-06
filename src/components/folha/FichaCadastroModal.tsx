@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { toast } from 'sonner';
 import { useFolha } from '../../contexts/FolhaContext';
 import { api } from '../../api';
+import { escapeHtml } from '../../lib/utils';
 
 interface FichaCadastroModalProps {
   professor: Professor;
@@ -333,12 +334,36 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
   };
 
   const handlePrint = () => {
-    const data = getFichaPayload();
+    const rawData = getFichaPayload();
     const win = window.open('', '_blank');
     if (!win) {
       toast.error('Por favor, permita popups para imprimir.');
       return;
     }
+
+    // Escapar todos os valores de string para interpolação segura no HTML de impressão (anti-XSS)
+    const _esc = escapeHtml;
+    const _escaped: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rawData)) _escaped[k] = typeof v === 'string' ? _esc(v) : v;
+    const safeNome = _esc(nome || '');
+    const safeCpf = _esc(cpf || '');
+    const {
+      empresa, cnpj, encarregado, foneRamal, dataNascimento, municipioNascimento, ufNascimento,
+      nomePai, nomeMae, estadoCivil, raca, pisPasep, rg, estadoEmissor, dataEmissaoRg,
+      ctpsDigital, ctps, serieCtps, dataEmissaoCtps, cnh, categoriaCnh, validadeCnh,
+      dataEmissaoCnh, dataPrimeiraHabilitacao, tituloEleitor, zona, secao, reservista,
+      categoriaReservista, dataEmissaoReservista, observacoes, endereco, numero, complemento,
+      bairro, municipio, estado, cep, telefoneFixo, telefoneCelular, email, escolaridade,
+      banco, agencia, numeroConta, tipoConta, obsBancarias,
+      dep1Nome, dep1Cpf, dep1Nascimento, dep1SalFamilia, dep1IR,
+      dep2Nome, dep2Cpf, dep2Nascimento, dep2SalFamilia, dep2IR,
+      dep3Nome, dep3Cpf, dep3Nascimento, dep3SalFamilia, dep3IR,
+      dep4Nome, dep4Cpf, dep4Nascimento, dep4SalFamilia, dep4IR,
+      nomeConjuge, cpfConjuge, nascimentoConjuge, primeiroEmprego, multiplosVinculos,
+      empresaOutroVinculo, cnpjOutroVinculo, cargoFuncao, horarioTrabalho, servicoObra,
+      diasSemana, salario, salarioTipo, valeTransporte, periculidade, insalubridade,
+      experiencia, exEmpregado, lgpdConcorda
+    } = _escaped as Record<string, any>;
 
     const checkbox = (val: boolean) => val ? '☒' : '☐';
     const checked = (val1: string, val2: string) => val1 === val2 ? '☒' : '☐';
@@ -353,7 +378,7 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
     const docHTML = `
       <html>
       <head>
-        <title>Ficha de Admissão - ${nome}</title>
+        <title>Ficha de Admissão - ${safeNome}</title>
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
           body {
@@ -564,7 +589,7 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
             <tr>
               <td colspan="3">
                 <span class="field-label">Nome Completo: <span style="float:right; font-size:8px; color:#888;">LGPD: 1, 2, 3, 4, 5 e 6</span></span>
-                <span class="field-value">${nome}</span>
+                <span class="field-value">${safeNome}</span>
               </td>
             </tr>
             <tr>
@@ -616,7 +641,7 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
             <tr>
               <td style="width: 35%;">
                 <span class="field-label">CPF: <span style="float:right; font-size:8px; color:#888;">LGPD: 1, 2, 3, 4, 5 e 6</span></span>
-                <span class="field-value">${cpf}</span>
+                <span class="field-value">${safeCpf}</span>
               </td>
               <td colspan="2" style="width: 65%;">
                 <span class="field-label">PIS/PASEP: <span style="float:right; font-size:8px; color:#888;">LGPD: 2 e 5</span></span>

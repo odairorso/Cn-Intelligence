@@ -314,6 +314,18 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     setNotification(null);
   }, []);
 
+  // ─── Interceptar erros 401 centrais ──────────────────────────────────
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      logout();
+      showNotification('Sessão expirada. Faça login novamente.', 'error');
+    };
+    window.addEventListener('cn-unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('cn-unauthorized', handleUnauthorized);
+    };
+  }, [logout, showNotification]);
+
   // --------------------------------------------------------------
   // Fetch Transactions
   // --------------------------------------------------------------

@@ -10,6 +10,7 @@ export const sanitizeInput = (value) => {
 };
 
 export const sanitizeObject = (obj) => {
+  if (typeof obj === 'string') return sanitizeInput(obj);
   if (!obj || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map((item) => sanitizeObject(item));
   const sanitized = {};

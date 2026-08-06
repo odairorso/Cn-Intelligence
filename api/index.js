@@ -324,7 +324,7 @@ export default async function handler(req, res) {
     req.body = sanitizeObject(req.body);
   }
 
-  return dbStorage.run(req.authUid, async () => {
+  return dbStorage.run({ uid: req.authUid, role: req.authRole }, async () => {
     try {
       // Rate limiting (após auth para não bloquear login)
       if (!(await checkRateLimit(req, res))) return;

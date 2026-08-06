@@ -84,7 +84,7 @@ test('sanitizeObject', () => {
 
   assert.strictEqual(clean.name, 'bJoão/b');
   assert.strictEqual(clean.details.address, 'Rua 1 scriptalert(1)/script');
-  assert.strictEqual(clean.details.items[0], '<tag>'); // Arrays de strings simples passam como estão pela implementação atual de sanitizeObject
+  assert.strictEqual(clean.details.items[0], 'tag'); // Arrays de strings são sanitizados recursivamente pela implementação atual de sanitizeObject
   assert.strictEqual(clean.details.items[1], 'ok');
   assert.strictEqual(clean.age, 30);
 });

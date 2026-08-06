@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Transaction, TransactionStatus, ContaContabil } from '../types';
-import { cn, isRevenueTransaction, normalizeCompanyKey, dateSortKey, formatBRL, stripAccents, matchesAccountType } from '../lib/utils';
+import { cn, isRevenueTransaction, normalizeCompanyKey, dateSortKey, formatBRL, stripAccents, matchesAccountType, escapeHtml } from '../lib/utils';
 import { api } from '../api';
 import { Printer, Search, ChevronDown } from 'lucide-react';
 
@@ -357,15 +357,15 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
         return `<tr style="background-color: ${rowBg}">
           <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${i + 1}</td>
           <td style="padding:8px;border:1px solid #ddd;text-align:center;font-weight:bold;color:${tipoColor};font-size:9pt">${tipoText}</td>
-          <td style="padding:8px;border:1px solid #ddd;font-size:10pt"><b>${tx.fornecedor || 'NÃO INFORMADO'}</b></td>
-          <td style="padding:8px;border:1px solid #ddd;font-size:9pt">${tx.descricao || '-'}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.empresa || '-'}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.vencimento || '-'}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${tx.pagamento || '-'}</td>
+          <td style="padding:8px;border:1px solid #ddd;font-size:10pt"><b>${escapeHtml(tx.fornecedor || 'NÃO INFORMADO')}</b></td>
+          <td style="padding:8px;border:1px solid #ddd;font-size:9pt">${escapeHtml(tx.descricao || '-')}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${escapeHtml(tx.empresa || '-')}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${escapeHtml(tx.vencimento || '-')}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${escapeHtml(tx.pagamento || '-')}</td>
           <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:10pt;color:${valorColor};font-weight:${isNaoPago ? 'bold' : 'normal'}">${(Number(tx.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:9pt;color:${jurosColor};font-weight:${isNaoPago ? 'bold' : 'normal'}">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
           <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;color:${totalColor};font-size:10pt">${(isRev ? '' : '-')}${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-weight:${statusWeight};color:${statusColor};font-size:9pt">${status}</td>
+          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-weight:${statusWeight};color:${statusColor};font-size:9pt">${escapeHtml(status)}</td>
         </tr>`;
       }).join('');
 

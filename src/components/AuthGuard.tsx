@@ -140,33 +140,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
     }
   };
 
-  /*
-  const handleGoogleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!googleCompanyPassword) return;
-    setLoading(true);
-    setError(false);
-    try {
-      const success = await apiAuth.googleRegister(
-        googleEmail,
-        googleName,
-        googleCompanyPassword,
-        googleCredential
-      );
-      if (success) {
-        localStorage.setItem('cn_last_logged_email', googleEmail);
-        window.location.reload();
-      } else {
-        setError('Senha da empresa incorreta.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Erro ao vincular conta do Google.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  */
-
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!registerName || !registerEmail || !registerPassword) return;

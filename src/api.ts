@@ -34,24 +34,8 @@ const setUser = (user: LocalUser) => {
 const removeUser = () => {
   try {
     localStorage.removeItem('cn_user');
-    localStorage.removeItem('cn_jwt_token_local');
   } catch { /* ignore */ }
 };
-
-const saveTokenLocal = (token: string) => {
-  try {
-    localStorage.setItem('cn_jwt_token_local', token);
-  } catch { /* ignore */ }
-};
-
-const getTokenLocal = (): string | null => {
-  try {
-    return localStorage.getItem('cn_jwt_token_local');
-  } catch { return null; }
-};
-
-// Mantido apenas para compatibilidade de tipos no frontend
-const getToken = (): string | null => null;
 
 export const decodeJwtPayload = (token: string): any => {
   try {
@@ -120,7 +104,6 @@ export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
     if (response.status === 401 && !isAuthRoute) {
       try {
         localStorage.removeItem('cn_user');
-        localStorage.removeItem('cn_jwt_token_local');
       } catch { /* ignore */ }
       window.dispatchEvent(new CustomEvent('cn-unauthorized'));
     }
@@ -213,7 +196,6 @@ export const apiAuth = {
     return true;
   },
 
-  getToken,
   getUid,
   getUser,
   isAuthenticated: (): boolean => {
@@ -560,8 +542,7 @@ export const api = {
 
   async exportBackup(): Promise<Blob> {
     if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
-    // O backup token é lido diretamente pelo backend via BACKUP_TOKEN (server-side).
-    // Não expomos o token no frontend para evitar risks de XSS.
+    // Protegido por JWT de admin via cookie HttpOnly — sem token separado no frontend.
     const res = await fetchWithSecurity(`${API_BASE}?route=export-backup`);
     if (!res.ok) throw new Error('Failed to export backup');
     return res.blob();

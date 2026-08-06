@@ -199,10 +199,11 @@ CREATE TABLE IF NOT EXISTS user_settings (
 -- 11. ROW LEVEL SECURITY (RLS)
 -- ---------------------------------------------------------------
 -- Função auxiliar para setar o contexto do usuário
-CREATE OR REPLACE FUNCTION set_app_uid(p_uid VARCHAR)
+CREATE OR REPLACE FUNCTION set_app_uid(p_uid VARCHAR, p_role VARCHAR DEFAULT 'user')
 RETURNS VOID AS $$
 BEGIN
     PERFORM set_config('app.current_uid', p_uid, true);
+    PERFORM set_config('app.current_role', p_role, true);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -211,7 +212,7 @@ ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "transactions_select_own"
     ON transactions FOR SELECT
-    USING (uid = current_setting('app.current_uid', true));
+    USING (uid = current_setting('app.current_uid', true) OR (uid IS NULL AND current_setting('app.current_role', true) = 'admin'));
 
 CREATE POLICY "transactions_insert_own"
     ON transactions FOR INSERT
@@ -231,7 +232,7 @@ ALTER TABLE suppliers ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "suppliers_select_own"
     ON suppliers FOR SELECT
-    USING (uid = current_setting('app.current_uid', true));
+    USING (uid = current_setting('app.current_uid', true) OR (uid IS NULL AND current_setting('app.current_role', true) = 'admin'));
 
 CREATE POLICY "suppliers_insert_own"
     ON suppliers FOR INSERT
@@ -251,7 +252,7 @@ ALTER TABLE banks ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "banks_select_own"
     ON banks FOR SELECT
-    USING (uid = current_setting('app.current_uid', true));
+    USING (uid = current_setting('app.current_uid', true) OR (uid IS NULL AND current_setting('app.current_role', true) = 'admin'));
 
 CREATE POLICY "banks_insert_own"
     ON banks FOR INSERT
@@ -271,7 +272,7 @@ ALTER TABLE boleto_patterns ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "patterns_select_own"
     ON boleto_patterns FOR SELECT
-    USING (uid = current_setting('app.current_uid', true));
+    USING (uid = current_setting('app.current_uid', true) OR (uid IS NULL AND current_setting('app.current_role', true) = 'admin'));
 
 CREATE POLICY "patterns_insert_own"
     ON boleto_patterns FOR INSERT
@@ -286,7 +287,7 @@ ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "settings_select_own"
     ON user_settings FOR SELECT
-    USING (uid = current_setting('app.current_uid', true));
+    USING (uid = current_setting('app.current_uid', true) OR (uid IS NULL AND current_setting('app.current_role', true) = 'admin'));
 
 CREATE POLICY "settings_upsert_own"
     ON user_settings FOR ALL
@@ -302,7 +303,7 @@ CREATE POLICY "api_logs_insert"
 
 CREATE POLICY "api_logs_select_admin"
     ON api_logs FOR SELECT
-    USING (current_setting('app.current_uid', true) = 'admin');
+    USING (current_setting('app.current_role', true) = 'admin');
 
 -- ─── security_logs — apenas INSERT ────────────────────────────
 ALTER TABLE security_logs ENABLE ROW LEVEL SECURITY;
@@ -313,14 +314,14 @@ CREATE POLICY "security_logs_insert"
 
 CREATE POLICY "security_logs_select_admin"
     ON security_logs FOR SELECT
-    USING (current_setting('app.current_uid', true) = 'admin');
+    USING (current_setting('app.current_role', true) = 'admin');
 
 -- ─── users — self-select + self-update ────────────────────────
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "users_select_own"
     ON users FOR SELECT
-    USING (uid = current_setting('app.current_uid', true));
+    USING (uid = current_setting('app.current_uid', true) OR (uid IS NULL AND current_setting('app.current_role', true) = 'admin'));
 
 CREATE POLICY "users_update_own"
     ON users FOR UPDATE
@@ -328,6 +329,25 @@ CREATE POLICY "users_update_own"
 
 -- ─── portal_users ─────────────────────────────────────────────
 ALTER TABLE portal_users ENABLE ROW LEVEL SECURITY;
+
+-- Admin vê todos os usuários; usuário comum vê apenas o próprio registro (por uid compartilhado)
+CREATE POLICY "portal_users_select_own"
+    ON portal_users FOR SELECT
+    USING (
+        current_setting('app.current_role', true) = 'admin'
+        OR uid = current_setting('app.current_uid', true)
+    );
+
+CREATE POLICY "portal_users_update_own"
+    ON portal_users FOR UPDATE
+    USING (
+        current_setting('app.current_role', true) = 'admin'
+        OR uid = current_setting('app.current_uid', true)
+    )
+    WITH CHECK (
+        current_setting('app.current_role', true) = 'admin'
+        OR uid = current_setting('app.current_uid', true)
+    );
 
 -- ---------------------------------------------------------------
 -- 12. DADOS PADRÃO (se não existirem)
