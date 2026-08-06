@@ -17,7 +17,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
   const [extractFilter, setExtractFilter] = useState<'PAGO' | 'TODOS'>('PAGO');
   const [extractMonth, setExtractMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
   const [extractYear, setExtractYear] = useState<string>(() => String(new Date().getFullYear()));
-  const [extractSortOrder, setExtractSortOrder] = useState<'LANCAMENTO_ASC' | 'LANCAMENTO_DESC' | 'DATA_DESC' | 'DATA_ASC'>('LANCAMENTO_ASC');
+  const [extractSortOrder, setExtractSortOrder] = useState<'DATA_DESC' | 'DATA_ASC' | 'LANCAMENTO_DESC' | 'LANCAMENTO_ASC'>('DATA_DESC');
 
   const [extractTransactions, setExtractTransactions] = useState<Transaction[]>([]);
   const [loadingExtract, setLoadingExtract] = useState(false);
@@ -189,31 +189,42 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
             return matchesYear && matchesMonth;
           })
           .sort((a, b) => {
-            const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-            const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
             const dateA = a.pagamento || a.vencimento || '';
             const dateB = b.pagamento || b.vencimento || '';
+            const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            const isRevenueA = a.tipo === 'RECEITA' || (a.tipo === 'TRANSFERENCIA' && Number(a.valor || 0) > 0);
+            const isRevenueB = b.tipo === 'RECEITA' || (b.tipo === 'TRANSFERENCIA' && Number(b.valor || 0) > 0);
 
-            if (extractSortOrder === 'LANCAMENTO_ASC') {
-              // Ordem exata de digitação no extrato (do 1º ao último lançado)
-              if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
-              return dateA.localeCompare(dateB);
-            }
-            if (extractSortOrder === 'LANCAMENTO_DESC') {
-              // Ordem de lançamento invertida (do último ao 1º lançado)
-              if (timeA !== timeB && timeA > 0 && timeB > 0) return timeB - timeA;
-              return dateB.localeCompare(dateA);
-            }
             if (extractSortOrder === 'DATA_DESC') {
-              // Ordem por data de movimento (mais recente no topo) + desempate por ordem digitada
+              // 1º Critério: Data de movimentação (dia mais recente no topo, sem misturar datas!)
               if (dateA !== dateB) return dateB.localeCompare(dateA);
+              // 2º Critério (dentro do mesmo dia): Receitas no topo do dia (como no extrato oficial)
+              if (isRevenueA !== isRevenueB) return isRevenueA ? -1 : 1;
+              // 3º Critério (dentro do mesmo dia e mesmo tipo): Ordem em que foi digitado/cadastrado
               if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
               return 0;
             }
-            // DATA_ASC: Ordem por data de movimento (mais antiga no topo) + desempate por ordem digitada
-            if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+            if (extractSortOrder === 'DATA_ASC') {
+              // 1º Critério: Data de movimentação (dia mais antigo no topo)
+              if (dateA !== dateB) return dateA.localeCompare(dateB);
+              // 2º Critério (dentro do mesmo dia): Receitas no topo do dia
+              if (isRevenueA !== isRevenueB) return isRevenueA ? -1 : 1;
+              // 3º Critério: Ordem em que foi digitado/cadastrado
+              if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
+              return 0;
+            }
+
+            if (extractSortOrder === 'LANCAMENTO_DESC') {
+              // Ordem puramente por horário de cadastro (mais recentes digitados no topo)
+              if (timeA !== timeB && timeA > 0 && timeB > 0) return timeB - timeA;
+              return dateB.localeCompare(dateA);
+            }
+
+            // LANCAMENTO_ASC: Ordem puramente por horário de cadastro (primeiros digitados no topo)
             if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
-            return 0;
+            return dateA.localeCompare(dateB);
           });
 
         // Totais do período filtrado
@@ -334,10 +345,10 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                       className="bg-surface border border-white/10 rounded px-2.5 py-1.5 text-xs outline-none focus:border-primary text-on-surface font-semibold text-primary"
                       style={{ backgroundColor: '#1e1e2e' }}
                     >
-                      <option value="LANCAMENTO_ASC">⏱️ Ordem Digitada (Do 1º ao Último do Extrato)</option>
-                      <option value="LANCAMENTO_DESC">⏱️ Ordem Digitada Invertida (Do Último ao 1º)</option>
-                      <option value="DATA_DESC">📅 Data Movimentação (Mais recente primeiro)</option>
-                      <option value="DATA_ASC">📅 Data Movimentação (Mais antiga primeiro)</option>
+                      <option value="DATA_DESC">📅 Ordem do Extrato por Data (Mais recente no topo)</option>
+                      <option value="DATA_ASC">📅 Ordem do Extrato por Data (Mais antiga no topo)</option>
+                      <option value="LANCAMENTO_DESC">⏱️ Ordem por Data de Cadastro (Últimos digitados)</option>
+                      <option value="LANCAMENTO_ASC">⏱️ Ordem por Data de Cadastro (Primeiros digitados)</option>
                     </select>
                   </div>
                 </div>
