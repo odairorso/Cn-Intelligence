@@ -191,28 +191,13 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
           .sort((a, b) => {
             const dateA = a.pagamento || a.vencimento || '';
             const dateB = b.pagamento || b.vencimento || '';
-            const isRevenueA = a.tipo === 'RECEITA' || (a.tipo === 'TRANSFERENCIA' && Number(a.valor || 0) > 0);
-            const isRevenueB = b.tipo === 'RECEITA' || (b.tipo === 'TRANSFERENCIA' && Number(b.valor || 0) > 0);
-
-            const getTimeForSort = (tx: Transaction, moveDateStr: string) => {
-              if (!tx.created_at) return 0;
-              const createdDateStr = tx.created_at.split('T')[0];
-              if (createdDateStr < moveDateStr) {
-                const timePart = tx.created_at.includes('T') ? tx.created_at.split('T')[1] : '12:00:00';
-                return new Date(`${moveDateStr}T${timePart}`).getTime();
-              }
-              return new Date(tx.created_at).getTime();
-            };
-
-            const timeA = getTimeForSort(a, dateA);
-            const timeB = getTimeForSort(b, dateB);
+            const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
 
             if (extractSortOrder === 'DATA_DESC') {
               // 1º Critério: Data de movimentação (dia mais recente no topo)
               if (dateA !== dateB) return dateB.localeCompare(dateA);
-              // 2º Critério (dentro do mesmo dia): Receitas no topo do dia (como no extrato oficial)
-              if (isRevenueA !== isRevenueB) return isRevenueA ? -1 : 1;
-              // 3º Critério (dentro do mesmo dia e mesmo tipo): Ordem sequencial de digitação do dia
+              // 2º Critério (dentro do mesmo dia): Ordem exata em que foi digitado/cadastrado no extrato
               if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
               return 0;
             }
@@ -220,24 +205,18 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
             if (extractSortOrder === 'DATA_ASC') {
               // 1º Critério: Data de movimentação (dia mais antigo no topo)
               if (dateA !== dateB) return dateA.localeCompare(dateB);
-              // 2º Critério (dentro do mesmo dia): Receitas no topo do dia
-              if (isRevenueA !== isRevenueB) return isRevenueA ? -1 : 1;
-              // 3º Critério: Ordem sequencial de digitação do dia
+              // 2º Critério (dentro do mesmo dia): Ordem exata de digitação
               if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
               return 0;
             }
 
             if (extractSortOrder === 'LANCAMENTO_DESC') {
-              const rawTimeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-              const rawTimeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-              if (rawTimeA !== rawTimeB && rawTimeA > 0 && rawTimeB > 0) return rawTimeB - rawTimeA;
+              if (timeA !== timeB && timeA > 0 && timeB > 0) return timeB - timeA;
               return dateB.localeCompare(dateA);
             }
 
             // LANCAMENTO_ASC
-            const rawTimeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-            const rawTimeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-            if (rawTimeA !== rawTimeB && rawTimeA > 0 && rawTimeB > 0) return rawTimeA - rawTimeB;
+            if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
             return dateA.localeCompare(dateB);
           });
 
