@@ -17,7 +17,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
   const [extractFilter, setExtractFilter] = useState<'PAGO' | 'TODOS'>('PAGO');
   const [extractMonth, setExtractMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
   const [extractYear, setExtractYear] = useState<string>(() => String(new Date().getFullYear()));
-  const [extractSortOrder, setExtractSortOrder] = useState<'DATA_DESC' | 'DATA_ASC' | 'LANCAMENTO_DESC' | 'LANCAMENTO_ASC'>('DATA_DESC');
+  const [extractSortOrder, setExtractSortOrder] = useState<'DATA_ASC' | 'DATA_DESC' | 'LANCAMENTO_DESC' | 'LANCAMENTO_ASC'>('DATA_ASC');
 
   const [extractTransactions, setExtractTransactions] = useState<Transaction[]>([]);
   const [loadingExtract, setLoadingExtract] = useState(false);
@@ -191,21 +191,30 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
           .sort((a, b) => {
             const dateA = a.pagamento || a.vencimento || '';
             const dateB = b.pagamento || b.vencimento || '';
-            const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-            const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            
+            // Pega a hora exata da gravação da baixa ou do lançamento (updated_at || created_at)
+            const getRecordTime = (tx: Transaction) => {
+              const str = tx.updated_at || tx.created_at;
+              if (!str) return 0;
+              const dt = new Date(str);
+              return isNaN(dt.getTime()) ? 0 : dt.getTime();
+            };
 
-            if (extractSortOrder === 'DATA_DESC') {
-              // 1º Critério: Data de movimentação (dia mais recente no topo)
-              if (dateA !== dateB) return dateB.localeCompare(dateA);
-              // 2º Critério (dentro do mesmo dia): Ordem exata em que foi digitado/cadastrado no extrato
+            const timeA = getRecordTime(a);
+            const timeB = getRecordTime(b);
+
+            if (extractSortOrder === 'DATA_ASC') {
+              // 1º Critério: Data de movimentação em ordem cronológica (Dia 05/08 primeiro, dia 06/08 no rodapé!)
+              if (dateA !== dateB) return dateA.localeCompare(dateB);
+              // 2º Critério (dentro do mesmo dia): Hora exata de gravação da baixa ou lançamento
               if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
               return 0;
             }
 
-            if (extractSortOrder === 'DATA_ASC') {
-              // 1º Critério: Data de movimentação (dia mais antigo no topo)
-              if (dateA !== dateB) return dateA.localeCompare(dateB);
-              // 2º Critério (dentro do mesmo dia): Ordem exata de digitação
+            if (extractSortOrder === 'DATA_DESC') {
+              // 1º Critério: Data de movimentação (dia mais recente no topo)
+              if (dateA !== dateB) return dateB.localeCompare(dateA);
+              // 2º Critério (dentro do mesmo dia): Hora exata de gravação da baixa ou lançamento
               if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
               return 0;
             }
@@ -338,8 +347,8 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                       className="bg-surface border border-white/10 rounded px-2.5 py-1.5 text-xs outline-none focus:border-primary text-on-surface font-semibold text-primary"
                       style={{ backgroundColor: '#1e1e2e' }}
                     >
-                      <option value="DATA_DESC">📅 Ordem do Extrato por Data (Mais recente no topo)</option>
-                      <option value="DATA_ASC">📅 Ordem do Extrato por Data (Mais antiga no topo)</option>
+                      <option value="DATA_ASC">📅 Ordem Cronológica do Extrato (Conforme Extrato Bancário)</option>
+                      <option value="DATA_DESC">📅 Data Movimentação (Mais recente no topo)</option>
                       <option value="LANCAMENTO_DESC">⏱️ Ordem por Data de Cadastro (Últimos digitados)</option>
                       <option value="LANCAMENTO_ASC">⏱️ Ordem por Data de Cadastro (Primeiros digitados)</option>
                     </select>

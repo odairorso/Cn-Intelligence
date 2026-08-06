@@ -31,6 +31,7 @@ export interface Transaction {
   numero_boleto?: string;
   conta_contabil_id?: number;
   created_at?: string;
+  updated_at?: string;
 }
 
 
