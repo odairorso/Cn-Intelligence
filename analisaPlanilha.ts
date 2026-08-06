@@ -1,18 +1,20 @@
-import * as xlsx from 'xlsx';
+import xlsxReader from './scripts/lib/xlsx-reader.cjs';
+const { readWorkbook, sheetToJson } = xlsxReader;
 import * as fs from 'fs';
 
 const filePath = './Fluxo de caixa - Grupo CN 2024_2025.xlsx';
 
-try {
+async function main() {
+  try {
   console.log('Simulando o App.tsx...');
   const buffer = fs.readFileSync(filePath);
-  const workbook = xlsx.read(buffer, { type: 'buffer', cellDates: true });
+  const workbook = await readWorkbook(buffer);
   
   let allDataMatrix: any[] = [];
   
   for (const sheetName of workbook.SheetNames) {
     const worksheet = workbook.Sheets[sheetName];
-    const sheetMatrix = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: true }) as any[][];
+    const sheetMatrix = sheetToJson(worksheet, { header: 1, raw: true }) as any[][];
     
     if (sheetMatrix.length < 2) continue;
     
@@ -118,6 +120,11 @@ try {
   console.log(`  Linhas com fornecedor valido: ${totalImported}`);
   console.log(`  Amostras de Vencimento cru (Date):`, dateSamples);
 
-} catch (error) {
-  console.error('Erro ao ler a planilha:', error);
+  } catch (error) {
+    console.error('Erro ao ler a planilha:', error);
+  }
 }
+
+main().catch((error) => {
+  console.error('Erro ao ler a planilha:', error);
+});

@@ -1,5 +1,6 @@
 import { Client } from 'pg';
-import * as xlsx from 'xlsx';
+import xlsxReader from './lib/xlsx-reader.cjs';
+const { readWorkbook, sheetToJson } = xlsxReader;
 import * as fs from 'fs';
 import 'dotenv/config';
 
@@ -17,7 +18,7 @@ async function importData() {
   }
 
   const buffer = fs.readFileSync(filePath);
-  const workbook = xlsx.read(buffer, { type: 'buffer', cellDates: true });
+  const workbook = await readWorkbook(buffer);
   console.log(`Planilha carregada. Encontradas ${workbook.SheetNames.length} abas.`);
 
   let allDataMatrix: any[] = [];
@@ -27,7 +28,7 @@ async function importData() {
     const worksheet = workbook.Sheets[sheetName];
     
     // raw: true para ler valores numéricos como numbers (não strings formatadas)
-    const sheetMatrix = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: true }) as any[][];
+    const sheetMatrix = sheetToJson(worksheet, { header: 1, raw: true }) as any[][];
     
     if (sheetMatrix.length < 2) continue; // Pula abas vazias
     
@@ -178,7 +179,7 @@ async function importData() {
       return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     }
 
-    // Se o XLSX converteu para Date (ele as vezes inverte mês e dia na leitura se o Windows tiver confuso)
+    // Se a planilha converteu para Date (ela às vezes inverte mês e dia na leitura se o Windows tiver confuso)
     if (val instanceof Date) {
       const dt = new Date(val);
       let day = dt.getUTCDate();

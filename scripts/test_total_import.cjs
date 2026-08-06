@@ -1,4 +1,4 @@
-const xlsx = require('xlsx');
+const { readWorkbook, sheetToJson } = require('./lib/xlsx-reader.cjs');
 const fs = require('fs');
 
 const filePath = './Fluxo de caixa - Grupo CN 2024_2025.xlsx';
@@ -13,9 +13,9 @@ const getRowValue = (row, keys) => {
     return undefined;
 };
 
-function testAppImportLogic() {
+async function testAppImportLogic() {
   const buffer = fs.readFileSync(filePath);
-  const workbook = xlsx.read(buffer, { type: 'buffer' });
+  const workbook = await readWorkbook(buffer);
   
   let totalRows = 0;
   let anhangueraRows = 0;
@@ -24,7 +24,7 @@ function testAppImportLogic() {
     if (['CASHFLOW', 'PLANILHA1', 'MANUTENÇAO'].includes(sheetName.trim().toUpperCase())) continue;
 
     const worksheet = workbook.Sheets[sheetName];
-    const sheetMatrix = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: true });
+    const sheetMatrix = sheetToJson(worksheet, { header: 1, raw: true });
     
     if (sheetMatrix.length < 1) continue;
     
@@ -54,4 +54,7 @@ function testAppImportLogic() {
   console.log(`Total de linhas que seriam importadas: ${totalRows}`);
   console.log(`Linhas para 'Anhanguera': ${anhangueraRows}`);
 }
-testAppImportLogic();
+testAppImportLogic().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

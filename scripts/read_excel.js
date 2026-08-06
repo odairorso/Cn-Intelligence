@@ -1,4 +1,5 @@
-import XLSX from 'xlsx';
+import xlsxReader from './lib/xlsx-reader.cjs';
+const { readWorkbook, sheetToJson } = xlsxReader;
 import fs from 'fs';
 
 const filePath = 'c:\\Users\\Financeiro\\Documents\\Fluxo de caixa - Grupo CN 2024_2025\\Fluxo de caixa - Grupo CN 2024_2025.xlsx';
@@ -14,11 +15,11 @@ function excelDateToJS(serial) {
 const results = [];
 
 try {
-  const workbook = XLSX.readFile(filePath);
+  const workbook = await readWorkbook(filePath);
   
   workbook.SheetNames.forEach(sheetName => {
     const sheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(sheet);
+    const data = sheetToJson(sheet);
     
     if (data.length > 0) {
       results.push(`\n=== ABA: ${sheetName} (Colunas: ${Object.keys(data[0]).join(', ')}) ===`);

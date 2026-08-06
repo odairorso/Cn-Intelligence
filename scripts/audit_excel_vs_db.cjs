@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const xlsx = require('xlsx');
+const { readWorkbook, sheetToJson } = require('./lib/xlsx-reader.cjs');
 const { Pool } = require('pg');
 require('dotenv').config();
 
@@ -62,15 +62,15 @@ const parseValor = (value) => {
   return Number.isNaN(parsed) ? 0 : parsed;
 };
 
-const readExcelRows = () => {
+const readExcelRows = async () => {
   const buffer = fs.readFileSync(filePath);
-  const workbook = xlsx.read(buffer, { type: 'buffer', cellDates: true });
+  const workbook = await readWorkbook(buffer);
   const rows = [];
 
   for (const sheetName of workbook.SheetNames) {
     if (EXCLUDED_SHEETS.has(sheetName.trim().toUpperCase())) continue;
     const worksheet = workbook.Sheets[sheetName];
-    const sheetMatrix = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: true });
+    const sheetMatrix = sheetToJson(worksheet, { header: 1, raw: true });
     if (!sheetMatrix.length) continue;
 
     const firstRowUpper = sheetMatrix[0].map((h) => String(h || '').trim().toUpperCase());
@@ -126,7 +126,7 @@ const buildSummary = (rows) => {
 };
 
 async function main() {
-  const excelRows = readExcelRows();
+  const excelRows = await readExcelRows();
   const excelSummary = buildSummary(excelRows);
 
   console.log('=== EXCEL ===');

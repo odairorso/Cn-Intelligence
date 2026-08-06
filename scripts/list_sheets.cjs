@@ -1,14 +1,17 @@
-const xlsx = require('xlsx');
+const { readWorkbook } = require('./lib/xlsx-reader.cjs');
 const fs = require('fs');
 
 const filePath = './Fluxo de caixa - Grupo CN 2024_2025.xlsx';
 
-function listSheets() {
+async function listSheets() {
   const buffer = fs.readFileSync(filePath);
-  const workbook = xlsx.read(buffer, { type: 'buffer' });
+  const workbook = await readWorkbook(buffer);
   console.log('Sheets names (with brackets to see spaces):');
   workbook.SheetNames.forEach(name => {
     console.log(`[${name}]`);
   });
 }
-listSheets();
+listSheets().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

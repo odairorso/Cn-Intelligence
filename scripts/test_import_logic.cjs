@@ -1,4 +1,4 @@
-const xlsx = require('xlsx');
+const { readWorkbook, sheetToJson } = require('./lib/xlsx-reader.cjs');
 const fs = require('fs');
 
 const filePath = './Fluxo de caixa - Grupo CN 2024_2025.xlsx';
@@ -13,14 +13,14 @@ const getRowValue = (row, keys) => {
     return undefined;
 };
 
-function testImportLogic() {
+async function testImportLogic() {
   const buffer = fs.readFileSync(filePath);
-  const workbook = xlsx.read(buffer, { type: 'buffer' });
+  const workbook = await readWorkbook(buffer);
   
   const sheetName = 'Janeiro 26';
   console.log(`Testando aba: ${sheetName}`);
   const worksheet = workbook.Sheets[sheetName];
-  const sheetMatrix = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: true });
+  const sheetMatrix = sheetToJson(worksheet, { header: 1, raw: true });
   
   console.log(`Total de linhas na matriz: ${sheetMatrix.length}`);
   if (sheetMatrix.length < 2) return;
@@ -50,4 +50,7 @@ function testImportLogic() {
   console.log(`Linhas válidas encontradas: ${count}`);
   console.log(`Linhas para 'Anhanguera': ${matches}`);
 }
-testImportLogic();
+testImportLogic().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

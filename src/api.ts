@@ -56,6 +56,9 @@ const getUid = (): string | null => {
   return user ? user.uid : null;
 };
 
+// Mantido apenas para compatibilidade de tipos no frontend
+const getToken = (): string | null => null;
+
 const buildHttpError = async (res: Response, fallback: string) => {
   const contentType = res.headers.get('content-type') || '';
   let err: Error;
@@ -86,18 +89,14 @@ export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>) || {},
   };
-  const securityToken = import.meta.env.VITE_CN_SECURITY_TOKEN;
-  if (securityToken) headers['x-cn-security'] = securityToken;
-
-
-  return fetch(url, { 
-    ...options, 
+  return fetch(url, {
+    ...options,
     headers,
-    credentials: 'same-origin'
+    credentials: 'same-origin' // Habilita o envio automático de cookies HttpOnly
   }).then((response) => {
-    const isAuthRoute = url.includes('route=auth-login') || 
-                        url.includes('route=login') || 
-                        url.includes('route=auth-google') || 
+    const isAuthRoute = url.includes('route=auth-login') ||
+                        url.includes('route=login') ||
+                        url.includes('route=auth-google') ||
                         url.includes('route=auth-register') ||
                         url.includes('route=auth-google-register');
 

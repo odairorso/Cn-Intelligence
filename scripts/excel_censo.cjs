@@ -1,4 +1,4 @@
-const xlsx = require('xlsx');
+const { readWorkbook, sheetToJson } = require('./lib/xlsx-reader.cjs');
 const fs = require('fs');
 
 const filePath = './Fluxo de caixa - Grupo CN 2024_2025.xlsx';
@@ -23,16 +23,16 @@ const parseDateYear = (val) => {
     return null;
 };
 
-function excelCenso() {
+async function excelCenso() {
   const buffer = fs.readFileSync(filePath);
-  const workbook = xlsx.read(buffer, { type: 'buffer' });
+  const workbook = await readWorkbook(buffer);
   
   const years = {};
   
   for (const sheetName of workbook.SheetNames) {
     if (['CASHFLOW', 'PLANILHA1', 'MANUTENÇAO'].includes(sheetName.trim().toUpperCase())) continue;
     const worksheet = workbook.Sheets[sheetName];
-    const sheetMatrix = xlsx.utils.sheet_to_json(worksheet, { header: 1, raw: true });
+    const sheetMatrix = sheetToJson(worksheet, { header: 1, raw: true });
     if (sheetMatrix.length < 1) continue;
     const headers = sheetMatrix[0].map(h => String(h || '').trim().toUpperCase());
     const vIndex = headers.indexOf('VENCIMENTO');
@@ -55,4 +55,7 @@ function excelCenso() {
       console.log(`  ${y}: ${years[y]}`);
   });
 }
-excelCenso();
+excelCenso().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

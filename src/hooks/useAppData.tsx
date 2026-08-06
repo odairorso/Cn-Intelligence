@@ -835,11 +835,8 @@ export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>) || {},
   };
-  // Mantém o SECURITY_TOKEN legado apenas para compatibilidade — não é mais usado para auth
-  const securityToken = import.meta.env.VITE_CN_SECURITY_TOKEN;
-  if (securityToken) headers['x-cn-security'] = securityToken;
-  return fetch(url, { 
-    ...options, 
+  return fetch(url, {
+    ...options,
     headers,
     credentials: 'same-origin' // Habilita o envio automático de cookies HttpOnly
   });

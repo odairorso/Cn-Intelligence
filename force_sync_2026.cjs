@@ -1,4 +1,4 @@
-const xlsx = require('xlsx');
+const { readWorkbook, sheetToJson } = require('./scripts/lib/xlsx-reader.cjs');
 const pg = require('pg');
 require('dotenv').config();
 
@@ -55,7 +55,7 @@ const parseDataValue = (val) => {
 async function forceSync2026() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
   const buffer = require('fs').readFileSync(filePath);
-  const workbook = xlsx.read(buffer, { type: 'buffer' });
+  const workbook = await readWorkbook(buffer);
   
   let inserted = 0;
   let errors = 0;
@@ -73,7 +73,7 @@ async function forceSync2026() {
           const ws = workbook.Sheets[s];
           if (!ws) continue;
           
-          const sheetMatrix = xlsx.utils.sheet_to_json(ws, { header: 1, raw: true });
+          const sheetMatrix = sheetToJson(ws, { header: 1, raw: true });
           if (sheetMatrix.length < 1) continue;
           
           const headers = sheetMatrix[0].map(h => String(h || '').trim().toUpperCase());
