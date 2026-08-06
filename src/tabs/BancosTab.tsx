@@ -192,11 +192,22 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
             const dateA = a.pagamento || a.vencimento || '';
             const dateB = b.pagamento || b.vencimento || '';
             
-            // Pega a hora exata do lançamento/cadastro original no sistema (created_at)
+            // Regra de ordenação dentro do mesmo dia:
+            // - Se updated_at cai na mesma data do movimento (pagamento/vencimento) → usa updated_at
+            //   (boleto lançado ontem mas pago hoje: a hora da BAIXA define a posição no extrato)
+            // - Caso contrário → usa created_at
+            //   (evita que edições/correções feitas em outro dia baguncem a ordem)
             const getRecordTime = (tx: Transaction) => {
-              const str = tx.created_at;
-              if (!str) return 0;
-              const dt = new Date(str);
+              const movDate = tx.pagamento || tx.vencimento || '';
+              if (tx.updated_at && movDate) {
+                const updatedDay = tx.updated_at.substring(0, 10); // YYYY-MM-DD
+                if (updatedDay === movDate) {
+                  const dt = new Date(tx.updated_at);
+                  if (!isNaN(dt.getTime())) return dt.getTime();
+                }
+              }
+              if (!tx.created_at) return 0;
+              const dt = new Date(tx.created_at);
               return isNaN(dt.getTime()) ? 0 : dt.getTime();
             };
 
