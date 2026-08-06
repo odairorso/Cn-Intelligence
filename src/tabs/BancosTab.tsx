@@ -17,6 +17,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
   const [extractFilter, setExtractFilter] = useState<'PAGO' | 'TODOS'>('PAGO');
   const [extractMonth, setExtractMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
   const [extractYear, setExtractYear] = useState<string>(() => String(new Date().getFullYear()));
+  const [extractSortOrder, setExtractSortOrder] = useState<'LANCAMENTO_DESC' | 'LANCAMENTO_ASC' | 'DATA_DESC' | 'DATA_ASC'>('LANCAMENTO_DESC');
 
   const [extractTransactions, setExtractTransactions] = useState<Transaction[]>([]);
   const [loadingExtract, setLoadingExtract] = useState(false);
@@ -188,9 +189,29 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
             return matchesYear && matchesMonth;
           })
           .sort((a, b) => {
-            const dateA = a.pagamento || a.vencimento;
-            const dateB = b.pagamento || b.vencimento;
-            return dateB.localeCompare(dateA);
+            const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            const dateA = a.pagamento || a.vencimento || '';
+            const dateB = b.pagamento || b.vencimento || '';
+
+            if (extractSortOrder === 'LANCAMENTO_DESC') {
+              // Ordem de lançamento/cadastro: mais recentes lançados no topo
+              if (timeA !== timeB && timeA > 0 && timeB > 0) return timeB - timeA;
+              return dateB.localeCompare(dateA);
+            }
+            if (extractSortOrder === 'LANCAMENTO_ASC') {
+              // Ordem de lançamento/cadastro: primeiros lançados no topo
+              if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
+              return dateA.localeCompare(dateB);
+            }
+            if (extractSortOrder === 'DATA_DESC') {
+              // Ordem por data de pagamento/vencimento: mais recentes no topo + desempate por lançamento
+              if (dateA !== dateB) return dateB.localeCompare(dateA);
+              return timeB - timeA;
+            }
+            // DATA_ASC: Ordem por data de pagamento/vencimento: mais antigas no topo + desempate por lançamento
+            if (dateA !== dateB) return dateA.localeCompare(dateB);
+            return timeA - timeB;
           });
 
         // Totais do período filtrado
@@ -299,6 +320,22 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                         .map(y => (
                           <option key={y} value={y}>{y}</option>
                         ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-on-surface-variant uppercase font-black tracking-wider">Ordem:</span>
+                    <select
+                      disabled={loadingExtract}
+                      value={extractSortOrder}
+                      onChange={(e) => setExtractSortOrder(e.target.value as any)}
+                      className="bg-surface border border-white/10 rounded px-2.5 py-1.5 text-xs outline-none focus:border-primary text-on-surface font-semibold text-primary"
+                      style={{ backgroundColor: '#1e1e2e' }}
+                    >
+                      <option value="LANCAMENTO_DESC">⏱️ Ordem de Lançamento (Últimos primeiro)</option>
+                      <option value="LANCAMENTO_ASC">⏱️ Ordem de Lançamento (Primeiros primeiro)</option>
+                      <option value="DATA_DESC">📅 Data Movimentação (Mais recente primeiro)</option>
+                      <option value="DATA_ASC">📅 Data Movimentação (Mais antiga primeiro)</option>
                     </select>
                   </div>
                 </div>
