@@ -192,9 +192,9 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
             const dateA = a.pagamento || a.vencimento || '';
             const dateB = b.pagamento || b.vencimento || '';
             
-            // Pega a hora exata da gravação da baixa ou do lançamento (updated_at || created_at)
+            // Pega a hora exata do lançamento/cadastro original no sistema (created_at)
             const getRecordTime = (tx: Transaction) => {
-              const str = tx.updated_at || tx.created_at;
+              const str = tx.created_at;
               if (!str) return 0;
               const dt = new Date(str);
               return isNaN(dt.getTime()) ? 0 : dt.getTime();
