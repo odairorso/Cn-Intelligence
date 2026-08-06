@@ -105,11 +105,6 @@ export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
   const securityToken = import.meta.env.VITE_CN_SECURITY_TOKEN;
   if (securityToken) headers['x-cn-security'] = securityToken;
 
-  // Fallback: se tiver token salvo localmente, envia como Bearer
-  const localToken = getTokenLocal();
-  if (localToken && !headers['Authorization']) {
-    headers['Authorization'] = `Bearer ${localToken}`;
-  }
 
   return fetch(url, { 
     ...options, 
@@ -149,7 +144,7 @@ export const apiAuth = {
     }
     const data = await res.json();
     if (data.user) setUser(data.user);
-    if (data.token) saveTokenLocal(data.token); // salva token localmente
+    // Token já salvo em cookie HttpOnly pelo servidor — não duplicar em localStorage
     return data;
   },
 
@@ -198,7 +193,7 @@ export const apiAuth = {
     }
     const data = await res.json();
     if (data.user) setUser(data.user);
-    if (data.token) saveTokenLocal(data.token); // salva token localmente
+    // Token já salvo em cookie HttpOnly pelo servidor
     return data;
   },
 
@@ -214,7 +209,7 @@ export const apiAuth = {
     }
     const data = await res.json();
     if (data.user) setUser(data.user);
-    if (data.token) saveTokenLocal(data.token); // salva token localmente
+    // Token já salvo em cookie HttpOnly pelo servidor
     return true;
   },
 

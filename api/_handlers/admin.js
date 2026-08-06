@@ -238,17 +238,12 @@ export async function handleDbCheck(req, res) {
 
 // GET /api?route=export-backup
 export async function handleExportBackup(req, res) {
-  const backupToken = req.headers['x-cn-backup-token'];
-  const BACKUP_TOKEN = process.env.BACKUP_TOKEN;
-
-  if (!BACKUP_TOKEN) {
-    await logSecurity(req, res, "BACKUP_TOKEN não configurado no servidor");
-    return res.status(500).json({ error: 'Backup não disponível. BACKUP_TOKEN não configurado.' });
-  }
-
-  if (backupToken !== BACKUP_TOKEN) {
-    await logSecurity(req, res, "Tentativa de backup sem token válido");
-    return res.status(403).json({ error: "Acesso negado" });
+  // Protegido por JWT de admin (via cookie HttpOnly cn_jwt_token)
+  const uid = req.authUid;
+  const role = req.authRole;
+  if (!uid || role !== 'admin') {
+    await logSecurity(req, res, 'Tentativa de backup sem permissão de admin');
+    return res.status(403).json({ error: 'Acesso negado: apenas administradores podem exportar backup.' });
   }
 
   try {

@@ -558,7 +558,7 @@ export async function handleFixReceitasTipo(req, res) {
   const uid = req.authUid;
 
   try {
-    const result = await sql`
+    const rows = await sql`
       UPDATE transactions
       SET tipo = 'RECEITA'
       WHERE ${uid ? sql`uid = ${uid} AND` : sql``}
@@ -570,8 +570,9 @@ export async function handleFixReceitasTipo(req, res) {
           OR fornecedor ILIKE '%EDUCBANK%'
           OR fornecedor ILIKE '%KROTON%'
         )
+      RETURNING id
     `;
-    return res.json({ ok: true, updated: result.count || 0 });
+    return res.json({ ok: true, updated: rows.length });
   } catch (e) {
     return handleError(res, e, 'transactions.js handleFixReceitasTipo');
   }

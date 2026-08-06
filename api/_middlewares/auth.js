@@ -43,6 +43,7 @@ export function authMiddleware(req, res, next) {
   if (decoded) {
     if (decoded.uid) {
       req.authUid = decoded.uid;
+      req.authRole = decoded.role || 'user';
       if (typeof next === 'function') next();
       return;
     }
@@ -55,6 +56,7 @@ export function authMiddleware(req, res, next) {
 
   if (legacyEnabled && EXPECTED_TOKEN && securityToken === EXPECTED_TOKEN) {
     req.authUid = process.env.APP_UID || 'odair';
+    req.authRole = 'admin';
     if (typeof next === 'function') next();
     return;
   }

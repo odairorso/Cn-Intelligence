@@ -38,8 +38,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
     if (savedLogo) setLogo(savedLogo);
     const savedEmail = localStorage.getItem('cn_last_logged_email');
     if (savedEmail) setEmail(savedEmail);
-    const savedPassword = localStorage.getItem('cn_last_logged_pw');
-    if (savedPassword) setPassword(savedPassword);
 
     // Processar retorno do OAuth do Google (redirect flow)
     const hash = window.location.hash;
@@ -142,6 +140,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
     }
   };
 
+  /*
   const handleGoogleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!googleCompanyPassword) return;
@@ -166,6 +165,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
       setLoading(false);
     }
   };
+  */
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,7 +184,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
         const loginSuccess = await onLogin(registerEmail, registerPassword);
         if (loginSuccess) {
           localStorage.setItem('cn_last_logged_email', registerEmail);
-          localStorage.setItem('cn_last_logged_pw', registerPassword); // Salva a senha para preenchimento automático
         } else {
           setError('Cadastro realizado, mas falha ao logar automaticamente. Tente logar manualmente.');
           setIsRegistering(false);
@@ -211,10 +210,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
       if (!success) {
         setError('E-mail ou Senha incorretos.');
         setPassword('');
-        localStorage.removeItem('cn_last_logged_pw');
       } else {
         localStorage.setItem('cn_last_logged_email', email);
-        localStorage.setItem('cn_last_logged_pw', password); // salva senha para próximo acesso
       }
     } catch (err) {
       setError('Erro ao conectar com o servidor.');

@@ -35,6 +35,13 @@ export default async function handler(req, res) {
 
   const { route, id } = req.query;
 
+  // ── Rate Limit para rotas de autenticação (anti-brute-force) ──
+  const isAuthRoute = route === 'login' || route === 'auth-login' || route === 'auth-register' || route === 'auth-google' || route === 'auth-google-register';
+  if (isAuthRoute) {
+    const limitOk = await checkRateLimit(req, res);
+    if (!limitOk) return; // checkRateLimit já enviou a resposta 429
+  }
+
   // ── Lógica de Login Isolada e Imediata ──────────────────
   if (route === 'login' || route === 'auth-login') {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -128,13 +135,14 @@ export default async function handler(req, res) {
     }
 
     try {
-      const existing = await sql`SELECT id FROM portal_users WHERE LOWER(email) = ${email.toLowerCase().trim()}`;
-      if (existing && existing.length > 0) {
-        return res.status(400).json({ error: 'Este e-mail já está cadastrado.' });
+      // Só permite cadastro se NENHUM usuário existir (primeiro acesso)
+      const existingUsers = await sql`SELECT id FROM portal_users LIMIT 1`;
+      if (existingUsers && existingUsers.length > 0) {
+        return res.status(403).json({ error: 'Cadastro de novos usuários não permitido. Entre em contato com o administrador.' });
       }
 
       const passwordHash = bcrypt.hashSync(password, 10);
-      const role = 'admin'; // Primeiro acesso com senha de empresa é sempre admin
+      const role = 'admin'; // Primeiro acesso é sempre admin
 
       await sql`
         INSERT INTO portal_users (name, email, password_hash, role)
