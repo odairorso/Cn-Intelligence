@@ -17,7 +17,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
   const [extractFilter, setExtractFilter] = useState<'PAGO' | 'TODOS'>('PAGO');
   const [extractMonth, setExtractMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
   const [extractYear, setExtractYear] = useState<string>(() => String(new Date().getFullYear()));
-  const [extractSortOrder, setExtractSortOrder] = useState<'LANCAMENTO_DESC' | 'LANCAMENTO_ASC' | 'DATA_DESC' | 'DATA_ASC'>('LANCAMENTO_DESC');
+  const [extractSortOrder, setExtractSortOrder] = useState<'LANCAMENTO_ASC' | 'LANCAMENTO_DESC' | 'DATA_DESC' | 'DATA_ASC'>('LANCAMENTO_ASC');
 
   const [extractTransactions, setExtractTransactions] = useState<Transaction[]>([]);
   const [loadingExtract, setLoadingExtract] = useState(false);
@@ -194,24 +194,26 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
             const dateA = a.pagamento || a.vencimento || '';
             const dateB = b.pagamento || b.vencimento || '';
 
-            if (extractSortOrder === 'LANCAMENTO_DESC') {
-              // Ordem de lançamento/cadastro: mais recentes lançados no topo
-              if (timeA !== timeB && timeA > 0 && timeB > 0) return timeB - timeA;
-              return dateB.localeCompare(dateA);
-            }
             if (extractSortOrder === 'LANCAMENTO_ASC') {
-              // Ordem de lançamento/cadastro: primeiros lançados no topo
+              // Ordem exata de digitação no extrato (do 1º ao último lançado)
               if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
               return dateA.localeCompare(dateB);
             }
-            if (extractSortOrder === 'DATA_DESC') {
-              // Ordem por data de pagamento/vencimento: mais recentes no topo + desempate por lançamento
-              if (dateA !== dateB) return dateB.localeCompare(dateA);
-              return timeB - timeA;
+            if (extractSortOrder === 'LANCAMENTO_DESC') {
+              // Ordem de lançamento invertida (do último ao 1º lançado)
+              if (timeA !== timeB && timeA > 0 && timeB > 0) return timeB - timeA;
+              return dateB.localeCompare(dateA);
             }
-            // DATA_ASC: Ordem por data de pagamento/vencimento: mais antigas no topo + desempate por lançamento
+            if (extractSortOrder === 'DATA_DESC') {
+              // Ordem por data de movimento (mais recente no topo) + desempate por ordem digitada
+              if (dateA !== dateB) return dateB.localeCompare(dateA);
+              if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
+              return 0;
+            }
+            // DATA_ASC: Ordem por data de movimento (mais antiga no topo) + desempate por ordem digitada
             if (dateA !== dateB) return dateA.localeCompare(dateB);
-            return timeA - timeB;
+            if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
+            return 0;
           });
 
         // Totais do período filtrado
@@ -332,8 +334,8 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                       className="bg-surface border border-white/10 rounded px-2.5 py-1.5 text-xs outline-none focus:border-primary text-on-surface font-semibold text-primary"
                       style={{ backgroundColor: '#1e1e2e' }}
                     >
-                      <option value="LANCAMENTO_DESC">⏱️ Ordem de Lançamento (Últimos primeiro)</option>
-                      <option value="LANCAMENTO_ASC">⏱️ Ordem de Lançamento (Primeiros primeiro)</option>
+                      <option value="LANCAMENTO_ASC">⏱️ Ordem Digitada (Do 1º ao Último do Extrato)</option>
+                      <option value="LANCAMENTO_DESC">⏱️ Ordem Digitada Invertida (Do Último ao 1º)</option>
                       <option value="DATA_DESC">📅 Data Movimentação (Mais recente primeiro)</option>
                       <option value="DATA_ASC">📅 Data Movimentação (Mais antiga primeiro)</option>
                     </select>
