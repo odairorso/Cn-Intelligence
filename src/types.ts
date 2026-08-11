@@ -32,6 +32,7 @@ export interface Transaction {
   conta_contabil_id?: number;
   created_at?: string;
   updated_at?: string;
+  paid_at?: string;
 }
 
 

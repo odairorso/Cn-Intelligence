@@ -17,6 +17,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
   const [extractFilter, setExtractFilter] = useState<'PAGO' | 'TODOS'>('PAGO');
   const [extractMonth, setExtractMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
   const [extractYear, setExtractYear] = useState<string>(() => String(new Date().getFullYear()));
+  const [extractDay, setExtractDay] = useState<string>('TODOS');
   const [extractSortOrder, setExtractSortOrder] = useState<'DATA_ASC' | 'DATA_DESC' | 'LANCAMENTO_DESC' | 'LANCAMENTO_ASC'>('DATA_ASC');
 
   const [extractTransactions, setExtractTransactions] = useState<Transaction[]>([]);
@@ -182,32 +183,25 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
             const parts = dateStr.includes('-') ? dateStr.split('-') : dateStr.split('/');
             const year = dateStr.includes('-') ? parts[0] : parts[2];
             const month = dateStr.includes('-') ? parts[1] : parts[1];
+            const day = dateStr.includes('-') ? parts[2] : parts[0];
             
             const matchesYear = extractYear === 'TODOS' || year === extractYear;
             const matchesMonth = extractMonth === 'TODOS' || month === extractMonth;
+            const matchesDay = extractDay === 'TODOS' || day === extractDay;
             
-            return matchesYear && matchesMonth;
+            return matchesYear && matchesMonth && matchesDay;
           })
           .sort((a, b) => {
             const dateA = a.pagamento || a.vencimento || '';
             const dateB = b.pagamento || b.vencimento || '';
             
             // Regra de ordenação dentro do mesmo dia:
-            // - Se updated_at cai na mesma data do movimento (pagamento/vencimento) → usa updated_at
-            //   (boleto lançado ontem mas pago hoje: a hora da BAIXA define a posição no extrato)
-            // - Caso contrário → usa created_at
-            //   (evita que edições/correções feitas em outro dia baguncem a ordem)
+            // Usamos paid_at (hora do pagamento/baixa) para manter a ordem exata em que foram dados como pagos.
+            // Se não houver paid_at (pendente/vencido), usamos created_at como fallback.
             const getRecordTime = (tx: Transaction) => {
-              const movDate = tx.pagamento || tx.vencimento || '';
-              if (tx.updated_at && movDate) {
-                const updatedDay = tx.updated_at.substring(0, 10); // YYYY-MM-DD
-                if (updatedDay === movDate) {
-                  const dt = new Date(tx.updated_at);
-                  if (!isNaN(dt.getTime())) return dt.getTime();
-                }
-              }
-              if (!tx.created_at) return 0;
-              const dt = new Date(tx.created_at);
+              const str = tx.paid_at || tx.created_at;
+              if (!str) return 0;
+              const dt = new Date(str);
               return isNaN(dt.getTime()) ? 0 : dt.getTime();
             };
 
@@ -217,27 +211,27 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
             if (extractSortOrder === 'DATA_ASC') {
               // 1º Critério: Data de movimentação em ordem cronológica (Dia 05/08 primeiro, dia 06/08 no rodapé!)
               if (dateA !== dateB) return dateA.localeCompare(dateB);
-              // 2º Critério (dentro do mesmo dia): Hora exata de gravação da baixa ou lançamento
+              // 2º Critério (dentro do mesmo dia): Hora exata de gravação
               if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
-              return 0;
+              return a.id.localeCompare(b.id);
             }
 
             if (extractSortOrder === 'DATA_DESC') {
               // 1º Critério: Data de movimentação (dia mais recente no topo)
               if (dateA !== dateB) return dateB.localeCompare(dateA);
-              // 2º Critério (dentro do mesmo dia): Hora exata de gravação da baixa ou lançamento
+              // 2º Critério (dentro do mesmo dia): Hora exata de gravação
               if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
-              return 0;
+              return a.id.localeCompare(b.id);
             }
 
             if (extractSortOrder === 'LANCAMENTO_DESC') {
               if (timeA !== timeB && timeA > 0 && timeB > 0) return timeB - timeA;
-              return dateB.localeCompare(dateA);
+              return a.id.localeCompare(b.id);
             }
 
             // LANCAMENTO_ASC
             if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
-            return dateA.localeCompare(dateB);
+            return a.id.localeCompare(b.id);
           });
 
         // Totais do período filtrado
@@ -270,6 +264,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                     setExtractFilter('PAGO');
                     setExtractMonth(String(new Date().getMonth() + 1).padStart(2, '0'));
                     setExtractYear(String(new Date().getFullYear()));
+                    setExtractDay('TODOS');
                     setExtractTransactions([]);
                   }}
                   className="p-1.5 hover:bg-white/10 rounded-full text-on-surface-variant transition-all"
@@ -328,6 +323,22 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                       <option value="10">Outubro</option>
                       <option value="11">Novembro</option>
                       <option value="12">Dezembro</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-on-surface-variant uppercase font-black tracking-wider">Dia:</span>
+                    <select
+                      disabled={loadingExtract}
+                      value={extractDay}
+                      onChange={(e) => setExtractDay(e.target.value)}
+                      className="bg-surface border border-white/10 rounded px-2.5 py-1.5 text-xs outline-none focus:border-primary text-on-surface"
+                      style={{ backgroundColor: '#1e1e2e' }}
+                    >
+                      <option value="TODOS">Todos</option>
+                      {Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
                     </select>
                   </div>
 

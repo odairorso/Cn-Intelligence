@@ -198,10 +198,11 @@ export async function handleTransactions(req, res) {
         resolvedContaContabilId = await getContaContabilId(fornecedor, descricao, tipo);
       }
 
+      const paidAtValue = status === 'PAGO' ? sql`NOW()` : null;
       const rows = await sql`
-        INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
+        INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by, paid_at)
         VALUES (${uid}, ${fornecedor}, ${descricao || '-'}, ${empresa || 'Geral'},
-                ${vDate}, ${pDate}, ROUND(${valorNumber}::numeric, 2), ${status || 'PENDENTE'}, ${bancoValue}, ${tipo}, ${numero_boleto || null}, ${resolvedContaContabilId ?? null}, ${uid})
+                ${vDate}, ${pDate}, ROUND(${valorNumber}::numeric, 2), ${status || 'PENDENTE'}, ${bancoValue}, ${tipo}, ${numero_boleto || null}, ${resolvedContaContabilId ?? null}, ${uid}, ${paidAtValue})
         RETURNING *`;
       await auditLog(uid, 'CREATE', rows[0].id, null, rows[0]);
       return res.status(201).json(rows[0]);
@@ -266,7 +267,16 @@ export async function handleTransactionById(req, res) {
       if (body.vencimento !== undefined) fields.push(sql`vencimento = ${parseDateToPg(body.vencimento)}`);
       if (body.pagamento !== undefined) fields.push(sql`pagamento = ${parseDateToPg(body.pagamento)}`);
       if (body.valor !== undefined) fields.push(sql`valor = ROUND(${body.valor === null ? null : Number(Number(body.valor).toFixed(2))}::numeric, 2)`);
-      if (body.status !== undefined) fields.push(sql`status = ${body.status}`);
+      if (body.status !== undefined) {
+        fields.push(sql`status = ${body.status}`);
+        if (body.status === 'PAGO') {
+          if (existing[0].status !== 'PAGO') {
+            fields.push(sql`paid_at = NOW()`);
+          }
+        } else {
+          fields.push(sql`paid_at = NULL`);
+        }
+      }
       if (body.banco !== undefined) {
         const bancoValue = (body.banco && String(body.banco).trim() !== '') ? String(body.banco).trim() : null;
         fields.push(sql`banco = ${bancoValue}`);
@@ -441,15 +451,19 @@ export async function handleTransactionsBatch(req, res) {
 
     if (toInsert.length > 0) {
       try {
-        // Build a single bulk INSERT with multiple value rows
-        const values = toInsert.map(p => {
+        const baseTime = Date.now();
+        // Build a single bulk INSERT with multiple value rows and explicit sequential created_at and paid_at
+        const values = toInsert.map((p, index) => {
           const { tx, vDate, pDate, resolvedCcId } = p;
           const bancoVal = tx.banco && String(tx.banco).trim() !== '' ? String(tx.banco).trim() : null;
           const roundedVal = Math.round(Number(tx.valor) * 100) / 100;
-          return sql`(${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${roundedVal}, ${tx.status || 'PENDENTE'}, ${bancoVal}, ${tx.tipo}, ${tx.numero_boleto || null}, ${resolvedCcId ?? null}, ${uid})`;
+          // Offset by index milliseconds to guarantee absolute ordering on batch insert
+          const createdAt = new Date(baseTime + index).toISOString();
+          const paidAt = tx.status === 'PAGO' ? createdAt : null;
+          return sql`(${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${roundedVal}, ${tx.status || 'PENDENTE'}, ${bancoVal}, ${tx.tipo}, ${tx.numero_boleto || null}, ${resolvedCcId ?? null}, ${uid}, ${createdAt}, ${paidAt})`;
         });
 
-        const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
+        const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by, created_at, paid_at)
           VALUES ${sql.join(values, sql`, `)}
           RETURNING id`;
 
@@ -461,13 +475,16 @@ export async function handleTransactionsBatch(req, res) {
         })).catch(() => {});
       } catch (bulkError) {
         // Fallback: if multi-row INSERT fails, try individual inserts
+        const baseTime = Date.now();
         for (const p of toInsert) {
           try {
             const { tx, vDate, pDate, resolvedCcId } = p;
             const bancoVal = tx.banco && String(tx.banco).trim() !== '' ? String(tx.banco).trim() : null;
             const roundedVal = Math.round(Number(tx.valor) * 100) / 100;
-            const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by)
-              VALUES (${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${roundedVal}, ${tx.status || 'PENDENTE'}, ${bancoVal}, ${tx.tipo}, ${tx.numero_boleto || null}, ${resolvedCcId ?? null}, ${uid})
+            const createdAt = new Date(baseTime + p.i).toISOString();
+            const paidAt = tx.status === 'PAGO' ? createdAt : null;
+            const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by, created_at, paid_at)
+              VALUES (${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${roundedVal}, ${tx.status || 'PENDENTE'}, ${bancoVal}, ${tx.tipo}, ${tx.numero_boleto || null}, ${resolvedCcId ?? null}, ${uid}, ${createdAt}, ${paidAt})
               RETURNING id`;
             await auditLog(uid, 'CREATE', inserted[0]?.id, null, { fornecedor: tx.fornecedor, valor: tx.valor, empresa: tx.empresa, vencimento: vDate, tipo: tx.tipo });
             created++;
@@ -515,7 +532,7 @@ export async function handleTransactionsBatchUpdate(req, res) {
 
     const pDate = parseDateToPg(dataPagamento);
     const bancoValue = (banco && String(banco).trim() !== '') ? String(banco).trim() : null;
-    await sql`UPDATE transactions SET status = 'PAGO', banco = ${bancoValue}, pagamento = ${pDate}, updated_at = NOW() WHERE (uid = ${uid} OR uid IS NULL) AND id = ANY(${ids}::uuid[])`;
+    await sql`UPDATE transactions SET status = 'PAGO', banco = ${bancoValue}, pagamento = ${pDate}, paid_at = COALESCE(paid_at, NOW()), updated_at = NOW() WHERE (uid = ${uid} OR uid IS NULL) AND id = ANY(${ids}::uuid[])`;
     return res.json({ message: 'Updated successfully' });
   } catch (e) {
     return handleError(res, e, 'transactions.js handleTransactionsBatchUpdate');
