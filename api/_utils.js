@@ -244,7 +244,9 @@ export async function getContaContabilId(fornecedor, descricao, tipo = 'DESPESA'
   // 2. Mapeamento heurístico por palavras-chave
   let targetCodigo = null;
 
-  if (tipo === 'RECEITA') {
+  if (fUpper.includes('EDITORA E DISTRIBUIDORA') || fUpper.includes('EDITORA E DISTRIB')) {
+    targetCodigo = '4.3';
+  } else if (tipo === 'RECEITA') {
     if (text.includes('MENSALIDADE') || text.includes('ALUNO') || text.includes('MATRICULA') || text.includes('MATRÍCULA')) {
       targetCodigo = '4.1';
     } else if (text.includes('REPASSE') || text.includes('CONVÊNIO') || text.includes('CONVENIO')) {

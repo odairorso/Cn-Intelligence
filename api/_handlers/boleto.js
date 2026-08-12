@@ -115,7 +115,8 @@ export async function handleExtractBoleto(req, res) {
          - NÃO use o código de barras numérico.
          - Se não houver "Número do Documento" explícito, deixe vazio.
       6. DESCRIÇÃO: Uma breve descrição baseada no conteúdo (ex: "Seguro Auto", "Conta de Energia").
-      7. CONTA CONTÁBIL (conta_contabil_id): Baseado na descrição e fornecedor, sugira o ID NUMÉRICO da conta contábil mais adequada. Retorne apenas o ID numérico ou null se não souber.${contasContabeisText}`;
+      7. CONTA CONTÁBIL (conta_contabil_id): Baseado na descrição e fornecedor, sugira o ID NUMÉRICO da conta contábil mais adequada. Retorne apenas o ID numérico ou null se não souber.${contasContabeisText}
+      8. PAGADOR: Identifique o nome do Pagador/Sacado/Cliente do boleto (ex: "ELAINE CRISTINA CAMACHO CAVALCANTE").`;
 
       const parts = [];
       if (pdfBase64) {
@@ -144,7 +145,8 @@ export async function handleExtractBoleto(req, res) {
               cnpj: { type: 'string' },
               numero_boleto: { type: 'string' },
               descricao: { type: 'string' },
-              conta_contabil_id: { type: 'number', nullable: true }
+              conta_contabil_id: { type: 'number', nullable: true },
+              pagador: { type: 'string' }
             },
             required: ['fornecedor', 'vencimento', 'valor']
           }
@@ -197,6 +199,25 @@ export async function handleExtractBoleto(req, res) {
         }
       }
 
+      // Caso especial: EDITORA E DISTRIBUIDORA EDUCACIONAL SA
+      const isEditora = extracted.fornecedor && 
+        (extracted.fornecedor.toUpperCase().includes('EDITORA E DISTRIBUIDORA') || 
+         extracted.fornecedor.toUpperCase().includes('EDITORA E DISTRIB'));
+
+      if (isEditora) {
+        if (extracted.pagador) {
+          extracted.descricao = extracted.pagador;
+        }
+        try {
+          const rowCc = await sql`SELECT id FROM contas_contabeis WHERE codigo = '4.3' AND ativo = true LIMIT 1`;
+          if (rowCc.length > 0) {
+            extracted.conta_contabil_id = rowCc[0].id;
+          }
+        } catch (e) {
+          console.error('Erro ao buscar conta contábil 4.3:', e);
+        }
+      }
+
       return res.json({
         ...extracted,
         descricao: extracted.descricao || `${fileName} - Importado via IA`
@@ -209,16 +230,40 @@ export async function handleExtractBoleto(req, res) {
       const valorMatch = srcUpper.match(/VALOR[^0-9]*([\d.,]+)/);
       const numero = extractLocalBoletoNumber(srcUpper);
 
+      let fallbackDesc = `${fileName} - ${pattern.descricao || ''}`;
+      let fallbackCcId = pattern.conta_contabil_id;
+
+      const isEditoraFallback = pattern.fornecedor && 
+        (pattern.fornecedor.toUpperCase().includes('EDITORA E DISTRIBUIDORA') || 
+         pattern.fornecedor.toUpperCase().includes('EDITORA E DISTRIB'));
+
+      if (isEditoraFallback) {
+        const pagadorMatch = srcUpper.match(/PAGADOR\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
+        const sacadoMatch = srcUpper.match(/SACADO\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
+        const pagadorNome = (pagadorMatch?.[1] || sacadoMatch?.[1] || '').trim().replace(/\s+/g, ' ');
+        if (pagadorNome) {
+          fallbackDesc = pagadorNome;
+        }
+        try {
+          const rowCc = await sql`SELECT id FROM contas_contabeis WHERE codigo = '4.3' AND ativo = true LIMIT 1`;
+          if (rowCc.length > 0) {
+            fallbackCcId = rowCc[0].id;
+          }
+        } catch (e) {
+          console.error('Erro ao buscar conta contábil 4.3 em fallback:', e);
+        }
+      }
+
       return res.json({
         fornecedor: pattern.fornecedor,
         vencimento: dateMatch?.[1] || '',
         valor: parseFloat(valorMatch?.[1]?.replace(/\./g, '').replace(',', '.') || '0'),
         cnpj: rawCnpj,
-        descricao: `${fileName} - ${pattern.descricao || ''}`,
+        descricao: fallbackDesc,
         empresa: pattern.empresa,
         tipo: pattern.tipo,
         numero_boleto: numero,
-        conta_contabil_id: pattern.conta_contabil_id,
+        conta_contabil_id: fallbackCcId,
         _from_pattern: true,
         _gemini_error: geminiError
       });

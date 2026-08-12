@@ -276,6 +276,15 @@ function extrairDadosDoTexto(texto) {
     }
   }
 
+  if (dados.fornecedor && (dados.fornecedor.toUpperCase().includes('EDITORA E DISTRIBUIDORA') || dados.fornecedor.toUpperCase().includes('EDITORA E DISTRIB'))) {
+    const pagadorMatch = textoUpper.match(/PAGADOR\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
+    const sacadoMatch = textoUpper.match(/SACADO\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
+    const pagadorNome = (pagadorMatch?.[1] || sacadoMatch?.[1] || '').trim().replace(/\s+/g, ' ');
+    if (pagadorNome) {
+      dados.descricao = pagadorNome;
+    }
+  }
+
   } catch (e) {
     console.log('Erro ao extrair dados:', e.message);
   }
@@ -474,7 +483,9 @@ async function getContaContabilId(client, fornecedor, descricao, tipo = 'DESPESA
 
   let targetCodigo = null;
 
-  if (tipo === 'RECEITA') {
+  if (fUpper.includes('EDITORA E DISTRIBUIDORA') || fUpper.includes('EDITORA E DISTRIB')) {
+    targetCodigo = '4.3';
+  } else if (tipo === 'RECEITA') {
     if (text.includes('MENSALIDADE') || text.includes('ALUNO') || text.includes('MATRICULA') || text.includes('MATRÍCULA')) {
       targetCodigo = '4.1';
     } else if (text.includes('REPASSE') || text.includes('CONVÊNIO') || text.includes('CONVENIO')) {
