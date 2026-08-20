@@ -1373,7 +1373,7 @@ export default function App() {
     <AuthGuard isAuthorized={isAuthorized} onLogin={login}>
       <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="bg-surface/80 backdrop-blur-md border-b border-surface-variant flex justify-between items-center w-full px-4 md:px-8 py-5 fixed top-0 z-50">
+      <header className="bg-surface/90 backdrop-blur-md border-b border-surface-variant flex justify-between items-center w-full px-4 md:px-8 py-3 fixed top-0 z-50">
         <div className="flex items-center gap-4 md:gap-8">
           <div className="flex items-center gap-3">
             <img
@@ -1384,16 +1384,16 @@ export default function App() {
             <h1 className="text-xl md:text-2xl font-black tracking-tighter premium-gradient-text font-headline">Fluxo Caixa CN</h1>
           </div>
 
-          <nav className="hidden lg:flex gap-6">
+          <nav className="hidden lg:flex gap-1">
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'dashboard' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
+              className={cn("transition-all duration-200 font-medium text-sm px-3 py-2 rounded-sm", activeTab === 'dashboard' ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/35")}
             >
               Dashboard
             </button>
             <button
               onClick={() => setActiveTab('lancamentos')}
-              className={cn("relative transition-all duration-200 font-medium text-sm", activeTab === 'lancamentos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
+              className={cn("relative transition-all duration-200 font-medium text-sm px-3 py-2 rounded-sm", activeTab === 'lancamentos' ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/35")}
             >
               Lançamentos
               {stats.vencidos > 0 && (
@@ -1404,43 +1404,43 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveTab('fornecedores')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'fornecedores' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
+              className={cn("transition-all duration-200 font-medium text-sm px-3 py-2 rounded-sm", activeTab === 'fornecedores' ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/35")}
             >
               Fornecedores
             </button>
             <button
               onClick={() => setActiveTab('relatorios')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'relatorios' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
+              className={cn("transition-all duration-200 font-medium text-sm px-3 py-2 rounded-sm", activeTab === 'relatorios' ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/35")}
             >
               Relatórios
             </button>
             <button
               onClick={() => setActiveTab('receitas')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'receitas' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
+              className={cn("transition-all duration-200 font-medium text-sm px-3 py-2 rounded-sm", activeTab === 'receitas' ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/35")}
             >
               Receitas
             </button>
             <button
               onClick={() => setActiveTab('bancos')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'bancos' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
+              className={cn("transition-all duration-200 font-medium text-sm px-3 py-2 rounded-sm", activeTab === 'bancos' ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/35")}
             >
               Bancos
             </button>
             <button
               onClick={() => setActiveTab('extrato')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'extrato' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
+              className={cn("transition-all duration-200 font-medium text-sm px-3 py-2 rounded-sm", activeTab === 'extrato' ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/35")}
             >
               Extrato OFX
             </button>
             <button
               onClick={() => setActiveTab('configuracoes')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'configuracoes' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
+              className={cn("transition-all duration-200 font-medium text-sm px-3 py-2 rounded-sm", activeTab === 'configuracoes' ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/35")}
             >
               Configurações
             </button>
             <button
               onClick={() => setActiveTab('folha')}
-              className={cn("transition-all duration-200 font-medium text-sm", activeTab === 'folha' ? "text-primary border-b-2 border-primary pb-1" : "text-on-surface-variant hover:text-on-surface")}
+              className={cn("transition-all duration-200 font-medium text-sm px-3 py-2 rounded-sm", activeTab === 'folha' ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/35")}
             >
               Folha
             </button>
@@ -1582,11 +1582,11 @@ export default function App() {
       </nav>
 
 
-      <main className="flex-grow pt-24 pb-24 lg:pb-12 px-4 md:px-8 max-w-[1920px] mx-auto w-full">
+      <main className="flex-grow pt-20 pb-24 lg:pb-10 px-4 md:px-8 max-w-[1920px] mx-auto w-full">
         {/* Dashboard Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4">
           <div>
-            <h2 className="text-2xl md:text-4xl font-extrabold font-headline text-on-surface mb-3 tracking-tight">
+            <h2 className="text-2xl md:text-3xl font-extrabold font-headline text-on-surface mb-2 tracking-tight">
               {activeTab === 'dashboard' && '💰 Dashboard Fluxo de Caixa'}
               {activeTab === 'lancamentos' && '📋 Gestão de Lançamentos'}
               {activeTab === 'fornecedores' && '🏢 Fornecedores'}
@@ -1597,17 +1597,17 @@ export default function App() {
               {activeTab === 'folha' && '📝 Folha de Pagamento'}
               {activeTab === 'configuracoes' && '⚙️ Configurações'}
             </h2>
-            <div className="flex flex-wrap gap-3">
-              <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-primary border border-primary/20 flex items-center gap-2">
+            <div className="flex flex-wrap gap-2">
+              <span className="bg-surface-variant/20 px-3 py-1.5 rounded-sm text-xs font-semibold text-primary border border-primary/20 flex items-center gap-2">
                 <LayoutDashboard size={14} /> Grupo CN
               </span>
-              <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-surface-variant flex items-center gap-2">
+              <span className="bg-surface-variant/20 px-3 py-1.5 rounded-sm text-xs font-semibold text-on-surface-variant flex items-center gap-2">
                 <CheckCircle size={14} /> {transactions.length} registros
               </span>
-              <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-on-surface-variant flex items-center gap-2">
+              <span className="bg-surface-variant/20 px-3 py-1.5 rounded-sm text-xs font-semibold text-on-surface-variant flex items-center gap-2">
                 <Calendar size={14} /> {[...new Set(transactions.map(t => t.vencimento.substring(0, 7)))].length} períodos
               </span>
-              <span className="bg-surface-variant/20 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-on-surface-variant flex items-center gap-2">
+              <span className="bg-surface-variant/20 px-3 py-1.5 rounded-sm text-[11px] font-semibold text-on-surface-variant flex items-center gap-2">
                 Build: {(__BUILD_SHA__ || __BUILD_TIME__).slice(0, 8)}
               </span>
             </div>
@@ -1619,7 +1619,7 @@ export default function App() {
               <>
                 <button
                   onClick={() => pdfInputRef.current?.click()}
-                  className="bg-primary/15 text-primary px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/25 transition-all border border-primary/25"
+                  className="bg-primary/15 text-primary px-4 py-2 rounded-sm text-sm font-bold flex items-center gap-2 hover:bg-primary/25 transition-all border border-primary/25"
                 >
                   {isProcessingPdf ? <Loader2 size={18} className="animate-spin" /> : <FileUp size={18} />}
                   Importar Boletos PDF
@@ -1636,13 +1636,13 @@ export default function App() {
             )}
             <button
               onClick={() => setShowTransferModal(true)}
-              className="bg-secondary/15 text-secondary px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-secondary/25 transition-all border border-secondary/25"
+              className="bg-secondary/15 text-secondary px-4 py-2 rounded-sm text-sm font-bold flex items-center gap-2 hover:bg-secondary/25 transition-all border border-secondary/25"
             >
               <Merge size={18} /> Transferência
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="bg-surface-variant/20 text-on-surface px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-surface-variant/40 transition-all border border-surface-variant"
+              className="bg-surface-variant/20 text-on-surface px-4 py-2 rounded-sm text-sm font-bold flex items-center gap-2 hover:bg-surface-variant/40 transition-all border border-surface-variant"
             >
               <FileSpreadsheet size={18} className="text-primary" /> Importar CSV
             </button>

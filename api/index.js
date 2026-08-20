@@ -23,6 +23,8 @@ const generateToken = (payload) => {
 
 // --- Rotas que NÃO devem ser logadas (saúde, internas) ---
 const SKIP_LOG_ROUTES = new Set(['health']);
+const LOG_SUCCESS_REQUESTS = String(process.env.LOG_SUCCESS_REQUESTS || 'false').toLowerCase() === 'true';
+const SLOW_REQUEST_LOG_MS = Number.parseInt(process.env.SLOW_REQUEST_LOG_MS || '1500', 10);
 
 export default async function handler(req, res) {
   const startTime = Date.now();
@@ -374,7 +376,13 @@ export default async function handler(req, res) {
       console.error('[API Router Error]:', e);
       return res.status(500).json({ error: 'Erro interno no servidor' });
     } finally {
-      if (!SKIP_LOG_ROUTES.has(route) && res.statusCode !== 429) {
+      const duration = Date.now() - startTime;
+      const shouldLog =
+        !SKIP_LOG_ROUTES.has(route)
+        && res.statusCode !== 429
+        && (LOG_SUCCESS_REQUESTS || res.statusCode >= 400 || duration >= SLOW_REQUEST_LOG_MS);
+
+      if (shouldLog) {
         try {
           const { logRequest } = await import('./_handlers/admin.js');
           await logRequest(req, res, startTime);

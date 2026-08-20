@@ -325,10 +325,11 @@ const LancamentosTab = React.memo(({
   const selectedTotal = selectedTxs.reduce((s, tx) => s + Number(tx.valor) + Number(tx.juros || 0), 0);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between gap-4">
-        <div className="flex flex-wrap gap-3 flex-grow max-w-4xl">
-          <div className="bg-surface-variant/20 flex items-center px-4 py-2.5 rounded-sm border border-surface-variant flex-grow min-w-[200px] focus-within:border-primary/40 transition-all">
+    <div className="space-y-5">
+      <div className="glass-card p-3">
+        <div className="flex flex-col xl:flex-row justify-between gap-3">
+        <div className="flex flex-wrap gap-2 flex-grow">
+          <div className="bg-background/50 flex items-center px-3 py-2 rounded-sm border border-surface-variant flex-grow min-w-[260px] focus-within:border-primary/40 transition-all">
             <Search size={18} className="text-on-surface-variant" />
             <input
               type="text"
@@ -341,7 +342,7 @@ const LancamentosTab = React.memo(({
 
 
           <select
-            className="bg-surface border border-white/10 text-on-surface text-sm rounded-sm px-4 py-2.5 outline-none focus:border-primary hover:bg-surface-variant/20 transition-all"
+            className="bg-background/50 border border-white/10 text-on-surface text-sm rounded-sm px-3 py-2 outline-none focus:border-primary hover:bg-surface-variant/20 transition-all"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -352,7 +353,7 @@ const LancamentosTab = React.memo(({
           </select>
 
           <select
-            className="bg-surface border border-white/10 text-on-surface text-sm rounded-sm px-4 py-2.5 outline-none focus:border-primary hover:bg-surface-variant/20 transition-all"
+            className="bg-background/50 border border-white/10 text-on-surface text-sm rounded-sm px-3 py-2 outline-none focus:border-primary hover:bg-surface-variant/20 transition-all"
             value={monthFilter}
             onChange={(e) => setMonthFilter(e.target.value)}
           >
@@ -363,7 +364,7 @@ const LancamentosTab = React.memo(({
           </select>
 
           <select
-            className="bg-surface border border-white/10 text-on-surface text-sm rounded-sm px-4 py-2.5 outline-none focus:border-primary hover:bg-surface-variant/20 transition-all"
+            className="bg-background/50 border border-white/10 text-on-surface text-sm rounded-sm px-3 py-2 outline-none focus:border-primary hover:bg-surface-variant/20 transition-all"
             value={yearFilter}
             onChange={(e) => setYearFilter(e.target.value)}
           >
@@ -375,7 +376,7 @@ const LancamentosTab = React.memo(({
 
           <select
             className={cn(
-              "bg-surface border text-on-surface text-sm rounded-sm px-4 py-2.5 outline-none hover:bg-surface-variant/20 transition-all",
+              "bg-background/50 border text-on-surface text-sm rounded-sm px-3 py-2 outline-none hover:bg-surface-variant/20 transition-all",
               specialFilter !== 'TODOS' ? "border-secondary/60 text-secondary font-bold" : "border-white/10"
             )}
             value={specialFilter}
@@ -394,30 +395,31 @@ const LancamentosTab = React.memo(({
 
           <button
             onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
-            className="bg-surface border border-white/10 text-on-surface-variant text-xs font-bold uppercase px-3 py-2.5 rounded-sm hover:bg-surface-variant/20 hover:text-on-surface transition-all whitespace-nowrap"
+            className="bg-background/50 border border-white/10 text-on-surface-variant text-xs font-bold uppercase px-3 py-2 rounded-sm hover:bg-surface-variant/20 hover:text-on-surface transition-all whitespace-nowrap"
             title={sortOrder === 'desc' ? 'Mais recentes primeiro' : 'Mais antigos primeiro'}
           >
             {sortOrder === 'desc' ? '↓ Recentes' : '↑ Antigos'}
           </button>
 
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 justify-end">
           {selectedMap.size > 0 && (
             <button
               onClick={() => onMarkAsPaidBatch(selectedTxs)}
-              className="bg-primary/20 border border-primary/40 text-primary px-5 py-2.5 rounded-sm text-sm font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary/30 transition-all whitespace-nowrap"
+              className="bg-primary/20 border border-primary/40 text-primary px-4 py-2 rounded-sm text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary/30 transition-all whitespace-nowrap"
             >
               <Check size={18} strokeWidth={3} /> Receber {selectedMap.size} selecionado{selectedMap.size > 1 ? 's' : ''} – {formatBRL(selectedTotal)}
             </button>
           )}
           <button
             onClick={() => setShowNewTxModal(true)}
-            className="bg-primary text-background px-6 py-2.5 rounded-sm text-sm font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all whitespace-nowrap shadow-lg shadow-primary/10"
+            className="bg-primary text-background px-5 py-2 rounded-sm text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all whitespace-nowrap shadow-lg shadow-primary/10"
           >
             <Plus size={18} strokeWidth={3} /> Novo Lançamento
           </button>
         </div>
 
+        </div>
       </div>
 
       {/* Mobile: cards */}
@@ -504,10 +506,10 @@ const LancamentosTab = React.memo(({
 
       {/* Desktop: table */}
       <div className="glass-card overflow-hidden hidden md:block">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left min-w-[1100px]">
             <thead>
-              <tr className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-surface-variant">
+              <tr className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-surface-variant bg-surface">
                 <th className="px-3 py-3 w-8 whitespace-nowrap text-center">
                   <input
                     type="checkbox"
@@ -529,7 +531,7 @@ const LancamentosTab = React.memo(({
                 <th className="px-3 py-3 whitespace-nowrap w-20 sticky right-0 bg-surface z-10 border-l border-surface-variant shadow-[-10px_0_15px_-3px_rgba(0,0,0,0.3)] text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="text-sm divide-y divide-surface-variant">
+            <tbody className="text-sm divide-y divide-surface-variant/80">
               {paginated.map((tx) => (
                 <tr key={tx.id} className={cn("hover:bg-surface-variant/40 transition-colors", selectedMap.has(tx.id) && "bg-primary/5")}>
                   <td className="px-3 py-3 text-center">
@@ -542,13 +544,13 @@ const LancamentosTab = React.memo(({
                       />
                     )}
                   </td>
-                  <td className="px-3 py-3 font-semibold max-w-[180px] truncate" title={tx.fornecedor}>
+                  <td className="px-3 py-2.5 font-semibold max-w-[180px] truncate" title={tx.fornecedor}>
                     {tx.fornecedor}
                   </td>
-                  <td className="px-3 py-3 text-on-surface-variant font-mono text-xs max-w-[120px] truncate" title={tx.numero_boleto || ''}>
+                  <td className="px-3 py-2.5 text-on-surface-variant font-mono text-xs max-w-[120px] truncate" title={tx.numero_boleto || ''}>
                     {tx.numero_boleto || '-'}
                   </td>
-                  <td className="px-3 py-3 text-on-surface-variant max-w-[200px] truncate" title={tx.descricao}>{tx.descricao}</td>
+                  <td className="px-3 py-2.5 text-on-surface-variant max-w-[200px] truncate" title={tx.descricao}>{tx.descricao}</td>
                   <td className={cn(
                     "px-3 py-3 font-bold text-right whitespace-nowrap",
                     tx.valor < 0 ? "text-tertiary" : (isRevenueTransaction(tx) ? "text-success" : "text-primary")

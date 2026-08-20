@@ -2,6 +2,27 @@ import { sql } from '../_db.js';
 import { logSecurity, handleError } from '../_utils.js';
 import bcrypt from 'bcryptjs';
 
+let apiLogsTableChecked = false;
+
+async function ensureApiLogsTable() {
+  if (apiLogsTableChecked) return;
+  apiLogsTableChecked = true;
+  try {
+    await sql`CREATE TABLE IF NOT EXISTS api_logs (
+      id SERIAL PRIMARY KEY,
+      timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      route TEXT NOT NULL,
+      method TEXT NOT NULL,
+      status_code INTEGER NOT NULL,
+      duration_ms INTEGER NOT NULL,
+      response_size_bytes INTEGER NOT NULL DEFAULT 0
+    )`;
+  } catch (e) {
+    apiLogsTableChecked = false;
+    throw e;
+  }
+}
+
 // POST /api?route=setup-tables
 export async function handleSetupTables(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -250,19 +271,7 @@ export async function handleExportBackup(req, res) {
   }
 
   try {
-    const hasApiLogs = await sql`SELECT to_regclass('public.api_logs') AS exists`;
-    if (!hasApiLogs?.[0]?.exists) {
-      await sql`CREATE TABLE IF NOT EXISTS api_logs (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        route TEXT NOT NULL,
-        method TEXT NOT NULL,
-        status_code INTEGER NOT NULL,
-        duration_ms INTEGER NOT NULL,
-        response_size_bytes INTEGER NOT NULL DEFAULT 0,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      )`;
-      await sql`CREATE INDEX IF NOT EXISTS idx_api_logs_route_created ON api_logs(route, created_at DESC)`;
-    }
+    await ensureApiLogsTable();
     const [txs, sups, banks] = await Promise.all([
       sql`SELECT * FROM transactions`,
       sql`SELECT * FROM suppliers`,
@@ -278,15 +287,7 @@ export async function handleExportBackup(req, res) {
 export async function logRequest(req, res, startTime, responseSize = 0) {
   const duration = Date.now() - startTime;
   try {
-    await sql`CREATE TABLE IF NOT EXISTS api_logs (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      route TEXT NOT NULL,
-      method TEXT NOT NULL,
-      status_code INTEGER NOT NULL,
-      duration_ms INTEGER NOT NULL,
-      response_size_bytes INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    )`;
+    await ensureApiLogsTable();
     await sql`
       INSERT INTO api_logs (route, method, status_code, duration_ms, response_size_bytes)
       VALUES (${req.query.route || "unknown"}, ${req.method}, ${res.statusCode}, ${duration}, ${responseSize})

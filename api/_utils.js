@@ -29,6 +29,7 @@ const RATE_LIMIT_TABLE = 'rate_limits';
 
 // Garante que a tabela de rate limit existe (criada automaticamente no primeiro uso)
 let rateLimitTableChecked = false;
+let lastRateLimitCleanupAt = 0;
 
 async function ensureRateLimitTable() {
   if (rateLimitTableChecked) return;
@@ -59,34 +60,34 @@ export const checkRateLimit = async (req, res) => {
   const now = Date.now();
 
   try {
-    // Limpa entradas expiradas antes de checar
-    await sql.unsafe(`DELETE FROM rate_limits WHERE reset_at < $1`, [now]);
-
-    // Tenta pegar registro existente
-    const existing = await sql.unsafe(`SELECT count, reset_at FROM rate_limits WHERE key = $1`, [ip]);
-
-    if (!existing.length) {
-      // Primeira requisição na janela: insere e permite
-      const resetAt = now + RATE_LIMIT_WINDOW_MS;
-      await sql.unsafe(`INSERT INTO rate_limits (key, count, reset_at) VALUES ($1, 1, $2)`, [ip, resetAt]);
-      return true;
+    // Limpa entradas expiradas no máximo uma vez por janela por instância.
+    if (now - lastRateLimitCleanupAt > RATE_LIMIT_WINDOW_MS) {
+      lastRateLimitCleanupAt = now;
+      await sql.unsafe(`DELETE FROM rate_limits WHERE reset_at < $1`, [now]);
     }
 
-    const record = existing[0];
-    if (record.reset_at <= now) {
-      // Janela expirou: reseta contador
-      const resetAt = now + RATE_LIMIT_WINDOW_MS;
-      await sql.unsafe(`UPDATE rate_limits SET count = 1, reset_at = $1 WHERE key = $2`, [resetAt, ip]);
-      return true;
-    }
+    const resetAt = now + RATE_LIMIT_WINDOW_MS;
+    const rows = await sql.unsafe(`
+      INSERT INTO rate_limits (key, count, reset_at)
+      VALUES ($1, 1, $2)
+      ON CONFLICT (key) DO UPDATE SET
+        count = CASE
+          WHEN rate_limits.reset_at <= $3 THEN 1
+          ELSE rate_limits.count + 1
+        END,
+        reset_at = CASE
+          WHEN rate_limits.reset_at <= $3 THEN $2
+          ELSE rate_limits.reset_at
+        END
+      RETURNING count, reset_at
+    `, [ip, resetAt, now]);
 
-    if (record.count >= RATE_LIMIT_MAX) {
+    const record = rows[0];
+    if (record.count > RATE_LIMIT_MAX) {
       res.status(429).json({ error: 'Too many requests' });
       return false;
     }
 
-    // Incrementa contador
-    await sql.unsafe(`UPDATE rate_limits SET count = count + 1 WHERE key = $1`, [ip]);
     return true;
   } catch (e) {
     // Se o DB falhar, permite a requisição (fail-open)

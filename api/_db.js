@@ -7,11 +7,6 @@ pg.types.setTypeParser(pg.types.builtins.DATE, (val) => val);
 export const dbStorage = new AsyncLocalStorage();
 
 let connectionString = process.env.DATABASE_URL;
-// Remove any sslmode that might conflict with our manual ssl config
-if (connectionString) {
-  connectionString = connectionString.replace(/sslmode=[^&?]+/g, 'sslmode=require');
-}
-
 const poolMax = (() => {
   const raw = process.env.PG_POOL_MAX || process.env.DB_POOL_MAX || '2';
   const n = Number.parseInt(String(raw), 10);
@@ -21,6 +16,16 @@ const poolMax = (() => {
 // SSL: por padrão exige certificado válido. Em ambiente local com certificado self-signed,
 // defina PG_SSL_REJECT_UNAUTHORIZED=false (nunca faça isso em produção).
 const sslRejectUnauthorized = String(process.env.PG_SSL_REJECT_UNAUTHORIZED ?? 'true').toLowerCase() !== 'false';
+
+// Remove any sslmode that might conflict with our manual ssl config.
+// When local development opts out of certificate validation, keep the connection
+// string aligned so pg-connection-string does not override the ssl object below.
+if (connectionString) {
+  connectionString = connectionString.replace(
+    /sslmode=[^&?]+/g,
+    sslRejectUnauthorized ? 'sslmode=require' : 'sslmode=no-verify'
+  );
+}
 
 const pool = new pg.Pool({
   connectionString,

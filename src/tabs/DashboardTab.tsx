@@ -323,14 +323,14 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         {periodos.map((p) => (
           <button
             key={p}
             onClick={() => setPeriodoFilter(p)}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+              "px-3 py-1.5 rounded-sm text-xs font-bold transition-all border",
               periodoFilter === p
                 ? "bg-primary text-background border-primary"
                 : "bg-surface-variant/40 text-on-surface-variant border-surface-variant hover:border-primary/40 hover:text-on-surface"
@@ -341,7 +341,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
         ))}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           { label: 'VALOR TOTAL', value: filteredStats.total, format: 'currency' as const, color: '#3b82f6' },
           { label: 'REGISTROS', value: registrosTotal, format: 'number' as const, color: '#3b82f6', desc: 'Volume operacional' },
@@ -355,11 +355,11 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.07 }}
-            className="relative overflow-hidden glass-card p-5 group hover:border-primary/40 transition-all duration-300"
+            className="relative overflow-hidden glass-card p-4 group hover:border-primary/40 transition-all duration-300"
           >
             <div className="absolute top-0 right-0 w-16 h-16 rounded-bl-full" style={{ background: `radial-gradient(circle, ${kpi.color}18, transparent)` }} />
             <p className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/60 mb-2">{kpi.label}</p>
-            <h3 className="text-lg xl:text-2xl font-black font-headline text-on-surface group-hover:text-primary transition-colors leading-tight">
+            <h3 className="text-lg xl:text-[1.35rem] font-black font-headline text-on-surface group-hover:text-primary transition-colors leading-tight">
               <AnimatedNumber value={kpi.value} format={kpi.format} duration={900} />
               {kpi.suffix}
             </h3>
@@ -379,7 +379,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: item.delay }}
-            className={`glass-card p-6 border-l-4 border-${item.color}`}
+            className={`glass-card p-4 border-l-4 border-${item.color}`}
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
@@ -391,7 +391,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
                   </p>
                 </div>
               </div>
-              <span className={`text-3xl font-black text-${item.color}/20`}>{item.percent}%</span>
+              <span className={`text-2xl font-black text-${item.color}/25`}>{item.percent}%</span>
             </div>
             <div className="h-2 bg-white/10 rounded-full overflow-hidden">
               <motion.div
@@ -406,7 +406,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }} className="glass-card p-6 xl:col-span-2">
+        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }} className="glass-card p-5 xl:col-span-2">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-5">
             <div>
               <h4 className="text-lg font-bold font-headline flex items-center gap-2">
@@ -425,7 +425,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
                 key={card.label}
                 type="button"
                 onClick={card.action}
-                className={cn('rounded-xl border p-4 text-left hover:border-primary/60 hover:bg-surface-variant/20 transition-all cursor-pointer', toneClasses[card.tone])}
+                className={cn('rounded-lg border p-3 text-left hover:border-primary/60 hover:bg-surface-variant/20 transition-all cursor-pointer', toneClasses[card.tone])}
                 title="Abrir lançamentos filtrados"
               >
                 <div className="flex items-center justify-between gap-3">
@@ -439,7 +439,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-surface-variant bg-background/30 p-4">
+            <div className="rounded-lg border border-surface-variant bg-background/30 p-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-[10px] font-black uppercase tracking-widest text-tertiary">Maiores vencidos</p>
                 <span className="text-[10px] text-on-surface-variant">lista carregada</span>
@@ -478,7 +478,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
               </div>
             </div>
 
-            <div className="rounded-xl border border-surface-variant bg-background/30 p-4">
+            <div className="rounded-lg border border-surface-variant bg-background/30 p-4">
               <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">Checklist de qualidade</p>
               {[
                 ['Fornecedor não identificado', attentionData.missingSupplier.length, 'missing_supplier'],
@@ -502,7 +502,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-card p-6">
+        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-card p-5">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h4 className="text-lg font-bold font-headline flex items-center gap-2">
@@ -518,7 +518,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
                 key={item.days}
                 type="button"
                 onClick={() => onOpenLancamentos?.({ status: 'PENDENTE', special: `due_${item.days}` })}
-                className="w-full text-left rounded-xl border border-surface-variant bg-background/30 p-4 hover:border-primary/60 hover:bg-surface-variant/10 transition-all cursor-pointer block"
+                className="w-full text-left rounded-lg border border-surface-variant bg-background/30 p-3 hover:border-primary/60 hover:bg-surface-variant/10 transition-all cursor-pointer block"
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-black uppercase tracking-widest">Próximos {item.days} dias</span>
@@ -541,7 +541,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-card p-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="glass-card p-5">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h4 className="text-lg font-bold font-headline">Receitas vs Despesas</h4>
@@ -569,7 +569,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
           </ResponsiveContainer>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="glass-card p-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="glass-card p-5">
           <div className="mb-6">
             <h4 className="text-lg font-bold font-headline">Status dos Lançamentos</h4>
             <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest mt-1">Distribuição atual</p>
@@ -612,7 +612,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }} className="glass-card p-6">
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }} className="glass-card p-5">
           <div className="mb-6 flex items-center justify-between">
             <div>
               <h4 className="text-lg font-bold font-headline">Top Fornecedores</h4>
@@ -653,7 +653,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
           )}
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }} className="glass-card p-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }} className="glass-card p-5">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h4 className="text-lg font-bold font-headline text-success">Últimas Receitas</h4>
@@ -668,7 +668,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.9 + idx * 0.05 }}
-                className="flex flex-col p-3 bg-success/5 rounded-xl border border-success/10 hover:bg-success/10 transition-all group"
+                className="flex flex-col p-3 bg-success/5 rounded-lg border border-success/10 hover:bg-success/10 transition-all group"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-on-surface truncate pr-2">{tx.fornecedor}</span>
@@ -692,7 +692,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }} className="glass-card p-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }} className="glass-card p-5">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h4 className="text-lg font-bold font-headline text-primary">Últimas Despesas</h4>
@@ -707,7 +707,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 1.0 + idx * 0.05 }}
-                className="flex flex-col p-3 bg-primary/5 rounded-xl border border-primary/10 hover:bg-primary/10 transition-all group"
+                className="flex flex-col p-3 bg-primary/5 rounded-lg border border-primary/10 hover:bg-primary/10 transition-all group"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-on-surface truncate pr-2">{tx.fornecedor}</span>

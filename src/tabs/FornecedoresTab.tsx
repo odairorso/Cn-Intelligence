@@ -155,13 +155,13 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
   }, [suppliers]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
+    <div className="space-y-5">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-xl font-bold font-headline">Gestão de Fornecedores</h3>
           <button
             onClick={syncSuppliers}
-            className="bg-white/5 text-on-surface-variant px-4 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-white/10 transition-colors"
+            className="bg-white/5 text-on-surface-variant px-3 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-white/10 transition-colors"
             title="Sincronizar fornecedores dos lançamentos"
           >
             <RefreshCw size={14} /> Sincronizar
@@ -179,14 +179,14 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
                 setAutoMerging(false);
               }
             }}
-            className="bg-primary/10 text-primary px-4 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-primary/20 transition-colors"
+            className="bg-primary/10 text-primary px-3 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-primary/20 transition-colors"
             title="Unificar variações automaticamente"
           >
             <Merge size={14} /> {autoMerging ? 'Unificando...' : 'Unificar Auto'}
           </button>
           <button
             onClick={() => { setManualMergeTarget(''); setManualMergeAlias(''); setShowMergeModal(true); }}
-            className="bg-secondary/10 text-secondary px-4 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-secondary/20 transition-colors"
+            className="bg-secondary/10 text-secondary px-3 py-2 rounded-sm text-xs font-bold flex items-center gap-2 hover:bg-secondary/20 transition-colors"
             title="Unificar dois fornecedores manualmente"
           >
             <Merge size={14} /> Unificar Manual
@@ -194,7 +194,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
         </div>
         <button
           onClick={() => setShowNewSupplierModal(true)}
-          className="bg-primary text-background px-6 py-2.5 rounded-sm text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all"
+          className="bg-primary text-background px-5 py-2 rounded-sm text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-dark transition-all self-start lg:self-auto"
         >
           <UserPlus size={18} /> Novo Fornecedor
         </button>
@@ -207,7 +207,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
             value={searchSupplier}
             onChange={(e) => setSearchSupplier(e.target.value)}
             placeholder="Buscar fornecedor..."
-            className="w-full bg-surface-variant/20 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-sm outline-none focus:border-primary"
+            className="w-full bg-background/50 border border-white/10 rounded-sm pl-10 pr-4 py-2 text-sm outline-none focus:border-primary"
           />
         </div>
       </div>
@@ -217,7 +217,7 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
           <h4 className="text-sm font-bold text-on-surface mb-3">Unificar Fornecedores Duplicados</h4>
           <div className="space-y-3">
             {duplicateGroups.map((g, idx) => (
-              <div key={g.key} className="flex flex-wrap items-center gap-2 border border-white/10 rounded-lg p-3">
+              <div key={g.key} className="flex flex-wrap items-center gap-2 border border-white/10 rounded-sm p-3">
                 <select
                   value={mergeTarget && g.names.includes(mergeTarget) ? mergeTarget : g.names[0]}
                   onChange={(e) => setMergeTarget(e.target.value)}
@@ -267,9 +267,9 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
         {filteredSuppliers.map(s => (
-          <div key={s.id || normalizeSupplierName(s.nome)} className="glass-card p-6 flex flex-col gap-4 relative group cursor-pointer hover:border-primary/40" onClick={() => onSelectSupplier(s)}>
+          <div key={s.id || normalizeSupplierName(s.nome)} className="glass-card p-5 flex flex-col gap-3 relative group cursor-pointer hover:border-primary/40 min-h-[210px]" onClick={() => onSelectSupplier(s)}>
             {s.id && !String(s.id).startsWith('virtual-') && (
               <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
@@ -288,21 +288,21 @@ const FornecedoresTab = ({ suppliers, transactions, deleteSupplier, setShowNewSu
                 </button>
               </div>
             )}
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-sm bg-primary/20 flex items-center justify-center text-primary font-bold text-xl border border-primary/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-sm bg-primary/20 flex items-center justify-center text-primary font-bold text-lg border border-primary/10 shrink-0">
                 {s.nome.charAt(0)}
               </div>
-              <div>
-                <h4 className="font-bold text-on-surface">{s.nome}</h4>
+              <div className="min-w-0">
+                <h4 className="font-bold text-on-surface truncate" title={s.nome}>{s.nome}</h4>
                 <p className="text-[10px] font-black text-on-surface-variant/60 tracking-wider mt-0.5">{s.cnpj || 'CNPJ NÃO INFORMADO'}</p>
               </div>
             </div>
-            <div className="space-y-2 text-sm mt-2">
+            <div className="space-y-2 text-sm mt-1">
               <p className="flex items-center gap-2 text-on-surface-variant/80 text-xs font-medium">
-                <FileText size={14} className="opacity-40" /> {s.email || 'E-mail não informado'}
+                <FileText size={14} className="opacity-40 shrink-0" /> <span className="truncate">{s.email || 'E-mail não informado'}</span>
               </p>
               <p className="flex items-center gap-2 text-on-surface-variant/80 text-xs font-medium">
-                <HelpCircle size={14} className="opacity-40" /> {s.telefone || 'Telefone não informado'}
+                <HelpCircle size={14} className="opacity-40 shrink-0" /> <span className="truncate">{s.telefone || 'Telefone não informado'}</span>
               </p>
             </div>
             <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center">
