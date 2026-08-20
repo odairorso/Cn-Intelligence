@@ -433,7 +433,8 @@ export async function handleFolhaPush(req, res) {
 
     const duplicateRows = await sql`
       SELECT id FROM transactions
-      WHERE fornecedor = ${fornecedor || `Folha de Pagamento - ${competencia}`}
+      WHERE uid = ${uid}
+        AND fornecedor = ${fornecedor || `Folha de Pagamento - ${competencia}`}
         AND empresa = ${empresa || 'Geral'}
         AND deleted_at IS NULL
         AND abs(valor - ${valorNumber}) < 0.0001

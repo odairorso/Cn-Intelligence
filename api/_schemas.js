@@ -52,9 +52,10 @@ export const ContaContabilSchema = z.object({
 });
 
 export const ExtractBoletoSchema = z.object({
-  text: z.string().optional().nullable(),
-  fileName: z.string().optional().nullable(),
-  pdfBase64: z.string().optional().nullable(),
+  text: z.string().max(100000, 'Texto muito grande').optional().nullable(),
+  fileName: z.string().max(500, 'Nome de arquivo muito grande').optional().nullable(),
+  // Base64 de PDF: limite ~15MB antes de codificar (base64 infla ~33%).
+  pdfBase64: z.string().max(20_000_000, 'PDF muito grande (limite: 15MB)').optional().nullable(),
 });
 
 export const SaveBoletoPatternSchema = z.object({

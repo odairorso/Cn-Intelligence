@@ -52,10 +52,9 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
             if (res.user?.email) localStorage.setItem('cn_last_logged_email', res.user.email);
             window.location.reload();
           } else if (res.registrationRequired) {
-            apiAuth.googleRegister(res.email!, res.name || '', '', idToken).then(() => {
-              if (res.email) localStorage.setItem('cn_last_logged_email', res.email);
-              window.location.reload();
-            }).catch(err => setError(err.message || 'Erro ao cadastrar com Google.'));
+            // Cadastro fechado: novos usuários Google só são criados por um administrador.
+            setError('Sua conta Google ainda não está cadastrada. Entre em contato com o administrador para liberar o acesso.');
+            setLoading(false);
           } else {
             setError('Falha na autenticação com Google.');
           }
@@ -117,19 +116,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
         localStorage.setItem('cn_last_logged_email', res.user.email);
         window.location.reload();
       } else if (res.registrationRequired) {
-        // Auto-registrar direto sem pedir senha da empresa
-        const success = await apiAuth.googleRegister(
-          res.email,
-          res.name,
-          '', // sem senha da empresa
-          response.credential
-        );
-        if (success) {
-          localStorage.setItem('cn_last_logged_email', res.email);
-          window.location.reload();
-        } else {
-          setError('Não foi possível completar o cadastro com Google. Tente novamente.');
-        }
+        // Cadastro fechado: novos usuários Google só são criados por um administrador.
+        setError('Sua conta Google ainda não está cadastrada. Entre em contato com o administrador para liberar o acesso.');
       } else {
         setError('Falha na autenticação do Google.');
       }

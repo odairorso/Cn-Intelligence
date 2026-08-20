@@ -179,6 +179,14 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Token do Google inválido ou expirado.' });
       }
       const googleData = await googleRes.json();
+
+      // Valida a audiência (client_id) para impedir aceitar tokens emitidos para outro client OAuth.
+      const expectedAud = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+      if (expectedAud && googleData.aud !== expectedAud) {
+        await logSecurity(req, res, `Token Google com aud inesperada: ${googleData.aud || 'vazio'}`);
+        return res.status(403).json({ error: 'Token do Google inválido (audiência não reconhecida).' });
+      }
+
       const googleEmail = googleData.email;
       const googleName = googleData.name || googleData.given_name || 'Usuário Google';
 
@@ -227,10 +235,18 @@ export default async function handler(req, res) {
       try { bodyData = JSON.parse(bodyData); } catch (e) {}
     }
 
-    const { email, name, credential } = bodyData;
+    const { email, name, companyPassword, credential } = bodyData;
 
     if (!email || !credential) {
       return res.status(400).json({ error: 'E-mail e credential do Google são obrigatórios.' });
+    }
+
+    // Cadastro fechado: somente quem informa a senha da empresa (APP_PASSWORD) pode se autocadastrar.
+    if (!APP_PASSWORD) {
+      return res.status(503).json({ error: 'Cadastro pelo Google desabilitado. Entre em contato com o administrador.' });
+    }
+    if (typeof companyPassword !== 'string' || companyPassword !== APP_PASSWORD) {
+      return res.status(403).json({ error: 'Senha da empresa inválida. Entre em contato com o administrador.' });
     }
 
     const safeName = (name || 'Usuário Google').trim();
@@ -241,6 +257,14 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Token do Google inválido ou expirado.' });
       }
       const googleData = await googleRes.json();
+
+      // Valida a audiência (client_id) do token Google.
+      const expectedAud = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+      if (expectedAud && googleData.aud !== expectedAud) {
+        await logSecurity(req, res, `Cadastro Google com aud inesperada: ${googleData.aud || 'vazio'}`);
+        return res.status(403).json({ error: 'Token do Google inválido (audiência não reconhecida).' });
+      }
+
       if (googleData.email.toLowerCase().trim() !== email.toLowerCase().trim()) {
         return res.status(400).json({ error: 'E-mail informado não corresponde à conta do Google.' });
       }
@@ -296,17 +320,12 @@ export default async function handler(req, res) {
     }
   } else {
     if (route === 'folha-push') {
-      let targetUid = req.query.uid || (req.body && typeof req.body === 'object' ? req.body.uid : null);
-      if (!targetUid && req.body && typeof req.body === 'string') {
-        try {
-          const parsed = JSON.parse(req.body);
-          targetUid = parsed.uid;
-        } catch {}
-      }
-      if (!targetUid) {
-        return res.status(401).json({ error: 'folha-push requires uid' });
-      }
-      req.authUid = targetUid;
+      // Rota de integração: autenticada por FOLHA_INTEGRATION_TOKEN no handler.
+      // NUNCA confiamos em uid vindo do request. A integração SEMPRE escreve como o
+      // tenant canônico do sistema (APP_UID). Isso impede que um token de integração
+      // vazado crie/altere lançamentos de qualquer outro usuário.
+      req.authUid = process.env.APP_UID || 'odair';
+      req.authRole = 'admin';
     }
   }
 

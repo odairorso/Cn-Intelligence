@@ -27,6 +27,7 @@ export async function handleTransactions(req, res) {
   if (req.method === 'GET') {
     try {
       const uid = req.authUid;
+      const isAdmin = req.authRole === 'admin';
       const { limit, offset, year, month, search, tipo, empresa, status, conta_contabil_id, startDate, endDate } = req.query;
 
       if (!uid || uid === 'undefined' || uid === 'null') {
@@ -39,7 +40,9 @@ export async function handleTransactions(req, res) {
       if (isNaN(parsedLimit)) parsedLimit = defaultLimit;
       if (isNaN(parsedOffset)) parsedOffset = 0;
 
-      let query = sql`SELECT * FROM transactions WHERE (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL`;
+      let query = isAdmin
+        ? sql`SELECT * FROM transactions WHERE (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL`
+        : sql`SELECT * FROM transactions WHERE uid = ${uid} AND deleted_at IS NULL`;
       if (tipo && tipo !== 'TODOS') query = sql`${query} AND tipo = ${tipo}`;
       if (empresa && empresa !== 'TODOS') query = sql`${query} AND upper(empresa) = upper(${empresa})`;
       if (status && status !== 'TODOS') {
@@ -219,12 +222,15 @@ export async function handleTransactionById(req, res) {
   const uid = req.authUid;
   if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
+  const isAdmin = req.authRole === 'admin';
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: 'ID missing' });
 
   if (req.method === 'GET') {
     try {
-      const rows = await sql`SELECT * FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL`;
+      const rows = isAdmin
+        ? await sql`SELECT * FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL`
+        : await sql`SELECT * FROM transactions WHERE id = ${id} AND uid = ${uid} AND deleted_at IS NULL`;
       if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
       const tx = rows[0];
       return res.json({
@@ -242,7 +248,9 @@ export async function handleTransactionById(req, res) {
   if (req.method === 'PUT') {
     try {
       // Verificar propriedade
-      const existing = await sql`SELECT id, fornecedor, valor, status FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL`;
+      const existing = isAdmin
+        ? await sql`SELECT id, fornecedor, valor, status FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL`
+        : await sql`SELECT id, fornecedor, valor, status FROM transactions WHERE id = ${id} AND uid = ${uid} AND deleted_at IS NULL`;
       if (existing.length === 0) return res.status(404).json({ error: 'Not found' });
 
       const body = req.body || {};
@@ -298,7 +306,7 @@ export async function handleTransactionById(req, res) {
       const rows = await sql`
         UPDATE transactions
         SET ${setClause}, updated_at = NOW(), updated_by = ${uid}
-        WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL
+        WHERE id = ${id} AND ${isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`} AND deleted_at IS NULL
         RETURNING *`;
         
       if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -317,13 +325,15 @@ export async function handleTransactionById(req, res) {
 
   if (req.method === 'DELETE') {
     try {
-      const existing = await sql`SELECT * FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL`;
+      const existing = isAdmin
+        ? await sql`SELECT * FROM transactions WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL) AND deleted_at IS NULL`
+        : await sql`SELECT * FROM transactions WHERE id = ${id} AND uid = ${uid} AND deleted_at IS NULL`;
       if (existing.length === 0) return res.status(404).json({ error: 'Not found' });
       // Soft Delete — nunca apaga o registro do banco
       await sql`
         UPDATE transactions
         SET deleted_at = NOW(), deleted_by = ${uid}, updated_at = NOW()
-        WHERE id = ${id} AND (uid = ${uid} OR uid IS NULL)
+        WHERE id = ${id} AND ${isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`}
       `;
       await auditLog(uid, 'DELETE', id, existing[0], null);
       return res.status(200).json({ success: true });
@@ -507,18 +517,26 @@ export async function handleTransactionsBatchUpdate(req, res) {
 
   const uid = req.authUid;
   if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+  const isAdmin = req.authRole === 'admin';
 
   const { ids, banco, dataPagamento } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'IDs missing' });
 
   try {
     // Validação de ownership: só permite atualizar IDs que pertencem ao usuário
-    const ownedRows = await sql`
-      SELECT id FROM transactions 
-      WHERE (uid = ${uid} OR uid IS NULL) 
-        AND deleted_at IS NULL 
-        AND id = ANY(${ids}::uuid[])
-    `;
+    const ownedRows = isAdmin
+      ? await sql`
+          SELECT id FROM transactions 
+          WHERE (uid = ${uid} OR uid IS NULL) 
+            AND deleted_at IS NULL 
+            AND id = ANY(${ids}::uuid[])
+        `
+      : await sql`
+          SELECT id FROM transactions 
+          WHERE uid = ${uid}
+            AND deleted_at IS NULL 
+            AND id = ANY(${ids}::uuid[])
+        `;
     const ownedIds = new Set(ownedRows.map(r => r.id));
 
     // Verifica se todos os IDs solicitados pertencem ao usuário
@@ -532,7 +550,7 @@ export async function handleTransactionsBatchUpdate(req, res) {
 
     const pDate = parseDateToPg(dataPagamento);
     const bancoValue = (banco && String(banco).trim() !== '') ? String(banco).trim() : null;
-    await sql`UPDATE transactions SET status = 'PAGO', banco = ${bancoValue}, pagamento = ${pDate}, paid_at = COALESCE(paid_at, NOW()), updated_at = NOW() WHERE (uid = ${uid} OR uid IS NULL) AND id = ANY(${ids}::uuid[])`;
+    await sql`UPDATE transactions SET status = 'PAGO', banco = ${bancoValue}, pagamento = ${pDate}, paid_at = COALESCE(paid_at, NOW()), updated_at = NOW() WHERE ${isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`} AND id = ANY(${ids}::uuid[])`;
     return res.json({ message: 'Updated successfully' });
   } catch (e) {
     return handleError(res, e, 'transactions.js handleTransactionsBatchUpdate');
@@ -545,6 +563,7 @@ export async function handleTransactionsDedupeMovimentos(req, res) {
 
   const uid = req.authUid;
   if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+  const isAdmin = req.authRole === 'admin';
 
   try {
     // Soft delete dos duplicados (não apaga de verdade)
@@ -555,7 +574,7 @@ export async function handleTransactionsDedupeMovimentos(req, res) {
           ORDER BY created_at DESC
         ) as row_num
         FROM transactions
-        WHERE (uid = ${uid} OR uid IS NULL) AND status = 'PAGO' AND deleted_at IS NULL
+        WHERE ${isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`} AND status = 'PAGO' AND deleted_at IS NULL
       )
       UPDATE transactions
       SET deleted_at = NOW(), deleted_by = ${uid}, updated_at = NOW()
