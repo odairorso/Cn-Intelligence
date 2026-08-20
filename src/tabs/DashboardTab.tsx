@@ -321,6 +321,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
     info: 'border-primary/30 bg-primary/5 text-primary',
     neutral: 'border-surface-variant bg-surface-variant/20 text-on-surface',
   };
+  const flow30 = attentionData.flowWindows.find((item) => item.days === 30);
 
   return (
     <div className="space-y-5">
@@ -341,24 +342,65 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
         ))}
       </div>
 
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="relative overflow-hidden rounded-lg border border-primary/25 bg-surface p-5 shadow-[0_16px_60px_-36px_rgba(59,130,246,0.95)]"
+      >
+        <div className="absolute inset-y-0 left-0 w-1.5 bg-primary" />
+        <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(59,130,246,0.16),rgba(16,185,129,0.06)_42%,rgba(245,158,11,0.08))]" />
+        <div className="relative grid grid-cols-1 gap-5 xl:grid-cols-[1.25fr_2fr] xl:items-center">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/80">Painel financeiro</p>
+            <h3 className="mt-2 text-3xl font-black leading-tight text-on-surface md:text-4xl font-headline">
+              {formatBRL(filteredStats.total)}
+            </h3>
+            <p className="mt-2 max-w-xl text-xs font-medium text-on-surface-variant">
+              Visão consolidada dos lançamentos carregados, qualidade operacional e pressão de vencimentos.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              { label: 'Saúde', value: `${healthScore}%`, desc: healthLabel, color: healthColor },
+              { label: 'Em aberto', value: filteredStats.pendentes, desc: 'pendentes', color: '#f59e0b' },
+              { label: 'Vencidos', value: filteredStats.vencidos, desc: 'corrigir agora', color: '#ef4444' },
+              { label: '30 dias', value: formatBRL(flow30?.saldo || 0), desc: 'saldo previsto', color: (flow30?.saldo || 0) >= 0 ? '#10b981' : '#ef4444' },
+            ].map((item) => (
+              <div key={item.label} className="rounded-lg border border-white/10 bg-background/45 p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/60">{item.label}</p>
+                <p className="mt-2 text-xl font-black leading-tight" style={{ color: item.color }}>{item.value}</p>
+                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant/55">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.section>
+
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: 'VALOR TOTAL', value: filteredStats.total, format: 'currency' as const, color: '#3b82f6' },
-          { label: 'REGISTROS', value: registrosTotal, format: 'number' as const, color: '#3b82f6', desc: 'Volume operacional' },
-          { label: 'PENDENTES', value: filteredStats.pendentes, format: 'number' as const, color: '#f59e0b', desc: 'Aguardando' },
-          { label: 'PAGOS', value: filteredStats.pagos, format: 'number' as const, color: '#10b981', desc: 'Liquidados' },
-          { label: 'VENCIDOS', value: filteredStats.vencidos, format: 'number' as const, color: '#ef4444', desc: 'Ação necessária' },
-          { label: 'SAÚDE', value: healthScore, format: 'number' as const, color: healthColor, desc: healthLabel, suffix: '%' },
+          { label: 'VALOR TOTAL', value: filteredStats.total, format: 'currency' as const, color: '#3b82f6', icon: <Banknote size={18} /> },
+          { label: 'REGISTROS', value: registrosTotal, format: 'number' as const, color: '#60a5fa', desc: 'Volume operacional', icon: <ClipboardList size={18} /> },
+          { label: 'PENDENTES', value: filteredStats.pendentes, format: 'number' as const, color: '#f59e0b', desc: 'Aguardando', icon: <Calendar size={18} /> },
+          { label: 'PAGOS', value: filteredStats.pagos, format: 'number' as const, color: '#10b981', desc: 'Liquidados', icon: <CheckCircle size={18} /> },
+          { label: 'VENCIDOS', value: filteredStats.vencidos, format: 'number' as const, color: '#ef4444', desc: 'Ação necessária', icon: <AlertTriangle size={18} /> },
+          { label: 'SAÚDE', value: healthScore, format: 'number' as const, color: healthColor, desc: healthLabel, suffix: '%', icon: <PieChartIcon size={18} /> },
         ].map((kpi, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.07 }}
-            className="relative overflow-hidden glass-card p-4 group hover:border-primary/40 transition-all duration-300"
+            className="relative overflow-hidden glass-card p-4 pl-5 group hover:border-primary/40 transition-all duration-300"
           >
-            <div className="absolute top-0 right-0 w-16 h-16 rounded-bl-full" style={{ background: `radial-gradient(circle, ${kpi.color}18, transparent)` }} />
-            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/60 mb-2">{kpi.label}</p>
+            <div className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: kpi.color }} />
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant/60">{kpi.label}</p>
+              <span className="flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-background/60" style={{ color: kpi.color }}>
+                {kpi.icon}
+              </span>
+            </div>
             <h3 className="text-lg xl:text-[1.35rem] font-black font-headline text-on-surface group-hover:text-primary transition-colors leading-tight">
               <AnimatedNumber value={kpi.value} format={kpi.format} duration={900} />
               {kpi.suffix}
