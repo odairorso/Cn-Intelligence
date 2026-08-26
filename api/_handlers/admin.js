@@ -112,7 +112,8 @@ export async function handleSetupTables(req, res) {
       { codigo: '4.7',  nome: 'Dia das Mães',          tipo: 'RECEITA' },
       { codigo: '4.8',  nome: 'Aluguel',               tipo: 'RECEITA' },
       { codigo: '4.9',  nome: 'Receita Cartão',        tipo: 'RECEITA' },
-      { codigo: '4.10', nome: 'Empréstimo',            tipo: 'RECEITA' }
+      { codigo: '4.10', nome: 'Empréstimo',            tipo: 'RECEITA' },
+      { codigo: '4.11', nome: 'Rendimentos de Aplicações Financeiras', tipo: 'RECEITA' }
     ];
 
     for (const acc of defaultAccounts) {

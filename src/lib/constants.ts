@@ -27,7 +27,8 @@ export const DEFAULT_ACCOUNTS: ContaContabil[] = [
   { id: 0, codigo: '4.7',  nome: 'Dia das Mães',          tipo: 'RECEITA', ativo: true },
   { id: 0, codigo: '4.8',  nome: 'Aluguel',               tipo: 'RECEITA', ativo: true },
   { id: 0, codigo: '4.9',  nome: 'Receita Cartão',        tipo: 'RECEITA', ativo: true },
-  { id: 0, codigo: '4.10', nome: 'Empréstimo',            tipo: 'RECEITA', ativo: true }
+  { id: 0, codigo: '4.10', nome: 'Empréstimo',            tipo: 'RECEITA', ativo: true },
+  { id: 0, codigo: '4.11', nome: 'Rendimentos de Aplicações Financeiras', tipo: 'RECEITA', ativo: true }
 ];
 
 export const PAGE_SIZE = 50;
