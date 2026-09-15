@@ -208,7 +208,15 @@ export async function handleTransactions(req, res) {
                 ${vDate}, ${pDate}, ROUND(${valorNumber}::numeric, 2), ${status || 'PENDENTE'}, ${bancoValue}, ${tipo}, ${numero_boleto || null}, ${resolvedContaContabilId ?? null}, ${uid}, ${paidAtValue})
         RETURNING *`;
       await auditLog(uid, 'CREATE', rows[0].id, null, rows[0]);
-      return res.status(201).json(rows[0]);
+      const tx = rows[0];
+      const formatted = {
+        ...tx,
+        vencimento: tx.vencimento ? new Date(tx.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
+        pagamento: tx.pagamento ? new Date(tx.pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
+        valor: Number(tx.valor),
+        juros: Number(tx.juros || 0),
+      };
+      return res.status(201).json(formatted);
     } catch (e) {
       return handleError(res, e, 'transactions.js handleTransactions POST');
     }

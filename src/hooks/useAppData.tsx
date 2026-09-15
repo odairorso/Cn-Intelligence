@@ -84,6 +84,7 @@ type AppDataActions = {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   fetchTransactions: (append?: boolean, year?: string, month?: string, search?: string, tipo?: string, options?: any) => Promise<void>;
+  setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
   addTransaction: (tx: Partial<Transaction>) => Promise<void>;
   updateTransaction: (id: string, data: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
@@ -329,6 +330,8 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   // --------------------------------------------------------------
   // Fetch Transactions
   // --------------------------------------------------------------
+  const lastFiltersRef = useRef<{ year?: string; month?: string; search?: string; tipo?: string; options?: any }>({});
+
   const fetchTransactions = useCallback(async (append = false, year?: string, month?: string, search?: string, tipo?: string, options?: any) => {
     if (!apiAuth.isAuthenticated()) {
       showNotification('Faça login para acessar os dados.', 'error');
@@ -336,24 +339,46 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     }
     try {
       setLoadingTransactions(true);
-      const limit = options?.limit || 100;
+
+      // Preservar filtros anteriores se for chamada de atualização sem parâmetros (ex: pós-criação ou syncSuppliers)
+      const activeYear = year !== undefined ? year : (!append ? lastFiltersRef.current.year : undefined);
+      const activeMonth = month !== undefined ? month : (!append ? lastFiltersRef.current.month : undefined);
+      const activeSearch = search !== undefined ? search : (!append ? lastFiltersRef.current.search : undefined);
+      const activeTipo = tipo !== undefined ? tipo : (!append ? lastFiltersRef.current.tipo : undefined);
+      const activeOptions = options !== undefined ? options : (!append ? lastFiltersRef.current.options : undefined);
+
+      if (!append) {
+        lastFiltersRef.current = {
+          year: activeYear,
+          month: activeMonth,
+          search: activeSearch,
+          tipo: activeTipo,
+          options: activeOptions,
+        };
+      }
+
+      const limit = activeOptions?.limit || 100;
       const offset = append ? transactionPageRef.current * limit : 0;
       const data = await api.getTransactions(
         limit,
         offset,
-        year,
-        month,
-        search,
-        tipo,
-        options?.empresa,
-        options?.status,
-        options?.conta_contabil_id,
-        options?.startDate,
-        options?.endDate
+        activeYear,
+        activeMonth,
+        activeSearch,
+        activeTipo,
+        activeOptions?.empresa,
+        activeOptions?.status,
+        activeOptions?.conta_contabil_id,
+        activeOptions?.startDate,
+        activeOptions?.endDate
       );
       const list = Array.isArray(data) ? data : [];
       if (append) {
-        setTransactions((prev) => [...prev, ...list]);
+        setTransactions((prev) => {
+          const existingIds = new Set(prev.map(t => String(t.id)));
+          const newItems = list.filter(t => !existingIds.has(String(t.id)));
+          return [...prev, ...newItems];
+        });
         transactionPageRef.current += 1;
         setTransactionPage(transactionPageRef.current);
       } else {
@@ -378,7 +403,14 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     if (loadingTransactions || !hasMoreTransactions) return;
     setIsLoadingMore(true);
     try {
-      await fetchTransactions(true);
+      await fetchTransactions(
+        true,
+        lastFiltersRef.current.year,
+        lastFiltersRef.current.month,
+        lastFiltersRef.current.search,
+        lastFiltersRef.current.tipo,
+        lastFiltersRef.current.options
+      );
     } finally {
       setIsLoadingMore(false);
     }
@@ -748,6 +780,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     login,
     logout,
     fetchTransactions,
+    setTransactions,
     addTransaction,
     updateTransaction,
     deleteTransaction,
@@ -783,7 +816,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     extractBoleto,
     importBoletoOFX,
   }), [
-    login, logout, fetchTransactions, addTransaction, updateTransaction,
+    login, logout, fetchTransactions, setTransactions, addTransaction, updateTransaction,
     deleteTransaction, loadMoreTransactions, markAsPaid, markAsPaidBatch,
     importOFX, fixReceitasTipo, dedupeMovimentos, searchTransactions,
     fetchSuppliers, addSupplier, updateSupplier, deleteSupplier,
