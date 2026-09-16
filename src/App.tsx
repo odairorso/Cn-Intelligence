@@ -50,6 +50,7 @@ const FolhaTab = lazy(() => import('./tabs/FolhaTab'));
 const NewTxModal = lazy(() => import('./modals/NewTxModal'));
 const EditTxModal = lazy(() => import('./modals/EditTxModal'));
 const SelectBankModal = lazy(() => import('./modals/SelectBankModal'));
+const BatchPayModal = lazy(() => import('./modals/BatchPayModal'));
 const NewBankModal = lazy(() => import('./modals/NewBankModal'));
 const EditBankModal = lazy(() => import('./modals/EditBankModal'));
 const TransferModal = lazy(() => import('./modals/TransferModal'));
@@ -2539,14 +2540,13 @@ export default function App() {
       )}
 
       {showPayBatchModal && (
-        <SelectBankModal
-          transactionId="batch"
-          valor={showPayBatchModal.reduce((sum, tx) => sum + tx.valor, 0)}
+        <BatchPayModal
+          transactions={showPayBatchModal}
           banks={safeBanks}
           initialDate={showPayBatchModal.length > 0 ? toInputDate(showPayBatchModal[0].vencimento) : undefined}
           onClose={() => setShowPayBatchModal(null)}
-          onConfirm={(banco, dataPagamento) => {
-            markAsPaidBatch(showPayBatchModal.map(t => t.id), banco, dataPagamento);
+          onConfirm={(items, banco, dataPagamento) => {
+            markAsPaidBatch(items, banco, dataPagamento);
             setShowPayBatchModal(null);
           }}
         />

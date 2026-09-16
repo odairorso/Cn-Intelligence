@@ -527,8 +527,14 @@ export async function handleTransactionsBatchUpdate(req, res) {
   if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
   const isAdmin = req.authRole === 'admin';
 
-  const { ids, banco, dataPagamento } = req.body;
-  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'IDs missing' });
+  const { ids: rawIds, items, jurosMap, banco, dataPagamento } = req.body;
+  const ids = Array.isArray(items) 
+    ? items.map(it => typeof it === 'object' ? String(it.id) : String(it)) 
+    : (Array.isArray(rawIds) ? rawIds.map(String) : []);
+
+  if (ids.length === 0) return res.status(400).json({ error: 'IDs missing' });
+
+  const finalJurosMap = jurosMap || (Array.isArray(items) ? Object.fromEntries(items.filter(it => it && typeof it === 'object').map(it => [String(it.id), Number(it.juros) || 0])) : null);
 
   try {
     // Validação de ownership: só permite atualizar IDs que pertencem ao usuário
@@ -558,7 +564,25 @@ export async function handleTransactionsBatchUpdate(req, res) {
 
     const pDate = parseDateToPg(dataPagamento);
     const bancoValue = (banco && String(banco).trim() !== '') ? String(banco).trim() : null;
-    await sql`UPDATE transactions SET status = 'PAGO', banco = ${bancoValue}, pagamento = ${pDate}, paid_at = COALESCE(paid_at, NOW()), updated_at = NOW() WHERE ${isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`} AND id = ANY(${ids}::uuid[])`;
+
+    if (finalJurosMap && Object.keys(finalJurosMap).length > 0) {
+      for (const id of ids) {
+        const jurosVal = Number(finalJurosMap[id]) || 0;
+        await sql`
+          UPDATE transactions 
+          SET status = 'PAGO', 
+              banco = ${bancoValue}, 
+              pagamento = ${pDate}, 
+              juros = ${jurosVal}, 
+              paid_at = COALESCE(paid_at, NOW()), 
+              updated_at = NOW() 
+          WHERE ${isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`} 
+            AND id = ${id}::uuid
+        `;
+      }
+    } else {
+      await sql`UPDATE transactions SET status = 'PAGO', banco = ${bancoValue}, pagamento = ${pDate}, paid_at = COALESCE(paid_at, NOW()), updated_at = NOW() WHERE ${isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`} AND id = ANY(${ids}::uuid[])`;
+    }
     return res.json({ message: 'Updated successfully' });
   } catch (e) {
     return handleError(res, e, 'transactions.js handleTransactionsBatchUpdate');

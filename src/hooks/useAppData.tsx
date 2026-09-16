@@ -89,8 +89,7 @@ type AppDataActions = {
   updateTransaction: (id: string, data: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   loadMoreTransactions: () => Promise<void>;
-  markAsPaid: (tx: Transaction, banco?: string) => Promise<void>;
-  markAsPaidBatch: (ids: string[], banco?: string, dataPagamento?: string) => Promise<void>;
+  markAsPaidBatch: (itemsOrIds: (string | { id: string; juros?: number })[], banco?: string, dataPagamento?: string) => Promise<void>;
   importOFX: (ofxData: any[]) => Promise<void>;
   fixReceitasTipo: () => Promise<number>;
   dedupeMovimentos: () => Promise<number>;
@@ -433,15 +432,31 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     showNotification('Marcado como pago!', 'success');
   }, [showNotification]);
 
-  const markAsPaidBatch = useCallback(async (ids: string[], banco?: string, dataPagamento?: string) => {
-    if (!Array.isArray(ids) || ids.length === 0) return;
+  const markAsPaidBatch = useCallback(async (
+    itemsOrIds: (string | { id: string; juros?: number })[],
+    banco?: string,
+    dataPagamento?: string
+  ) => {
+    if (!Array.isArray(itemsOrIds) || itemsOrIds.length === 0) return;
+    const items = itemsOrIds.map(item => (typeof item === 'string' ? { id: item, juros: 0 } : item));
+    const ids = items.map(i => String(i.id));
+    const jurosMap = Object.fromEntries(items.map(i => [String(i.id), Number(i.juros) || 0]));
+
     const today = new Date().toISOString().split('T')[0];
     const dataPag = dataPagamento || today;
-    await api.updateTransactionsBatch(ids.map(String), banco || '', dataPag);
+    await api.updateTransactionsBatch(items, banco || '', dataPag);
     
     setTransactions((prev) => prev.map((t) => {
-      if (ids.map(String).includes(String(t.id))) {
-        return { ...t, status: 'PAGO', banco: banco || t.banco, pagamento: dataPag };
+      const idStr = String(t.id);
+      if (ids.includes(idStr)) {
+        const jurosVal = jurosMap[idStr] !== undefined ? jurosMap[idStr] : (t.juros || 0);
+        return { 
+          ...t, 
+          status: 'PAGO', 
+          banco: banco || t.banco, 
+          pagamento: dataPag,
+          juros: jurosVal
+        };
       }
       return t;
     }));
