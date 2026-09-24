@@ -677,11 +677,12 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     status?: string,
     search?: string,
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    dateField?: 'vencimento' | 'pagamento'
   ) => {
     if (!apiAuth.isAuthenticated()) return;
     try {
-      const data = await api.getStats(year, period, empresa, tipo, status, search, startDate, endDate);
+      const data = await api.getStats(year, period, empresa, tipo, status, search, startDate, endDate, dateField);
       setGlobalStats(data);
     } catch (err: any) {
       if (err.message?.includes('Autenticação')) setIsAuthorized(false);

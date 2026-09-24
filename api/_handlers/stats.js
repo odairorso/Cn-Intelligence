@@ -11,7 +11,7 @@ export async function handleStats(req, res) {
   if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
   try {
-    const { year, period, empresa, tipo, status, search, startDate, endDate } = req.query;
+    const { year, period, empresa, tipo, status, search, startDate, endDate, dateField } = req.query;
 
     const isAdmin = req.authRole === 'admin';
     const uidFilterSql = isAdmin
@@ -36,25 +36,33 @@ export async function handleStats(req, res) {
     }
 
     // Filtro de data dinâmico
+    const isPaymentDate = dateField === 'pagamento';
+    const dateCol = isPaymentDate ? sql`pagamento` : sql`vencimento`;
+
     let dateFilterSql;
     if (startDate || endDate) {
       dateFilterSql = sql`1=1`;
       if (startDate) {
-        dateFilterSql = sql`${dateFilterSql} AND vencimento >= ${startDate}`;
+        dateFilterSql = sql`${dateFilterSql} AND ${dateCol} >= ${startDate}`;
       }
       if (endDate) {
-        dateFilterSql = sql`${dateFilterSql} AND vencimento <= ${endDate}`;
+        dateFilterSql = sql`${dateFilterSql} AND ${dateCol} <= ${endDate}`;
+      }
+      if (isPaymentDate) {
+        dateFilterSql = sql`${dateFilterSql} AND pagamento IS NOT NULL`;
       }
     } else {
       if (year && year !== 'TODOS' && !isRange(year)) {
         const y = parseInt(year);
-        dateFilterSql = sql`AND vencimento >= ${y + '-01-01'} AND vencimento <= ${y + '-12-31'}`;
+        dateFilterSql = sql`AND ${dateCol} >= ${y + '-01-01'} AND ${dateCol} <= ${y + '-12-31'}`;
+        if (isPaymentDate) dateFilterSql = sql`${dateFilterSql} AND pagamento IS NOT NULL`;
       } else if (isRange(year) || isRange(period)) {
         const range = isRange(year) ? year : period;
         const [start, end] = range.split('-');
-        dateFilterSql = sql`AND vencimento >= ${start + '-01-01'} AND vencimento <= ${end + '-12-31'}`;
+        dateFilterSql = sql`AND ${dateCol} >= ${start + '-01-01'} AND ${dateCol} <= ${end + '-12-31'}`;
+        if (isPaymentDate) dateFilterSql = sql`${dateFilterSql} AND pagamento IS NOT NULL`;
       } else {
-        dateFilterSql = sql``;
+        dateFilterSql = isPaymentDate ? sql`AND pagamento IS NOT NULL` : sql``;
       }
     }
 
@@ -88,7 +96,7 @@ export async function handleStats(req, res) {
     if (startDate || endDate) {
       fluxRows = await sql`
         SELECT
-          EXTRACT(MONTH FROM vencimento) as month_num,
+          EXTRACT(MONTH FROM ${dateCol}) as month_num,
           COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo = 'DESPESA'
             THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
@@ -96,13 +104,13 @@ export async function handleStats(req, res) {
             ELSE 0 END), 0) as despesas
         FROM transactions
         WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
-        GROUP BY EXTRACT(MONTH FROM vencimento)
+        GROUP BY EXTRACT(MONTH FROM ${dateCol})
         ORDER BY month_num`;
     } else if (year && year !== 'TODOS' && !activeRange) {
       const y = parseInt(year);
       fluxRows = await sql`
         SELECT
-          EXTRACT(MONTH FROM vencimento) as month_num,
+          EXTRACT(MONTH FROM ${dateCol}) as month_num,
           COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo = 'DESPESA'
             THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
@@ -112,13 +120,13 @@ export async function handleStats(req, res) {
         WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
           AND vencimento >= ${y + '-01-01'}
           AND vencimento <= ${y + '-12-31'}
-        GROUP BY EXTRACT(MONTH FROM vencimento)
+        GROUP BY EXTRACT(MONTH FROM ${dateCol})
         ORDER BY month_num`;
     } else if (activeRange) {
       const [start, end] = activeRange.split('-');
       fluxRows = await sql`
         SELECT
-          EXTRACT(MONTH FROM vencimento) as month_num,
+          EXTRACT(MONTH FROM ${dateCol}) as month_num,
           COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo = 'DESPESA'
             THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
@@ -128,12 +136,12 @@ export async function handleStats(req, res) {
         WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
           AND vencimento >= ${start + '-01-01'}
           AND vencimento <= ${end + '-12-31'}
-        GROUP BY EXTRACT(MONTH FROM vencimento)
+        GROUP BY EXTRACT(MONTH FROM ${dateCol})
         ORDER BY month_num`;
     } else {
       fluxRows = await sql`
         SELECT
-          EXTRACT(MONTH FROM vencimento) as month_num,
+          EXTRACT(MONTH FROM ${dateCol}) as month_num,
           COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo = 'DESPESA'
             THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
@@ -143,7 +151,7 @@ export async function handleStats(req, res) {
         WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
           AND vencimento >= DATE_TRUNC('year', CURRENT_DATE)
           AND vencimento < DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year'
-        GROUP BY EXTRACT(MONTH FROM vencimento)
+        GROUP BY EXTRACT(MONTH FROM ${dateCol})
         ORDER BY month_num`;
     }
 
@@ -162,9 +170,9 @@ export async function handleStats(req, res) {
       LIMIT 10`;
 
     const yearRows = await sql`
-      SELECT DISTINCT EXTRACT(YEAR FROM vencimento)::int as year
+      SELECT DISTINCT EXTRACT(YEAR FROM ${dateCol})::int as year
       FROM transactions
-      WHERE 1=1 ${uidFilterSql} AND vencimento IS NOT NULL
+      WHERE 1=1 ${uidFilterSql} AND ${dateCol} IS NOT NULL
       ORDER BY year DESC`;
 
     return res.json({

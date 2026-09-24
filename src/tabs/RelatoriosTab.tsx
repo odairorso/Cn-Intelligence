@@ -23,7 +23,8 @@ interface RelatoriosTabProps {
     status?: string,
     search?: string,
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    dateField?: 'vencimento' | 'pagamento'
   ) => Promise<void>;
   contasContabeis: ContaContabil[];
 }
@@ -31,17 +32,20 @@ interface RelatoriosTabProps {
 const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<RelatoriosTabProps, 'transactions' | 'fetchTransactions'>) => {
   const [reportTransactions, setReportTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [dateField, setDateField] = useState<'vencimento' | 'pagamento'>('vencimento');
 
   const years = useMemo(() => {
     const y = reportTransactions.map(tx => {
-      const dateParts = tx.vencimento.includes('-') ? tx.vencimento.split('-') : tx.vencimento.split('/');
-      return tx.vencimento.includes('-') ? dateParts[0] : dateParts[2];
+      const d = dateField === 'pagamento' ? (tx.pagamento || tx.vencimento) : tx.vencimento;
+      if (!d) return null;
+      const dateParts = d.includes('-') ? d.split('-') : d.split('/');
+      return d.includes('-') ? dateParts[0] : dateParts[2];
     });
-    const set = new Set<string>(y.filter(Boolean));
+    const set = new Set<string>(y.filter(Boolean) as string[]);
     const currentYear = new Date().getFullYear();
     for (let yr = currentYear; yr >= 2020; yr -= 1) set.add(String(yr));
     return Array.from(set).sort().reverse();
-  }, [reportTransactions]);
+  }, [reportTransactions, dateField]);
 
   const [selectedYear, setSelectedYear] = useState<string>('TODOS');
 
@@ -109,7 +113,8 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
           apiStatus,
           Number.isFinite(contaId as any) ? (contaId as number) : undefined,
           queryStartDate,
-          queryEndDate
+          queryEndDate,
+          dateField
         );
         setReportTransactions(Array.isArray(data) ? data : []);
       } catch (err) {
@@ -129,7 +134,8 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
       apiStatus,
       undefined,
       queryStartDate,
-      queryEndDate
+      queryEndDate,
+      dateField
     );
   }, [
     filterType,
@@ -141,6 +147,7 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
     selectedTipo,
     selectedStatus,
     selectedContaContabil,
+    dateField,
     fetchStats
   ]);
 
@@ -173,12 +180,16 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
     const searchNormalized = removeAccents(searchTerm);
     const filtered = reportTransactions.filter(tx => {
       let matchesDateRange = true;
-      if (filterType === 'PERIODO') {
+      const targetDate = dateField === 'pagamento' ? tx.pagamento : tx.vencimento;
+
+      if (dateField === 'pagamento' && !tx.pagamento) {
+        matchesDateRange = false;
+      } else if (filterType === 'PERIODO') {
         let txDateStr = '';
-        if (tx.vencimento) {
-          const parts = tx.vencimento.includes('/') ? tx.vencimento.split('/') : tx.vencimento.split('-');
-          if (tx.vencimento.includes('/')) {
-            // DD/MM/YYYY
+        if (targetDate) {
+          const parts = targetDate.includes('/') ? targetDate.split('/') : targetDate.split('-');
+          if (targetDate.includes('/')) {
+            // DD/MM/YYYY -> YYYY-MM-DD
             txDateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
           } else {
             // YYYY-MM-DD
@@ -188,12 +199,16 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
         if (startDate && txDateStr < startDate) matchesDateRange = false;
         if (endDate && txDateStr > endDate) matchesDateRange = false;
       } else {
-        const parts = tx.vencimento.includes('/') ? tx.vencimento.split('/') : tx.vencimento.split('-');
-        const year = tx.vencimento.includes('/') ? parts[2] : parts[0];
-        const month = tx.vencimento.includes('/') ? parts[1] : parts[1];
-        const matchesYear = selectedYear === 'TODOS' || year === selectedYear;
-        const matchesMonth = selectedMonth === 'TODOS' || month === selectedMonth;
-        matchesDateRange = matchesYear && matchesMonth;
+        if (!targetDate) {
+          matchesDateRange = false;
+        } else {
+          const parts = targetDate.includes('/') ? targetDate.split('/') : targetDate.split('-');
+          const year = targetDate.includes('/') ? parts[2] : parts[0];
+          const month = targetDate.includes('/') ? parts[1].padStart(2, '0') : parts[1].padStart(2, '0');
+          const matchesYear = selectedYear === 'TODOS' || year === selectedYear;
+          const matchesMonth = selectedMonth === 'TODOS' || month === selectedMonth;
+          matchesDateRange = matchesYear && matchesMonth;
+        }
       }
 
       const matchesCompany = selectedCompany === 'TODOS' || normalizeCompanyKey(tx.empresa) === normalizeCompanyKey(selectedCompany);
@@ -213,8 +228,10 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
     });
 
     return filtered.sort((a, b) => {
-      const keyA = dateSortKey(a.vencimento);
-      const keyB = dateSortKey(b.vencimento);
+      const dateA = dateField === 'pagamento' ? (a.pagamento || a.vencimento) : a.vencimento;
+      const dateB = dateField === 'pagamento' ? (b.pagamento || b.vencimento) : b.vencimento;
+      const keyA = dateSortKey(dateA);
+      const keyB = dateSortKey(dateB);
       if (keyA !== keyB) {
         return keyA - keyB;
       }
@@ -222,7 +239,7 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
       const fornB = String(b.fornecedor || '').toLowerCase();
       return fornA.localeCompare(fornB, 'pt-BR');
     });
-  }, [reportTransactions, filterType, startDate, endDate, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, todayKey, searchTerm]);
+  }, [reportTransactions, filterType, startDate, endDate, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, todayKey, searchTerm, dateField]);
 
   const periodTotals = useMemo(() => {
     let total = 0;
@@ -314,9 +331,10 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
         return dateStr;
       };
 
+      const dateFieldLabel = dateField === 'pagamento' ? 'Data de Pagamento' : 'Data de Vencimento';
       const periodDisplay = filterType === 'PERIODO' 
-        ? `${formatDateForDisplay(startDate)} a ${formatDateForDisplay(endDate)}` 
-        : `${monthLabel} de ${selectedYear}`;
+        ? `${formatDateForDisplay(startDate)} a ${formatDateForDisplay(endDate)} (${dateFieldLabel})` 
+        : `${monthLabel} de ${selectedYear} (${dateFieldLabel})`;
 
       const pendentesCount = filteredData.filter(tx => effectiveStatus(tx) === 'PENDENTE').length;
       const vencidosCount = filteredData.filter(tx => effectiveStatus(tx) === 'VENCIDO').length;
@@ -599,12 +617,32 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
           </select>
         </div>
         <div className="space-y-1">
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase">Filtrar Data por</label>
+          <select
+            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
+            style={{ backgroundColor: '#1e1e2e' }}
+            value={dateField}
+            onChange={e => setDateField(e.target.value as 'vencimento' | 'pagamento')}
+          >
+            <option value="vencimento" className="bg-surface text-on-surface">Data de Vencimento</option>
+            <option value="pagamento" className="bg-surface text-on-surface">Data de Pagamento</option>
+          </select>
+        </div>
+        <div className="space-y-1">
           <label className="text-[10px] font-bold text-on-surface-variant uppercase">Status</label>
           <select
             className="w-full bg-surface border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary text-on-surface"
             style={{ backgroundColor: '#1e1e2e' }}
             value={selectedStatus}
-            onChange={e => setSelectedStatus(e.target.value)}
+            onChange={e => {
+              const newStatus = e.target.value;
+              setSelectedStatus(newStatus);
+              if (newStatus === 'PAGO') {
+                setDateField('pagamento');
+              } else if (newStatus === 'PENDENTE' || newStatus === 'VENCIDO' || newStatus === 'NAO_PAGO') {
+                setDateField('vencimento');
+              }
+            }}
           >
             <option value="TODOS" className="bg-surface text-on-surface">Todos</option>
             <option value="PENDENTE" className="bg-surface text-on-surface">Em Aberto (Pendentes + Vencidos)</option>
