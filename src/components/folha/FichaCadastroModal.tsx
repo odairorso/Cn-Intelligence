@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Professor, isEstagiaria, isMonitora } from '../../lib/folhaTypes';
+import { Professor, isEstagiaria, isMonitora, gerarLancamento } from '../../lib/folhaTypes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -249,21 +249,8 @@ export default function FichaCadastroModal({ professor, open, onOpenChange }: Fi
         professor.segmentoIds.forEach((sid) => {
           const seg = segmentos.find((s) => s.id === sid);
           if (seg) {
-            const isMon = isMonitora(seg.nome);
-            const horasBaseSemanais = isMon ? 0 : (Number(professor.segmentoHoras?.[seg.id]) || Number(seg.horasSemanais) || 0);
-            
-            if (isEstagiaria(seg.nome)) {
-              totalEstimado += Math.round(((1000 / 30) * horasBaseSemanais) * 100) / 100;
-            } else {
-              const horasMensais = horasBaseSemanais * 4.5;
-              const haPercent = Number(seg.horasAtividade) / (Number(seg.horasSemanais) * 4.5 || 1) || 0;
-              const horasAtividade = horasMensais * haPercent;
-              const repouso = (horasMensais + horasAtividade) / 6;
-              const totalHoras = horasMensais + repouso + horasAtividade;
-              const valorHora = Number(seg.valorHora) || 0;
-              const ajudaCusto = Number(seg.ajudaCusto) || 0;
-              totalEstimado += Math.round((totalHoras * valorHora + ajudaCusto) * 100) / 100;
-            }
+            const l = gerarLancamento(professor, seg, '');
+            totalEstimado += l.totalPagar;
           }
         });
         if (totalEstimado > 0) {

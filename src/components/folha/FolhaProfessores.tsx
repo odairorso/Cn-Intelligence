@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Badge } from '../ui/badge';
 import { Plus, Search, MoreHorizontal, Pencil, Trash2, UserX, UserCheck, FileText } from 'lucide-react';
-import { Professor, gerarLancamento, isMonitora, isEstagiaria } from '../../lib/folhaTypes';
+import {Professor, gerarLancamento, isMonitora, isEstagiaria, getMonitoraValor } from '../../lib/folhaTypes';
 import { formatDateBR, formatCurrency, toNumberBR, formatNumberBR } from '../../lib/folhaUtils';
 import { toast } from 'sonner';
 import FichaCadastroModal from './FichaCadastroModal';
@@ -269,11 +269,6 @@ export default function FolhaProfessores() {
       if (!seg) return;
       const hs = toNumberBR(s.horas); // toNumberBR handles comma as decimal
 
-      if (isMonitora(seg.nome)) {
-        salario += Number(seg.ajudaCusto) || 0;
-        return;
-      }
-
       dummyProf.segmentoHoras![seg.id] = hs;
       const l = gerarLancamento(dummyProf, seg, '');
       salario += l.totalPagar;
@@ -292,10 +287,6 @@ export default function FolhaProfessores() {
       if (!seg) return;
       const hs = Number(prof.segmentoHoras?.[sid]) || 0;
       if (hs === 0 && !isMonitora(seg.nome)) return;
-      if (isMonitora(seg.nome)) {
-        total += Number(seg.ajudaCusto) || 0;
-        return;
-      }
       const l = gerarLancamento(prof, seg, '');
       total += l.totalPagar;
     });
@@ -331,17 +322,16 @@ export default function FolhaProfessores() {
       if (!seg) return;
       const hs = toNumberBR(s.horas);
 
-      if (isMonitora(seg.nome)) {
-        const fixo = Number(seg.ajudaCusto) || 0;
-        salario += fixo;
-        items.push(`${seg.nome}: ${formatCurrency(fixo)} (fixo)`);
-        return;
-      }
-
       dummyProf.segmentoHoras![seg.id] = hs;
       const l = gerarLancamento(dummyProf, seg, '');
       salario += l.totalPagar;
-      items.push(`${seg.nome} (${hs}h): ${formatCurrency(l.totalPagar)}`);
+
+      if (isMonitora(seg.nome)) {
+        const hsLabel = hs <= 12 && hs > 0 ? ` (${hs}h)` : '';
+        items.push(`${seg.nome}${hsLabel}: ${formatCurrency(l.totalPagar)}`);
+      } else {
+        items.push(`${seg.nome} (${hs}h): ${formatCurrency(l.totalPagar)}`);
+      }
     });
 
     return (
@@ -416,9 +406,16 @@ export default function FolhaProfessores() {
                         const seg = segmentos.find((s) => s.id === sid);
                         const hs = prof.segmentoHoras?.[sid] || 0;
                         const isMon = seg && isMonitora(seg.nome);
+                        let badgeText = seg?.nome || '?';
+                        if (isMon && seg) {
+                          const valMon = getMonitoraValor(prof, seg);
+                          badgeText += hs <= 12 && hs > 0 ? ` (${hs}h - ${formatCurrency(valMon)})` : ` (${formatCurrency(valMon)})`;
+                        } else {
+                          badgeText += ` (${hs}h)`;
+                        }
                         return (
                           <Badge key={sid} variant="secondary" className="bg-surface-variant/40 border-surface-variant text-on-surface-variant text-[10px] py-0 px-2 font-normal">
-                            {seg?.nome || '?'} {isMon ? '' : `(${hs}h)`}
+                            {badgeText}
                           </Badge>
                         );
                       })}
@@ -530,28 +527,40 @@ export default function FolhaProfessores() {
             </div>
 
             <div className="border-t border-surface-variant pt-4">
-              <Label className="text-on-surface-variant font-semibold text-xs block mb-3">Horas Semanais por Turma</Label>
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-on-surface-variant font-semibold text-xs">Carga Horária e Turmas</Label>
+                <span className="text-[10px] text-on-surface-variant/60">Monitora: digite horas (ex: 4h) ou valor em R$ (ex: 809,50)</span>
+              </div>
               <div className="grid grid-cols-2 gap-x-8 gap-y-3 max-h-[240px] overflow-y-auto pr-1">
                 {slots.map((slot, index) => {
                   const seg = segmentos.find((s) => s.id === slot.segId);
+                  const isMon = seg && isMonitora(seg.nome);
                   return (
                     <div key={index} className="flex items-center justify-between gap-3">
-                      <span className="text-xs text-on-surface-variant font-medium truncate flex-1">{seg?.nome}</span>
-                      <Input
-                        type="text"
-                        placeholder="0"
-                        value={slot.horas}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const newSlots = slots.map((s, idx) => (idx === index ? { ...s, horas: val } : s));
-                          setSlots(newSlots);
-                          const est = calcularSalarioEstimado(newSlots);
-                          if (est > 0) {
-                            setSalarioFixo(String(est));
-                          }
-                        }}
-                        className="w-20 text-right bg-background border-surface-variant text-on-surface h-8"
-                      />
+                      <div className="flex flex-col truncate flex-1">
+                        <span className="text-xs text-on-surface-variant font-medium truncate">{seg?.nome}</span>
+                        {isMon && (
+                          <span className="text-[10px] text-blue-400/80">Valor R$ ou horas (4h / 809,50)</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {isMon && <span className="text-[11px] text-on-surface-variant/60 font-semibold">R$</span>}
+                        <Input
+                          type="text"
+                          placeholder={isMon ? '809,50' : '0'}
+                          value={slot.horas}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const newSlots = slots.map((s, idx) => (idx === index ? { ...s, horas: val } : s));
+                            setSlots(newSlots);
+                            const est = calcularSalarioEstimado(newSlots);
+                            if (est > 0) {
+                              setSalarioFixo(String(est));
+                            }
+                          }}
+                          className={`${isMon ? 'w-24' : 'w-20'} text-right bg-background border-surface-variant text-on-surface h-8`}
+                        />
+                      </div>
                     </div>
                   );
                 })}
@@ -644,28 +653,40 @@ export default function FolhaProfessores() {
             </div>
 
             <div className="border-t border-surface-variant pt-4">
-              <Label className="text-on-surface-variant font-semibold text-xs block mb-3">Horas Semanais por Turma</Label>
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-on-surface-variant font-semibold text-xs">Carga Horária e Turmas</Label>
+                <span className="text-[10px] text-on-surface-variant/60">Monitora: digite horas (ex: 4h) ou valor em R$ (ex: 809,50)</span>
+              </div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 max-h-[200px] overflow-y-auto pr-1">
                 {editSlots.map((slot, index) => {
                   const seg = segmentos.find((s) => s.id === slot.segId);
+                  const isMon = seg && isMonitora(seg.nome);
                   return (
                     <div key={index} className="flex items-center justify-between gap-3">
-                      <span className="text-xs text-on-surface-variant font-medium truncate flex-1">{seg?.nome}</span>
-                      <Input
-                        type="text"
-                        placeholder="0"
-                        value={slot.horas}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const newSlots = editSlots.map((s, idx) => (idx === index ? { ...s, horas: val } : s));
-                          setEditSlots(newSlots);
-                          const est = calcularSalarioEstimado(newSlots);
-                          if (est > 0) {
-                            setEditSalarioFixo(String(est));
-                          }
-                        }}
-                        className="w-20 text-right bg-background border-surface-variant text-on-surface h-8"
-                      />
+                      <div className="flex flex-col truncate flex-1">
+                        <span className="text-xs text-on-surface-variant font-medium truncate">{seg?.nome}</span>
+                        {isMon && (
+                          <span className="text-[10px] text-blue-400/80">Valor R$ ou horas (4h / 809,50)</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {isMon && <span className="text-[11px] text-on-surface-variant/60 font-semibold">R$</span>}
+                        <Input
+                          type="text"
+                          placeholder={isMon ? '809,50' : '0'}
+                          value={slot.horas}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const newSlots = editSlots.map((s, idx) => (idx === index ? { ...s, horas: val } : s));
+                            setEditSlots(newSlots);
+                            const est = calcularSalarioEstimado(newSlots);
+                            if (est > 0) {
+                              setEditSalarioFixo(String(est));
+                            }
+                          }}
+                          className={`${isMon ? 'w-24' : 'w-20'} text-right bg-background border-surface-variant text-on-surface h-8`}
+                        />
+                      </div>
                     </div>
                   );
                 })}

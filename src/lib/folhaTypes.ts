@@ -87,6 +87,21 @@ export function isMonitora(nome: string): boolean {
   return n.includes('monitora');
 }
 
+export function getMonitoraValor(professor: Professor, segmento: Segmento): number {
+  const val = Number(professor.segmentoHoras?.[segmento.id]);
+  if (val !== undefined && !isNaN(val) && val > 0) {
+    // Se informou horas semanais (ex: <= 12 horas, como 4h em uma escala base de 8h), calcula proporcionalmente
+    if (val <= 12) {
+      const base = Number(segmento.ajudaCusto) || 1619;
+      return round2((val / 8) * base);
+    }
+    // Se informou o valor em R$ diretamente (ex: 809.50)
+    return round2(val);
+  }
+  return Number(segmento.ajudaCusto) || 0;
+}
+
+
 export function bolsaEstagiaria(horasSemanais: number): number {
   return round2((1000 / 30) * horasSemanais);
 }
@@ -109,8 +124,31 @@ export function gerarLancamento(
   competencia: string
 ): Omit<Lancamento, 'id'> {
   const isMon = isMonitora(segmento.nome);
+
+  if (isMon) {
+    const totalPagar = getMonitoraValor(professor, segmento);
+    const rawVal = Number(professor.segmentoHoras?.[segmento.id]) || 0;
+    const hsSemanais = rawVal > 0 && rawVal <= 12
+      ? rawVal
+      : (rawVal > 12 ? round1((totalPagar / (Number(segmento.ajudaCusto) || 1619)) * 8) : 0);
+    const horasMensais = round4(calcularHorasMensais(hsSemanais));
+
+    return {
+      professorId: professor.id,
+      segmentoId: segmento.id,
+      competencia,
+      horasMensais,
+      repouso: 0,
+      horasAtividade: 0,
+      totalHoras: horasMensais,
+      ajudaCusto: totalPagar,
+      totalPagar,
+      status: 'aberto',
+    };
+  }
+
   // Forçar Number() pois PostgreSQL NUMERIC retorna strings
-  const horasBaseSemanais = isMon ? 0 : (Number(professor.segmentoHoras?.[segmento.id]) || Number(professor.horasSemanais) || Number(segmento.horasSemanais) || 0);
+  const horasBaseSemanais = Number(professor.segmentoHoras?.[segmento.id]) || Number(professor.horasSemanais) || Number(segmento.horasSemanais) || 0;
   const horasMensais = round4(calcularHorasMensais(horasBaseSemanais));
 
   if (isEstagiaria(segmento.nome)) {

@@ -121,9 +121,12 @@ export default function FolhaLancamentos() {
                     const seg = segMap.get(lanc.segmentoId || lanc.segmento_id);
                     const isMon = seg && isMonitora(seg.nome);
 
-                    const horasSemanais = isFechado 
-                      ? (isMon ? 0 : Number(lanc.horas_mensais || lanc.horasMensais) / 4.5)
-                      : (isMon ? 0 : (prof?.segmentoHoras?.[seg.id] ?? 0));
+                    const rawHs = isFechado 
+                      ? (Number(lanc.horas_mensais || lanc.horasMensais) / 4.5 || 0)
+                      : (Number(prof?.segmentoHoras?.[seg.id]) || 0);
+                    const horasSemanais = isMon
+                      ? (rawHs > 0 && rawHs <= 12 ? rawHs : (Number(lanc.total_horas || lanc.totalHoras || 0) / 4.5 || 0))
+                      : rawHs;
                     
                     const valorHora = isFechado
                       ? Number(seg?.valorHora || 0)
@@ -144,7 +147,7 @@ export default function FolhaLancamentos() {
                             {seg?.nome || 'Turma não encontrada'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right text-on-surface-variant">{isMon ? '-' : horasSemanais.toFixed(1)}</TableCell>
+                        <TableCell className="text-right text-on-surface-variant">{isMon ? (horasSemanais > 0 ? horasSemanais.toFixed(1) : '-') : horasSemanais.toFixed(1)}</TableCell>
                         <TableCell className="text-right text-on-surface-variant">{isMon ? '-' : hsMensais.toFixed(1)}</TableCell>
                         <TableCell className="text-right text-on-surface-variant">{isMon ? '-' : hsRepouso.toFixed(1)}</TableCell>
                         <TableCell className="text-right text-on-surface-variant">{isMon ? '-' : hsAtividade.toFixed(1)}</TableCell>
