@@ -375,7 +375,9 @@ INSERT INTO contas_contabeis (codigo, nome, tipo, ativo) VALUES
     ('4.5',  'Aplicação Bancária',         'RECEITA', true),
     ('4.6',  'Outras Receitas',            'RECEITA', true),
     ('4.7',  'Dia das Mães',               'RECEITA', true),
-    ('4.11', 'Rendimentos de Aplicações Financeiras', 'RECEITA', true)
+    ('4.11', 'Rendimentos de Aplicações Financeiras', 'RECEITA', true),
+    ('4.12', 'Dia dos Pais',               'RECEITA', true),
+    ('4.13', 'Dia das Crianças',           'RECEITA', true)
 ON CONFLICT (codigo) DO NOTHING;
 
 -- ---------------------------------------------------------------
