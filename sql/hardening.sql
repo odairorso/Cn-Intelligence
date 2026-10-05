@@ -368,6 +368,8 @@ INSERT INTO contas_contabeis (codigo, nome, tipo, ativo) VALUES
     ('3.13', 'PIS / COFINS',               'DESPESA', true),
     ('3.14', 'PIS',                        'DESPESA', true),
     ('3.15', 'COFINS',                     'DESPESA', true),
+    ('3.31', 'Festa / Evento Dia dos Pais',        'DESPESA', true),
+    ('3.36', 'Festa / Evento Dia das Crianças',    'DESPESA', true),
     ('4.1',  'Mensalidades',               'RECEITA', true),
     ('4.2',  'Repasses',                   'RECEITA', true),
     ('4.3',  'Matrículas',                 'RECEITA', true),

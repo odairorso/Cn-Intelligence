@@ -18,6 +18,8 @@ export const DEFAULT_ACCOUNTS: ContaContabil[] = [
   { id: 0, codigo: '3.13', nome: 'PIS / COFINS',          tipo: 'DESPESA', ativo: true },
   { id: 0, codigo: '3.14', nome: 'PIS',                   tipo: 'DESPESA', ativo: true },
   { id: 0, codigo: '3.15', nome: 'COFINS',                tipo: 'DESPESA', ativo: true },
+  { id: 0, codigo: '3.31', nome: 'Festa / Evento Dia dos Pais', tipo: 'DESPESA', ativo: true },
+  { id: 0, codigo: '3.36', nome: 'Festa / Evento Dia das Crianças', tipo: 'DESPESA', ativo: true },
   { id: 0, codigo: '4.1',  nome: 'Mensalidades',          tipo: 'RECEITA', ativo: true },
   { id: 0, codigo: '4.2',  nome: 'Repasses',              tipo: 'RECEITA', ativo: true },
   { id: 0, codigo: '4.3',  nome: 'Matrículas',            tipo: 'RECEITA', ativo: true },
