@@ -51,20 +51,24 @@ export async function handleExtractBoleto(req, res) {
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const generateContentWithFallback = async (contents) => {
-      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', process.env.GEMINI_MODEL].filter(Boolean);
+    const generateContentWithFallback = async (contents, config) => {
+      const modelsToTry = [process.env.GEMINI_MODEL, 'gemini-2.0-flash', 'gemini-1.5-flash'].filter(Boolean);
       let lastErr = null;
       for (const modelName of modelsToTry) {
         try {
-          // No @google/genai a chamada é direta em ai.models.generateContent
-          return await ai.models.generateContent({
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Timeout ao consultar IA modelo ${modelName}`)), 7000)
+          );
+          const callPromise = ai.models.generateContent({
             model: modelName,
-            contents: contents
+            contents: contents,
+            config: config
           });
+          return await Promise.race([callPromise, timeoutPromise]);
         } catch (e) {
           lastErr = e;
-          if (String(e?.message).includes('404')) continue;
-          throw e;
+          console.warn(`[boleto] Modelo ${modelName} falhou:`, e.message);
+          continue;
         }
       }
       throw lastErr;
@@ -131,10 +135,7 @@ export async function handleExtractBoleto(req, res) {
 
       const contents = [{ role: 'user', parts }];
 
-      const resultGemini = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: contents,
-        config: {
+      const config = {
           responseMimeType: 'application/json',
           responseSchema: {
             type: 'object',
@@ -150,8 +151,8 @@ export async function handleExtractBoleto(req, res) {
             },
             required: ['fornecedor', 'vencimento', 'valor']
           }
-        }
-      });
+        };
+      const resultGemini = await generateContentWithFallback(contents, config);
 
       const responseText = resultGemini.text || resultGemini.response?.text?.() || '';
       if (responseText) {
@@ -224,19 +225,17 @@ export async function handleExtractBoleto(req, res) {
       });
     }
 
-    // Se a IA falhou, usamos o fallback de padrão se existir
-    if (pattern && pattern.fornecedor && pattern.fornecedor !== 'Fornecedor não identificado' && extractedText.length > 100) {
-      const dateMatch = srcUpper.match(/VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/);
+    // Se a IA falhou ou deu timeout, usa o padrão do banco OU regex local
+    if (!extracted) {
+      const dateMatch = srcUpper.match(/VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/) ||
+                        srcUpper.match(/(\d{2}\/\d{2}\/\d{4})/);
       const valorMatch = srcUpper.match(/VALOR[^0-9]*([\d.,]+)/);
       const numero = extractLocalBoletoNumber(srcUpper);
 
-      let fallbackDesc = `${fileName} - ${pattern.descricao || ''}`;
-      let fallbackCcId = pattern.conta_contabil_id;
+      let fallbackDesc = pattern?.descricao ? `${fileName} - ${pattern.descricao}` : fileName.replace(/\.pdf$/i, '').trim();
+      let fallbackCcId = pattern?.conta_contabil_id || null;
 
-      const isEditoraFallback = pattern.fornecedor && 
-        (pattern.fornecedor.toUpperCase().includes('EDITORA E DISTRIBUIDORA') || 
-         pattern.fornecedor.toUpperCase().includes('EDITORA E DISTRIB'));
-
+      const isEditoraFallback = (pattern?.fornecedor || rawBenefName || '').toUpperCase().includes('EDITORA');
       if (isEditoraFallback) {
         const pagadorMatch = srcUpper.match(/PAGADOR\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
         const sacadoMatch = srcUpper.match(/SACADO\s+([\w\u00C0-\u017E\s.'-]{5,80})(?=\s+\d{3}\.|\s+CPF|\s+CNPJ|\s+\d{2,3}\.\d{3})/i);
@@ -246,30 +245,28 @@ export async function handleExtractBoleto(req, res) {
         }
         try {
           const rowCc = await sql`SELECT id FROM contas_contabeis WHERE codigo = '4.3' AND ativo = true LIMIT 1`;
-          if (rowCc.length > 0) {
-            fallbackCcId = rowCc[0].id;
-          }
+          if (rowCc.length > 0) fallbackCcId = rowCc[0].id;
         } catch (e) {
           console.error('Erro ao buscar conta contábil 4.3 em fallback:', e);
         }
       }
 
+      const localFornecedor = pattern?.fornecedor || rawBenefName || supplierFromFileName(fileName) || 'Fornecedor não identificado';
+
       return res.json({
-        fornecedor: pattern.fornecedor,
+        fornecedor: localFornecedor,
         vencimento: dateMatch?.[1] || '',
         valor: parseFloat(valorMatch?.[1]?.replace(/\./g, '').replace(',', '.') || '0'),
         cnpj: rawCnpj,
         descricao: fallbackDesc,
-        empresa: pattern.empresa,
-        tipo: pattern.tipo,
+        empresa: pattern?.empresa || '',
+        tipo: pattern?.tipo || 'DESPESA',
         numero_boleto: numero,
         conta_contabil_id: fallbackCcId,
-        _from_pattern: true,
+        _from_pattern: !!pattern,
         _gemini_error: geminiError
       });
     }
-
-    throw new Error(geminiError || 'Falha na resposta da IA');
   } catch (e) {
     return handleError(res, e, 'boleto.js handleExtractBoleto');
   }

@@ -501,13 +501,25 @@ export const api = {
 
   async extractBoleto(text?: string, fileName?: string, pdfBase64?: string): Promise<Record<string, unknown>> {
     if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
-    const res = await fetchWithSecurity(`${API_BASE}?route=extract-boleto`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, fileName, pdfBase64 }),
-    });
-    if (!res.ok) throw await buildHttpError(res, 'Falha ao extrair boleto');
-    return res.json();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetchWithSecurity(`${API_BASE}?route=extract-boleto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, fileName, pdfBase64 }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw await buildHttpError(res, 'Falha ao extrair boleto');
+      return await res.json();
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        throw new Error('Tempo limite excedido na IA (8s)');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   },
 
   async saveBoletoPattern(data: {

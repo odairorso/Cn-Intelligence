@@ -534,7 +534,7 @@ export default function App() {
       const errorMsg = String((err as any)?.message || err || 'Erro desconhecido na API');
       
       // Notifica o usuário sobre a falha da IA
-      showNotification(`IA falhou: ${errorMsg}. Usando dados extraídos localmente.`, 'error');
+      console.warn(`[boleto] IA indisponível ou timeout (${errorMsg}). Usando dados extraídos localmente.`);
       
       return { ...fallback, valor: sanitizeBoletoValor((fallback as any).valor), empresa: '', cnpj: '', numero_boleto: '', tipo: 'DESPESA', ai_error: errorMsg };
     }
@@ -557,46 +557,52 @@ export default function App() {
         pdfFiles.map(async (file) => {
           const arrayBuffer = await file.arrayBuffer();
 
-          // Extrai texto com PDF.js primeiro
+          // Extrai texto com PDF.js primeiro (com timeout de 4s para nunca travar)
           let fullText = '';
           try {
-            let pdf: any;
-            try {
-              pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
-            } catch {
-              pdf = await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true } as any).promise;
-            }
-            const maxPages = Math.min(5, pdf.numPages || 0);
+            const getPdf = async () => {
+              try {
+                return await pdfjsLib.getDocument({ data: arrayBuffer.slice(0), disableWorker: true } as any).promise;
+              } catch {
+                return await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true } as any).promise;
+              }
+            };
+            const timeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('PDF.js timeout')), 4000)
+            );
+            const pdf: any = await Promise.race([getPdf(), timeoutPromise]);
+            const maxPages = Math.min(3, pdf.numPages || 0);
             for (let i = 1; i <= maxPages; i++) {
               const page = await pdf.getPage(i);
               const textContent = await page.getTextContent();
               fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n';
             }
           } catch (pdfErr) {
-            console.log(`[boleto] PDF.js failed for ${file.name}:`, pdfErr);
+            console.log(`[boleto] PDF.js failed or timed out for ${file.name}:`, pdfErr);
           }
 
-          const hasGoodText = fullText.trim().length > 100;
+          const hasGoodText = fullText.trim().length > 80;
 
           const local = extractBoletoData(fullText, file.name, safeSuppliers);
           local.fornecedor = resolveSupplierName(local.fornecedor, fullText, safeSuppliers);
 
-          // Para garantir 100% de acerto nas datas e valores, sempre usamos a IA (Gemini) como primeira opção.
-          // O leitor local (regex) é muito propenso a falhas de leitura (como capturar descontos, multas ou juros no lugar do valor real, ex: R$ 7,95 de desconto).
-          const hasLocalCore = false;
-
-          // Se a extração local funcionou perfeitamente, usa ela (desabilitado em favor da precisão da IA)
-          if (hasLocalCore) return local;
-
-          // Converte PDF para base64 para o Gemini
-          const pdfBase64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const result = reader.result as string;
-              resolve(result.split(',')[1] || '');
-            };
-            reader.readAsDataURL(file);
-          });
+          // Se já extraiu bom texto, não precisa subir megabytes de base64 (upload instantâneo)
+          let pdfBase64: string | undefined = undefined;
+          if (!hasGoodText && file.size <= 3.5 * 1024 * 1024) {
+            try {
+              pdfBase64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const result = reader.result as string;
+                  resolve(result.split(',')[1] || '');
+                };
+                reader.onerror = () => resolve('');
+                reader.readAsDataURL(file);
+              });
+            } catch {
+              pdfBase64 = undefined;
+            }
+          }
 
           const ai = await extractBoletoWithGemini(fullText, file.name, pdfBase64);
           ai.fornecedor = resolveSupplierName(ai.fornecedor, fullText, safeSuppliers);
