@@ -373,17 +373,17 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
         const totalColor = isNaoPago ? '#f59e0b' : tipoColor;
 
         return `<tr style="background-color: ${rowBg}">
-          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${i + 1}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-weight:bold;color:${tipoColor};font-size:9pt">${tipoText}</td>
-          <td style="padding:8px;border:1px solid #ddd;font-size:10pt"><b>${escapeHtml(tx.fornecedor || 'NÃO INFORMADO')}</b></td>
-          <td style="padding:8px;border:1px solid #ddd;font-size:9pt">${escapeHtml(tx.descricao || '-')}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${escapeHtml(tx.empresa || '-')}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${escapeHtml(tx.vencimento || '-')}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-size:9pt">${escapeHtml(tx.pagamento || '-')}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:10pt;color:${valorColor};font-weight:${isNaoPago ? 'bold' : 'normal'}">${(Number(tx.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-size:9pt;color:${jurosColor};font-weight:${isNaoPago ? 'bold' : 'normal'}">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold;color:${totalColor};font-size:10pt">${(isRev ? '' : '-')}${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-          <td style="padding:8px;border:1px solid #ddd;text-align:center;font-weight:${statusWeight};color:${statusColor};font-size:9pt">${escapeHtml(status)}</td>
+          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:8pt">${i + 1}</td>
+          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;color:${tipoColor};font-size:8pt">${tipoText}</td>
+          <td style="padding:5px 6px;border:1px solid #e2e8f0;font-size:8.5pt"><b>${escapeHtml(tx.fornecedor || 'NÃO INFORMADO')}</b></td>
+          <td style="padding:5px 6px;border:1px solid #e2e8f0;font-size:8pt">${escapeHtml(tx.descricao || '-')}</td>
+          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:8pt">${escapeHtml(tx.empresa || '-')}</td>
+          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:8pt">${escapeHtml(tx.vencimento || '-')}</td>
+          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:8pt">${escapeHtml(tx.pagamento || '-')}</td>
+          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:right;font-size:8.5pt;color:${valorColor};font-weight:${isNaoPago ? 'bold' : 'normal'}">${(Number(tx.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:right;font-size:8pt;color:${jurosColor};font-weight:${isNaoPago ? 'bold' : 'normal'}">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
+          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:right;font-weight:bold;color:${totalColor};font-size:8.5pt">${(isRev ? '' : '-')}${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-weight:${statusWeight};color:${statusColor};font-size:8pt">${escapeHtml(status)}</td>
         </tr>`;
       }).join('');
 
@@ -393,23 +393,32 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
   <meta charset="UTF-8">
   <title>${tipoLabel} - ${periodDisplay}</title>
   <style>
-    @page { margin: 1.2cm; size: A4 landscape; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 11pt; color: #333; line-height: 1.4; margin: 0; padding: 0; }
-    .header { border-bottom: 3px solid #3b82f6; padding-bottom: 12px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
-    .header-info h1 { margin: 0; font-size: 20pt; color: #1e293b; text-transform: uppercase; font-weight: 800; }
-    .header-info p { margin: 5px 0 0; font-size: 10pt; color: #64748b; font-weight: 600; }
-    .summary-boxes { display: flex; gap: 15px; margin-bottom: 25px; }
-    .summary-box { flex: 1; border: 1px solid #e2e8f0; border-radius: 10px; padding: 15px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .summary-box .label { font-size: 8pt; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
-    .summary-box .value { font-size: 15pt; font-weight: 800; color: #1e293b; }
+    @page { margin: 0.8cm 1cm; size: A4 landscape; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 9.5pt; color: #333; line-height: 1.3; margin: 0; padding: 0; }
+    .header { border-bottom: 2px solid #3b82f6; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .header-info h1 { margin: 0; font-size: 16pt; color: #1e293b; text-transform: uppercase; font-weight: 800; }
+    .header-info p { margin: 3px 0 0; font-size: 8.5pt; color: #64748b; font-weight: 600; }
+    .summary-boxes { display: flex; gap: 10px; margin-bottom: 12px; }
+    .summary-box { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+    .summary-box .label { font-size: 7.5pt; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 3px; letter-spacing: 0.5px; }
+    .summary-box .value { font-size: 13pt; font-weight: 800; color: #1e293b; }
     .summary-box.highlight { border-color: #f59e0b; background-color: #fffbeb; }
     .summary-box.critical { border-color: #ef4444; background-color: #fff5f5; }
     .summary-box.success { border-color: #10b981; background-color: #ecfdf5; }
     
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    th { background: #f8fafc; padding: 12px 8px; border: 1px solid #e2e8f0; text-align: left; font-weight: 800; text-transform: uppercase; font-size: 8pt; color: #475569; }
-    .total-row td { font-weight: 800; background: #f1f5f9 !important; border-top: 2px solid #334155; }
-    .footer { margin-top: 50px; font-size: 8pt; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    th { background: #f8fafc; padding: 6px 5px; border: 1px solid #e2e8f0; text-align: left; font-weight: 800; text-transform: uppercase; font-size: 7.5pt; color: #475569; }
+    .total-row td { font-weight: 800; background: #f1f5f9 !important; border-top: 2px solid #334155; padding: 6px 5px !important; }
+    .footer { margin-top: 10px; font-size: 7.5pt; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 6px; font-weight: 600; page-break-inside: avoid; break-inside: avoid; }
+    .footer p { margin: 0; padding: 0; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .header, .summary-boxes, .footer, tr, .total-row {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+    }
   </style>
 </head>
 <body>
@@ -439,15 +448,15 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
     <div class="summary-box highlight">
       <div class="label">Em Aberto (Total)</div>
       <div class="value">${pendentesValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
-      <div style="font-size: 8pt; color: #b45309; margin-top: 4px; font-weight: 800;">${vencidosCount + pendentesCount} ITENS EM ABERTO</div>
-      <div style="height: 8px;"></div>
+      <div style="font-size: 7.5pt; color: #b45309; margin-top: 2px; font-weight: 800;">${vencidosCount + pendentesCount} ITENS EM ABERTO</div>
+      <div style="height: 4px;"></div>
       <div class="label">A Pagar</div>
-      <div class="value">${periodTotals.naoPagoDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
-      <div style="font-size: 8pt; color: #b45309; margin-top: 4px; font-weight: 800;">${periodTotals.naoPagoDespesasCount} DESPESAS PENDENTES</div>
-      <div style="height: 8px;"></div>
+      <div class="value" style="font-size: 11pt;">${periodTotals.naoPagoDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+      <div style="font-size: 7pt; color: #b45309; font-weight: 800;">${periodTotals.naoPagoDespesasCount} DESPESAS PENDENTES</div>
+      <div style="height: 4px;"></div>
       <div class="label">A Receber</div>
-      <div class="value">${periodTotals.naoPagoReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
-      <div style="font-size: 8pt; color: #1d4ed8; margin-top: 4px; font-weight: 800;">${periodTotals.naoPagoReceitasCount} RECEITAS PENDENTES</div>
+      <div class="value" style="font-size: 11pt;">${periodTotals.naoPagoReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+      <div style="font-size: 7pt; color: #1d4ed8; font-weight: 800;">${periodTotals.naoPagoReceitasCount} RECEITAS PENDENTES</div>
     </div>
   </div>
   
@@ -470,17 +479,17 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
     <tbody>
       ${rows}
       <tr class="total-row">
-        <td colspan="7" style="padding:12px;text-align:right;text-transform:uppercase;letter-spacing:1px;font-size:9pt">Resumo de Saldos</td>
-        <td style="padding:12px;text-align:right;color:#64748b;font-size:8pt">
+        <td colspan="7" style="padding:6px 8px;text-align:right;text-transform:uppercase;letter-spacing:1px;font-size:8.5pt">Resumo de Saldos</td>
+        <td style="padding:6px 8px;text-align:right;color:#64748b;font-size:7.5pt;line-height:1.2">
           (+) ${periodTotals.totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}<br/>
           (-) ${periodTotals.totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
         </td>
-        <td style="padding:12px;text-align:right;color:#ef4444">${periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '-'}</td>
-        <td style="padding:12px;text-align:right;font-size:13pt;color:${periodTotals.total >= 0 ? '#10b981' : '#ef4444'}">
+        <td style="padding:6px 8px;text-align:right;color:#ef4444;font-size:8.5pt">${periodTotals.jurosTotal > 0 ? periodTotals.jurosTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '-'}</td>
+        <td style="padding:6px 8px;text-align:right;font-size:11pt;color:${periodTotals.total >= 0 ? '#10b981' : '#ef4444'}">
           ${periodTotals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-          <div style="font-size:8pt;color:#64748b;font-weight:700;">SALDO PREVISTO FINAL</div>
+          <div style="font-size:7.5pt;color:#64748b;font-weight:700;">SALDO PREVISTO FINAL</div>
         </td>
-        <td style="padding:12px;text-align:center;font-size:8pt;color:#64748b">${periodTotals.count} registros</td>
+        <td style="padding:6px 8px;text-align:center;font-size:7.5pt;color:#64748b">${periodTotals.count} registros</td>
       </tr>
       ${periodTotals.naoPagoDespesas > 0 ? `
       <tr style="background-color: #fffbeb;">
