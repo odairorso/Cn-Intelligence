@@ -52,7 +52,7 @@ export async function handleExtractBoleto(req, res) {
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const generateContentWithFallback = async (contents, config) => {
-      const modelsToTry = [process.env.GEMINI_MODEL, 'gemini-1.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash'].filter(Boolean);
+      const modelsToTry = [process.env.GEMINI_MODEL, 'gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.1-pro-preview', 'gemini-pro-latest', 'gemini-flash-latest'].filter(Boolean);
       let lastErr = null;
       for (const modelName of modelsToTry) {
         try {
