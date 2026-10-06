@@ -52,12 +52,12 @@ export async function handleExtractBoleto(req, res) {
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const generateContentWithFallback = async (contents, config) => {
-      const modelsToTry = [process.env.GEMINI_MODEL, 'gemini-2.0-flash', 'gemini-1.5-flash'].filter(Boolean);
+      const modelsToTry = [process.env.GEMINI_MODEL, 'gemini-1.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash'].filter(Boolean);
       let lastErr = null;
       for (const modelName of modelsToTry) {
         try {
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`Timeout ao consultar IA modelo ${modelName}`)), 7000)
+            setTimeout(() => reject(new Error(`Timeout ao consultar IA modelo ${modelName}`)), 12000)
           );
           const callPromise = ai.models.generateContent({
             model: modelName,
