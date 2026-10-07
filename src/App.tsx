@@ -1,4 +1,4 @@
-// v1.2.0 - Performance: lazy loading tabs + extracted components
+﻿// v1.2.0 - Performance: lazy loading tabs + extracted components
 import React, { useState, useRef, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import {
   LayoutDashboard, FileText, Building2, Settings, Bell, Wallet,
@@ -1710,12 +1710,13 @@ export default function App() {
             )}
 
             {activeTab === 'relatorios' && (
-              <RelatoriosTab
-                globalStats={globalStats}
-                fetchStats={fetchStats}
-                contasContabeis={contasContabeis}
-              />
-            )}
+                <RelatoriosTab
+                  globalStats={globalStats}
+                  fetchStats={fetchStats}
+                  contasContabeis={contasContabeis}
+                  companyOptions={safeCompanyOptions}
+                />
+              )}
             {activeTab === 'receitas' && <ReceitasTab transactions={transactions} onNewRevenue={() => { setNewTxInitialTipo('RECEITA'); setShowNewTxModal(true); }} />}
             {activeTab === 'bancos' && (
               <BancosTab

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Transaction, TransactionStatus, ContaContabil } from '../types';
 import { cn, isRevenueTransaction, normalizeCompanyKey, dateSortKey, formatBRL, stripAccents, matchesAccountType, escapeHtml } from '../lib/utils';
+import { DEFAULT_COMPANIES } from '../lib/constants';
 import { api } from '../api';
 import { Printer, Search, ChevronDown } from 'lucide-react';
 
@@ -27,9 +28,10 @@ interface RelatoriosTabProps {
     dateField?: 'vencimento' | 'pagamento'
   ) => Promise<void>;
   contasContabeis: ContaContabil[];
+  companyOptions?: string[];
 }
 
-const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<RelatoriosTabProps, 'transactions' | 'fetchTransactions'>) => {
+const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis, companyOptions = [] }: Omit<RelatoriosTabProps, 'transactions' | 'fetchTransactions'>) => {
   const [reportTransactions, setReportTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [dateField, setDateField] = useState<'vencimento' | 'pagamento'>('vencimento');
@@ -47,27 +49,81 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
     return Array.from(set).sort().reverse();
   }, [reportTransactions, dateField]);
 
-  const [selectedYear, setSelectedYear] = useState<string>('TODOS');
+  const [displayLimit, setDisplayLimit] = useState<number>(100);
+  const currentYearStr = String(new Date().getFullYear());
+  const currentMonthStr = String(new Date().getMonth() + 1).padStart(2, '0');
 
-  const [selectedMonth, setSelectedMonth] = useState<string>('TODOS');
-  const [selectedCompany, setSelectedCompany] = useState<string>('TODOS');
-  const [selectedTipo, setSelectedTipo] = useState<string>('TODOS');
-  const [selectedStatus, setSelectedStatus] = useState<string>('TODOS');
-  const [selectedContaContabil, setSelectedContaContabil] = useState<string>('TODOS');
+  const [selectedYear, setSelectedYear] = useState<string>(() => {
+    try { return sessionStorage.getItem('cn_relatorios_selectedYear') || currentYearStr; } catch { return currentYearStr; }
+  });
+
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    try { return sessionStorage.getItem('cn_relatorios_selectedMonth') || currentMonthStr; } catch { return currentMonthStr; }
+  });
+
+  const [selectedCompany, setSelectedCompany] = useState<string>(() => {
+    try { return sessionStorage.getItem('cn_relatorios_selectedCompany') || 'TODOS'; } catch { return 'TODOS'; }
+  });
+
+  const [selectedTipo, setSelectedTipo] = useState<string>(() => {
+    try { return sessionStorage.getItem('cn_relatorios_selectedTipo') || 'TODOS'; } catch { return 'TODOS'; }
+  });
+
+  const [selectedStatus, setSelectedStatus] = useState<string>(() => {
+    try { return sessionStorage.getItem('cn_relatorios_selectedStatus') || 'TODOS'; } catch { return 'TODOS'; }
+  });
+
+  const [selectedContaContabil, setSelectedContaContabil] = useState<string>(() => {
+    try { return sessionStorage.getItem('cn_relatorios_selectedConta') || 'TODOS'; } catch { return 'TODOS'; }
+  });
+
   const [showContaDropdown, setShowContaDropdown] = useState(false);
   const [searchConta, setSearchConta] = useState('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const [filterType, setFilterType] = useState<'MES' | 'PERIODO'>('MES');
+  const [filterType, setFilterType] = useState<'MES' | 'PERIODO'>(() => {
+    try { return (sessionStorage.getItem('cn_relatorios_filterType') as 'MES' | 'PERIODO') || 'MES'; } catch { return 'MES'; }
+  });
+
   const [startDate, setStartDate] = useState<string>(() => {
+    try {
+      const saved = sessionStorage.getItem('cn_relatorios_startDate');
+      if (saved) return saved;
+    } catch {}
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
   });
+
   const [endDate, setEndDate] = useState<string>(() => {
+    try {
+      const saved = sessionStorage.getItem('cn_relatorios_endDate');
+      if (saved) return saved;
+    } catch {}
     const now = new Date();
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
   });
+
+  // Salvar filtros no sessionStorage para persistir navegação entre abas
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('cn_relatorios_dateField', dateField);
+      sessionStorage.setItem('cn_relatorios_selectedYear', selectedYear);
+      sessionStorage.setItem('cn_relatorios_selectedMonth', selectedMonth);
+      sessionStorage.setItem('cn_relatorios_selectedCompany', selectedCompany);
+      sessionStorage.setItem('cn_relatorios_selectedTipo', selectedTipo);
+      sessionStorage.setItem('cn_relatorios_selectedStatus', selectedStatus);
+      sessionStorage.setItem('cn_relatorios_selectedConta', selectedContaContabil);
+      sessionStorage.setItem('cn_relatorios_filterType', filterType);
+      sessionStorage.setItem('cn_relatorios_startDate', startDate);
+      sessionStorage.setItem('cn_relatorios_endDate', endDate);
+    } catch { /* ignore */ }
+  }, [dateField, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, filterType, startDate, endDate]);
+
+  // Reset do limite visual ao trocar qualquer filtro
+  useEffect(() => {
+    setDisplayLimit(100);
+  }, [filterType, startDate, endDate, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, searchTerm, dateField]);
 
   const todayKey = useMemo(() => {
     const d = new Date();
@@ -94,8 +150,8 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
           ? 'NAO_PAGO'
           : selectedStatus;
           
-    const queryYear = filterType === 'MES' ? selectedYear : undefined;
-    const queryMonth = filterType === 'MES' ? selectedMonth : undefined;
+    const queryYear = filterType === 'MES' && selectedYear !== 'TODOS' ? selectedYear : undefined;
+    const queryMonth = filterType === 'MES' && selectedMonth !== 'TODOS' ? selectedMonth : undefined;
     const queryStartDate = filterType === 'PERIODO' ? (startDate || undefined) : undefined;
     const queryEndDate = filterType === 'PERIODO' ? (endDate || undefined) : undefined;
 
@@ -125,18 +181,6 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
     };
 
     loadData();
-
-    fetchStats(
-      queryYear,
-      queryMonth,
-      selectedCompany === 'TODOS' ? undefined : selectedCompany,
-      selectedTipo === 'TODOS' ? undefined : selectedTipo,
-      apiStatus,
-      undefined,
-      queryStartDate,
-      queryEndDate,
-      dateField
-    );
   }, [
     filterType,
     startDate,
@@ -147,8 +191,7 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
     selectedTipo,
     selectedStatus,
     selectedContaContabil,
-    dateField,
-    fetchStats
+    dateField
   ]);
 
   // Reset conta contabil filter if it doesn't match the new selectedTipo
@@ -163,6 +206,13 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
 
   const companies = useMemo(() => {
     const map = new Map<string, string>();
+    const baseList = Array.isArray(companyOptions) && companyOptions.length > 0 ? companyOptions : DEFAULT_COMPANIES;
+    for (const comp of baseList) {
+      const raw = String(comp || '').trim();
+      if (!raw) continue;
+      const key = normalizeCompanyKey(raw);
+      if (!map.has(key)) map.set(key, raw);
+    }
     for (const tx of reportTransactions) {
       const raw = String(tx.empresa || '').trim();
       if (!raw) continue;
@@ -172,7 +222,7 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
     return Array.from(map.entries())
       .map(([, raw]) => ({ value: raw, label: raw }))
       .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [reportTransactions]);
+  }, [companyOptions, reportTransactions]);
 
   const filteredData = useMemo(() => {
     const removeAccents = (str: string) => 
@@ -240,6 +290,10 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
       return fornA.localeCompare(fornB, 'pt-BR');
     });
   }, [reportTransactions, filterType, startDate, endDate, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, todayKey, searchTerm, dateField]);
+
+  const displayedRows = useMemo(() => {
+    return filteredData.slice(0, displayLimit);
+  }, [filteredData, displayLimit]);
 
   const periodTotals = useMemo(() => {
     let total = 0;
@@ -508,14 +562,14 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
 </body>
 </html>`);
       printWindow.document.close();
-      printWindow.focus();
-      try { printWindow.print(); } catch {}
       setTimeout(() => {
         try {
           printWindow.focus();
           printWindow.print();
-        } catch {}
-      }, 200);
+        } catch (err) {
+          console.error('Erro ao disparar impressão:', err);
+        }
+      }, 250);
     } catch (error) {
       console.error('Erro ao imprimir:', error);
       alert('Erro ao gerar o relatório. Verifique os dados e tente novamente.');
@@ -781,12 +835,12 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
 
         {/* Mobile: cards */}
         <div className="divide-y divide-white/5 md:hidden">
-          {filteredData.length === 0 ? (
+          {displayedRows.length === 0 ? (
             <p className="px-6 py-10 text-center text-on-surface-variant italic text-sm">
               Nenhum lançamento encontrado.
             </p>
           ) : (
-            filteredData.map((tx) => {
+            displayedRows.map((tx) => {
               const status = effectiveStatus(tx);
               const isNaoPago = status !== 'PAGO';
               return (
@@ -836,14 +890,14 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
               </tr>
             </thead>
             <tbody className="text-xs divide-y divide-white/5">
-              {filteredData.length === 0 ? (
+              {displayedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center text-on-surface-variant italic">
+                  <td colSpan={11} className="px-4 py-12 text-center text-on-surface-variant italic">
                     Nenhum lançamento encontrado para os filtros selecionados.
                   </td>
                 </tr>
               ) : (
-                filteredData.map((tx, i) => {
+                displayedRows.map((tx, i) => {
                   const isRev = tx.tipo === 'RECEITA' || (tx.tipo !== 'DESPESA' && isRevenueTransaction(tx));
                   const status = effectiveStatus(tx);
                   const isNaoPago = status !== 'PAGO';
@@ -902,6 +956,22 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis }: Omit<Relato
             </tbody>
           </table>
         </div>
+
+        {/* Visual pagination button to prevent browser freezes when viewing thousands of items */}
+        {filteredData.length > displayLimit && (
+          <div className="p-4 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/[0.01]">
+            <span className="text-xs text-on-surface-variant">
+              Mostrando <b>{displayedRows.length}</b> de <b>{filteredData.length}</b> registros na tela. O relatório impresso (PDF) conterá todos os {filteredData.length} registros.
+            </span>
+            <button
+              type="button"
+              onClick={() => setDisplayLimit(prev => prev + 100)}
+              className="px-4 py-1.5 text-xs font-bold bg-surface border border-white/10 hover:border-primary text-primary rounded-lg transition-all"
+            >
+              Carregar mais 100 registros
+            </button>
+          </div>
+        )}
 
         {/* Responsive Summary Card (No longer inside the scrolling table to prevent cut off!) */}
         {filteredData.length > 0 && (
