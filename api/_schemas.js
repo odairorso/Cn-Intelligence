@@ -1,4 +1,4 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 export const TransactionSchema = z.object({
   uid: z.string(),
@@ -39,6 +39,7 @@ export const BankSchema = z.object({
   agencia: z.string().optional().nullable(),
   conta: z.string().optional().nullable(),
   saldo: z.number().or(z.string().transform(v => Number(v))),
+  limite: z.number().or(z.string().transform(v => Number(v))).optional().nullable(),
   cor: z.string().optional(),
   ativo: z.boolean().optional(),
   uid: z.string(),

@@ -17,6 +17,7 @@ export async function handleBanks(req, res) {
           b.agencia,
           b.conta,
           b.saldo,
+          b.limite,
           b.ativo,
           COALESCE(
             (
@@ -45,6 +46,7 @@ export async function handleBanks(req, res) {
       const formatted = rows.map(b => ({
         ...b,
         saldo: Number(b.saldo),
+        limite: Number(b.limite || 0),
         total_pago: Number(b.total_pago)
       }));
       
@@ -63,10 +65,10 @@ export async function handleBanks(req, res) {
         return res.status(400).json({ error: 'Dados inválidos', details: result.error.flatten().fieldErrors });
       }
 
-      const { nome, agencia, conta, saldo, ativo } = result.data;
+      const { nome, agencia, conta, saldo, limite, ativo } = result.data;
       const rows = await sql`
-        INSERT INTO banks (uid, nome, agencia, conta, saldo, ativo)
-        VALUES (${uid}, ${nome}, ${agencia || null}, ${conta || null}, ${saldo || 0}, ${ativo !== false})
+        INSERT INTO banks (uid, nome, agencia, conta, saldo, limite, ativo)
+        VALUES (${uid}, ${nome}, ${agencia || null}, ${conta || null}, ${saldo || 0}, ${limite || 0}, ${ativo !== false})
         RETURNING *`;
       return res.status(201).json(rows[0]);
     } catch (e) {
@@ -102,6 +104,7 @@ export async function handleBankById(req, res) {
             agencia = COALESCE(${agencia}, agencia),
             conta = COALESCE(${conta}, conta),
             saldo = COALESCE(${saldo}, saldo),
+            limite = COALESCE(${limite}, limite),
             ativo = COALESCE(${ativo}, ativo)
         WHERE id = ${id} AND uid = ${uid}
         RETURNING *`;

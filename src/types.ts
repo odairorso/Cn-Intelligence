@@ -57,6 +57,7 @@ export interface Bank {
   agencia?: string;
   conta?: string;
   saldo: number;
+  limite?: number;
   ativo: boolean;
   total_pago?: number;
 }

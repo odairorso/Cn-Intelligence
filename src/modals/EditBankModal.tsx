@@ -15,6 +15,7 @@ const EditBankModal = ({ bank, onClose, onSuccess }: EditBankModalProps) => {
     agencia: bank.agencia || '',
     conta: bank.conta || '',
     saldo: String(bank.saldo ?? 0),
+    limite: String(bank.limite ?? 0),
     ativo: bank.ativo ?? true
   });
 
@@ -27,6 +28,7 @@ const EditBankModal = ({ bank, onClose, onSuccess }: EditBankModalProps) => {
         agencia: formData.agencia || undefined,
         conta: formData.conta || undefined,
         saldo: Number(formData.saldo) || 0,
+        limite: Number(formData.limite) || 0,
         ativo: formData.ativo
       });
       onClose();
@@ -75,14 +77,26 @@ const EditBankModal = ({ bank, onClose, onSuccess }: EditBankModalProps) => {
               />
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Saldo Inicial (R$)</label>
-            <input
-              type="number" step="0.01"
-              className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
-              value={formData.saldo}
-              onChange={e => setFormData({ ...formData, saldo: e.target.value })}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Saldo Inicial (R$)</label>
+              <input
+                type="number" step="0.01"
+                className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-2 text-sm outline-none focus:border-primary"
+                value={formData.saldo}
+                onChange={e => setFormData({ ...formData, saldo: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-amber-400 uppercase mb-1">Limite / Cheque Esp. (R$)</label>
+              <input
+                type="number" step="0.01"
+                className="w-full bg-surface-variant/20 border border-amber-500/30 rounded-lg px-4 py-2 text-sm outline-none focus:border-amber-400 text-amber-300"
+                value={formData.limite}
+                onChange={e => setFormData({ ...formData, limite: e.target.value })}
+                placeholder="0.00"
+              />
+            </div>
           </div>
           <div>
             <label className="flex items-center gap-3 cursor-pointer">

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CreditCard, Edit, Trash2, Plus, X, Loader2 } from 'lucide-react';
 import type { Bank, Transaction } from '../types';
 import { api } from '../api';
+import { cn } from '../lib/utils';
 
 interface BancosTabProps {
   banks: Bank[];
@@ -80,11 +81,44 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
         {banks.map(bank => {
           const totalPagoVal = bank.total_pago || 0;
           const saldoAtualVal = Number(bank.saldo) + totalPagoVal;
+          const limiteVal = Number(bank.limite || 0);
+          const isUsandoLimite = saldoAtualVal < 0;
+          const valorUsadoLimite = isUsandoLimite ? Math.abs(saldoAtualVal) : 0;
+          const estourouLimite = limiteVal > 0 && valorUsadoLimite > limiteVal;
+          const dentroDoLimite = limiteVal > 0 && isUsandoLimite && valorUsadoLimite <= limiteVal;
+          const limiteDisponivel = Math.max(0, limiteVal - valorUsadoLimite);
+
+          // Estilo dinâmico baseado no uso do limite:
+          // - Estourou limite: Vermelho pulsante + sombra de alerta
+          // - Usando limite contratado: Âmbar / Laranja dourado com destaque
+          // - Saldo negativo sem limite: Vermelho
+          // - Normal positivo: Vidro elegante padrão
+          let cardBorderClass = "hover:border-primary/40";
+          let cardBgClass = "";
+          let iconBoxClass = "bg-primary/20 text-primary";
+
+          if (estourouLimite) {
+            cardBorderClass = "border-red-500/70 shadow-[0_0_30px_rgba(239,68,68,0.22)]";
+            cardBgClass = "bg-gradient-to-b from-red-500/[0.12] via-red-950/[0.05] to-transparent";
+            iconBoxClass = "bg-red-500/20 text-red-400 border border-red-500/30";
+          } else if (dentroDoLimite) {
+            cardBorderClass = "border-amber-500/70 shadow-[0_0_30px_rgba(245,158,11,0.22)]";
+            cardBgClass = "bg-gradient-to-b from-amber-500/[0.12] via-amber-950/[0.05] to-transparent";
+            iconBoxClass = "bg-amber-500/20 text-amber-400 border border-amber-500/30";
+          } else if (isUsandoLimite) {
+            cardBorderClass = "border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.1)]";
+            cardBgClass = "bg-gradient-to-b from-red-500/[0.06] to-transparent";
+            iconBoxClass = "bg-red-500/20 text-red-400";
+          }
 
           return (
             <div
               key={bank.id}
-              className="glass-card p-6 relative group cursor-pointer hover:border-primary/30 transition-all hover:shadow-lg"
+              className={cn(
+                "glass-card p-6 relative group cursor-pointer transition-all hover:shadow-xl",
+                cardBorderClass,
+                cardBgClass
+              )}
               onClick={() => setSelectedBankForExtract(bank)}
             >
               <button
@@ -93,6 +127,7 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                   setEditingBank(bank);
                 }}
                 className="absolute top-4 right-14 p-2 text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10 rounded-sm z-10"
+                title="Editar dados da conta e limite"
               >
                 <Edit size={16} />
               </button>
@@ -102,23 +137,39 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                   deleteBank(bank.id);
                 }}
                 className="absolute top-4 right-4 p-2 text-tertiary opacity-0 group-hover:opacity-100 transition-opacity hover:bg-tertiary/10 rounded-sm z-10"
+                title="Excluir conta bancária"
               >
                 <Trash2 size={16} />
               </button>
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-12 h-12 rounded-sm bg-primary/20 flex items-center justify-center text-primary">
+                <div className={cn("w-12 h-12 rounded-sm flex items-center justify-center transition-colors", iconBoxClass)}>
                   <CreditCard size={24} />
                 </div>
                 <div>
-                  <h4 className="font-bold text-on-surface">{bank.nome}</h4>
-                  <p className="text-[10px] text-on-surface-variant/60 flex items-center gap-1.5 mt-0.5">
-                    <span>{bank.ativo ? 'Ativo' : 'Inativo'}</span>
-                    {saldoAtualVal < 0 && (
-                      <span className="text-[8px] bg-red-500/10 text-red-400 border border-red-500/20 px-1 py-0.2 rounded-xs font-black uppercase tracking-wider">
-                        Usando Limite
+                  <h4 className="font-bold text-on-surface flex items-center gap-2">
+                    {bank.nome}
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    <span className="text-[10px] text-on-surface-variant/70">{bank.ativo ? 'Ativo' : 'Inativo'}</span>
+                    
+                    {estourouLimite ? (
+                      <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/40 px-2 py-0.5 rounded font-black uppercase tracking-wider flex items-center gap-1 animate-pulse">
+                        🚨 Limite Estourado
                       </span>
-                    )}
-                  </p>
+                    ) : dentroDoLimite ? (
+                      <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded font-black uppercase tracking-wider flex items-center gap-1">
+                        ⚠️ Usando Limite ({((valorUsadoLimite / limiteVal) * 100).toFixed(0)}%)
+                      </span>
+                    ) : isUsandoLimite ? (
+                      <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                        Saldo Negativo
+                      </span>
+                    ) : limiteVal > 0 ? (
+                      <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                        Limite OK
+                      </span>
+                    ) : null}
+                  </div>
                   {(bank.agencia || bank.conta) && (
                     <p className="text-[10px] text-on-surface-variant/60 mt-1">
                       {bank.agencia ? `Ag ${bank.agencia}` : ''}{bank.agencia && bank.conta ? ' • ' : ''}{bank.conta ? `Conta ${bank.conta}` : ''}
@@ -142,11 +193,72 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
                 <div className="pt-2 border-t border-white/5">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-primary">Saldo Atual</span>
-                    <span className="text-lg font-black" style={{ color: saldoAtualVal < 0 ? '#ef4444' : '#3b82f6' }}>
+                    <span
+                      className="text-lg font-black"
+                      style={{
+                        color: estourouLimite ? '#ef4444' : dentroDoLimite ? '#f59e0b' : saldoAtualVal < 0 ? '#ef4444' : '#3b82f6'
+                      }}
+                    >
                       {saldoAtualVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
+
+                {/* Bloco visual destacado para contas com Limite Contratado */}
+                {limiteVal > 0 && (
+                  <div className={cn(
+                    "p-3 rounded-lg border mt-2 space-y-1.5 transition-all",
+                    estourouLimite
+                      ? "bg-red-500/10 border-red-500/40 text-red-200"
+                      : dentroDoLimite
+                        ? "bg-amber-500/10 border-amber-500/40 text-amber-200"
+                        : "bg-surface-variant/20 border-white/5 text-on-surface"
+                  )}>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-on-surface-variant font-bold uppercase text-[10px] tracking-wider">
+                        Limite de Crédito:
+                      </span>
+                      <span className="font-bold text-on-surface">
+                        {limiteVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </span>
+                    </div>
+
+                    {isUsandoLimite ? (
+                      <>
+                        {/* Barra de progresso do limite */}
+                        <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden my-1">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all duration-500",
+                              estourouLimite ? "bg-red-500" : "bg-amber-500"
+                            )}
+                            style={{ width: `${Math.min(100, (valorUsadoLimite / limiteVal) * 100)}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between items-center text-[11px] font-bold">
+                          <span className={dentroDoLimite ? "text-amber-400" : "text-red-400"}>
+                            {estourouLimite
+                              ? `Excedeu: ${(valorUsadoLimite - limiteVal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                              : `Em uso: ${valorUsadoLimite.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
+                          </span>
+                          <span className={limiteDisponivel > 0 ? "text-emerald-400" : "text-red-400"}>
+                            {limiteDisponivel > 0
+                              ? `Resta: ${limiteDisponivel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                              : '0,00 livre'}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex justify-between items-center text-[11px] text-emerald-400 pt-0.5">
+                        <span className="text-[10px] uppercase font-bold text-on-surface-variant">Disponível Total:</span>
+                        <span className="font-black">
+                          {(saldoAtualVal + limiteVal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <p className="text-[10px] text-primary/70 mt-2 opacity-0 group-hover:opacity-100 transition-opacity text-right font-bold">
                   Clique para ver lançamentos →
                 </p>
