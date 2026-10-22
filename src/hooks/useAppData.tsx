@@ -13,7 +13,17 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
+// Camada em memória por cima do localStorage: evita repetir JSON.parse na
+// leitura e mantém a escrita fora do caminho crítico (a lista de fornecedores
+// pode ter milhares de itens e travava 20-80 ms no boot).
+const memCache = new Map<string, CacheEntry<unknown>>();
+
 function getCache<T>(key: string): T | null {
+  const hit = memCache.get(key) as CacheEntry<T> | undefined;
+  if (hit) {
+    if (Date.now() - hit.timestamp <= CACHE_TTL_MS) return hit.data;
+    memCache.delete(key);
+  }
   try {
     const raw = localStorage.getItem(CACHE_PREFIX + key);
     if (!raw) return null;
@@ -22,6 +32,7 @@ function getCache<T>(key: string): T | null {
       localStorage.removeItem(CACHE_PREFIX + key);
       return null;
     }
+    memCache.set(key, entry as CacheEntry<unknown>);
     return entry.data;
   } catch {
     return null;
@@ -29,13 +40,23 @@ function getCache<T>(key: string): T | null {
 }
 
 function setCache<T>(key: string, data: T): void {
-  try {
-    const entry: CacheEntry<T> = { data, timestamp: Date.now() };
-    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
-  } catch { /* ignore */ }
+  const entry: CacheEntry<T> = { data, timestamp: Date.now() };
+  memCache.set(key, entry as CacheEntry<unknown>);
+  // Persistência adiada: não bloqueia a resposta da requisição.
+  const persist = () => {
+    try {
+      localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
+    } catch { /* ignore */ }
+  };
+  if (typeof (window as any).requestIdleCallback === 'function') {
+    (window as any).requestIdleCallback(persist, { timeout: 2000 });
+  } else {
+    window.setTimeout(persist, 0);
+  }
 }
 
 function clearCache(key: string): void {
+  memCache.delete(key);
   try {
     localStorage.removeItem(CACHE_PREFIX + key);
   } catch { /* ignore */ }

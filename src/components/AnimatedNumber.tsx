@@ -7,6 +7,15 @@ interface AnimatedNumberProps {
   className?: string;
 }
 
+// Formatadores de módulo: antes eram recriados a cada frame da animação.
+const BRL_ANIMATED = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const NUMBER_ANIMATED = new Intl.NumberFormat('pt-BR');
+
 export function AnimatedNumber({ value, format = 'number', duration = 1200, className }: AnimatedNumberProps) {
   const [display, setDisplay] = useState(0);
   const startRef = useRef<number | null>(null);
@@ -43,8 +52,8 @@ export function AnimatedNumber({ value, format = 'number', duration = 1200, clas
   }, [value, duration]);
 
   const formatted = format === 'currency'
-    ? display.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2, minimumFractionDigits: 2 })
-    : Math.round(display).toLocaleString('pt-BR');
+    ? BRL_ANIMATED.format(display)
+    : NUMBER_ANIMATED.format(Math.round(display));
 
   return <span className={className}>{formatted}</span>;
 }
