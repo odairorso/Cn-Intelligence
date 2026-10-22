@@ -34,7 +34,14 @@ import {
 // pdf.js (~1 MB) e read-excel-file só são usados ao importar arquivos.
 // Carregados sob demanda para não pesar no boot do sistema.
 let pdfjsPromise: Promise<typeof import('pdfjs-dist')> | null = null;
-const loadPdfJs = () => (pdfjsPromise ??= import('pdfjs-dist'));
+// Sem workerSrc o pdf.js não sobe no navegador em produção e a leitura do PDF
+// volta vazia — era por isso que boleto importado vinha sem vencimento/valor.
+const loadPdfJs = () => (pdfjsPromise ??= (async () => {
+  const lib = await import('pdfjs-dist');
+  const worker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+  lib.GlobalWorkerOptions.workerSrc = worker.default;
+  return lib;
+})());
 
 const loadReadXlsxFile = async () => {
   const mod = await import('read-excel-file/browser');
@@ -567,9 +574,9 @@ export default function App() {
             const pdfjsLib = await loadPdfJs();
             const getPdf = async () => {
               try {
-                return await pdfjsLib.getDocument({ data: arrayBuffer.slice(0), disableWorker: true } as any).promise;
+                return await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) } as any).promise;
               } catch {
-                return await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true } as any).promise;
+                return await pdfjsLib.getDocument({ data: arrayBuffer } as any).promise;
               }
             };
             const timeoutPromise = new Promise<never>((_, reject) =>

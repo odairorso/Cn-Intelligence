@@ -399,7 +399,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
           { label: 'SAÚDE', value: healthScore, format: 'number' as const, color: healthColor, desc: healthLabel, suffix: '%', icon: <PieChartIcon size={18} /> },
         ].map((kpi, i) => (
           <motion.div
-            key={i}
+            key={kpi.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.07 }}
@@ -426,9 +426,9 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
           { label: 'Pagos', value: filteredStats.pagos, percent: pagosPercent, color: 'success', icon: <CheckCircle size={20} className="text-success" />, delay: 0.2 },
           { label: 'Pendentes', value: filteredStats.pendentes, percent: pendentesPercent, color: 'secondary', icon: <Calendar size={20} className="text-secondary" />, delay: 0.3 },
           { label: 'Vencidos', value: filteredStats.vencidos, percent: vencidosPercent, color: 'tertiary', icon: <TrendingUp size={20} className="text-tertiary" />, delay: 0.4 },
-        ].map((item, i) => (
+        ].map((item) => (
           <motion.div
-            key={i}
+            key={item.label}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: item.delay }}
@@ -654,8 +654,8 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
             )}
           </div>
           <div className="flex justify-center gap-6 mt-4">
-            {statusChartData.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-2">
+            {statusChartData.map((item) => (
+              <div key={item.name} className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
                 <span className="text-xs font-medium text-on-surface-variant">{item.name}: {item.value}</span>
               </div>
@@ -683,7 +683,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
                 const maxValue = topSuppliers[0]?.value || 1;
                 const percent = Math.round((supplier.value / maxValue) * 100);
                 return (
-                  <div key={idx} className="group">
+                  <div key={supplier.name} className="group">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
                         <span className="w-6 h-6 rounded bg-primary/20 flex items-center justify-center text-[10px] font-black text-primary">{idx + 1}</span>

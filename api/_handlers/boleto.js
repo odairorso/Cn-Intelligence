@@ -43,14 +43,16 @@ export async function handleExtractBoleto(req, res) {
 
     const { text, fileName, pdfBase64 } = result.data;
 
-    if (!process.env.GEMINI_API_KEY) {
+    // Chave colada com espaço/quebra de linha no painel da Vercel gera 401.
+    const apiKey = String(process.env.GEMINI_API_KEY || '').trim();
+    if (!apiKey) {
       return res.status(503).json({
         error: 'IA não configurada no servidor (GEMINI_API_KEY ausente).',
         code: 'AI_NOT_CONFIGURED'
       });
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     // Orçamento total de tempo para a IA (a função serverless tem 60s).
     const GEMINI_TIME_BUDGET_MS = 45000;
     const generateContentWithFallback = async (contents, config) => {
@@ -268,7 +270,10 @@ export async function handleExtractBoleto(req, res) {
     if (!extracted) {
       const dateMatch = srcUpper.match(/VENCIMENTO[:\s]+(\d{2}\/\d{2}\/\d{4})/) ||
                         srcUpper.match(/(\d{2}\/\d{2}\/\d{4})/);
-      const valorMatch = srcUpper.match(/VALOR[^0-9]*([\d.,]+)/);
+      const valorMatch = srcUpper.match(/VALOR\s+(?:DO\s+)?DOCUMENTO[^0-9]*([\d.,]+)/) ||
+                         srcUpper.match(/VALOR\s+COBRADO[^0-9]*([\d.,]+)/) ||
+                         srcUpper.match(/VALOR\s+TOTAL[^0-9]*([\d.,]+)/) ||
+                         srcUpper.match(/VALOR[^0-9]*([\d.,]+)/);
       const numero = extractLocalBoletoNumber(srcUpper);
 
       let fallbackDesc = pattern?.descricao ? `${fileName} - ${pattern.descricao}` : fileName.replace(/\.pdf$/i, '').trim();
@@ -303,7 +308,9 @@ export async function handleExtractBoleto(req, res) {
         numero_boleto: numero,
         conta_contabil_id: fallbackCcId,
         _from_pattern: !!pattern,
-        _gemini_error: geminiError
+        _gemini_error: /API key not valid|UNAUTHENTICATED|401/i.test(String(geminiError))
+          ? 'Chave da IA inválida no servidor (GEMINI_API_KEY)'
+          : geminiError
       });
     }
   } catch (e) {

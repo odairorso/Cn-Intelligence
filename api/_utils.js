@@ -183,7 +183,11 @@ export const extractLocalBoletoNumber = (text) => {
   for (const pattern of patterns) {
     const match = source.match(pattern);
     if (match?.[1]) {
-      const raw = match[1].trim().replace(/\s+/g, ' ');
+      const raw = match[1]
+        .split(/\s+(?:ESP[ÉE]CIE|ACEITE|DATA\s+DO|NOSSO\s+N|USO\s+DO|CARTEIRA|VALOR|CNPJ|BENEFICI|AG[ÊE]NCIA|SACADOR|PAGADOR|INSTRU)/i)[0]
+        .trim()
+        .replace(/\s+/g, ' ')
+        .slice(0, 40);
       const blacklist = ['CONSTATADO', 'CONTRATADO', 'CONTRATO', 'ISENTO', 'UNDEFINED', 'NULL', 'INVALID', 'CADASTRE', 'TELEFONE'];
       const isBlacklisted = blacklist.some(word => raw.includes(word));
       const hasDigits = /\d/.test(raw);

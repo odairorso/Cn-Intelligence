@@ -130,6 +130,12 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
       }
 
       const parcelas = Math.max(1, Number(formData.parcelas) || 1);
+      // Divide em centavos: trunca cada parcela e joga a sobra na última, para a
+      // soma fechar exatamente com o total (100/3 não vira 99,99).
+      const totalCentavos = Math.round(parseMoneyToNumber(formData.valor) * 100);
+      const baseCentavos = Math.floor(totalCentavos / parcelas);
+      const valorDaParcela = (i: number) =>
+        (i === parcelas - 1 ? totalCentavos - baseCentavos * (parcelas - 1) : baseCentavos) / 100;
       const addMonthsToInputDate = (baseDate: string, monthsToAdd: number) => {
         const [year, month, day] = baseDate.split('-').map(Number);
         const dt = new Date(Date.UTC(year, (month || 1) - 1 + monthsToAdd, day || 1));
@@ -154,7 +160,9 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
           empresa: formData.empresa,
           vencimento: toInputDate(vencimentoParcela),
           pagamento: formData.status === 'PAGO' ? toInputDate(pagamentoParcela) : null,
-          valor: Math.round(((formData.valorTipo === 'total' ? (parseMoneyToNumber(formData.valor) / parcelas) : parseMoneyToNumber(formData.valor))) * 100) / 100,
+          valor: formData.valorTipo === 'total'
+            ? valorDaParcela(i)
+            : Math.round(parseMoneyToNumber(formData.valor) * 100) / 100,
           status: formData.status,
           banco: formData.status === 'PAGO' ? formData.banco : null,
           tipo: formData.tipo,

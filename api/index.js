@@ -12,6 +12,15 @@ const APP_EMAIL = process.env.APP_EMAIL || 'user@cn.com';
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
+// Client IDs aceitos (o front usa o mesmo default quando a env não existe).
+// A validação de audiência NUNCA é pulada: sem isso, um id_token emitido para
+// qualquer outro app Google seria aceito.
+const GOOGLE_ALLOWED_AUDIENCES = [
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.VITE_GOOGLE_CLIENT_ID,
+  '139195051788-6l3qj8v9a20r1d6ii6u3edukvshh4ebn.apps.googleusercontent.com',
+].filter(Boolean);
+
 if (!APP_PASSWORD) {
   console.warn('[AUTH] AVISO: APP_PASSWORD não definida em variáveis de ambiente. Login desabilitado!');
 }
@@ -184,8 +193,7 @@ export default async function handler(req, res) {
       const googleData = await googleRes.json();
 
       // Valida a audiência (client_id) para impedir aceitar tokens emitidos para outro client OAuth.
-      const expectedAud = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
-      if (expectedAud && googleData.aud !== expectedAud) {
+      if (!GOOGLE_ALLOWED_AUDIENCES.includes(googleData.aud)) {
         await logSecurity(req, res, `Token Google com aud inesperada: ${googleData.aud || 'vazio'}`);
         return res.status(403).json({ error: 'Token do Google inválido (audiência não reconhecida).' });
       }
@@ -262,8 +270,7 @@ export default async function handler(req, res) {
       const googleData = await googleRes.json();
 
       // Valida a audiência (client_id) do token Google.
-      const expectedAud = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
-      if (expectedAud && googleData.aud !== expectedAud) {
+      if (!GOOGLE_ALLOWED_AUDIENCES.includes(googleData.aud)) {
         await logSecurity(req, res, `Cadastro Google com aud inesperada: ${googleData.aud || 'vazio'}`);
         return res.status(403).json({ error: 'Token do Google inválido (audiência não reconhecida).' });
       }
