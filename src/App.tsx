@@ -2308,6 +2308,7 @@ export default function App() {
       </main>
 
       {/* Modals */}
+      <Suspense fallback={<ModalFallback />}>
       <AnimatePresence>
         {detailSupplier && (
           <SupplierDetailModal
@@ -2614,6 +2615,8 @@ export default function App() {
           onSave={updateTransaction}
         />
       )}
+
+      </Suspense>
 
       {/* Footer */}
       <footer className="bg-surface border-t border-surface-variant hidden lg:flex flex-col md:flex-row justify-between items-center px-8 w-full py-6 mt-auto">

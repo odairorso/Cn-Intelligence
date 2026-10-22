@@ -116,7 +116,16 @@ export async function handleTransactions(req, res) {
           }
           if (month && month !== 'TODOS') {
             const m = month.padStart(2, '0');
-            query = sql`${query} AND TO_CHAR(pagamento, 'MM') = ${m}`;
+            if (year && year !== 'TODOS') {
+              // Intervalo de datas usa índice; TO_CHAR(pagamento,'MM') obriga a varrer tudo.
+              const monthStart = `${year}-${m}-01`;
+              const nextM = Number(m) === 12 ? 1 : Number(m) + 1;
+              const nextY = Number(m) === 12 ? Number(year) + 1 : Number(year);
+              const monthEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
+              query = sql`${query} AND pagamento >= ${monthStart} AND pagamento < ${monthEnd}`;
+            } else {
+              query = sql`${query} AND TO_CHAR(pagamento, 'MM') = ${m}`;
+            }
           }
         }
         query = sql`${query} AND pagamento IS NOT NULL`;
@@ -135,7 +144,15 @@ export async function handleTransactions(req, res) {
           }
           if (month && month !== 'TODOS') {
             const m = month.padStart(2, '0');
-            query = sql`${query} AND TO_CHAR(vencimento, 'MM') = ${m}`;
+            if (year && year !== 'TODOS') {
+              const monthStart = `${year}-${m}-01`;
+              const nextM = Number(m) === 12 ? 1 : Number(m) + 1;
+              const nextY = Number(m) === 12 ? Number(year) + 1 : Number(year);
+              const monthEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
+              query = sql`${query} AND vencimento >= ${monthStart} AND vencimento < ${monthEnd}`;
+            } else {
+              query = sql`${query} AND TO_CHAR(vencimento, 'MM') = ${m}`;
+            }
           }
         }
       }

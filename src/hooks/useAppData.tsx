@@ -882,13 +882,19 @@ export const useAppData = () => {
   return { ...ctx.state, ...ctx.actions };
 };
 
-export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
+export const fetchWithSecurity = async (url: string, options: RequestInit = {}) => {
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>) || {},
   };
-  return fetch(url, {
+  const res = await fetch(url, {
     ...options,
     headers,
     credentials: 'same-origin' // Habilita o envio automático de cookies HttpOnly
   });
+  // Mesmo tratamento de 401 da camada de API: sem isso, um token expirado
+  // falhava silenciosamente nas rotinas de manutenção.
+  if (res.status === 401) {
+    window.dispatchEvent(new CustomEvent('cn-unauthorized'));
+  }
+  return res;
 };
