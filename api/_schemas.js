@@ -34,12 +34,18 @@ export const SupplierMergeSchema = z.object({
   aliases: z.array(z.string().min(1)).min(1),
 });
 
+// z.number() do zod aceita NaN; sem o refine, "abc" virava NaN e o Postgres
+// gravava NULL no saldo/limite do banco (dinheiro do usuário).
+const coercedMoney = (label) =>
+  z.union([z.number(), z.string().transform((v) => Number(v))])
+    .refine((v) => Number.isFinite(v), `${label} inválido`);
+
 export const BankSchema = z.object({
   nome: z.string().min(1),
   agencia: z.string().optional().nullable(),
   conta: z.string().optional().nullable(),
-  saldo: z.number().or(z.string().transform(v => Number(v))),
-  limite: z.number().or(z.string().transform(v => Number(v))).optional().nullable(),
+  saldo: coercedMoney('Saldo'),
+  limite: coercedMoney('Limite').optional().nullable(),
   cor: z.string().optional(),
   ativo: z.boolean().optional(),
   uid: z.string(),
