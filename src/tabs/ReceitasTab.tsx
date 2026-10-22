@@ -1,7 +1,7 @@
 import React from 'react';
 import { Transaction } from '../types';
 import { cn, isRevenueTransaction, normalizeCompanyKey, dateSortKey, toDisplayDate } from '../lib/utils';
-import { api } from '../api';
+import { api, apiAuth } from '../api';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { Plus } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -11,8 +11,9 @@ interface ReceitasTabProps {
   onNewRevenue: () => void;
 }
 
-// Cache em memória persistido durante o tempo de vida da aba/aplicativo
-let receitasBaseCache: Transaction[] | null = null;
+// Cache em memória, por usuário: antes era global e, após trocar de conta
+// sem recarregar a página, as receitas do usuário anterior continuavam visíveis.
+let receitasBaseCache: { uid: string; data: Transaction[] } | null = null;
 
 const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
   const MIN_YEAR = 2024;
@@ -20,8 +21,9 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
   const [isLoadingReceitas, setIsLoadingReceitas] = React.useState(false);
 
   const loadReceitasBase = React.useCallback(async (forceRefetch = false) => {
-    if (receitasBaseCache && !forceRefetch) {
-      setReceitasBase(receitasBaseCache);
+    const currentUid = apiAuth.getUid() || '';
+    if (receitasBaseCache && receitasBaseCache.uid === currentUid && !forceRefetch) {
+      setReceitasBase(receitasBaseCache.data);
       return;
     }
     setIsLoadingReceitas(true);
@@ -60,7 +62,7 @@ const ReceitasTab = ({ transactions, onNewRevenue }: ReceitasTabProps) => {
       });
 
       const sorted = since.sort((a, b) => dateSortKey(b.vencimento) - dateSortKey(a.vencimento));
-      receitasBaseCache = sorted;
+      receitasBaseCache = { uid: currentUid, data: sorted };
       setReceitasBase(sorted);
     } catch (e) {
       console.error(e);

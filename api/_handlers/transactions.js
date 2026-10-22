@@ -307,15 +307,17 @@ export async function handleTransactionById(req, res) {
       const body = req.body || {};
 
       // Validação parcial com Zod (pick)
-      if (body.vencimento) {
+      if (body.vencimento !== undefined) {
         const vPg = parseDateToPg(body.vencimento);
-        if (vPg) {
-          const vResult = TransactionSchema.pick({ vencimento: true }).safeParse({ vencimento: vPg });
-          if (!vResult.success) return res.status(400).json({ error: 'Data de vencimento inválida' });
-        }
+        // Antes, data inválida virava NULL e o banco devolvia 500 (NOT NULL).
+        if (!vPg) return res.status(400).json({ error: 'Data de vencimento inválida' });
+        const vResult = TransactionSchema.pick({ vencimento: true }).safeParse({ vencimento: vPg });
+        if (!vResult.success) return res.status(400).json({ error: 'Data de vencimento inválida' });
       }
       if (body.valor !== undefined && body.valor !== null) {
-        const valResult = TransactionSchema.pick({ valor: true }).safeParse({ valor: Number(body.valor) });
+        const valorNum = Number(body.valor);
+        if (!Number.isFinite(valorNum)) return res.status(400).json({ error: 'Valor inválido' });
+        const valResult = TransactionSchema.pick({ valor: true }).safeParse({ valor: valorNum });
         if (!valResult.success) return res.status(400).json({ error: 'Valor inválido' });
       }
 
@@ -340,7 +342,12 @@ export async function handleTransactionById(req, res) {
         const bancoValue = (body.banco && String(body.banco).trim() !== '') ? String(body.banco).trim() : null;
         fields.push(sql`banco = ${bancoValue}`);
       }
-      if (body.juros !== undefined) fields.push(sql`juros = ${body.juros === null ? null : Number(body.juros)}`);
+      if (body.juros !== undefined) {
+        // "abc" virava NaN e o Postgres aceita NaN em numeric, contaminando somas.
+        const jurosNum = body.juros === null ? 0 : Number(body.juros);
+        if (!Number.isFinite(jurosNum)) return res.status(400).json({ error: 'Juros inválido' });
+        fields.push(sql`juros = ${jurosNum}`);
+      }
       if (body.tipo !== undefined) fields.push(sql`tipo = ${body.tipo}`);
       if (body.numero_boleto !== undefined) fields.push(sql`numero_boleto = ${body.numero_boleto}`);
       if (body.conta_contabil_id !== undefined) fields.push(sql`conta_contabil_id = ${body.conta_contabil_id}`);
@@ -556,7 +563,7 @@ export async function handleTransactionsBatch(req, res) {
         }
       }
     }
-    return res.status(201).json({ message: 'Batch processed', count: created, blocked, errors });
+    return res.status(errors.length ? 207 : 201).json({ message: 'Batch processed', count: created, blocked, errors });
   } catch (e) {
     return handleError(res, e, 'transactions.js handleTransactionsBatch');
   }
@@ -571,13 +578,26 @@ export async function handleTransactionsBatchUpdate(req, res) {
   const isAdmin = req.authRole === 'admin';
 
   const { ids: rawIds, items, jurosMap, banco, dataPagamento } = req.body;
-  const ids = Array.isArray(items) 
-    ? items.map(it => typeof it === 'object' ? String(it.id) : String(it)) 
-    : (Array.isArray(rawIds) ? rawIds.map(String) : []);
+  const ids = (Array.isArray(items)
+    ? items.map(it => (it && typeof it === 'object' ? String(it.id) : String(it)))
+    : (Array.isArray(rawIds) ? rawIds.map(String) : [])
+  ).filter(Boolean);
 
   if (ids.length === 0) return res.status(400).json({ error: 'IDs missing' });
 
-  const finalJurosMap = jurosMap || (Array.isArray(items) ? Object.fromEntries(items.filter(it => it && typeof it === 'object').map(it => [String(it.id), Number(it.juros) || 0])) : null);
+  // Um id malformado derrubava o ::uuid[] com erro 500 em vez de 400.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (ids.some((id) => !UUID_RE.test(id))) {
+    return res.status(400).json({ error: 'IDs inválidos' });
+  }
+
+  const finalJurosMap = jurosMap || (Array.isArray(items)
+    ? Object.fromEntries(
+        items
+          .filter(it => it && typeof it === 'object' && it.juros !== undefined && it.juros !== null && it.juros !== '')
+          .map(it => [String(it.id), Number(it.juros) || 0])
+      )
+    : null);
 
   try {
     // Validação de ownership: só permite atualizar IDs que pertencem ao usuário
@@ -607,25 +627,31 @@ export async function handleTransactionsBatchUpdate(req, res) {
 
     const pDate = parseDateToPg(dataPagamento);
     const bancoValue = (banco && String(banco).trim() !== '') ? String(banco).trim() : null;
+    const ownership = isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`;
 
-    if (finalJurosMap && Object.keys(finalJurosMap).length > 0) {
-      // Um único UPDATE para o lote inteiro. Antes era 1 UPDATE por boleto
-      // (50 boletos pagos = 50 idas ao banco em série).
-      const jurosList = ids.map((id) => Number(finalJurosMap[id]) || 0);
+    // 1) Baixa de todos os títulos do lote (status, banco, data).
+    await sql`UPDATE transactions
+      SET status = 'PAGO', banco = ${bancoValue}, pagamento = ${pDate},
+          paid_at = COALESCE(paid_at, NOW()), updated_at = NOW()
+      WHERE ${ownership} AND id = ANY(${ids}::uuid[])`;
+
+    // 2) Só grava juros de quem realmente informou um valor.
+    //    Antes, ids sem juros no mapa eram gravados como 0 e apagavam
+    //    descontos/acréscimos já existentes no título.
+    const idsWithJuros = ids.filter((id) => {
+      const v = finalJurosMap ? finalJurosMap[id] : undefined;
+      return v !== undefined && v !== null && v !== '';
+    });
+
+    if (idsWithJuros.length > 0) {
+      const jurosList = idsWithJuros.map((id) => Number(finalJurosMap[id]) || 0);
       await sql`
         UPDATE transactions t
-        SET status = 'PAGO',
-            banco = ${bancoValue},
-            pagamento = ${pDate},
-            juros = v.juros,
-            paid_at = COALESCE(t.paid_at, NOW()),
-            updated_at = NOW()
-        FROM (SELECT * FROM unnest(${ids}::uuid[], ${jurosList}::numeric[]) AS x(id, juros)) v
+        SET juros = v.juros, updated_at = NOW()
+        FROM (SELECT * FROM unnest(${idsWithJuros}::uuid[], ${jurosList}::numeric[]) AS x(id, juros)) v
         WHERE t.id = v.id
           AND ${isAdmin ? sql`(t.uid = ${uid} OR t.uid IS NULL)` : sql`t.uid = ${uid}`}
       `;
-    } else {
-      await sql`UPDATE transactions SET status = 'PAGO', banco = ${bancoValue}, pagamento = ${pDate}, paid_at = COALESCE(paid_at, NOW()), updated_at = NOW() WHERE ${isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`} AND id = ANY(${ids}::uuid[])`;
     }
     return res.json({ message: 'Updated successfully' });
   } catch (e) {
@@ -640,6 +666,9 @@ export async function handleTransactionsDedupeMovimentos(req, res) {
   const uid = req.authUid;
   if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
   const isAdmin = req.authRole === 'admin';
+
+  // Rotina destrutiva (remove lançamentos repetidos): só administrador.
+  if (!isAdmin) return res.status(403).json({ error: 'Acesso negado' });
 
   try {
     // Soft delete dos duplicados (não apaga de verdade)
@@ -668,13 +697,15 @@ export async function handleFixReceitasTipo(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const uid = req.authUid;
+  if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+  if (req.authRole !== 'admin') return res.status(403).json({ error: 'Acesso negado' });
 
   try {
     const rows = await sql`
       UPDATE transactions
       SET tipo = 'RECEITA'
-      WHERE ${uid ? sql`uid = ${uid} AND` : sql``}
-        tipo != 'RECEITA'
+      WHERE uid = ${uid}
+        AND tipo != 'RECEITA'
         AND (
           descricao ILIKE '%REPASSE%'
           OR descricao ILIKE '%RECEITA%'

@@ -268,9 +268,21 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     verifySession();
   }, []);
 
+  const notificationTimerRef = useRef<number | null>(null);
+
   const showNotification = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
+    // Sem limpar o timer anterior, uma notificação antiga apagava a nova
+    // 3 s depois; e o timeout podia rodar com o componente já desmontado.
+    if (notificationTimerRef.current) window.clearTimeout(notificationTimerRef.current);
+    notificationTimerRef.current = window.setTimeout(() => {
+      setNotification(null);
+      notificationTimerRef.current = null;
+    }, 3000);
+  }, []);
+
+  useEffect(() => () => {
+    if (notificationTimerRef.current) window.clearTimeout(notificationTimerRef.current);
   }, []);
 
   const addCompanyOption = useCallback((name: string) => {
@@ -351,12 +363,16 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   // Fetch Transactions
   // --------------------------------------------------------------
   const lastFiltersRef = useRef<{ year?: string; month?: string; search?: string; tipo?: string; options?: any }>({});
+  // Geração da busca: garante que uma resposta atrasada (filtro antigo) não
+  // sobrescreva a lista atual.
+  const fetchGenerationRef = useRef(0);
 
   const fetchTransactions = useCallback(async (append = false, year?: string, month?: string, search?: string, tipo?: string, options?: any) => {
     if (!apiAuth.isAuthenticated()) {
       showNotification('Faça login para acessar os dados.', 'error');
       return;
     }
+    const generation = append ? fetchGenerationRef.current : ++fetchGenerationRef.current;
     try {
       setLoadingTransactions(true);
 
@@ -393,6 +409,8 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
         activeOptions?.endDate
       );
       const list = Array.isArray(data) ? data : [];
+      // Chegou uma resposta de uma busca que já foi substituída: descarta.
+      if (generation !== fetchGenerationRef.current) return;
       if (append) {
         setTransactions((prev) => {
           const existingIds = new Set(prev.map(t => String(t.id)));
@@ -408,6 +426,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
       }
       setHasMoreTransactions(list.length >= limit);
     } catch (err: any) {
+      if (generation !== fetchGenerationRef.current) return;
       if (err.message?.includes('Autenticação')) {
         setIsAuthorized(false);
         showNotification('Sessão expirada. Faça login novamente.', 'error');
@@ -415,12 +434,17 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
         showNotification(err.message || 'Erro ao carregar transações.', 'error');
       }
     } finally {
-      setLoadingTransactions(false);
+      if (generation === fetchGenerationRef.current) setLoadingTransactions(false);
     }
   }, [showNotification]);
 
+  const loadingMoreRef = useRef(false);
+
   const loadMoreTransactions = useCallback(async () => {
-    if (loadingTransactions || !hasMoreTransactions) return;
+    // Trava síncrona: dois cliques rápidos incrementavam a página duas vezes
+    // e uma página era pulada (offset avançava sem o append correspondente).
+    if (loadingMoreRef.current || loadingTransactions || !hasMoreTransactions) return;
+    loadingMoreRef.current = true;
     setIsLoadingMore(true);
     try {
       await fetchTransactions(
@@ -432,6 +456,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
         lastFiltersRef.current.options
       );
     } finally {
+      loadingMoreRef.current = false;
       setIsLoadingMore(false);
     }
   }, [fetchTransactions, loadingTransactions, hasMoreTransactions]);
@@ -459,9 +484,15 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     dataPagamento?: string
   ) => {
     if (!Array.isArray(itemsOrIds) || itemsOrIds.length === 0) return;
-    const items = itemsOrIds.map(item => (typeof item === 'string' ? { id: item, juros: 0 } : item));
+    const items = itemsOrIds.map(item => (typeof item === 'string' ? { id: item } : item));
     const ids = items.map(i => String(i.id));
-    const jurosMap = Object.fromEntries(items.map(i => [String(i.id), Number(i.juros) || 0]));
+    // Só envia juros de quem tem valor explícito; enviar 0 para todos
+    // apagava descontos/acréscimos já lançados no título.
+    const jurosMap = Object.fromEntries(
+      items
+        .filter(i => i.juros !== undefined && i.juros !== null)
+        .map(i => [String(i.id), Number(i.juros) || 0])
+    );
 
     const today = new Date().toISOString().split('T')[0];
     const dataPag = dataPagamento || today;

@@ -13,7 +13,7 @@ interface BatchPayModalProps {
     items: { id: string; juros: number }[],
     banco: string,
     dataPagamento: string
-  ) => void;
+  ) => Promise<void> | void;
 }
 
 const BatchPayModal: React.FC<BatchPayModalProps> = ({
@@ -26,6 +26,7 @@ const BatchPayModal: React.FC<BatchPayModalProps> = ({
   const [selectedBank, setSelectedBank] = useState<string | null>(null);
   const [paymentDate, setPaymentDate] = useState(initialDate || todayInputDate());
   const [dateError, setDateError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const paymentDateRef = useRef<HTMLInputElement | null>(null);
 
   // Mapa de juros individual por ID da transação
@@ -76,7 +77,8 @@ const BatchPayModal: React.FC<BatchPayModalProps> = ({
     };
   }, [transactions, jurosMap]);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    if (isSubmitting) return;
     if (selectedBank === null) return;
     const normalizedDate = paymentDateRef.current?.value || paymentDate;
     if (!normalizedDate) {
@@ -89,7 +91,13 @@ const BatchPayModal: React.FC<BatchPayModalProps> = ({
       juros: Number(jurosMap[String(tx.id)] || 0),
     }));
 
-    onConfirm(items, selectedBank, normalizedDate);
+    // Dois cliques/toques rápidos davam duas baixas no mesmo lote.
+    setIsSubmitting(true);
+    try {
+      await onConfirm(items, selectedBank, normalizedDate);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -316,11 +324,11 @@ const BatchPayModal: React.FC<BatchPayModalProps> = ({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={selectedBank === null}
+            disabled={selectedBank === null || isSubmitting}
             className="flex-1 px-4 py-3 rounded-lg bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <CheckCircle2 size={16} />
-            Confirmar Baixa ({transactions.length})
+            {isSubmitting ? 'Processando...' : `Confirmar Baixa (${transactions.length})`}
           </button>
         </div>
       </motion.div>

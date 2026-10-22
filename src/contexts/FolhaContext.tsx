@@ -122,6 +122,9 @@ export const FolhaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         dataAdmissao: p.dataAdmissao,
         segmentos: segmentosList,
         ativo: p.ativo,
+        // Antes eram descartados no cadastro e o professor ficava sem cargo/salário.
+        cargo: p.cargo,
+        salarioFixo: p.salarioFixo,
       };
 
       const data = await api.createFolhaProfessor(body);

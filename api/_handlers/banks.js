@@ -97,7 +97,7 @@ export async function handleBankById(req, res) {
       const existing = await sql`SELECT id FROM banks WHERE id = ${id} AND uid = ${uid}`;
       if (existing.length === 0) return res.status(404).json({ error: 'Not found' });
 
-      const { nome, agencia, conta, saldo, ativo } = result.data;
+      const { nome, agencia, conta, saldo, limite, ativo } = result.data;
       const rows = await sql`
         UPDATE banks
         SET nome = COALESCE(${nome}, nome),
@@ -164,8 +164,9 @@ export async function handleContasContabeis(req, res) {
       if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
       // Contas contábeis são globais: só o administrador master pode criar/editar
-      const MASTER_UID = process.env.APP_UID || 'odair';
-      if (uid !== MASTER_UID) {
+      // Todos os usuários do portal compartilham o mesmo uid; a permissão
+      // correta vem do papel (role), não da comparação de uid.
+      if (req.authRole !== 'admin') {
         return res.status(403).json({ error: 'Acesso negado: apenas o administrador pode gerenciar o plano de contas.' });
       }
 
@@ -193,8 +194,9 @@ export async function handleContasContabeis(req, res) {
       if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
       // Contas contábeis são globais: só o administrador master pode criar/editar
-      const MASTER_UID = process.env.APP_UID || 'odair';
-      if (uid !== MASTER_UID) {
+      // Todos os usuários do portal compartilham o mesmo uid; a permissão
+      // correta vem do papel (role), não da comparação de uid.
+      if (req.authRole !== 'admin') {
         return res.status(403).json({ error: 'Acesso negado: apenas o administrador pode gerenciar o plano de contas.' });
       }
 
@@ -221,8 +223,9 @@ export async function handleContasContabeis(req, res) {
       if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
 
       // Contas contábeis são globais: só o administrador master pode desativar
-      const MASTER_UID = process.env.APP_UID || 'odair';
-      if (uid !== MASTER_UID) {
+      // Todos os usuários do portal compartilham o mesmo uid; a permissão
+      // correta vem do papel (role), não da comparação de uid.
+      if (req.authRole !== 'admin') {
         return res.status(403).json({ error: 'Acesso negado: apenas o administrador pode gerenciar o plano de contas.' });
       }
 

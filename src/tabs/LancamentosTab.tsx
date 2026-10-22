@@ -99,6 +99,12 @@ const LancamentosTab = React.memo(({
     }
   }, [filter, yearFilter, monthFilter, statusFilter]);
 
+  // A seleção precisa acompanhar o filtro: itens que saem da tela continuavam
+  // marcados e o botão "Receber N" agia sobre lançamentos invisíveis.
+  useEffect(() => {
+    setSelectedMap(new Map());
+  }, [filter, yearFilter, monthFilter, statusFilter, specialFilter]);
+
   // Extrair meses e anos únicos para os filtros
   const availableYears = useMemo(() => {
     const years = transactions.map(tx => {

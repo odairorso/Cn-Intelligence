@@ -293,6 +293,12 @@ export async function handleFechamentos(req, res) {
         return res.status(400).json({ error: 'Dados insuficientes' });
       }
 
+      // Sem validar, "2026" gerava vencimento "NaN-NaN-05" e o fechamento
+      // falhava DEPOIS de já ter apagado os lançamentos da competência.
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(competencia))) {
+        return res.status(400).json({ error: 'Competência inválida (use AAAA-MM).' });
+      }
+
       // Validação de ownership dos funcionários e segmentos (anti cross-tenant)
       const uniqueProfIds = Array.from(new Set((lancamentos || []).map(l => l.professorId).filter(Boolean)));
       const uniqueSegIds = Array.from(new Set((lancamentos || []).map(l => l.segmentoId).filter(Boolean)));

@@ -1297,25 +1297,39 @@ export default function App() {
     reader.readAsArrayBuffer(file);
   };
 
-  const handleMarkAsPaidClick = useCallback((tx: Transaction) => {
+  const handleMarkAsPaidClick = useCallback(async (tx: Transaction) => {
     if (banks.some(b => b.ativo)) {
       setShowPayModal({ id: tx.id, valor: tx.valor, vencimento: tx.vencimento });
     } else {
-      markAsPaid(String(tx.id), '');
+      try {
+        await markAsPaid(String(tx.id), '');
+      } catch (err: any) {
+        showNotification(err?.message || 'Erro ao marcar como pago.', 'error');
+      }
     }
-  }, [banks, markAsPaid]);
+  }, [banks, markAsPaid, showNotification]);
 
-  const handleMarkAsPaidBatchClick = useCallback((txs: Transaction[]) => {
+  const handleMarkAsPaidBatchClick = useCallback(async (txs: Transaction[]) => {
     if (txs.length === 0) return;
     if (banks.some(b => b.ativo)) {
       setShowPayBatchModal(txs);
     } else {
-      markAsPaidBatch(txs.map(t => t.id), '');
+      try {
+        // Só os IDs: o backend preserva juros/descontos já gravados.
+        await markAsPaidBatch(txs.map(t => String(t.id)), '');
+      } catch (err: any) {
+        showNotification(err?.message || 'Erro ao marcar como pago.', 'error');
+      }
     }
-  }, [banks, markAsPaidBatch]);
+  }, [banks, markAsPaidBatch, showNotification]);
 
   const handleOpenLancamentos = useCallback((filters?: { status?: string; search?: string; special?: string }) => {
     if (filters) {
+      // Mês/ano e página ficam salvos de visitas anteriores: sem resetar, a
+      // lista abria filtrada por um período antigo (ou vazia) ao vir do painel.
+      sessionStorage.setItem('cn_lancamentos_monthFilter', 'TODOS');
+      sessionStorage.setItem('cn_lancamentos_yearFilter', 'TODOS');
+      sessionStorage.setItem('cn_lancamentos_page', '0');
       if (filters.status) {
         sessionStorage.setItem('cn_lancamentos_statusFilter', filters.status);
       } else {
@@ -2575,9 +2589,13 @@ export default function App() {
           banks={safeBanks}
           initialDate={toInputDate(showPayModal.vencimento)}
           onClose={() => setShowPayModal(null)}
-          onConfirm={(banco, dataPagamento) => {
-            markAsPaid(showPayModal.id, banco, dataPagamento);
-            setShowPayModal(null);
+          onConfirm={async (banco, dataPagamento) => {
+            try {
+              await markAsPaid(showPayModal.id, banco, dataPagamento);
+              setShowPayModal(null);
+            } catch (err: any) {
+              showNotification(err?.message || 'Erro ao marcar como pago.', 'error');
+            }
           }}
         />
       )}
@@ -2588,9 +2606,15 @@ export default function App() {
           banks={safeBanks}
           initialDate={showPayBatchModal.length > 0 ? toInputDate(showPayBatchModal[0].vencimento) : undefined}
           onClose={() => setShowPayBatchModal(null)}
-          onConfirm={(items, banco, dataPagamento) => {
-            markAsPaidBatch(items, banco, dataPagamento);
-            setShowPayBatchModal(null);
+          onConfirm={async (items, banco, dataPagamento) => {
+            // Só fecha o modal quando a baixa realmente concluiu; antes,
+            // uma falha de rede fechava a tela e o título continuava pendente.
+            try {
+              await markAsPaidBatch(items, banco, dataPagamento);
+              setShowPayBatchModal(null);
+            } catch (err: any) {
+              showNotification(err?.message || 'Erro ao marcar como pago.', 'error');
+            }
           }}
         />
       )}

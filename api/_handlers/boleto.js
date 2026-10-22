@@ -100,8 +100,9 @@ export async function handleExtractBoleto(req, res) {
         } catch (e) {
           lastErr = e;
           console.warn(`[boleto] Modelo ${modelName} falhou em ${Date.now() - startedAt}ms:`, e?.message || e);
-          // 429 = cota. Espera um pouco antes de tentar o próximo modelo.
-          if (Number(e?.status || e?.code || 0) === 429) {
+          // 429 = cota. O SDK pode devolver 429, 'RESOURCE_EXHAUSTED' ou code 429.
+          const errStatus = e?.status;
+          if (errStatus === 429 || errStatus === 'RESOURCE_EXHAUSTED' || e?.code === 429) {
             await new Promise((r) => setTimeout(r, 1500));
           }
           continue;

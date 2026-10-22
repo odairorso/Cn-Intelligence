@@ -37,7 +37,7 @@ interface EditTxModalProps {
   contasContabeis: ContaContabil[];
   companyOptions: string[];
   onClose: () => void;
-  onSave: (id: string, data: Partial<Transaction>) => void;
+  onSave: (id: string, data: Partial<Transaction>) => Promise<void> | void;
 }
 
 const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOptions, onClose, onSave }: EditTxModalProps) => {
@@ -58,6 +58,8 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
   const [searchConta, setSearchConta] = useState('');
   const [showContaDropdown, setShowContaDropdown] = useState(false);
   const [searchSupplier, setSearchSupplier] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const getDefaultContaKey = (empresa: string, tipo: string) =>
     `cn_default_conta_contabil:${normalizeCompanyKey(empresa)}:${String(tipo || '').toUpperCase()}`;
 
@@ -113,8 +115,9 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
     });
   }, [transaction]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
     const rawNumero = String(formData.numero_boleto_base || '').trim();
     const occSuffix = formData.ocorrencia ? `-${formData.ocorrencia.trim()}` : '';
     const numeroBoletoFinal = rawNumero ? `${rawNumero}${occSuffix}` : null;
@@ -132,8 +135,18 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
     delete (rest as any).ocorrencia;
     delete (rest as any).valorPago;
 
-    onSave(String(id), rest);
-    onClose();
+    // Antes fechava antes de salvar: uma falha na API descartava a edição
+    // sem aviso. Agora só fecha quando o salvamento conclui.
+    try {
+      setIsSaving(true);
+      setSaveError('');
+      await onSave(String(id), rest);
+      onClose();
+    } catch (err: any) {
+      setSaveError(err?.message || 'Não foi possível salvar as alterações.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -410,19 +423,26 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               />
             </div>
           )}
+          {saveError && (
+            <p className="text-xs font-bold text-tertiary bg-tertiary/10 border border-tertiary/30 rounded-lg px-4 py-2">
+              {saveError}
+            </p>
+          )}
           <div className="flex gap-3 pt-6">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant"
+              disabled={isSaving}
+              className="flex-1 px-4 py-3 rounded-sm border border-white/10 text-xs font-black uppercase tracking-widest hover:bg-white/5 transition-all text-on-surface-variant disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
+              disabled={isSaving}
+              className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Salvar Alterações
+              {isSaving ? 'Salvando...' : 'Salvar Alterações'}
             </button>
           </div>
 

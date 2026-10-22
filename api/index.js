@@ -77,7 +77,9 @@ export default async function handler(req, res) {
     let userPayload = null;
 
     if (user) {
-      isValid = bcrypt.compareSync(password, user.password_hash);
+      // Usuário criado só com Google não tem senha: compareSync lançava exceção
+      // e derrubava a função com 500 em vez de negar o login.
+      isValid = Boolean(user.password_hash) && bcrypt.compareSync(password, user.password_hash);
       if (isValid) {
         userPayload = { uid: APP_UID, email: user.email, name: user.name, role: user.role };
       }

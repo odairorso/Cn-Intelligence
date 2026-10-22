@@ -41,7 +41,7 @@ export async function handleStats(req, res) {
 
     let dateFilterSql;
     if (startDate || endDate) {
-      dateFilterSql = sql`1=1`;
+      dateFilterSql = sql`AND 1=1`;
       if (startDate) {
         dateFilterSql = sql`${dateFilterSql} AND ${dateCol} >= ${startDate}`;
       }

@@ -92,7 +92,9 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {banks.map(bank => {
-          const totalPagoVal = bank.total_pago || 0;
+          // Pode vir como string do banco: sem Number(), "+" concatenava
+          // ("100050") ou virava NaN no saldo atual.
+          const totalPagoVal = Number(bank.total_pago || 0);
           const saldoAtualVal = Number(bank.saldo) + totalPagoVal;
           const limiteVal = Number(bank.limite || 0);
           const isUsandoLimite = saldoAtualVal < 0;

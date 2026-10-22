@@ -10,13 +10,14 @@ interface SelectBankModalProps {
   banks: Bank[];
   initialDate?: string;
   onClose: () => void;
-  onConfirm: (banco: string, dataPagamento: string) => void;
+  onConfirm: (banco: string, dataPagamento: string) => Promise<void> | void;
 }
 
 const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, onConfirm }: SelectBankModalProps) => {
   const [selectedBank, setSelectedBank] = useState<string | null>(null);
   const [paymentDate, setPaymentDate] = useState(initialDate || todayInputDate());
   const [dateError, setDateError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const paymentDateRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -100,19 +101,25 @@ const SelectBankModal = ({ transactionId, valor, banks, initialDate, onClose, on
             Cancelar
           </button>
           <button
-            onClick={() => {
-              if (selectedBank === null) return;
+            onClick={async () => {
+              // Dois cliques rápidos davam duas baixas no mesmo título.
+              if (isSubmitting || selectedBank === null) return;
               const normalized = paymentDateRef.current?.value || paymentDate;
               if (!normalized) {
                 setDateError('Informe uma data válida.');
                 return;
               }
-              onConfirm(selectedBank, normalized);
+              setIsSubmitting(true);
+              try {
+                await onConfirm(selectedBank, normalized);
+              } finally {
+                setIsSubmitting(false);
+              }
             }}
-            disabled={selectedBank === null}
+            disabled={selectedBank === null || isSubmitting}
             className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Confirmar
+            {isSubmitting ? 'Processando...' : 'Confirmar'}
           </button>
         </div>
       </motion.div>

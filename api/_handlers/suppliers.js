@@ -74,6 +74,7 @@ export async function handleSuppliersBatch(req, res) {
   if (!Array.isArray(suppliers) || suppliers.length === 0) return res.status(400).json({ error: 'Invalid batch data' });
 
   try {
+    let inserted = 0;
     for (const sup of suppliers) {
       const result = SupplierSchema.safeParse({ ...(sup || {}), uid });
       if (!result.success) continue;
@@ -90,12 +91,14 @@ export async function handleSuppliersBatch(req, res) {
         LIMIT 1`;
       if (exists.length) continue;
 
-      await sql`
+      const insertedRows = await sql`
         INSERT INTO suppliers (uid, nome, cnpj, email, telefone)
         VALUES (${uid}, ${nomeTrim}, ${cnpj || null}, ${email || null}, ${telefone || null})
-        ON CONFLICT DO NOTHING`;
+        ON CONFLICT DO NOTHING
+        RETURNING id`;
+      if (insertedRows.length) inserted += 1;
     }
-    return res.status(201).json({ message: 'Batch created successfully', count: suppliers.length });
+    return res.status(201).json({ message: 'Batch created successfully', count: inserted });
   } catch (e) {
     return handleError(res, e, 'suppliers.js handleSuppliersBatch');
   }

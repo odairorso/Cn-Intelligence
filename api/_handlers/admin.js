@@ -27,10 +27,9 @@ async function ensureApiLogsTable() {
 export async function handleSetupTables(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Somente o administrador master pode executar o setup de tabelas
+  // Somente administradores podem executar o setup de tabelas
   const uid = req.authUid;
-  const MASTER_UID = process.env.APP_UID || 'odair';
-  if (!uid || uid !== MASTER_UID) {
+  if (!uid || req.authRole !== 'admin') {
     return res.status(403).json({ error: 'Acesso negado: apenas administradores podem configurar tabelas.' });
   }
 
@@ -278,9 +277,9 @@ export async function handleExportBackup(req, res) {
   try {
     await ensureApiLogsTable();
     const [txs, sups, banks] = await Promise.all([
-      sql`SELECT * FROM transactions`,
-      sql`SELECT * FROM suppliers`,
-      sql`SELECT * FROM banks`
+      sql`SELECT * FROM transactions WHERE uid = ${uid} OR uid IS NULL`,
+      sql`SELECT * FROM suppliers WHERE uid = ${uid} OR uid IS NULL`,
+      sql`SELECT * FROM banks WHERE uid = ${uid} OR uid IS NULL`
     ]);
     return res.json({ timestamp: new Date(), data: { transactions: txs, suppliers: sups, banks } });
   } catch (e) {

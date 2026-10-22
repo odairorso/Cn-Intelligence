@@ -107,6 +107,13 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
 
     setIsSubmitting(true);
     try {
+      // "0", " " e "," passavam pelo required e criavam lançamento de R$ 0.
+      const valorInformado = parseMoneyToNumber(formData.valor);
+      if (!Number.isFinite(valorInformado) || valorInformado <= 0) {
+        alert('Informe um valor maior que zero.');
+        return;
+      }
+
       const fornecedorRaw = String(formData.fornecedor || '').trim();
       const fornecedorKey = normalizeSupplierName(fornecedorRaw);
       let fornecedorFinal = fornecedorRaw;
@@ -471,7 +478,7 @@ const NewTxModal = ({ suppliers, banks, contasContabeis, companyOptions, setShow
               </label>
               {formData.valorTipo === 'total' && formData.valor && (
                 <span className="text-[10px] text-primary ml-auto">
-                  = R$ {(Number(formData.valor) / Number(formData.parcelas)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/parcela
+                  = R$ {(parseMoneyToNumber(formData.valor) / Math.max(1, Number(formData.parcelas) || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/parcela
                 </span>
               )}
             </div>

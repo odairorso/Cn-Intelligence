@@ -8,10 +8,11 @@ interface TransferModalProps {
   banks: Bank[];
   companyOptions: string[];
   onClose: () => void;
-  onSubmit: (data: { originBank: string, destBank: string, originCompany: string, destCompany: string, value: number, date: string, description: string }) => void;
+  onSubmit: (data: { originBank: string, destBank: string, originCompany: string, destCompany: string, value: number, date: string, description: string }) => Promise<void> | void;
 }
 
 const TransferModal = ({ banks, companyOptions, onClose, onSubmit }: TransferModalProps) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     originBank: '',
     destBank: '',
@@ -22,17 +23,26 @@ const TransferModal = ({ banks, companyOptions, onClose, onSubmit }: TransferMod
     description: 'Transferência entre contas'
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!formData.originBank || !formData.destBank || !formData.value) return;
     if (formData.originBank === formData.destBank && formData.originCompany === formData.destCompany) {
       alert('Selecione contas ou empresas diferentes para origem e destino.');
       return;
     }
-    onSubmit({
-      ...formData,
-      value: parseMoneyToNumber(formData.value)
-    });
+    const value = parseMoneyToNumber(formData.value);
+    // Sem a checagem, "-100", "0" e "," passavam e geravam transferência inválida.
+    if (!Number.isFinite(value) || value <= 0) {
+      alert('Informe um valor maior que zero.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await onSubmit({ ...formData, value });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -128,6 +138,7 @@ const TransferModal = ({ banks, companyOptions, onClose, onSubmit }: TransferMod
               <input
                 type="number"
                 step="0.01"
+                min="0.01"
                 required
                 className="w-full bg-surface-variant/20 border border-white/10 rounded-lg px-4 py-3 text-sm outline-none focus:border-primary"
                 value={formData.value}
@@ -167,9 +178,10 @@ const TransferModal = ({ banks, companyOptions, onClose, onSubmit }: TransferMod
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10"
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-3 rounded-sm bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Confirmar Transferência
+              {isSubmitting ? 'Transferindo...' : 'Confirmar Transferência'}
             </button>
           </div>
         </form>

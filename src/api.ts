@@ -328,9 +328,15 @@ export const api = {
     dataPagamento?: string
   ): Promise<void> {
     if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
-    const items = itemsOrIds.map(item => (typeof item === 'string' ? { id: item, juros: 0 } : item));
+    const items = itemsOrIds.map(item => (typeof item === 'string' ? { id: item } : item));
     const ids = items.map(i => i.id);
-    const jurosMap = Object.fromEntries(items.map(i => [i.id, Number(i.juros) || 0]));
+    // Só envia juros de quem realmente informou valor: enviar 0 para todos
+    // apagava descontos/acréscimos já gravados no título.
+    const jurosMap = Object.fromEntries(
+      items
+        .filter(i => i.juros !== undefined && i.juros !== null)
+        .map(i => [i.id, Number(i.juros) || 0])
+    );
 
     const res = await fetchWithSecurity(`${API_BASE}?route=transactions-batch-update`, {
       method: 'PUT',
