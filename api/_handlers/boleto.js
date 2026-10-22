@@ -55,11 +55,13 @@ export async function handleExtractBoleto(req, res) {
     const GEMINI_TIME_BUDGET_MS = 45000;
     const generateContentWithFallback = async (contents, config) => {
       // Ordem: modelos rápidos primeiro.
-      // gemini-flash-lite-latest responde em ~2s; gemini-2.5-flash leva 20-40s.
+      // gemini-flash-lite responde em ~2s; gemini-2.5-flash leva 20-40s.
       const modelsToTry = [...new Set([
         process.env.GEMINI_MODEL,
         'gemini-flash-lite-latest',
+        'gemini-3.5-flash-lite',
         'gemini-flash-latest',
+        'gemini-3.5-flash',
         'gemini-3.8-flash',
       ].filter(Boolean))];
       const deadline = Date.now() + GEMINI_TIME_BUDGET_MS;
