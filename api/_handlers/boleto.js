@@ -52,23 +52,46 @@ export async function handleExtractBoleto(req, res) {
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const generateContentWithFallback = async (contents, config) => {
-      const modelsToTry = [process.env.GEMINI_MODEL, 'gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.1-pro-preview', 'gemini-pro-latest', 'gemini-flash-latest'].filter(Boolean);
+      // Ordem importa: modelos rápidos primeiro.
+      // gemini-flash-lite-latest responde em ~2s; gemini-2.5-flash leva 20-40s
+      // e, rodando primeiro, fazia cada boleto parecer travado.
+      const modelsToTry = [
+        process.env.GEMINI_MODEL,
+        'gemini-flash-lite-latest',
+        'gemini-flash-latest',
+        'gemini-2.5-flash',
+        'gemini-3.8-flash',
+      ].filter(Boolean);
       let lastErr = null;
-      for (const modelName of modelsToTry) {
+      for (let i = 0; i < modelsToTry.length; i++) {
+        const modelName = modelsToTry[i];
+        // Primeira tentativa tem folga; fallbacks são tentativas rápidas.
+        const timeoutMs = i === 0 ? 20000 : 12000;
+        const startedAt = Date.now();
+        let timer;
         try {
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`Timeout ao consultar IA modelo ${modelName}`)), 12000)
-          );
+          const timeoutPromise = new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`Timeout ao consultar IA modelo ${modelName}`)), timeoutMs);
+          });
+          const modelConfig = { ...config };
+          // Modelos 2.5 "pensam" antes de responder e ficam lentos; zerar acelera.
+          if (/^gemini-2\.5/.test(modelName)) {
+            modelConfig.thinkingConfig = { thinkingBudget: 0 };
+          }
           const callPromise = ai.models.generateContent({
             model: modelName,
             contents: contents,
-            config: config
+            config: modelConfig
           });
-          return await Promise.race([callPromise, timeoutPromise]);
+          const result = await Promise.race([callPromise, timeoutPromise]);
+          console.log(`[boleto] IA OK modelo=${modelName} em ${Date.now() - startedAt}ms`);
+          return result;
         } catch (e) {
           lastErr = e;
-          console.warn(`[boleto] Modelo ${modelName} falhou:`, e.message);
+          console.warn(`[boleto] Modelo ${modelName} falhou em ${Date.now() - startedAt}ms:`, e.message);
           continue;
+        } finally {
+          clearTimeout(timer);
         }
       }
       throw lastErr;

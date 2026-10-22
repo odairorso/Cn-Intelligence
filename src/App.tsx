@@ -553,8 +553,7 @@ export default function App() {
     showNotification(`Processando ${pdfFiles.length} boleto(s)...`, 'info');
 
     try {
-      const extractedRows: PdfImportDraft[] = await Promise.all(
-        pdfFiles.map(async (file) => {
+      const processOnePdf = async (file: File): Promise<PdfImportDraft> => {
           const arrayBuffer = await file.arrayBuffer();
 
           // Extrai texto com PDF.js primeiro (com timeout de 4s para nunca travar)
@@ -622,8 +621,21 @@ export default function App() {
             numero_boleto,
             descricao,
           };
-        })
-      );
+      };
+
+      // Concorrência limitada: 3 PDFs por vez.
+      // Antes ia tudo de uma vez, estourando o limite do Gemini (429) e
+      // deixando a importação lenta em lotes grandes.
+      const concurrency = Math.min(3, pdfFiles.length);
+      const extractedRows: PdfImportDraft[] = new Array(pdfFiles.length);
+      let nextIndex = 0;
+      await Promise.all(Array.from({ length: concurrency }, async () => {
+        while (true) {
+          const idx = nextIndex++;
+          if (idx >= pdfFiles.length) return;
+          extractedRows[idx] = await processOnePdf(pdfFiles[idx]);
+        }
+      }));
 
       if (!extractedRows.length) {
         showNotification('Nenhum dado foi extraído dos PDFs.', 'error');
