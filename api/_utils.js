@@ -51,12 +51,40 @@ async function ensureRateLimitTable() {
 
 
 
-export const checkRateLimit = async (req, res) => {
-  await ensureRateLimitTable();
+// Contador em memória para leituras (GET). Evita um UPSERT no banco em cada
+// request de leitura — o caminho mais quente do sistema — e evita 429 falso
+// quando toda a escola sai pelo mesmo IP (NAT).
+const memBuckets = new Map();
+function checkMemoryRateLimit(key, max) {
+  const now = Date.now();
+  const bucket = memBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    memBuckets.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  bucket.count += 1;
+  if (memBuckets.size > 5000) {
+    for (const [k, v] of memBuckets) if (v.resetAt <= now) memBuckets.delete(k);
+  }
+  return bucket.count <= max;
+}
 
+export const checkRateLimit = async (req, res) => {
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
     || req.socket?.remoteAddress
     || 'unknown';
+
+  // Leituras: limite em memória, sem tocar no banco.
+  if (String(req.method || 'GET').toUpperCase() === 'GET') {
+    if (!checkMemoryRateLimit(`g:${ip}`, 240)) {
+      res.status(429).json({ error: 'Too many requests' });
+      return false;
+    }
+    return true;
+  }
+
+  await ensureRateLimitTable();
+
   const now = Date.now();
 
   try {

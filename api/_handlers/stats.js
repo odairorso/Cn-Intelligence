@@ -67,20 +67,20 @@ export async function handleStats(req, res) {
     }
 
     // 1. KPIs Agrupados
-    const kpiRows = await sql`
+    const kpiPromise = sql`
       SELECT
-        COALESCE(SUM(CASE WHEN UPPER(tipo) = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as total_receitas,
+        COALESCE(SUM(CASE WHEN UPPER(tipo) = 'RECEITA' THEN (CASE WHEN valor = 'NaN'::numeric THEN 0 ELSE valor END) ELSE 0 END), 0) as total_receitas,
         COALESCE(SUM(CASE WHEN UPPER(tipo) = 'DESPESA'
-          THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
-             + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+          THEN (CASE WHEN valor = 'NaN'::numeric THEN 0 ELSE valor END)
+             + (CASE WHEN juros IS NULL OR juros = 'NaN'::numeric THEN 0 ELSE juros END)
           ELSE 0 END), 0) as total_despesas,
         COALESCE(SUM(CASE WHEN UPPER(tipo) = 'TRANSFERENCIA'
-          THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
-             + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+          THEN (CASE WHEN valor = 'NaN'::numeric THEN 0 ELSE valor END)
+             + (CASE WHEN juros IS NULL OR juros = 'NaN'::numeric THEN 0 ELSE juros END)
           ELSE 0 END), 0) as total_transferencias,
         COALESCE(SUM(
-          ABS(CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
-          + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+          ABS(CASE WHEN valor = 'NaN'::numeric THEN 0 ELSE valor END)
+          + (CASE WHEN juros IS NULL OR juros = 'NaN'::numeric THEN 0 ELSE juros END)
         ), 0) as total_geral,
         COUNT(CASE WHEN status = 'PAGO' AND tipo != 'TRANSFERENCIA' THEN 1 END) as count_pagos,
         COUNT(CASE WHEN (status = 'PENDENTE' OR status = 'VENCIDO') AND (vencimento >= CURRENT_DATE OR vencimento IS NULL) AND tipo != 'TRANSFERENCIA' THEN 1 END) as count_pendentes,
@@ -90,17 +90,17 @@ export async function handleStats(req, res) {
       WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}`;
 
     // 2. Fluxo Mensal
-    let fluxRows;
+    let fluxPromise;
     const activeRange = isRange(year) ? year : (isRange(period) ? period : null);
 
     if (startDate || endDate) {
-      fluxRows = await sql`
+      fluxPromise = sql`
         SELECT
           EXTRACT(MONTH FROM ${dateCol}) as month_num,
-          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
+          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor = 'NaN'::numeric THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo = 'DESPESA'
-            THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
-               + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+            THEN (CASE WHEN valor = 'NaN'::numeric THEN 0 ELSE valor END)
+               + (CASE WHEN juros IS NULL OR juros = 'NaN'::numeric THEN 0 ELSE juros END)
             ELSE 0 END), 0) as despesas
         FROM transactions
         WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
@@ -108,13 +108,13 @@ export async function handleStats(req, res) {
         ORDER BY month_num`;
     } else if (year && year !== 'TODOS' && !activeRange) {
       const y = parseInt(year);
-      fluxRows = await sql`
+      fluxPromise = sql`
         SELECT
           EXTRACT(MONTH FROM ${dateCol}) as month_num,
-          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
+          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor = 'NaN'::numeric THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo = 'DESPESA'
-            THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
-               + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+            THEN (CASE WHEN valor = 'NaN'::numeric THEN 0 ELSE valor END)
+               + (CASE WHEN juros IS NULL OR juros = 'NaN'::numeric THEN 0 ELSE juros END)
             ELSE 0 END), 0) as despesas
         FROM transactions
         WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
@@ -124,13 +124,13 @@ export async function handleStats(req, res) {
         ORDER BY month_num`;
     } else if (activeRange) {
       const [start, end] = activeRange.split('-');
-      fluxRows = await sql`
+      fluxPromise = sql`
         SELECT
           EXTRACT(MONTH FROM ${dateCol}) as month_num,
-          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
+          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor = 'NaN'::numeric THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo = 'DESPESA'
-            THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
-               + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+            THEN (CASE WHEN valor = 'NaN'::numeric THEN 0 ELSE valor END)
+               + (CASE WHEN juros IS NULL OR juros = 'NaN'::numeric THEN 0 ELSE juros END)
             ELSE 0 END), 0) as despesas
         FROM transactions
         WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
@@ -139,13 +139,13 @@ export async function handleStats(req, res) {
         GROUP BY EXTRACT(MONTH FROM ${dateCol})
         ORDER BY month_num`;
     } else {
-      fluxRows = await sql`
+      fluxPromise = sql`
         SELECT
           EXTRACT(MONTH FROM ${dateCol}) as month_num,
-          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
+          COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN (CASE WHEN valor = 'NaN'::numeric THEN 0 ELSE valor END) ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo = 'DESPESA'
-            THEN (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
-               + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+            THEN (CASE WHEN valor = 'NaN'::numeric THEN 0 ELSE valor END)
+               + (CASE WHEN juros IS NULL OR juros = 'NaN'::numeric THEN 0 ELSE juros END)
             ELSE 0 END), 0) as despesas
         FROM transactions
         WHERE 1=1 ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
@@ -156,12 +156,12 @@ export async function handleStats(req, res) {
     }
 
     // 3. Top Fornecedores
-    const supplierRows = await sql`
+    const supplierPromise = sql`
       SELECT
         fornecedor as name,
         COALESCE(SUM(
-          (CASE WHEN valor::text = 'NaN' THEN 0 ELSE valor END)
-          + (CASE WHEN juros IS NULL OR juros::text = 'NaN' THEN 0 ELSE juros END)
+          (CASE WHEN valor = 'NaN'::numeric THEN 0 ELSE valor END)
+          + (CASE WHEN juros IS NULL OR juros = 'NaN'::numeric THEN 0 ELSE juros END)
         ), 0) as value
       FROM transactions
       WHERE 1=1 AND tipo != 'TRANSFERENCIA' ${uidFilterSql} ${dateFilterSql} ${empresaFilterSql} ${tipoFilterSql} ${statusFilterSql} ${searchFilterSql}
@@ -169,11 +169,17 @@ export async function handleStats(req, res) {
       ORDER BY value DESC
       LIMIT 10`;
 
-    const yearRows = await sql`
+    const yearPromise = sql`
       SELECT DISTINCT EXTRACT(YEAR FROM ${dateCol})::int as year
       FROM transactions
       WHERE 1=1 ${uidFilterSql} AND ${dateCol} IS NOT NULL
       ORDER BY year DESC`;
+
+    // As quatro consultas são independentes: rodam em paralelo (antes eram
+    // sequenciais, somando 4 idas ao banco em série a cada carga do dashboard).
+    const [kpiRows, fluxRows, supplierRows, yearRows] = await Promise.all([
+      kpiPromise, fluxPromise, supplierPromise, yearPromise,
+    ]);
 
     return res.json({
       kpis: kpiRows[0],

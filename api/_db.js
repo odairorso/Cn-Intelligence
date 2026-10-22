@@ -93,12 +93,9 @@ export class SqlQuery {
       pool.connect()
         .then(async client => {
           try {
-            const currentUid = uid || '';
-            const currentRole = role || 'user';
-            await client.query(
-              "SELECT set_config('app.current_uid', $1, true), set_config('app.current_role', $2, true)",
-              [currentUid, currentRole]
-            );
+            // set_config(..., is_local=true) fora de BEGIN morre no fim do próprio
+            // statement — não vale para a query seguinte. Era 1 round-trip extra
+            // por query sem efeito algum. O contexto de RLS real fica em transaction().
             const res = await client.query(query, params);
             resolve(res.rows);
           } catch (err) {
@@ -151,12 +148,7 @@ export const sql = (strings, ...values) => {
 
     return pool.connect().then(async client => {
       try {
-        const currentUid = uid || '';
-        const currentRole = role || 'user';
-        await client.query(
-          "SELECT set_config('app.current_uid', $1, true), set_config('app.current_role', $2, true)",
-          [currentUid, currentRole]
-        );
+        // Idem acima: sem set_config por statement (round-trip inútil).
         const res = await client.query(strings, values);
         return res.rows;
       } finally {

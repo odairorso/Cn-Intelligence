@@ -327,8 +327,15 @@ export const matchesAccountType = (acc: ContaContabil, tipo: 'RECEITA' | 'DESPES
 };
 
 // ─── Currency formatter ───────────────────────────────────────────────────────
-export const formatBRL = (value: number): string =>
-  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Intl.NumberFormat é caro para criar; reaproveita uma instância em todas as chamadas.
+const BRL_FORMATTER = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+export const formatBRL = (value: number): string => BRL_FORMATTER.format(value);
 
 // ─── CPF/CNPJ Formatter ───────────────────────────────────────────────────────
 export const formatCnpjCpf = (value: string): string => {

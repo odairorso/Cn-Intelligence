@@ -7,13 +7,7 @@ import {
   BarChart3, PieChart as PieChartIcon, UserPlus, FileSpreadsheet,
   X, Edit, RefreshCw, CreditCard, FileUp, Loader2, Printer, Merge, Palette
 } from 'lucide-react';
-import readXlsxFile from 'read-excel-file/browser';
-import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { motion, AnimatePresence } from 'motion/react';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
-
 import { Transaction, KPI, Supplier, TransactionStatus, Bank, ContaContabil } from './types';
 import { api, apiAuth } from './api';
 import { OFXImportTab } from './OFXImport';
@@ -36,6 +30,16 @@ import {
   extractBoletoData,
   type PdfImportDraft
 } from './lib/boletoParser';
+
+// pdf.js (~1 MB) e read-excel-file só são usados ao importar arquivos.
+// Carregados sob demanda para não pesar no boot do sistema.
+let pdfjsPromise: Promise<typeof import('pdfjs-dist')> | null = null;
+const loadPdfJs = () => (pdfjsPromise ??= import('pdfjs-dist'));
+
+const loadReadXlsxFile = async () => {
+  const mod = await import('read-excel-file/browser');
+  return mod.default;
+};
 
 // Lazy-loaded tabs
 const DashboardTab = lazy(() => import('./tabs/DashboardTab'));
@@ -204,6 +208,7 @@ export default function App() {
   const [showPdfImportModal, setShowPdfImportModal] = useState(false);
   const [pdfExtractedRows, setPdfExtractedRows] = useState<PdfImportDraft[]>([]);
   const [isProcessingPdf, setIsProcessingPdf] = useState(false);
+  const [isSavingPdfImport, setIsSavingPdfImport] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -559,6 +564,7 @@ export default function App() {
           // Extrai texto com PDF.js primeiro (com timeout de 4s para nunca travar)
           let fullText = '';
           try {
+            const pdfjsLib = await loadPdfJs();
             const getPdf = async () => {
               try {
                 return await pdfjsLib.getDocument({ data: arrayBuffer.slice(0), disableWorker: true } as any).promise;
@@ -660,6 +666,10 @@ export default function App() {
   };
 
   const handleConfirmPdfImport = async () => {
+    // Guarda contra duplo clique: sem isso, dois cliques criavam duas
+    // importações financeiras duplicadas.
+    if (isSavingPdfImport) return;
+    setIsSavingPdfImport(true);
     try {
       const validRows = pdfExtractedRows
         .filter((row) => row.fornecedor && row.vencimento && row.valor > 0)
@@ -728,11 +738,12 @@ export default function App() {
         await api.createSuppliersBatch(newSuppliers as any);
       }
 
-      // Salva padrões aprendidos para cada boleto confirmado
-      // Roda em background sem bloquear o fluxo
-      canonicalRows.forEach(row => {
-        if (row.fornecedor && row.fornecedor !== 'Fornecedor não identificado') {
-          api.saveBoletoPattern({
+      // Salva padrões aprendidos para cada boleto confirmado, em lotes de 5.
+      // allSettled evita que uma falha derrube a importação já concluída.
+      for (let i = 0; i < canonicalRows.length; i += 5) {
+        await Promise.allSettled(canonicalRows.slice(i, i + 5).map((row) => {
+          if (!row.fornecedor || row.fornecedor === 'Fornecedor não identificado') return Promise.resolve();
+          return api.saveBoletoPattern({
             cnpj: row.cnpj,
             nome_beneficiario: row.fornecedor,
             fornecedor: row.fornecedor,
@@ -741,8 +752,8 @@ export default function App() {
             tipo: row.tipo || 'DESPESA',
             conta_contabil_id: row.conta_contabil_id,
           });
-        }
-      });
+        }));
+      }
 
       setShowPdfImportModal(false);
       setPdfExtractedRows([]);
@@ -759,6 +770,8 @@ export default function App() {
         ? 'Este boleto já foi lançado no sistema.'
         : 'Erro ao salvar lançamentos de boleto.';
       showNotification(msg, isDuplicate ? 'info' : 'error');
+    } finally {
+      setIsSavingPdfImport(false);
     }
   };
 
@@ -817,6 +830,7 @@ export default function App() {
           const text = new TextDecoder('utf-8').decode(arrayBuffer);
           sheetEntries = [{ sheetName: file.name.replace(/\.csv$/i, ''), sheetMatrix: parseCsv(text) }];
         } else {
+          const readXlsxFile = await loadReadXlsxFile();
           const sheets = await readXlsxFile(file);
           sheetEntries = sheets.map(({ sheet, data }) => ({
             sheetName: sheet,
@@ -1362,6 +1376,12 @@ export default function App() {
     return { total, pagos, pendentes, vencidos, kpis };
   }, [transactions]);
 
+  // Contagem de períodos memoizada: evita varrer todas as transações a cada render.
+  const periodCount = useMemo(
+    () => new Set(transactions.map((t) => t.vencimento?.substring(0, 7))).size,
+    [transactions],
+  );
+
   // Skeleton de carregamento inicial
   if (isLoading) {
     return (
@@ -1625,7 +1645,7 @@ export default function App() {
                 <CheckCircle size={14} /> {transactions.length} registros
               </span>
               <span className="bg-surface-variant/20 px-3 py-1.5 rounded-sm text-xs font-semibold text-on-surface-variant flex items-center gap-2">
-                <Calendar size={14} /> {[...new Set(transactions.map(t => t.vencimento.substring(0, 7)))].length} períodos
+                <Calendar size={14} /> {periodCount} períodos
               </span>
               <span className="bg-surface-variant/20 px-3 py-1.5 rounded-sm text-[11px] font-semibold text-on-surface-variant flex items-center gap-2">
                 Build: {(__BUILD_SHA__ || __BUILD_TIME__).slice(0, 8)}
@@ -2490,9 +2510,10 @@ export default function App() {
               </button>
               <button
                 onClick={handleConfirmPdfImport}
-                className="bg-primary text-background px-5 py-2 rounded-lg text-sm font-black uppercase tracking-widest hover:bg-primary-dark transition-all"
+                disabled={isSavingPdfImport}
+                className="bg-primary text-background px-5 py-2 rounded-lg text-sm font-black uppercase tracking-widest hover:bg-primary-dark transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Confirmar Importação
+                {isSavingPdfImport ? 'Salvando...' : 'Confirmar Importação'}
               </button>
             </div>
           </div>

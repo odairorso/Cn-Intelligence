@@ -570,7 +570,8 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   const fetchBanks = useCallback(async (force = false) => {
     if (!apiAuth.isAuthenticated()) return;
     try {
-      const data = await api.getBanks(true); // force fresh data
+      // Respeita o parâmetro: sem force, o navegador pode reutilizar o cache.
+      const data = await api.getBanks(force);
       const list = Array.isArray(data) ? data : [];
       setBanks(list);
       setBalance(list.reduce((acc, b) => acc + (Number(b.saldo) || 0), 0));
@@ -587,8 +588,11 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     const data = await api.createTransaction(tx as any);
     setTransactions((prev) => [data, ...prev]);
     clearCache(`suppliers_${apiAuth.getUid()}`);
-    await fetchSuppliers(true);
-    await fetchBanks(true);
+    // Em paralelo; e o saldo bancário só muda quando o lançamento já entra pago.
+    await Promise.all([
+      fetchSuppliers(true),
+      tx.status === 'PAGO' ? fetchBanks(true) : Promise.resolve(),
+    ]);
     showNotification('Lançamento criado com sucesso!', 'success');
   }, [fetchSuppliers, fetchBanks, showNotification]);
 
@@ -596,8 +600,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     const updated = await api.updateTransaction(id, data);
     setTransactions((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, ...updated } : t)));
     clearCache(`suppliers_${apiAuth.getUid()}`);
-    await fetchSuppliers(true);
-    await fetchBanks(true);
+    await Promise.all([fetchSuppliers(true), fetchBanks(true)]);
     showNotification('Lançamento atualizado!', 'success');
   }, [fetchSuppliers, fetchBanks, showNotification]);
 
@@ -605,8 +608,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     await api.deleteTransaction(id);
     setTransactions((prev) => prev.filter((t) => String(t.id) !== id));
     clearCache(`suppliers_${apiAuth.getUid()}`);
-    await fetchSuppliers(true);
-    await fetchBanks(true);
+    await Promise.all([fetchSuppliers(true), fetchBanks(true)]);
     showNotification('Lançamento excluído!', 'success');
   }, [fetchSuppliers, fetchBanks, showNotification]);
 
