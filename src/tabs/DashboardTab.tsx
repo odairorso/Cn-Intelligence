@@ -112,6 +112,17 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
     });
   }, [transactions, periodoFilter]);
 
+  // Listas do rodapé calculadas uma vez por mudança de filtro, em vez de
+  // 4 varreduras completas a cada re-render (duas no JSX e duas nas condições).
+  const recentRevenue = useMemo(
+    () => filteredTx.filter((tx) => isRevenueTransaction(tx)).slice(0, 5),
+    [filteredTx],
+  );
+  const recentExpense = useMemo(
+    () => filteredTx.filter((tx) => !isRevenueTransaction(tx)).slice(0, 5),
+    [filteredTx],
+  );
+
   const statusChartData = [
     { name: 'Pagos', value: realKpis?.count_pagos || 0, color: '#10b981' },
     { name: 'Pendentes', value: realKpis?.count_pendentes || 0, color: '#f59e0b' },
@@ -704,7 +715,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
             <TrendingUp size={20} className="text-success/40" />
           </div>
           <div className="space-y-3">
-            {filteredTx.filter(tx => isRevenueTransaction(tx)).slice(0, 5).map((tx, idx) => (
+            {recentRevenue.map((tx, idx) => (
               <motion.div
                 key={tx.id}
                 initial={{ opacity: 0, x: -10 }}
@@ -726,7 +737,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
                 </div>
               </motion.div>
             ))}
-            {filteredTx.filter(tx => isRevenueTransaction(tx)).length === 0 && (
+            {recentRevenue.length === 0 && (
               <div className="py-10 text-center opacity-30">
                 <p className="text-xs font-medium text-on-surface-variant">Nenhuma receita recente</p>
               </div>
@@ -743,7 +754,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
             <TrendingDown size={20} className="text-primary/40" />
           </div>
           <div className="space-y-3">
-            {filteredTx.filter(tx => !isRevenueTransaction(tx)).slice(0, 5).map((tx, idx) => (
+            {recentExpense.map((tx, idx) => (
               <motion.div
                 key={tx.id}
                 initial={{ opacity: 0, x: -10 }}
@@ -769,7 +780,7 @@ const DashboardTab = React.memo(({ transactions, onMarkAsPaid, onOpenLancamentos
                 </div>
               </motion.div>
             ))}
-            {filteredTx.filter(tx => !isRevenueTransaction(tx)).length === 0 && (
+            {recentExpense.length === 0 && (
               <div className="py-10 text-center opacity-30">
                 <p className="text-xs font-medium text-on-surface-variant">Nenhuma despesa recente</p>
               </div>
