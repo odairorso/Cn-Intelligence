@@ -587,7 +587,7 @@ export default function App() {
 
           // Se já extraiu bom texto, não precisa subir megabytes de base64 (upload instantâneo)
           let pdfBase64: string | undefined = undefined;
-          if (!hasGoodText && file.size <= 3.5 * 1024 * 1024) {
+          if (!hasGoodText && file.size <= 3.0 * 1024 * 1024) {
             try {
               pdfBase64 = await new Promise<string>((resolve) => {
                 const reader = new FileReader();
@@ -623,11 +623,11 @@ export default function App() {
           };
       };
 
-      // Concorrência limitada: 3 PDFs por vez.
+      // Concorrência limitada: 2 PDFs por vez.
       // Antes ia tudo de uma vez, estourando o limite do Gemini (429) e
       // deixando a importação lenta em lotes grandes.
-      const concurrency = Math.min(3, pdfFiles.length);
-      const extractedRows: PdfImportDraft[] = new Array(pdfFiles.length);
+      const concurrency = Math.min(2, pdfFiles.length);
+      const extractedRows: PdfImportDraft[] = Array.from({ length: pdfFiles.length });
       let nextIndex = 0;
       await Promise.all(Array.from({ length: concurrency }, async () => {
         while (true) {
@@ -637,14 +637,15 @@ export default function App() {
         }
       }));
 
-      if (!extractedRows.length) {
+      const validExtracted = extractedRows.filter(Boolean) as PdfImportDraft[];
+      if (!validExtracted.length) {
         showNotification('Nenhum dado foi extraído dos PDFs.', 'error');
         return;
       }
 
-      setPdfExtractedRows(applyDuplicateFlags(extractedRows));
+      setPdfExtractedRows(applyDuplicateFlags(validExtracted));
       setShowPdfImportModal(true);
-      const firstAiError = extractedRows.find((r) => (r as any).ai_error)?.ai_error;
+      const firstAiError = validExtracted.find((r) => (r as any).ai_error)?.ai_error;
       if (firstAiError) {
         showNotification(`Falha ao ler boleto por IA (usando nome do arquivo). Motivo: ${String(firstAiError).slice(0, 120)}`, 'error');
       }
@@ -1638,7 +1639,8 @@ export default function App() {
               <>
                 <button
                   onClick={() => pdfInputRef.current?.click()}
-                  className="bg-primary/15 text-primary px-4 py-2 rounded-sm text-sm font-bold flex items-center gap-2 hover:bg-primary/25 transition-all border border-primary/25"
+                  disabled={isProcessingPdf}
+                  className="bg-primary/15 text-primary px-4 py-2 rounded-sm text-sm font-bold flex items-center gap-2 hover:bg-primary/25 transition-all border border-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isProcessingPdf ? <Loader2 size={18} className="animate-spin" /> : <FileUp size={18} />}
                   Importar Boletos PDF

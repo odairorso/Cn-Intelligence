@@ -501,8 +501,9 @@ export const api = {
 
   async extractBoleto(text?: string, fileName?: string, pdfBase64?: string): Promise<Record<string, unknown>> {
     if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    // O servidor tem orçamento de 45s para a IA; o cliente espera um pouco mais.
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 58000);
     try {
       const res = await fetchWithSecurity(`${API_BASE}?route=extract-boleto`, {
         method: 'POST',
@@ -514,7 +515,7 @@ export const api = {
       return await res.json();
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        throw new Error('Tempo limite excedido na IA (15s)');
+        throw new Error('Tempo limite excedido na IA (58s)');
       }
       throw err;
     } finally {

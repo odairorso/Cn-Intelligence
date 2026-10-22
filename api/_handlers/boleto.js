@@ -51,22 +51,28 @@ export async function handleExtractBoleto(req, res) {
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    // Orçamento total de tempo para a IA (a função serverless tem 60s).
+    const GEMINI_TIME_BUDGET_MS = 45000;
     const generateContentWithFallback = async (contents, config) => {
-      // Ordem importa: modelos rápidos primeiro.
-      // gemini-flash-lite-latest responde em ~2s; gemini-2.5-flash leva 20-40s
-      // e, rodando primeiro, fazia cada boleto parecer travado.
-      const modelsToTry = [
+      // Ordem: modelos rápidos primeiro.
+      // gemini-flash-lite-latest responde em ~2s; gemini-2.5-flash leva 20-40s.
+      const modelsToTry = [...new Set([
         process.env.GEMINI_MODEL,
         'gemini-flash-lite-latest',
         'gemini-flash-latest',
-        'gemini-2.5-flash',
         'gemini-3.8-flash',
-      ].filter(Boolean);
+      ].filter(Boolean))];
+      const deadline = Date.now() + GEMINI_TIME_BUDGET_MS;
       let lastErr = null;
       for (let i = 0; i < modelsToTry.length; i++) {
         const modelName = modelsToTry[i];
+        const remaining = deadline - Date.now();
+        if (remaining < 4000) {
+          console.warn('[boleto] Orçamento de tempo esgotado antes de', modelName);
+          break;
+        }
         // Primeira tentativa tem folga; fallbacks são tentativas rápidas.
-        const timeoutMs = i === 0 ? 20000 : 12000;
+        const timeoutMs = Math.min(i === 0 ? 20000 : 12000, remaining);
         const startedAt = Date.now();
         let timer;
         try {
@@ -74,10 +80,13 @@ export async function handleExtractBoleto(req, res) {
             timer = setTimeout(() => reject(new Error(`Timeout ao consultar IA modelo ${modelName}`)), timeoutMs);
           });
           const modelConfig = { ...config };
-          // Modelos 2.5 "pensam" antes de responder e ficam lentos; zerar acelera.
-          if (/^gemini-2\.5/.test(modelName)) {
+          // Modelos 2.5 "pensam" antes de responder e ficam lentos; 0 desliga.
+          // gemini-2.5-pro exige >= 128, então só se aplica a flash/flash-lite.
+          if (/^gemini-2\.5-(flash|flash-lite)$/.test(modelName)) {
             modelConfig.thinkingConfig = { thinkingBudget: 0 };
           }
+          // timeout real na requisição HTTP: evita chamada órfã consumindo cota
+          modelConfig.httpOptions = { ...(modelConfig.httpOptions || {}), timeout: timeoutMs };
           const callPromise = ai.models.generateContent({
             model: modelName,
             contents: contents,
@@ -88,13 +97,17 @@ export async function handleExtractBoleto(req, res) {
           return result;
         } catch (e) {
           lastErr = e;
-          console.warn(`[boleto] Modelo ${modelName} falhou em ${Date.now() - startedAt}ms:`, e.message);
+          console.warn(`[boleto] Modelo ${modelName} falhou em ${Date.now() - startedAt}ms:`, e?.message || e);
+          // 429 = cota. Espera um pouco antes de tentar o próximo modelo.
+          if (Number(e?.status || e?.code || 0) === 429) {
+            await new Promise((r) => setTimeout(r, 1500));
+          }
           continue;
         } finally {
           clearTimeout(timer);
         }
       }
-      throw lastErr;
+      throw lastErr || new Error('Nenhum modelo de IA disponível');
     };
 
     const extractedText = text || '';
