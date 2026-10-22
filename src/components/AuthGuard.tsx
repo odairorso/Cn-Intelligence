@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Lock, AlertCircle, Loader2, Eye, EyeOff, UserPlus, LogIn, ChevronLeft } from 'lucide-react';
@@ -64,6 +64,10 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
     }
   }, []);
 
+  const [googleFailed, setGoogleFailed] = useState(false);
+  const googleLoginBtnRef = useRef<HTMLDivElement | null>(null);
+  const googleRegisterBtnRef = useRef<HTMLDivElement | null>(null);
+
   // Google Sign-In initialization
   useEffect(() => {
     if (isAuthorized) return;
@@ -77,34 +81,64 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
           callback: handleGoogleCallback,
           auto_select: false,
           cancel_on_tap_outside: true,
+          use_fedcm_for_prompt: false,
         });
         setGoogleReady(true);
+        return true;
       }
+      return false;
     };
 
+    initializeGoogle();
     const timer = setInterval(() => {
-      if ((window as any).google?.accounts?.id) {
-        initializeGoogle();
-        clearInterval(timer);
-      }
+      if (initializeGoogle()) clearInterval(timer);
     }, 300);
 
-    return () => clearInterval(timer);
+    // SDK bloqueado (extensão/CSP): libera o fallback de redirecionamento.
+    const failTimer = setTimeout(() => {
+      if (!(window as any).google?.accounts?.id) setGoogleFailed(true);
+    }, 6000);
+
+    return () => { clearInterval(timer); clearTimeout(failTimer); };
   }, [isAuthorized]);
 
-  const handleGoogleButtonClick = () => {
+  // O One-Tap (prompt) é bloqueado em navegadores com cookies de terceiros
+  // desativados (FedCM) — era por isso que o clique não fazia nada.
+  // O botão oficial sempre abre o popup de escolha de conta.
+  useEffect(() => {
+    if (!googleReady) return;
     const g = (window as any).google;
-    if (g?.accounts?.id) {
-      // SDK disponível — usa One-Tap
-      g.accounts.id.prompt();
-    } else {
-      // SDK bloqueado (Kaspersky/CSP) — usa redirect OAuth
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '139195051788-6l3qj8v9a20r1d6ii6u3edukvshh4ebn.apps.googleusercontent.com';
-      const redirectUri = encodeURIComponent(window.location.origin);
-      const nonce = Math.random().toString(36).substring(2, 15);
-      const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=id_token&scope=openid+email+profile&nonce=${nonce}&prompt=select_account`;
-      window.location.href = url;
+    if (!g?.accounts?.id?.renderButton) return;
+    const options = {
+      theme: 'filled_black',
+      size: 'large',
+      shape: 'pill',
+      text: 'continue_with',
+      logo_alignment: 'center',
+    };
+    const host = isRegistering ? googleRegisterBtnRef.current : googleLoginBtnRef.current;
+    if (host) {
+      host.innerHTML = '';
+      g.accounts.id.renderButton(host, options);
     }
+  }, [googleReady, isRegistering]);
+
+  // Retorno do fluxo de redirecionamento (quando o SDK está bloqueado).
+  useEffect(() => {
+    if (!window.location.hash.includes('id_token=')) return;
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const idToken = params.get('id_token');
+    window.history.replaceState(null, '', window.location.pathname);
+    if (idToken) handleGoogleCallback({ credential: idToken });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleGoogleButtonClick = () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '139195051788-6l3qj8v9a20r1d6ii6u3edukvshh4ebn.apps.googleusercontent.com';
+    const redirectUri = encodeURIComponent(window.location.origin);
+    const nonce = Math.random().toString(36).substring(2, 15);
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=id_token&scope=openid+email+profile&nonce=${nonce}&prompt=select_account`;
+    window.location.href = url;
   };
 
   const handleGoogleCallback = async (response: any) => {
@@ -287,20 +321,29 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
                   <span className="flex-1 h-px bg-white/10" />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleGoogleButtonClick}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-3 bg-white text-gray-700 font-semibold py-3 rounded-2xl hover:bg-gray-100 transition-all shadow-md disabled:opacity-50 text-sm"
-                >
-                  <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                    <path fill="#4285F4" d="M47.532 24.552c0-1.636-.147-3.2-.422-4.701H24.48v8.89h12.984c-.56 3.018-2.26 5.578-4.817 7.29v6.055h7.796c4.56-4.202 7.09-10.396 7.09-17.534z"/>
-                    <path fill="#34A853" d="M24.48 48c6.516 0 11.982-2.161 15.976-5.865l-7.796-6.055c-2.161 1.447-4.927 2.303-8.18 2.303-6.294 0-11.624-4.25-13.528-9.963H2.87v6.253C6.845 42.938 15.076 48 24.48 48z"/>
-                    <path fill="#FBBC05" d="M10.952 28.42A14.558 14.558 0 0 1 10.2 24c0-1.534.264-3.026.752-4.42V13.327H2.87A23.997 23.997 0 0 0 .48 24c0 3.868.925 7.527 2.39 10.673l8.082-6.253z"/>
-                    <path fill="#EA4335" d="M24.48 9.617c3.546 0 6.727 1.22 9.231 3.617l6.922-6.922C36.457 2.43 30.992 0 24.48 0 15.076 0 6.845 5.062 2.87 13.327l8.082 6.253c1.904-5.713 7.234-9.963 13.528-9.963z"/>
-                  </svg>
-                  {googleReady ? 'Cadastrar com Google' : 'Carregando Google...'}
-                </button>
+                {!googleReady && !googleFailed && (
+                  <div className="w-full h-12 rounded-2xl bg-white/10 animate-pulse" aria-hidden="true" />
+                )}
+                <div
+                  ref={googleRegisterBtnRef}
+                  className={cn('w-full flex justify-center', googleReady ? '' : 'hidden')}
+                />
+                {googleFailed && (
+                  <button
+                    type="button"
+                    onClick={handleGoogleButtonClick}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-3 bg-white text-gray-700 font-semibold py-3 rounded-2xl hover:bg-gray-100 transition-all shadow-md disabled:opacity-50 text-sm"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                      <path fill="#4285F4" d="M47.532 24.552c0-1.636-.147-3.2-.422-4.701H24.48v8.89h12.984c-.56 3.018-2.26 5.578-4.817 7.29v6.055h7.796c4.56-4.202 7.09-10.396 7.09-17.534z"/>
+                      <path fill="#34A853" d="M24.48 48c6.516 0 11.982-2.161 15.976-5.865l-7.796-6.055c-2.161 1.447-4.927 2.303-8.18 2.303-6.294 0-11.624-4.25-13.528-9.963H2.87v6.253C6.845 42.938 15.076 48 24.48 48z"/>
+                      <path fill="#FBBC05" d="M10.952 28.42A14.558 14.558 0 0 1 10.2 24c0-1.534.264-3.026.752-4.42V13.327H2.87A23.997 23.997 0 0 0 .48 24c0 3.868.925 7.527 2.39 10.673l8.082-6.253z"/>
+                      <path fill="#EA4335" d="M24.48 9.617c3.546 0 6.727 1.22 9.231 3.617l6.922-6.922C36.457 2.43 30.992 0 24.48 0 15.076 0 6.845 5.062 2.87 13.327l8.082 6.253c1.904-5.713 7.234-9.963 13.528-9.963z"/>
+                    </svg>
+                    Cadastrar com Google
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -387,20 +430,29 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
                 {/* Botão Google no Login */}
                 <div className="pt-2 border-t border-white/5 flex flex-col items-center gap-3">
 
-                  <button
-                    type="button"
-                    onClick={handleGoogleButtonClick}
-                    disabled={loading}
-                    className="w-full flex items-center justify-center gap-3 bg-white text-gray-700 font-semibold py-3 rounded-2xl hover:bg-gray-100 transition-all shadow-md disabled:opacity-50 text-sm"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                      <path fill="#4285F4" d="M47.532 24.552c0-1.636-.147-3.2-.422-4.701H24.48v8.89h12.984c-.56 3.018-2.26 5.578-4.817 7.29v6.055h7.796c4.56-4.202 7.09-10.396 7.09-17.534z"/>
-                      <path fill="#34A853" d="M24.48 48c6.516 0 11.982-2.161 15.976-5.865l-7.796-6.055c-2.161 1.447-4.927 2.303-8.18 2.303-6.294 0-11.624-4.25-13.528-9.963H2.87v6.253C6.845 42.938 15.076 48 24.48 48z"/>
-                      <path fill="#FBBC05" d="M10.952 28.42A14.558 14.558 0 0 1 10.2 24c0-1.534.264-3.026.752-4.42V13.327H2.87A23.997 23.997 0 0 0 .48 24c0 3.868.925 7.527 2.39 10.673l8.082-6.253z"/>
-                      <path fill="#EA4335" d="M24.48 9.617c3.546 0 6.727 1.22 9.231 3.617l6.922-6.922C36.457 2.43 30.992 0 24.48 0 15.076 0 6.845 5.062 2.87 13.327l8.082 6.253c1.904-5.713 7.234-9.963 13.528-9.963z"/>
-                    </svg>
-                    {googleReady ? 'Entrar com Google' : 'Carregando Google...'}
-                  </button>
+                  {!googleReady && !googleFailed && (
+                    <div className="w-full h-12 rounded-2xl bg-white/10 animate-pulse" aria-hidden="true" />
+                  )}
+                  <div
+                    ref={googleLoginBtnRef}
+                    className={cn('w-full flex justify-center', googleReady ? '' : 'hidden')}
+                  />
+                  {googleFailed && (
+                    <button
+                      type="button"
+                      onClick={handleGoogleButtonClick}
+                      disabled={loading}
+                      className="w-full flex items-center justify-center gap-3 bg-white text-gray-700 font-semibold py-3 rounded-2xl hover:bg-gray-100 transition-all shadow-md disabled:opacity-50 text-sm"
+                    >
+                      <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="#4285F4" d="M47.532 24.552c0-1.636-.147-3.2-.422-4.701H24.48v8.89h12.984c-.56 3.018-2.26 5.578-4.817 7.29v6.055h7.796c4.56-4.202 7.09-10.396 7.09-17.534z"/>
+                        <path fill="#34A853" d="M24.48 48c6.516 0 11.982-2.161 15.976-5.865l-7.796-6.055c-2.161 1.447-4.927 2.303-8.18 2.303-6.294 0-11.624-4.25-13.528-9.963H2.87v6.253C6.845 42.938 15.076 48 24.48 48z"/>
+                        <path fill="#FBBC05" d="M10.952 28.42A14.558 14.558 0 0 1 10.2 24c0-1.534.264-3.026.752-4.42V13.327H2.87A23.997 23.997 0 0 0 .48 24c0 3.868.925 7.527 2.39 10.673l8.082-6.253z"/>
+                        <path fill="#EA4335" d="M24.48 9.617c3.546 0 6.727 1.22 9.231 3.617l6.922-6.922C36.457 2.43 30.992 0 24.48 0 15.076 0 6.845 5.062 2.87 13.327l8.082 6.253c1.904-5.713 7.234-9.963 13.528-9.963z"/>
+                      </svg>
+                      Entrar com Google
+                    </button>
+                  )}
 
                   <div className="flex justify-between w-full text-[10px] font-bold tracking-widest uppercase">
                     <button
