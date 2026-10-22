@@ -43,6 +43,23 @@ const loadPdfJs = () => (pdfjsPromise ??= (async () => {
   return lib;
 })());
 
+// Última empresa/conta usadas na importação de boleto. Viram o padrão da
+// próxima importação ("deixa sempre o último lançado").
+const LAST_BOLETO_KEY = 'cn:lastBoletoDefaults';
+type BoletoDefaults = { empresa?: string; conta_contabil_id?: number; tipo?: 'RECEITA' | 'DESPESA' };
+const readBoletoDefaults = (): BoletoDefaults => {
+  try {
+    return JSON.parse(localStorage.getItem(LAST_BOLETO_KEY) || '{}') || {};
+  } catch {
+    return {};
+  }
+};
+const saveBoletoDefaults = (defaults: BoletoDefaults) => {
+  try {
+    localStorage.setItem(LAST_BOLETO_KEY, JSON.stringify(defaults));
+  } catch { /* navegador em modo privado */ }
+};
+
 const loadReadXlsxFile = async () => {
   const mod = await import('read-excel-file/browser');
   return mod.default;
@@ -656,7 +673,14 @@ export default function App() {
         return;
       }
 
-      setPdfExtractedRows(applyDuplicateFlags(validExtracted));
+      // Aplica a última empresa/conta usadas quando o boleto não trouxe nada.
+      const lastDefaults = readBoletoDefaults();
+      const withDefaults = validExtracted.map((row) => ({
+        ...row,
+        empresa: row.empresa || lastDefaults.empresa || '',
+        conta_contabil_id: row.conta_contabil_id ?? (row.tipo === lastDefaults.tipo ? lastDefaults.conta_contabil_id : undefined),
+      }));
+      setPdfExtractedRows(applyDuplicateFlags(withDefaults));
       setShowPdfImportModal(true);
       const firstAiError = validExtracted.find((r) => (r as any).ai_error)?.ai_error;
       if (firstAiError) {
@@ -728,6 +752,16 @@ export default function App() {
         await api.createTransaction(txList[0]);
       } else {
         await api.createTransactionsBatch(txList as any);
+      }
+
+      // Guarda a combinação usada para pré-preencher a próxima importação.
+      const lastRow = canonicalRows[canonicalRows.length - 1];
+      if (lastRow) {
+        saveBoletoDefaults({
+          empresa: lastRow.empresa || '',
+          conta_contabil_id: lastRow.conta_contabil_id,
+          tipo: lastRow.tipo || 'DESPESA',
+        });
       }
 
       const newSuppliers = canonicalRows

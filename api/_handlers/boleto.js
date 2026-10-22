@@ -53,63 +53,73 @@ export async function handleExtractBoleto(req, res) {
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    // Orçamento total de tempo para a IA (a função serverless tem 60s).
-    const GEMINI_TIME_BUDGET_MS = 45000;
+    // A função serverless tem 60s, mas o usuário não: alvo de ~10s por boleto.
+    const GEMINI_TIME_BUDGET_MS = 20000;
+
+    // Uma chamada por modelo, com timeout próprio.
+    const runModel = async (modelName, timeoutMs, contents, config) => {
+      const startedAt = Date.now();
+      let timer;
+      const modelConfig = { ...config };
+      // Modelos 2.5 "pensam" antes de responder e ficam lentos; 0 desliga.
+      if (/^gemini-2\.5-(flash|flash-lite)$/.test(modelName)) {
+        modelConfig.thinkingConfig = { thinkingBudget: 0 };
+      }
+      // timeout real na requisição HTTP: evita chamada órfã consumindo cota
+      modelConfig.httpOptions = { ...(modelConfig.httpOptions || {}), timeout: timeoutMs };
+      try {
+        const callPromise = ai.models.generateContent({
+          model: modelName,
+          contents,
+          config: modelConfig
+        });
+        const timeoutPromise = new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`Timeout ao consultar IA modelo ${modelName}`)), timeoutMs);
+        });
+        const result = await Promise.race([callPromise, timeoutPromise]);
+        console.log(`[boleto] IA OK modelo=${modelName} em ${Date.now() - startedAt}ms`);
+        return result;
+      } catch (e) {
+        console.warn(`[boleto] Modelo ${modelName} falhou em ${Date.now() - startedAt}ms:`, e?.message || e);
+        throw e;
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
     const generateContentWithFallback = async (contents, config) => {
-      // Ordem: modelos rápidos primeiro.
-      // gemini-flash-lite responde em ~2s; gemini-2.5-flash leva 20-40s.
+      // Só modelos rápidos. gemini-3.5-flash-lite leva ~17s e
+      // gemini-flash-latest pode estourar 60s; os dois saíram da lista.
       const modelsToTry = [...new Set([
         process.env.GEMINI_MODEL,
         'gemini-flash-lite-latest',
-        'gemini-3.5-flash-lite',
-        'gemini-flash-latest',
         'gemini-3.5-flash',
-        'gemini-3.8-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-flash-latest',
       ].filter(Boolean))];
+
+      // Corrida entre os dois primeiros: se um estiver sobrecarregado (503),
+      // o outro responde na hora e o usuário não espera o timeout inteiro.
+      const raced = modelsToTry.slice(0, 2);
+      if (raced.length) {
+        try {
+          return await Promise.any(raced.map((m, i) => runModel(m, i === 0 ? 12000 : 9000, contents, config)));
+        } catch { /* todos falharam: tenta o resto em sequência */ }
+      }
+
       const deadline = Date.now() + GEMINI_TIME_BUDGET_MS;
       let lastErr = null;
-      for (let i = 0; i < modelsToTry.length; i++) {
-        const modelName = modelsToTry[i];
+      for (const modelName of modelsToTry.slice(2)) {
         const remaining = deadline - Date.now();
-        if (remaining < 4000) {
-          console.warn('[boleto] Orçamento de tempo esgotado antes de', modelName);
-          break;
-        }
-        // Primeira tentativa tem folga; fallbacks são tentativas rápidas.
-        const timeoutMs = Math.min(i === 0 ? 20000 : 12000, remaining);
-        const startedAt = Date.now();
-        let timer;
+        if (remaining < 3000) break;
         try {
-          const timeoutPromise = new Promise((_, reject) => {
-            timer = setTimeout(() => reject(new Error(`Timeout ao consultar IA modelo ${modelName}`)), timeoutMs);
-          });
-          const modelConfig = { ...config };
-          // Modelos 2.5 "pensam" antes de responder e ficam lentos; 0 desliga.
-          // gemini-2.5-pro exige >= 128, então só se aplica a flash/flash-lite.
-          if (/^gemini-2\.5-(flash|flash-lite)$/.test(modelName)) {
-            modelConfig.thinkingConfig = { thinkingBudget: 0 };
-          }
-          // timeout real na requisição HTTP: evita chamada órfã consumindo cota
-          modelConfig.httpOptions = { ...(modelConfig.httpOptions || {}), timeout: timeoutMs };
-          const callPromise = ai.models.generateContent({
-            model: modelName,
-            contents: contents,
-            config: modelConfig
-          });
-          const result = await Promise.race([callPromise, timeoutPromise]);
-          console.log(`[boleto] IA OK modelo=${modelName} em ${Date.now() - startedAt}ms`);
-          return result;
+          return await runModel(modelName, Math.min(8000, remaining), contents, config);
         } catch (e) {
           lastErr = e;
-          console.warn(`[boleto] Modelo ${modelName} falhou em ${Date.now() - startedAt}ms:`, e?.message || e);
-          // 429 = cota. O SDK pode devolver 429, 'RESOURCE_EXHAUSTED' ou code 429.
-          const errStatus = e?.status;
-          if (errStatus === 429 || errStatus === 'RESOURCE_EXHAUSTED' || e?.code === 429) {
-            await new Promise((r) => setTimeout(r, 1500));
+          // 429 = cota. Espera curta e tenta o próximo.
+          if (e?.status === 429 || e?.status === 'RESOURCE_EXHAUSTED' || e?.code === 429) {
+            await new Promise((r) => setTimeout(r, 700));
           }
-          continue;
-        } finally {
-          clearTimeout(timer);
         }
       }
       throw lastErr || new Error('Nenhum modelo de IA disponível');
@@ -232,7 +242,7 @@ export async function handleExtractBoleto(req, res) {
 
       if (dbPattern) {
         extracted.fornecedor = dbPattern.fornecedor || extracted.fornecedor;
-        extracted.empresa = dbPattern.empresa || extracted.empresa;
+        // Empresa NÃO vem do padrão: vale sempre a última usada pelo usuário.
         extracted.tipo = dbPattern.tipo || extracted.tipo || 'DESPESA';
         extracted.conta_contabil_id = dbPattern.conta_contabil_id || extracted.conta_contabil_id;
         extracted._from_pattern = true;
@@ -251,12 +261,14 @@ export async function handleExtractBoleto(req, res) {
           extracted.descricao = extracted.pagador;
         }
         try {
-          const rowCc = await sql`SELECT id FROM contas_contabeis WHERE codigo = '4.3' AND ativo = true LIMIT 1`;
+          // Matrículas de DESPESA (3.22). A 4.3 é Matrículas de RECEITA e não
+          // aparece no seletor quando o lançamento é despesa.
+          const rowCc = await sql`SELECT id FROM contas_contabeis WHERE codigo = '3.22' AND ativo = true LIMIT 1`;
           if (rowCc.length > 0) {
             extracted.conta_contabil_id = rowCc[0].id;
           }
         } catch (e) {
-          console.error('Erro ao buscar conta contábil 4.3:', e);
+          console.error('Erro ao buscar conta contábil 3.22:', e);
         }
       }
 
@@ -288,10 +300,11 @@ export async function handleExtractBoleto(req, res) {
           fallbackDesc = pagadorNome;
         }
         try {
-          const rowCc = await sql`SELECT id FROM contas_contabeis WHERE codigo = '4.3' AND ativo = true LIMIT 1`;
+          // Mesma regra do caminho com IA: Editora = Matrículas (DESPESA 3.22).
+          const rowCc = await sql`SELECT id FROM contas_contabeis WHERE codigo = '3.22' AND ativo = true LIMIT 1`;
           if (rowCc.length > 0) fallbackCcId = rowCc[0].id;
         } catch (e) {
-          console.error('Erro ao buscar conta contábil 4.3 em fallback:', e);
+          console.error('Erro ao buscar conta contábil 3.22 em fallback:', e);
         }
       }
 
@@ -303,7 +316,7 @@ export async function handleExtractBoleto(req, res) {
         valor: parseFloat(valorMatch?.[1]?.replace(/\./g, '').replace(',', '.') || '0'),
         cnpj: rawCnpj,
         descricao: fallbackDesc,
-        empresa: pattern?.empresa || '',
+        empresa: '',
         tipo: pattern?.tipo || 'DESPESA',
         numero_boleto: numero,
         conta_contabil_id: fallbackCcId,
