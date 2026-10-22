@@ -592,20 +592,21 @@ export async function handleTransactionsBatchUpdate(req, res) {
     const bancoValue = (banco && String(banco).trim() !== '') ? String(banco).trim() : null;
 
     if (finalJurosMap && Object.keys(finalJurosMap).length > 0) {
-      for (const id of ids) {
-        const jurosVal = Number(finalJurosMap[id]) || 0;
-        await sql`
-          UPDATE transactions 
-          SET status = 'PAGO', 
-              banco = ${bancoValue}, 
-              pagamento = ${pDate}, 
-              juros = ${jurosVal}, 
-              paid_at = COALESCE(paid_at, NOW()), 
-              updated_at = NOW() 
-          WHERE ${isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`} 
-            AND id = ${id}::uuid
-        `;
-      }
+      // Um único UPDATE para o lote inteiro. Antes era 1 UPDATE por boleto
+      // (50 boletos pagos = 50 idas ao banco em série).
+      const jurosList = ids.map((id) => Number(finalJurosMap[id]) || 0);
+      await sql`
+        UPDATE transactions t
+        SET status = 'PAGO',
+            banco = ${bancoValue},
+            pagamento = ${pDate},
+            juros = v.juros,
+            paid_at = COALESCE(t.paid_at, NOW()),
+            updated_at = NOW()
+        FROM (SELECT * FROM unnest(${ids}::uuid[], ${jurosList}::numeric[]) AS x(id, juros)) v
+        WHERE t.id = v.id
+          AND ${isAdmin ? sql`(t.uid = ${uid} OR t.uid IS NULL)` : sql`t.uid = ${uid}`}
+      `;
     } else {
       await sql`UPDATE transactions SET status = 'PAGO', banco = ${bancoValue}, pagamento = ${pDate}, paid_at = COALESCE(paid_at, NOW()), updated_at = NOW() WHERE ${isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`} AND id = ANY(${ids}::uuid[])`;
     }

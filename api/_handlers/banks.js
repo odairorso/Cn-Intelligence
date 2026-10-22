@@ -127,19 +127,24 @@ export async function handleBankById(req, res) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
+// Cria a tabela uma única vez por instância. Antes a DDL rodava em TODA
+// request de contas-contabeis (1 ida ao banco + lock de catálogo por chamada).
+let contasTableReady = false;
+async function ensureContasTable() {
+  if (contasTableReady) return;
+  await sql`CREATE TABLE IF NOT EXISTS contas_contabeis (
+    id SERIAL PRIMARY KEY,
+    codigo VARCHAR(20) UNIQUE NOT NULL,
+    nome VARCHAR(255) NOT NULL,
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('RECEITA', 'DESPESA')),
+    ativo BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  )`;
+  contasTableReady = true;
+}
+
 // GET/POST/PUT/DELETE /api?route=contas-contabeis
 export async function handleContasContabeis(req, res) {
-  const ensureContasTable = async () => {
-    await sql`CREATE TABLE IF NOT EXISTS contas_contabeis (
-      id SERIAL PRIMARY KEY,
-      codigo VARCHAR(20) UNIQUE NOT NULL,
-      nome VARCHAR(255) NOT NULL,
-      tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('RECEITA', 'DESPESA')),
-      ativo BOOLEAN DEFAULT true,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    )`;
-  };
-
   if (req.method === 'GET') {
     try {
       await ensureContasTable();
