@@ -1427,7 +1427,7 @@ export default function App() {
     <AuthGuard isAuthorized={isAuthorized} onLogin={login}>
       <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="bg-surface/90 backdrop-blur-md border-b border-surface-variant flex justify-between items-center w-full px-4 md:px-8 py-3 fixed top-0 z-50">
+      <header className="bg-surface/80 backdrop-blur-xl border-b flex justify-between items-center w-full px-4 md:px-8 py-3 fixed top-0 z-50" style={{ borderBottomColor: 'var(--hairline-strong)', boxShadow: '0 1px 0 var(--hairline), 0 12px 32px -28px rgba(0,0,0,0.9)' }}>
         <div className="flex items-center gap-4 md:gap-8">
           <div className="flex items-center gap-3">
             <img
@@ -1576,7 +1576,7 @@ export default function App() {
       </header>
 
       {/* Mobile Navigation (Bottom Bar) */}
-      <nav className="lg:hidden fixed bottom-6 left-6 right-6 bg-surface/90 backdrop-blur-xl border border-surface-variant z-50 flex justify-around items-center py-4 px-4 rounded-sm shadow-2xl">
+      <nav className="lg:hidden fixed bottom-6 left-6 right-6 bg-surface/90 backdrop-blur-xl border z-50 flex justify-around items-center py-4 px-4 rounded-2xl" style={{ borderColor: 'var(--hairline-strong)', boxShadow: 'inset 0 1px 0 var(--hairline), var(--shadow-float)' }}>
         <button
           onClick={() => setActiveTab('dashboard')}
           className={cn("flex flex-col items-center gap-1 transition-all", activeTab === 'dashboard' ? "text-primary scale-110" : "text-on-surface-variant opacity-60")}

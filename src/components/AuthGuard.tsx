@@ -220,12 +220,19 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, isAuthorized, on
   }
 
   return (
-    <div className="fixed inset-0 z-[500] flex items-center justify-center bg-[#0a0c14] p-6 font-sans">
+    <div
+      className="fixed inset-0 z-[500] flex items-center justify-center p-6 font-sans"
+      style={{
+        backgroundColor: '#0a0c14',
+        backgroundImage:
+          'radial-gradient(58rem 30rem at 50% -8%, rgba(59,130,246,0.16), transparent 62%), radial-gradient(40rem 24rem at 90% 110%, rgba(245,158,11,0.06), transparent 60%)',
+      }}
+    >
       <AnimatePresence>
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-card p-10 w-full max-w-md border border-white/10 shadow-2xl text-center bg-[#111420]/80 backdrop-blur-2xl"
+          className="glass-card p-10 w-full max-w-md text-center"
         >
           <div className="flex flex-col items-center gap-6">
             {/* Logo Wrapper */}

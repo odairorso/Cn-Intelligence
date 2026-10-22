@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -35,6 +35,15 @@
   
   --color-on-surface: #f4f4f5;    /* zinc-50 */
   --color-on-surface-variant: #a1a1aa; /* zinc-400 */
+
+  /* Camada de acabamento: fio de luz no topo dos cartões, sombras em duas
+     etapas e raios consistentes (antes cada tela usava um raio diferente). */
+  --hairline: rgba(255, 255, 255, 0.06);
+  --hairline-strong: rgba(255, 255, 255, 0.11);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.40), 0 10px 28px -14px rgba(0, 0, 0, 0.70);
+  --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.45), 0 28px 56px -28px rgba(0, 0, 0, 0.85);
+  --radius-card: 16px;
+  --radius-control: 12px;
 }
 
 /* Tema Claro (Branco) */
@@ -51,6 +60,11 @@ html.theme-light {
   --color-secondary: #d97706;     /* Amber 600 */
   --color-tertiary: #dc2626;      /* Red 600 */
   --color-success: #16a34a;       /* Emerald 600 */
+
+  --hairline: rgba(15, 23, 42, 0.05);
+  --hairline-strong: rgba(15, 23, 42, 0.10);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 10px 24px -18px rgba(15, 23, 42, 0.25);
+  --shadow-float: 0 2px 8px rgba(15, 23, 42, 0.08), 0 24px 48px -30px rgba(15, 23, 42, 0.35);
 }
 
 /* Tema Azul Original (Exemplo Deep Blue + Neon Glow) */
@@ -95,16 +109,51 @@ html.theme-navy body::after {
 }
 
 @layer base {
+  html {
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html.theme-light { color-scheme: light; }
+
   body {
     @apply bg-background text-on-surface font-sans antialiased;
     min-height: 100vh;
+    /* Números alinhados em coluna — essencial em tabelas de valores. */
+    font-variant-numeric: tabular-nums;
+    font-optical-sizing: auto;
+    background-image:
+      radial-gradient(64rem 32rem at 8% -12%, color-mix(in oklab, var(--color-primary) 9%, transparent), transparent 65%),
+      radial-gradient(52rem 30rem at 102% -6%, color-mix(in oklab, var(--color-secondary) 5%, transparent), transparent 65%);
+    background-attachment: fixed;
+  }
+
+  /* O tema navy já tem os próprios brilhos. */
+  html.theme-navy body { background-image: none; }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-primary) 38%, transparent);
+    color: var(--color-on-surface);
+  }
+
+  :focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--color-primary) 70%, transparent);
+    outline-offset: 2px;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-surface-variant) transparent;
   }
 }
 
 .glass-card {
-  @apply bg-surface border border-surface-variant rounded-lg;
-  box-shadow: 0 3px 5px -2px rgba(0, 0, 0, 0.55), 0 1px 2px -1px rgba(0, 0, 0, 0.35);
-  transition: all 0.2s ease-in-out;
+  @apply bg-surface border rounded-lg;
+  border-color: var(--hairline-strong);
+  border-radius: var(--radius-card);
+  /* Fio de luz superior + sombra em duas etapas: dá volume sem "vidro" genérico. */
+  box-shadow: inset 0 1px 0 var(--hairline), var(--shadow-card);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 html.theme-navy .glass-card,
@@ -124,8 +173,8 @@ html.theme-navy tr:hover {
 }
 
 .glass-card:hover {
-  @apply border-primary/30;
-  box-shadow: 0 0 0 1px var(--color-border-glow), 0 8px 20px -16px rgba(59, 130, 246, 0.45);
+  border-color: color-mix(in oklab, var(--color-primary) 24%, var(--hairline-strong));
+  box-shadow: inset 0 1px 0 var(--hairline), var(--shadow-float);
 }
 
 .premium-gradient-text {
