@@ -57,7 +57,7 @@ export const extractLocalBoletoNumber = (text: string) => {
       // O texto do PDF vem em sequência: corta no rótulo seguinte para não
       // levar "ESPÉCIE/ACEITE/DATA..." junto com o número do documento.
       const raw = match[1]
-        .split(/\s+(?:ESP[ÉE]CIE|ACEITE|DATA\s+DO|NOSSO\s+N|USO\s+DO|CARTEIRA|VALOR|CNPJ|BENEFICI|AG[ÊE]NCIA|SACADOR|PAGADOR|INSTRU)/i)[0]
+        .split(/\s+(?:ESP|ACEITE|DATA\s+DO|NOSSO\s+N|USO\s+DO|CARTEIRA|VALOR|CNPJ|BENEFICI|AG[ÊE]NCIA|SACADOR|PAGADOR|INSTRU)/i)[0]
         .trim()
         .replace(/\s+/g, ' ')
         .slice(0, 40);
