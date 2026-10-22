@@ -114,7 +114,7 @@ export const fetchWithSecurity = (url: string, options: RequestInit = {}) => {
 // API Auth
 // --------------------------------------------------------------
 export const apiAuth = {
-  async login(email: string, password: string): Promise<{ token: string; user: LocalUser }> {
+  async login(email: string, password: string): Promise<{ user: LocalUser }> {
     const res = await fetchWithSecurity(`${API_BASE}?route=auth-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

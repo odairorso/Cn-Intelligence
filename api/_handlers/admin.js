@@ -255,6 +255,9 @@ export async function handleSetupTables(req, res) {
 
 // GET /api?route=db-check
 export async function handleDbCheck(req, res) {
+  if (req.authRole !== 'admin') {
+    return res.status(403).json({ ok: false, error: 'Acesso negado' });
+  }
   try {
     const rows = await sql`SELECT 1 AS ok, version(), current_database() as db`;
     return res.json({ ok: true, info: rows[0] });

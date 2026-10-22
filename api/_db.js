@@ -220,6 +220,8 @@ export const setCors = (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-cn-security, x-cn-backup-token');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  // Dados financeiros nunca devem ficar em cache de navegador/proxy.
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');

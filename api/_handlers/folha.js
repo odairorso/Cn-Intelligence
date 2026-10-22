@@ -1,4 +1,4 @@
-import { sql, parseDateToPg } from '../_db.js';
+import { sql, parseDateToPg, transaction } from '../_db.js';
 import { handleError } from '../_utils.js';
 
 // GET/POST/PATCH /api?route=folha-segmentos
@@ -317,89 +317,95 @@ export async function handleFechamentos(req, res) {
         }
       }
 
-      // 1. Registra o fechamento
-      const fRows = await sql`
-        INSERT INTO fechamentos (uid, competencia, total_geral, observacao)
-        VALUES (${uid}, ${competencia}, ${totalGeral || 0}, ${observacao || ''})
-        ON CONFLICT (uid, competencia) 
-        DO UPDATE SET total_geral = EXCLUDED.total_geral, observacao = EXCLUDED.observacao
-        RETURNING *`;
+      // 1 a 3 rodam numa transação: antes, uma falha na integração financeira
+      // deixava o fechamento novo gravado com os lançamentos já apagados.
+      const fRows = await transaction(async () => {
+        // 1. Registra o fechamento
+        const fechamento = await sql`
+          INSERT INTO fechamentos (uid, competencia, total_geral, observacao)
+          VALUES (${uid}, ${competencia}, ${totalGeral || 0}, ${observacao || ''})
+          ON CONFLICT (uid, competencia)
+          DO UPDATE SET total_geral = EXCLUDED.total_geral, observacao = EXCLUDED.observacao
+          RETURNING *`;
 
-      // 2. Salva e congela os lançamentos calculados
-      await sql`DELETE FROM lancamentos WHERE uid = ${uid} AND competencia = ${competencia}`;
-      for (const l of lancamentos) {
-        await sql`
-          INSERT INTO lancamentos (uid, professor_id, segmento_id, competencia, horas_mensais, repouso, horas_atividade, total_horas, ajuda_custo, total_pagar, status)
-          VALUES (
-            ${uid}, 
-            ${l.professorId}, 
-            ${l.segmentoId}, 
-            ${competencia}, 
-            ${l.horasMensais || 0}, 
-            ${l.repouso || 0}, 
-            ${l.horasAtividade || 0}, 
-            ${l.totalHoras || 0}, 
-            ${l.ajudaCusto || 0}, 
-            ${l.totalPagar || 0}, 
-            'fechado'
-          )
-        `;
-      }
-
-      // 3. INTEGRAÇÃO FINANCEIRA AUTOMÁTICA
-      // Busca o ID da conta contábil '3.1' (Folha de Pagamento)
-      let contaContabilId = null;
-      const contaRows = await sql`SELECT id FROM contas_contabeis WHERE codigo = '3.1' AND ativo = true LIMIT 1`;
-      if (contaRows.length > 0) contaContabilId = contaRows[0].id;
-
-      // Define data de vencimento: dia 5 do mês subsequente
-      let vDate = '';
-      try {
-        const [year, month] = competencia.split('-');
-        let nextM = parseInt(month) + 1;
-        let nextY = parseInt(year);
-        if (nextM > 12) {
-          nextM = 1;
-          nextY += 1;
-        }
-        vDate = `${nextY}-${String(nextM).padStart(2, '0')}-05`;
-      } catch {
-        vDate = new Date().toISOString().split('T')[0];
-      }
-
-      if (Array.isArray(lancamentosFinanceiros)) {
-        for (const lf of lancamentosFinanceiros) {
-          if (Number(lf.totalPagar) <= 0) continue;
-
-          // Dedup no financeiro para não duplicar o salário do mesmo professor no mesmo mês
-          const dup = await sql`
-            SELECT id FROM transactions
-            WHERE uid = ${uid}
-              AND fornecedor = ${lf.nome}
-              AND deleted_at IS NULL
-              AND vencimento = ${vDate}
-              AND upper(descricao) LIKE ${`%FOLHA DE PAGAMENTO - COMPETÊNCIA ${competencia}%`}
-            LIMIT 1
-          `;
-          if (dup.length > 0) continue;
-
+        // 2. Salva e congela os lançamentos calculados
+        await sql`DELETE FROM lancamentos WHERE uid = ${uid} AND competencia = ${competencia}`;
+        for (const l of lancamentos) {
           await sql`
-            INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, valor, status, tipo, conta_contabil_id, created_by)
+            INSERT INTO lancamentos (uid, professor_id, segmento_id, competencia, horas_mensais, repouso, horas_atividade, total_horas, ajuda_custo, total_pagar, status)
             VALUES (
               ${uid},
-              ${lf.nome},
-              ${`Folha de Pagamento - Competência ${competencia}`},
-              'Geral',
-              ${vDate},
-              ${Number(lf.totalPagar)},
-              'PENDENTE',
-              'DESPESA',
-              ${contaContabilId},
-              ${uid}
+              ${l.professorId},
+              ${l.segmentoId},
+              ${competencia},
+              ${l.horasMensais || 0},
+              ${l.repouso || 0},
+              ${l.horasAtividade || 0},
+              ${l.totalHoras || 0},
+              ${l.ajudaCusto || 0},
+              ${l.totalPagar || 0},
+              'fechado'
             )
           `;
         }
-      }
+
+        // 3. INTEGRAÇÃO FINANCEIRA AUTOMÁTICA
+        // Busca o ID da conta contábil '3.1' (Folha de Pagamento)
+        let contaContabilId = null;
+        const contaRows = await sql`SELECT id FROM contas_contabeis WHERE codigo = '3.1' AND ativo = true LIMIT 1`;
+        if (contaRows.length > 0) contaContabilId = contaRows[0].id;
+
+        // Define data de vencimento: dia 5 do mês subsequente
+        let vDate = '';
+        try {
+          const [year, month] = competencia.split('-');
+          let nextM = parseInt(month) + 1;
+          let nextY = parseInt(year);
+          if (nextM > 12) {
+            nextM = 1;
+            nextY += 1;
+          }
+          vDate = `${nextY}-${String(nextM).padStart(2, '0')}-05`;
+        } catch {
+          vDate = new Date().toISOString().split('T')[0];
+        }
+
+        if (Array.isArray(lancamentosFinanceiros)) {
+          for (const lf of lancamentosFinanceiros) {
+            if (Number(lf.totalPagar) <= 0) continue;
+
+            // Dedup no financeiro para não duplicar o salário do mesmo professor no mesmo mês
+            const dup = await sql`
+              SELECT id FROM transactions
+              WHERE uid = ${uid}
+                AND fornecedor = ${lf.nome}
+                AND deleted_at IS NULL
+                AND vencimento = ${vDate}
+                AND upper(descricao) LIKE ${`%FOLHA DE PAGAMENTO - COMPETÊNCIA ${competencia}%`}
+              LIMIT 1
+            `;
+            if (dup.length > 0) continue;
+
+            await sql`
+              INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, valor, status, tipo, conta_contabil_id, created_by)
+              VALUES (
+                ${uid},
+                ${lf.nome},
+                ${`Folha de Pagamento - Competência ${competencia}`},
+                'Geral',
+                ${vDate},
+                ${Number(lf.totalPagar)},
+                'PENDENTE',
+                'DESPESA',
+                ${contaContabilId},
+                ${uid}
+              )
+            `;
+          }
+        }
+
+        return fechamento;
+      });
 
       return res.status(201).json(fRows[0]);
     } catch (e) {

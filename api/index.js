@@ -112,7 +112,8 @@ export default async function handler(req, res) {
       }
       res.setHeader('Set-Cookie', cookieOptions.join('; '));
 
-      return res.json({ token, user: userPayload });
+      // O JWT vai apenas no cookie HttpOnly; devolver no corpo expõe o token a XSS.
+    return res.json({ user: userPayload });
     }
 
     try {
@@ -218,7 +219,7 @@ export default async function handler(req, res) {
         }
         res.setHeader('Set-Cookie', cookieOptions.join('; '));
 
-        return res.json({ success: true, token, user: userPayload });
+        return res.json({ success: true, user: userPayload });
       } else {
         return res.json({ registrationRequired: true, email: googleEmail, name: googleName });
       }
@@ -301,7 +302,7 @@ export default async function handler(req, res) {
       }
       res.setHeader('Set-Cookie', cookieOptions.join('; '));
 
-      return res.json({ success: true, token, user: userPayload });
+      return res.json({ success: true, user: userPayload });
     } catch (err) {
       console.error('[AUTH] Erro ao cadastrar via Google:', err);
       return res.status(500).json({ error: 'Erro interno ao cadastrar com o Google.' });

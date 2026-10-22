@@ -533,12 +533,16 @@ export async function handleTransactionsBatch(req, res) {
 
         const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by, created_at, paid_at)
           VALUES ${sql.join(values, sql`, `)}
-          RETURNING id`;
+          ON CONFLICT DO NOTHING
+          RETURNING id, numero_boleto`;
 
         created = inserted.length;
-        // Audit log in parallel (non-blocking)
-        Promise.all(inserted.map((row, idx) => {
-          const p = toInsert[idx];
+        // Com ON CONFLICT o RETURNING traz só o que entrou: casa o audit pelo
+        // número do boleto (chave única), não pela posição no array.
+        const byBoleto = new Map(toInsert.map((p) => [p.tx.numero_boleto || null, p]));
+        Promise.all(inserted.map((row) => {
+          const p = byBoleto.get(row.numero_boleto);
+          if (!p) return null;
           return auditLog(uid, 'CREATE', row.id, null, { fornecedor: p.tx.fornecedor, valor: p.tx.valor, empresa: p.tx.empresa, vencimento: p.vDate, tipo: p.tx.tipo });
         })).catch(() => {});
       } catch (bulkError) {
@@ -553,7 +557,9 @@ export async function handleTransactionsBatch(req, res) {
             const paidAt = tx.status === 'PAGO' ? createdAt : null;
             const inserted = await sql`INSERT INTO transactions (uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, numero_boleto, conta_contabil_id, created_by, created_at, paid_at)
               VALUES (${uid}, ${tx.fornecedor}, ${tx.descricao || '-'}, ${tx.empresa || 'Geral'}, ${vDate}, ${pDate}, ${roundedVal}, ${tx.status || 'PENDENTE'}, ${bancoVal}, ${tx.tipo}, ${tx.numero_boleto || null}, ${resolvedCcId ?? null}, ${uid}, ${createdAt}, ${paidAt})
+              ON CONFLICT DO NOTHING
               RETURNING id`;
+            if (inserted.length === 0) continue; // boleto já importado
             await auditLog(uid, 'CREATE', inserted[0]?.id, null, { fornecedor: tx.fornecedor, valor: tx.valor, empresa: tx.empresa, vencimento: vDate, tipo: tx.tipo });
             created++;
           } catch (rowError) {
