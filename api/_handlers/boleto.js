@@ -52,6 +52,7 @@ export async function handleExtractBoleto(req, res) {
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const generateContentWithFallback = async (contents, config) => {
+<<<<<<< HEAD
       // Ordem importa: modelos rápidos primeiro.
       // gemini-flash-lite-latest responde em ~2s; gemini-2.5-flash leva 20-40s
       // e, rodando primeiro, fazia cada boleto parecer travado.
@@ -62,6 +63,9 @@ export async function handleExtractBoleto(req, res) {
         'gemini-2.5-flash',
         'gemini-3.8-flash',
       ].filter(Boolean);
+=======
+      const modelsToTry = [process.env.GEMINI_MODEL, 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'].filter(Boolean);
+>>>>>>> fd576a3 (fix(gemini): atualizar modelos suportados para gemini-3.5-flash-lite)
       let lastErr = null;
       for (let i = 0; i < modelsToTry.length; i++) {
         const modelName = modelsToTry[i];
