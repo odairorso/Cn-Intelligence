@@ -30,6 +30,9 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
   useEffect(() => {
     if (!selectedBankForExtract) return;
 
+    const controller = new AbortController();
+    let cancelled = false;
+
     const loadExtract = async () => {
       setLoadingExtract(true);
       try {
@@ -37,18 +40,28 @@ const BancosTab = React.memo(({ banks, transactions, setShowNewBankModal, setEdi
         // Carregamos todos os registros para permitir filtragem por pagamento ou vencimento no frontend.
         const data = await api.getTransactions(
           5000,
-          0
+          0,
+          undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+          undefined, undefined, undefined,
+          controller.signal
         );
-        
-        setExtractTransactions(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error('Erro ao buscar extrato do banco:', err);
+        if (!cancelled) setExtractTransactions(Array.isArray(data) ? data : []);
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') console.error('Erro ao buscar extrato do banco:', err);
       } finally {
-        setLoadingExtract(false);
+        if (!cancelled) setLoadingExtract(false);
       }
     };
 
-    loadExtract();
+    // Debounce: evita recarregar 5.000 lançamentos várias vezes seguidas
+    // quando um lote de pagamentos atualiza as transações em sequência.
+    const timer = setTimeout(loadExtract, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [selectedBankForExtract, transactions]); // Recarrega se o banco ou as transações mudarem
 
   const formatCreatedAt = (dateTimeStr?: string) => {

@@ -257,11 +257,11 @@ const LancamentosTab = React.memo(({
       }
 
       return matchesSearch && matchesStatus && matchesMonth && matchesYear && matchesSpecialFilter(tx);
-    }).sort((a, b) => {
-      const keyA = dateSortKey(a.vencimento);
-      const keyB = dateSortKey(b.vencimento);
-      return sortOrder === 'desc' ? keyB - keyA : keyA - keyB;
-    });
+    })
+      // Chave calculada uma vez por item, em vez de 2x por comparação do sort.
+      .map((tx) => ({ tx, key: dateSortKey(tx.vencimento) }))
+      .sort((a, b) => (sortOrder === 'desc' ? b.key - a.key : a.key - b.key))
+      .map((item) => item.tx);
   }, [transactions, deferredFilter, statusFilter, monthFilter, yearFilter, specialFilter, sortOrder]);
 
   // Reset page when filters change, avoiding initial mount reset

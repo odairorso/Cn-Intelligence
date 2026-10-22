@@ -155,6 +155,9 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis, companyOption
     const queryStartDate = filterType === 'PERIODO' ? (startDate || undefined) : undefined;
     const queryEndDate = filterType === 'PERIODO' ? (endDate || undefined) : undefined;
 
+    const controller = new AbortController();
+    let cancelled = false;
+
     const loadData = async () => {
       setLoading(true);
       try {
@@ -170,17 +173,28 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis, companyOption
           Number.isFinite(contaId as any) ? (contaId as number) : undefined,
           queryStartDate,
           queryEndDate,
-          dateField
+          dateField,
+          controller.signal
         );
-        setReportTransactions(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error('Erro ao carregar transações do relatório:', err);
+        // Evita que uma resposta antiga sobrescreva a mais recente.
+        if (!cancelled) setReportTransactions(Array.isArray(data) ? data : []);
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.error('Erro ao carregar transações do relatório:', err);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    loadData();
+    // 250 ms de espera: trocar de filtro rápido não dispara uma requisição por clique.
+    const timer = setTimeout(loadData, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [
     filterType,
     startDate,
@@ -277,18 +291,17 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis, companyOption
       return matchesDateRange && matchesCompany && matchesTipo && matchesStatus && matchesConta && matchesSearch;
     });
 
-    return filtered.sort((a, b) => {
-      const dateA = dateField === 'pagamento' ? (a.pagamento || a.vencimento) : a.vencimento;
-      const dateB = dateField === 'pagamento' ? (b.pagamento || b.vencimento) : b.vencimento;
-      const keyA = dateSortKey(dateA);
-      const keyB = dateSortKey(dateB);
-      if (keyA !== keyB) {
-        return keyA - keyB;
-      }
-      const fornA = String(a.fornecedor || '').toLowerCase();
-      const fornB = String(b.fornecedor || '').toLowerCase();
-      return fornA.localeCompare(fornB, 'pt-BR');
-    });
+    // Pré-calcula as chaves de ordenação uma vez por item.
+    // Antes, cada comparação do sort chamava dateSortKey (2 parses de data),
+    // o que vira ~N·logN chamadas em listas grandes.
+    return filtered
+      .map((tx) => ({
+        tx,
+        key: dateSortKey(dateField === 'pagamento' ? (tx.pagamento || tx.vencimento) : tx.vencimento),
+        forn: String(tx.fornecedor || '').toLowerCase(),
+      }))
+      .sort((a, b) => (a.key !== b.key ? a.key - b.key : a.forn.localeCompare(b.forn, 'pt-BR')))
+      .map((item) => item.tx);
   }, [reportTransactions, filterType, startDate, endDate, selectedYear, selectedMonth, selectedCompany, selectedTipo, selectedStatus, selectedContaContabil, todayKey, searchTerm, dateField]);
 
   const displayedRows = useMemo(() => {

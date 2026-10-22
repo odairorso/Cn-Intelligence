@@ -1297,22 +1297,22 @@ export default function App() {
     reader.readAsArrayBuffer(file);
   };
 
-  const handleMarkAsPaidClick = (tx: Transaction) => {
-    if (banks.filter(b => b.ativo).length > 0) {
+  const handleMarkAsPaidClick = useCallback((tx: Transaction) => {
+    if (banks.some(b => b.ativo)) {
       setShowPayModal({ id: tx.id, valor: tx.valor, vencimento: tx.vencimento });
     } else {
       markAsPaid(String(tx.id), '');
     }
-  };
+  }, [banks, markAsPaid]);
 
-  const handleMarkAsPaidBatchClick = (txs: Transaction[]) => {
+  const handleMarkAsPaidBatchClick = useCallback((txs: Transaction[]) => {
     if (txs.length === 0) return;
-    if (banks.filter(b => b.ativo).length > 0) {
+    if (banks.some(b => b.ativo)) {
       setShowPayBatchModal(txs);
     } else {
       markAsPaidBatch(txs.map(t => t.id), '');
     }
-  };
+  }, [banks, markAsPaidBatch]);
 
   const handleOpenLancamentos = useCallback((filters?: { status?: string; search?: string; special?: string }) => {
     if (filters) {

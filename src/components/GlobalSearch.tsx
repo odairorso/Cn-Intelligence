@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue } from 'react';
 import { Search, X, FileText, Building2, CreditCard } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, formatBRL } from '../lib/utils';
@@ -37,18 +37,23 @@ export function GlobalSearch({ transactions, suppliers, banks, onNavigate }: Glo
     else setQuery('');
   }, [open]);
 
-  const q = query.toLowerCase().trim();
+  // useDeferredValue mantém a digitação fluida mesmo com milhares de itens:
+  // o filtro roda numa renderização de menor prioridade.
+  const deferredQuery = useDeferredValue(query);
+  const q = deferredQuery.toLowerCase().trim();
 
-  const txResults = q.length >= 2
-    ? transactions.filter(tx =>
+  const { txResults, supResults } = useMemo(() => {
+    if (q.length < 2) {
+      return { txResults: [] as Transaction[], supResults: [] as Supplier[] };
+    }
+    return {
+      txResults: transactions.filter(tx =>
         tx.fornecedor.toLowerCase().includes(q) ||
         (tx.descricao || '').toLowerCase().includes(q)
-      ).slice(0, 5)
-    : [];
-
-  const supResults = q.length >= 2
-    ? suppliers.filter(s => s.nome.toLowerCase().includes(q)).slice(0, 3)
-    : [];
+      ).slice(0, 5),
+      supResults: suppliers.filter(s => s.nome.toLowerCase().includes(q)).slice(0, 3),
+    };
+  }, [q, transactions, suppliers]);
 
   const hasResults = txResults.length > 0 || supResults.length > 0;
 

@@ -223,7 +223,8 @@ export const api = {
     conta_contabil_id?: number,
     startDate?: string,
     endDate?: string,
-    dateField?: 'vencimento' | 'pagamento'
+    dateField?: 'vencimento' | 'pagamento',
+    signal?: AbortSignal
   ): Promise<Transaction[]> {
     if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     const params = new URLSearchParams();
@@ -242,7 +243,7 @@ export const api = {
     if (endDate) params.append('endDate', endDate);
     if (dateField) params.append('dateField', dateField);
 
-    const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`);
+    const res = await fetchWithSecurity(`${API_BASE}?${params.toString()}`, { signal });
     if (!res.ok) throw await buildHttpError(res, 'Failed to fetch transactions');
     return res.json();
   },
