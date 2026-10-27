@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { api, apiAuth, decodeJwtPayload } from '../api';
 import type { Transaction, Supplier, Bank, ContaContabil } from '../types';
 import { DEFAULT_COMPANIES } from '../lib/constants';
-import { normalizeCompanyKey } from '../lib/utils';
+import { normalizeCompanyKey, formatBRL, toInputDate } from '../lib/utils';
 
 // ── Cache helpers (localStorage) ─────────────────────────────────────────────
 const CACHE_PREFIX = 'cn_cache_';

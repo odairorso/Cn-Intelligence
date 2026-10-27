@@ -227,7 +227,7 @@ export default function App() {
   const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-  const [showPayModal, setShowPayModal] = useState<{ id: string; valor: number; vencimento?: string } | null>(null);
+  const [showPayModal, setShowPayModal] = useState<{ id: string; valor: number; vencimento?: string; transaction?: Transaction } | null>(null);
   const [showPayBatchModal, setShowPayBatchModal] = useState<Transaction[] | null>(null);
   const [showPdfImportModal, setShowPdfImportModal] = useState(false);
   const [pdfExtractedRows, setPdfExtractedRows] = useState<PdfImportDraft[]>([]);
