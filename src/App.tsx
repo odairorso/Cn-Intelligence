@@ -110,7 +110,7 @@ export default function App() {
   const {
     transactions, globalStats, suppliers, banks, contasContabeis, companyOptions, notification, isLoading, isLoadingMore, hasMoreTransactions, boletoPatterns, isAuthorized,
     fetchTransactions, fetchSuppliers, fetchBanks, fetchContasContabeis, fetchBoletoPatterns, fetchStats,
-    showNotification, login, logout, markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction,
+    showNotification, login, logout, markAsPaid, markAsPaidBatch, updateTransaction, deleteTransaction, setTransactions,
     deleteSupplier, syncSuppliers, mergeSuppliers, mergeSuppliersAuto, updateSupplier,
     deleteBank,
     addCompanyOption, removeCompanyOption, updateCompanyOption,
@@ -2693,7 +2693,7 @@ export default function App() {
               const novoNumeroBoleto = editingTx.numero_boleto
                 ? `${editingTx.numero_boleto}-PARC2`
                 : undefined;
-              await api.createTransaction({
+              const createdRemainder = await api.createTransaction({
                 uid: editingTx.uid,
                 fornecedor: data.fornecedor || editingTx.fornecedor,
                 descricao: novaDescricao,
@@ -2706,8 +2706,12 @@ export default function App() {
                 numero_boleto: novoNumeroBoleto,
                 conta_contabil_id: data.conta_contabil_id || editingTx.conta_contabil_id,
               });
+              setTransactions((prev) => [
+                createdRemainder,
+                ...prev.map((t) => (String(t.id) === String(id) ? { ...t, ...data } : t))
+              ]);
               await fetchTransactions();
-              showNotification(`Lançamento atualizado para ${formatBRL(data.valor || 0)} e saldo de ${formatBRL(partialInfo.saldoRestante)} gerado!`, 'success');
+              showNotification(`Lançamento atualizado para ${formatBRL(data.valor || 0)} e saldo restante de ${formatBRL(partialInfo.saldoRestante)} gerado!`, 'success');
             } else {
               await updateTransaction(id, data);
             }

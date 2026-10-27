@@ -37,7 +37,15 @@ interface EditTxModalProps {
   contasContabeis: ContaContabil[];
   companyOptions: string[];
   onClose: () => void;
-  onSave: (id: string, data: Partial<Transaction>, partialInfo?: { saldoRestante: number; novoVencimentoSaldo: string }) => Promise<void> | void;
+  onSave: (
+    id: string, 
+    data: Partial<Transaction>,
+    partialInfo?: {
+      saldoRestante: number;
+      novoVencimentoSaldo: string;
+      originalTx: Transaction;
+    }
+  ) => Promise<void> | void;
 }
 
 const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOptions, onClose, onSave }: EditTxModalProps) => {
@@ -55,11 +63,14 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
     numero_boleto_base: initialNumInfo.numero,
     ocorrencia: initialNumInfo.ocorrencia,
   });
+  const [tipoDiferenca, setTipoDiferenca] = useState<'parcial' | 'desconto'>('parcial');
+  const [saldoVencimento, setSaldoVencimento] = useState(toInputDate(transaction.vencimento) || todayInputDate());
   const [searchConta, setSearchConta] = useState('');
   const [showContaDropdown, setShowContaDropdown] = useState(false);
   const [searchSupplier, setSearchSupplier] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+
   const getDefaultContaKey = (empresa: string, tipo: string) =>
     `cn_default_conta_contabil:${normalizeCompanyKey(empresa)}:${String(tipo || '').toUpperCase()}`;
 
@@ -113,7 +124,22 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
       numero_boleto_base: numInfo.numero,
       ocorrencia: numInfo.ocorrencia,
     });
+    setSaldoVencimento(toInputDate(transaction.vencimento) || todayInputDate());
+    setTipoDiferenca('parcial');
   }, [transaction]);
+
+  // Cálculos de valor original, valor pago e parcial
+  const valOriginalNum = useMemo(() => {
+    return Number(parseMoneyToNumber(String(formData.valor || 0)).toFixed(2));
+  }, [formData.valor]);
+
+  const valPagoNum = useMemo(() => {
+    if (!formData.valorPago) return valOriginalNum;
+    return Number(parseMoneyToNumber(String(formData.valorPago)).toFixed(2));
+  }, [formData.valorPago, valOriginalNum]);
+
+  const isPartial = formData.status === 'PAGO' && valPagoNum > 0 && valPagoNum < (valOriginalNum - 0.009);
+  const saldoRestante = isPartial ? Math.round((valOriginalNum - valPagoNum) * 100) / 100 : 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,12 +148,33 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
     const occSuffix = formData.ocorrencia ? `-${formData.ocorrencia.trim()}` : '';
     const numeroBoletoFinal = rawNumero ? `${rawNumero}${occSuffix}` : null;
 
+    let finalValor = valOriginalNum;
+    let finalJuros = Number(formData.juros || 0);
+    let partialInfoToSend: { saldoRestante: number; novoVencimentoSaldo: string; originalTx: Transaction } | undefined = undefined;
+
+    if (isPartial && tipoDiferenca === 'parcial') {
+      finalValor = valPagoNum;
+      finalJuros = 0;
+      partialInfoToSend = {
+        saldoRestante,
+        novoVencimentoSaldo: saldoVencimento || formData.vencimento,
+        originalTx: transaction,
+      };
+    } else if (isPartial && tipoDiferenca === 'desconto') {
+      finalValor = valOriginalNum;
+      finalJuros = -saldoRestante;
+    } else if (formData.status === 'PAGO' && valPagoNum > valOriginalNum) {
+      finalValor = valOriginalNum;
+      finalJuros = Math.round((valPagoNum - valOriginalNum) * 100) / 100;
+    }
+
     const { id, ...rest } = {
       ...transaction,
       ...formData,
       vencimento: toInputDate(formData.vencimento),
       pagamento: formData.status === 'PAGO' && formData.pagamento ? toInputDate(formData.pagamento) : null,
-      valor: Number(parseMoneyToNumber(formData.valor).toFixed(2)),
+      valor: finalValor,
+      juros: finalJuros,
       numero_boleto: numeroBoletoFinal
     };
     
@@ -135,12 +182,10 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
     delete (rest as any).ocorrencia;
     delete (rest as any).valorPago;
 
-    // Antes fechava antes de salvar: uma falha na API descartava a edição
-    // sem aviso. Agora só fecha quando o salvamento conclui.
     try {
       setIsSaving(true);
       setSaveError('');
-      await onSave(String(id), rest);
+      await onSave(String(id), rest, partialInfoToSend);
       onClose();
     } catch (err: any) {
       setSaveError(err?.message || 'Não foi possível salvar as alterações.');
@@ -150,12 +195,11 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
   };
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm overflow-y-auto">
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="glass-card p-10 w-full max-w-lg border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
-
+        className="glass-card p-6 md:p-10 w-full max-w-lg border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] my-auto max-h-[90vh] overflow-y-auto"
       >
         <h3 className="text-xl font-bold font-headline mb-6">Editar Lançamento</h3>
         <form onSubmit={handleSubmit} className="space-y-4" autoComplete="new-transaction">
@@ -234,8 +278,8 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                 value={formData.empresa}
                 onChange={e => setFormData({ ...formData, empresa: e.target.value })}
               >
-                {companyOptions.map((company) => (
-                  <option key={company} value={company} className="bg-[#161b2a] text-on-surface">{company}</option>
+                {companyOptions.map(c => (
+                  <option key={c} value={c} className="bg-[#161b2a] text-on-surface">{c}</option>
                 ))}
               </select>
             </div>
@@ -244,30 +288,35 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               <select
                 className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all text-on-surface appearance-none"
                 style={{ backgroundColor: '#161b2a' }}
-                value={formData.tipo || 'DESPESA'}
-                onChange={e => setFormData({ ...formData, tipo: e.target.value })}
+                value={formData.tipo}
+                onChange={e => setFormData({ ...formData, tipo: e.target.value as any })}
               >
                 <option value="DESPESA" className="bg-[#161b2a] text-on-surface">Despesa</option>
                 <option value="RECEITA" className="bg-[#161b2a] text-on-surface">Receita</option>
               </select>
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Conta Contábil</label>
               <div className="relative">
                 <div
-                  className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm cursor-pointer flex justify-between items-center"
+                  className="w-full bg-surface-variant/40 border border-white/10 rounded-sm px-4 py-3 text-sm outline-none focus:border-primary transition-all cursor-pointer flex justify-between items-center"
                   style={{ backgroundColor: '#161b2a' }}
                   onClick={() => setShowContaDropdown(!showContaDropdown)}
                 >
-                  <span className={formData.conta_contabil_id !== undefined ? 'text-on-surface' : 'text-on-surface-variant'}>
-                    {formData.conta_contabil_id !== undefined
-                      ? contasContabeis.find(c => c.id === formData.conta_contabil_id)?.nome
+                  <span className={formData.conta_contabil_id ? 'text-on-surface' : 'text-on-surface-variant'}>
+                    {formData.conta_contabil_id
+                      ? (() => {
+                          const conta = contasContabeis.find((c) => c.id === formData.conta_contabil_id);
+                          return conta ? `${conta.codigo} - ${conta.nome}` : 'Selecione a conta';
+                        })()
                       : 'Selecione a conta'}
                   </span>
-                  <ChevronDown size={14} className="text-on-surface-variant" />
+                  <ChevronDown className="text-on-surface-variant" size={16} />
                 </div>
+
                 {showContaDropdown && (
                   <div className="absolute z-50 w-full mt-1 bg-[#161b2a] border border-white/10 rounded-lg shadow-xl max-h-60 overflow-hidden">
                     <div className="p-2 border-b border-white/10">
@@ -342,7 +391,8 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                     setFormData({
                       ...formData,
                       status: newStatus,
-                      pagamento: formData.pagamento || todayInputDate()
+                      pagamento: formData.pagamento || todayInputDate(),
+                      valorPago: formData.valorPago || formData.valor,
                     });
                   }
                 }}
@@ -351,9 +401,9 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                 <option value="PAGO" className="bg-[#161b2a] text-on-surface">PAGO</option>
                 <option value="VENCIDO" className="bg-[#161b2a] text-on-surface">VENCIDO</option>
               </select>
-
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Vencimento</label>
@@ -366,7 +416,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor (R$)</label>
+              <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor Total do Título (R$)</label>
               <input
                 type="text"
                 inputMode="decimal"
@@ -382,8 +432,8 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               />
             </div>
             {formData.status === 'PAGO' && (
-              <div>
-                <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor Pago (R$)</label>
+              <div className="col-span-2">
+                <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Valor Efetivamente Pago / Recebido (R$)</label>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -401,10 +451,10 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                 />
                 {formData.juros > 0 && (
                   <p className="text-[10px] text-tertiary mt-1 font-bold">
-                    Juros: R$ {Number(formData.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    Juros/Multa: R$ {Number(formData.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                 )}
-                {formData.juros < 0 && (
+                {formData.juros < 0 && tipoDiferenca === 'desconto' && (
                   <p className="text-[10px] text-success mt-1 font-bold">
                     Desconto: R$ {Number(Math.abs(formData.juros)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
@@ -412,6 +462,62 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               </div>
             )}
           </div>
+
+          {/* Card de Recebimento Parcial Detectado */}
+          {isPartial && (
+            <div className="p-4 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs space-y-3">
+              <div className="flex items-center gap-2 font-bold text-amber-300 text-sm">
+                <Layers size={18} />
+                <span>Recebimento / Pagamento Parcial Detectado</span>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-t border-amber-500/20 text-xs">
+                <span className="text-on-surface-variant">Valor pago agora:</span>
+                <span className="font-bold text-on-surface">{formatBRL(valPagoNum)}</span>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-t border-amber-500/20 text-xs">
+                <span className="text-on-surface-variant font-medium">Saldo restante a pagar/receber:</span>
+                <span className="font-black text-amber-300 text-base">{formatBRL(saldoRestante)}</span>
+              </div>
+              <div className="flex flex-wrap gap-4 pt-1">
+                <label className="flex items-center gap-2 cursor-pointer font-bold text-amber-200">
+                  <input
+                    type="radio"
+                    name="editTipoDiferenca"
+                    checked={tipoDiferenca === 'parcial'}
+                    onChange={() => setTipoDiferenca('parcial')}
+                    className="text-primary focus:ring-primary"
+                  />
+                  <span>Gerar novo lançamento com o saldo restante ({formatBRL(saldoRestante)})</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer font-medium text-on-surface-variant">
+                  <input
+                    type="radio"
+                    name="editTipoDiferenca"
+                    checked={tipoDiferenca === 'desconto'}
+                    onChange={() => setTipoDiferenca('desconto')}
+                  />
+                  <span>Dar desconto integral (sem gerar saldo)</span>
+                </label>
+              </div>
+              {tipoDiferenca === 'parcial' && (
+                <div className="pt-1.5">
+                  <label className="block text-[11px] font-bold text-on-surface-variant uppercase mb-1">
+                    Vencimento do Saldo Restante
+                  </label>
+                  <input
+                    type="date"
+                    value={saldoVencimento}
+                    onChange={(e) => setSaldoVencimento(e.target.value)}
+                    className="w-full bg-[#161b2a] border border-amber-500/40 rounded px-3 py-2 text-xs text-on-surface outline-none focus:border-amber-400"
+                  />
+                  <p className="text-[11px] text-amber-300/90 mt-1">
+                    💡 Ao salvar: este lançamento atual fica com valor <strong>{formatBRL(valPagoNum)}</strong> (PAGO) e um novo lançamento de <strong>{formatBRL(saldoRestante)}</strong> será criado automaticamente como <strong>PENDENTE</strong>.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {formData.status === 'PAGO' && (
             <div>
               <label className="block text-xs font-bold text-on-surface-variant uppercase mb-1">Data de Pagamento</label>
@@ -423,6 +529,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               />
             </div>
           )}
+
           {saveError && (
             <p className="text-xs font-bold text-tertiary bg-tertiary/10 border border-tertiary/30 rounded-lg px-4 py-2">
               {saveError}
@@ -445,7 +552,6 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
               {isSaving ? 'Salvando...' : 'Salvar Alterações'}
             </button>
           </div>
-
         </form>
       </motion.div>
     </div>
