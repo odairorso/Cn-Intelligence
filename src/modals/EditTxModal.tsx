@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Search, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown, Layers } from 'lucide-react';
 import { Transaction, Supplier, Bank, TransactionStatus, ContaContabil } from '../types';
-import { cn, normalizeSupplierName, normalizeCompanyKey, todayInputDate, toInputDate, parseMoneyToNumber, matchesAccountType, stripAccents } from '../lib/utils';
+import { cn, normalizeSupplierName, normalizeCompanyKey, todayInputDate, toInputDate, parseMoneyToNumber, matchesAccountType, stripAccents, formatBRL } from '../lib/utils';
 import { api } from '../api';
 
 const parseNumeroBoleto = (num?: string) => {
@@ -37,7 +37,7 @@ interface EditTxModalProps {
   contasContabeis: ContaContabil[];
   companyOptions: string[];
   onClose: () => void;
-  onSave: (id: string, data: Partial<Transaction>) => Promise<void> | void;
+  onSave: (id: string, data: Partial<Transaction>, partialInfo?: { saldoRestante: number; novoVencimentoSaldo: string }) => Promise<void> | void;
 }
 
 const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOptions, onClose, onSave }: EditTxModalProps) => {

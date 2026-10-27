@@ -2683,7 +2683,35 @@ export default function App() {
           contasContabeis={safeContasContabeis}
           companyOptions={safeCompanyOptions}
           onClose={() => setEditingTx(null)}
-          onSave={updateTransaction}
+          onSave={async (id, data, partialInfo) => {
+            if (partialInfo && partialInfo.saldoRestante > 0) {
+              await updateTransaction(id, data);
+              const originalDesc = editingTx.descricao || '';
+              const novaDescricao = originalDesc.includes('(Saldo Parcial)')
+                ? originalDesc
+                : `${originalDesc} (Saldo Parcial)`.trim();
+              const novoNumeroBoleto = editingTx.numero_boleto
+                ? `${editingTx.numero_boleto}-PARC2`
+                : undefined;
+              await api.createTransaction({
+                uid: editingTx.uid,
+                fornecedor: data.fornecedor || editingTx.fornecedor,
+                descricao: novaDescricao,
+                empresa: data.empresa || editingTx.empresa,
+                vencimento: toInputDate(partialInfo.novoVencimentoSaldo || editingTx.vencimento),
+                valor: partialInfo.saldoRestante,
+                status: 'PENDENTE',
+                tipo: data.tipo || editingTx.tipo,
+                banco: editingTx.banco || '',
+                numero_boleto: novoNumeroBoleto,
+                conta_contabil_id: data.conta_contabil_id || editingTx.conta_contabil_id,
+              });
+              await fetchTransactions();
+              showNotification(`Lançamento atualizado para ${formatBRL(data.valor || 0)} e saldo de ${formatBRL(partialInfo.saldoRestante)} gerado!`, 'success');
+            } else {
+              await updateTransaction(id, data);
+            }
+          }}
         />
       )}
 
