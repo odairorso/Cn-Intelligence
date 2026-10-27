@@ -1339,16 +1339,13 @@ export default function App() {
   };
 
   const handleMarkAsPaidClick = useCallback(async (tx: Transaction) => {
-    if (banks.some(b => b.ativo)) {
-      setShowPayModal({ id: tx.id, valor: tx.valor, vencimento: tx.vencimento });
-    } else {
-      try {
-        await markAsPaid(String(tx.id), '');
-      } catch (err: any) {
-        showNotification(err?.message || 'Erro ao marcar como pago.', 'error');
-      }
-    }
-  }, [banks, markAsPaid, showNotification]);
+    setShowPayModal({
+      id: tx.id,
+      valor: tx.valor,
+      vencimento: tx.vencimento,
+      transaction: tx,
+    });
+  }, []);
 
   const handleMarkAsPaidBatchClick = useCallback(async (txs: Transaction[]) => {
     if (txs.length === 0) return;
@@ -2627,12 +2624,21 @@ export default function App() {
         <SelectBankModal
           transactionId={showPayModal.id}
           valor={showPayModal.valor}
+          transaction={showPayModal.transaction}
           banks={safeBanks}
           initialDate={toInputDate(showPayModal.vencimento)}
           onClose={() => setShowPayModal(null)}
-          onConfirm={async (banco, dataPagamento) => {
+          onConfirm={async (banco, dataPagamento, partialData) => {
             try {
-              await markAsPaid(showPayModal.id, banco, dataPagamento);
+              await markAsPaid(
+                showPayModal.id, 
+                banco, 
+                dataPagamento, 
+                partialData && showPayModal.transaction ? {
+                  ...partialData,
+                  originalTx: showPayModal.transaction
+                } : undefined
+              );
               setShowPayModal(null);
             } catch (err: any) {
               showNotification(err?.message || 'Erro ao marcar como pago.', 'error');

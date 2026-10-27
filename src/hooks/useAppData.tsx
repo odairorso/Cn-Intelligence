@@ -466,16 +466,71 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   // --------------------------------------------------------------
   // Mark as Paid
   // --------------------------------------------------------------
-  const markAsPaid = useCallback(async (id: string, banco?: string, pagamento?: string) => {
+  const markAsPaid = useCallback(async (
+    id: string, 
+    banco?: string, 
+    pagamento?: string,
+    partialData?: {
+      valorPago: number;
+      saldoRestante: number;
+      novoVencimentoSaldo: string;
+      originalTx: Transaction;
+    }
+  ) => {
     const today = new Date().toISOString().split('T')[0];
     const dataPagamento = pagamento || today;
-    const updated = await api.updateTransaction(id, {
-      status: 'PAGO',
-      banco: banco,
-      pagamento: dataPagamento,
-    });
-    setTransactions((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, ...updated } : t)));
-    showNotification('Marcado como pago!', 'success');
+
+    if (partialData && partialData.saldoRestante > 0) {
+      const { valorPago, saldoRestante, novoVencimentoSaldo, originalTx } = partialData;
+
+      // 1. Atualiza o lançamento original com o valor parcial recebido e marca como PAGO
+      const updatedOriginal = await api.updateTransaction(id, {
+        status: 'PAGO',
+        banco: banco,
+        pagamento: dataPagamento,
+        valor: valorPago,
+      });
+
+      // 2. Cria o novo lançamento correspondente ao saldo restante com status PENDENTE
+      const originalDesc = originalTx.descricao || '';
+      const novaDescricao = originalDesc.includes('(Saldo Parcial)') 
+        ? originalDesc 
+        : `${originalDesc} (Saldo Parcial)`.trim();
+
+      const novoNumeroBoleto = originalTx.numero_boleto 
+        ? `${originalTx.numero_boleto}-PARC2` 
+        : undefined;
+
+      const createdRemainder = await api.createTransaction({
+        uid: originalTx.uid,
+        fornecedor: originalTx.fornecedor,
+        descricao: novaDescricao,
+        empresa: originalTx.empresa,
+        vencimento: toInputDate(novoVencimentoSaldo || originalTx.vencimento),
+        valor: saldoRestante,
+        status: 'PENDENTE',
+        tipo: originalTx.tipo,
+        banco: originalTx.banco || '',
+        numero_boleto: novoNumeroBoleto,
+        conta_contabil_id: originalTx.conta_contabil_id,
+      });
+
+      // 3. Atualiza a lista de transações no estado local
+      setTransactions((prev) => [
+        createdRemainder,
+        ...prev.map((t) => (String(t.id) === String(id) ? { ...t, ...updatedOriginal, valor: valorPago } : t))
+      ]);
+
+      showNotification(`Baixa parcial de ${formatBRL(valorPago)} confirmada! Saldo restante de ${formatBRL(saldoRestante)} gerado.`, 'success');
+    } else {
+      const updated = await api.updateTransaction(id, {
+        status: 'PAGO',
+        banco: banco,
+        pagamento: dataPagamento,
+      });
+      setTransactions((prev) => prev.map((t) => (String(t.id) === String(id) ? { ...t, ...updated } : t)));
+      showNotification('Marcado como pago!', 'success');
+    }
   }, [showNotification]);
 
   const markAsPaidBatch = useCallback(async (
