@@ -104,6 +104,8 @@ export async function handleSetupTables(req, res) {
       { codigo: '3.15', nome: 'COFINS',                tipo: 'DESPESA' },
       { codigo: '3.31', nome: 'Festa / Evento Dia dos Pais', tipo: 'DESPESA' },
       { codigo: '3.36', nome: 'Festa / Evento Dia das Crianças', tipo: 'DESPESA' },
+      { codigo: '3.37', nome: 'Plano de Saúde',                  tipo: 'DESPESA' },
+      { codigo: '3.38', nome: 'Vale / Adiantamento Salarial',    tipo: 'DESPESA' },
       { codigo: '4.1',  nome: 'Mensalidades',          tipo: 'RECEITA' },
       { codigo: '4.2',  nome: 'Repasses',              tipo: 'RECEITA' },
       { codigo: '4.3',  nome: 'Matrículas',            tipo: 'RECEITA' },
