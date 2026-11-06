@@ -636,7 +636,7 @@ export async function handleTransactionsBatchUpdate(req, res) {
     const ownership = isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`;
 
     // ── FLUXO UNIFICADO: Agrupar todas as parcelas em 1 único pagamento (PIX único) ──
-    if (unificar) {
+    if (unificar) { try {
       const fullRows = isAdmin
         ? await sql`
             SELECT * FROM transactions 
@@ -711,7 +711,13 @@ Banco: ${bancoValue || 'Não informado'} | Total Quitado: R$ ${totalConsolidado.
 Composição das ${fullRows.length} parcelas quitadas:
 ${compositionLines.join('\n')}`;
 
-      const vFinal = pDate || parseDateToPg(fullRows[fullRows.length - 1].vencimento) || parseDateToPg(fullRows[0].vencimento);
+      // Convert Date objects from DB to ISO string before parseDateToPg (which expects string input)
+      const toDateStr = (v) => {
+        if (!v) return null;
+        if (v instanceof Date) return v.toISOString().slice(0, 10);
+        return parseDateToPg(String(v));
+      };
+      const vFinal = pDate || toDateStr(fullRows[fullRows.length - 1].vencimento) || toDateStr(fullRows[0].vencimento);
 
       // Insere lançamento unificado
       const inserted = await sql`
@@ -766,7 +772,10 @@ ${compositionLines.join('\n')}`;
         unifiedTransaction: formattedTx,
         unifiedIds: ids
       });
-    }
+    } catch (unifyErr) {
+      console.error('[UNIFY_BATCH] Falha interna:', unifyErr.message, unifyErr.detail || '', unifyErr.stack);
+      return handleError(res, unifyErr, 'transactions.js UNIFY_BATCH');
+    } }
 
     // 1) Baixa de todos os títulos do lote (status, banco, data).
     await sql`UPDATE transactions
