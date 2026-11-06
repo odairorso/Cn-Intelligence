@@ -752,7 +752,7 @@ ${compositionLines.join('\n')}`;
         SET deleted_at = NOW(),
             deleted_by = ${uid},
             updated_at = NOW(),
-            observacao = CONCAT(COALESCE(observacao, ''), ${unifNote})
+            observacao = CONCAT(COALESCE(observacao, ''), ${unifNote}::text)
         WHERE ${ownership} AND id = ANY(${ids}::uuid[])
       `;
 
