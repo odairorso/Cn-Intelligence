@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { CreditCard, Calendar, CheckCircle2, DollarSign, X, AlertCircle } from 'lucide-react';
+import { CreditCard, Calendar, CheckCircle2, DollarSign, X, AlertCircle, Layers } from 'lucide-react';
 import { Bank, Transaction } from '../types';
 import { cn, todayInputDate } from '../lib/utils';
 
@@ -12,7 +12,8 @@ interface BatchPayModalProps {
   onConfirm: (
     items: { id: string; juros: number }[],
     banco: string,
-    dataPagamento: string
+    dataPagamento: string,
+    options?: { unificar?: boolean; descricao?: string }
   ) => Promise<void> | void;
 }
 
@@ -27,6 +28,8 @@ const BatchPayModal: React.FC<BatchPayModalProps> = ({
   const [paymentDate, setPaymentDate] = useState(initialDate || todayInputDate());
   const [dateError, setDateError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [unify, setUnify] = useState(false);
+  const [customDesc, setCustomDesc] = useState('');
   const paymentDateRef = useRef<HTMLInputElement | null>(null);
 
   // Mapa de juros individual por ID da transação
@@ -77,6 +80,12 @@ const BatchPayModal: React.FC<BatchPayModalProps> = ({
     };
   }, [transactions, jurosMap]);
 
+  const defaultUnifiedDesc = useMemo(() => {
+    const uniqueSuppliers = [...new Set(transactions.map(t => t.fornecedor).filter(Boolean))];
+    const supName = uniqueSuppliers.length === 1 ? uniqueSuppliers[0] : (uniqueSuppliers[0] || 'Lote');
+    return `Pagamento unificado (${transactions.length} parcelas) - ${supName}`;
+  }, [transactions]);
+
   const handleConfirm = async () => {
     if (isSubmitting) return;
     if (selectedBank === null) return;
@@ -94,7 +103,10 @@ const BatchPayModal: React.FC<BatchPayModalProps> = ({
     // Dois cliques/toques rápidos davam duas baixas no mesmo lote.
     setIsSubmitting(true);
     try {
-      await onConfirm(items, selectedBank, normalizedDate);
+      await onConfirm(items, selectedBank, normalizedDate, {
+        unificar: unify && transactions.length > 1,
+        descricao: customDesc.trim() || undefined,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -238,6 +250,54 @@ const BatchPayModal: React.FC<BatchPayModalProps> = ({
             </div>
           </div>
 
+          {/* Opção de Unificar Valores (PIX Único) */}
+          {transactions.length > 1 && (
+            <div
+              className={cn(
+                "p-4 rounded-xl border transition-all cursor-pointer",
+                unify
+                  ? "bg-primary/10 border-primary/40 shadow-sm shadow-primary/20"
+                  : "bg-surface/40 border-white/10 hover:border-white/20"
+              )}
+              onClick={() => setUnify(!unify)}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="unify-batch-pay"
+                  checked={unify}
+                  onChange={(e) => setUnify(e.target.checked)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-0.5 w-4 h-4 rounded accent-primary cursor-pointer shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <label htmlFor="unify-batch-pay" className="text-xs font-bold text-on-surface cursor-pointer flex items-center gap-1.5">
+                    <Layers size={15} className="text-primary" />
+                    Unificar lançamentos em um único pagamento no extrato (PIX Único)
+                  </label>
+                  <p className="text-[11px] text-on-surface-variant mt-1 leading-relaxed">
+                    Gera <strong>1 único lançamento de {totalConsolidado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong> no extrato bancário para bater 1 para 1 com o PIX. As {transactions.length} parcelas selecionadas serão quitadas e os números dos boletos/documentos ficarão salvos no histórico detalhado.
+                  </p>
+
+                  {unify && (
+                    <div className="mt-3 pt-3 border-t border-primary/20 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-primary">
+                        Descrição do Lançamento Consolidado (Opcional):
+                      </label>
+                      <input
+                        type="text"
+                        value={customDesc}
+                        placeholder={defaultUnifiedDesc}
+                        onChange={(e) => setCustomDesc(e.target.value)}
+                        className="w-full bg-surface-variant/30 border border-white/15 rounded-lg px-3 py-1.5 text-xs text-on-surface outline-none focus:border-primary"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Data do Pagamento */}
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -328,7 +388,11 @@ const BatchPayModal: React.FC<BatchPayModalProps> = ({
             className="flex-1 px-4 py-3 rounded-lg bg-primary text-background text-xs font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <CheckCircle2 size={16} />
-            {isSubmitting ? 'Processando...' : `Confirmar Baixa (${transactions.length})`}
+            {isSubmitting
+              ? 'Processando...'
+              : unify
+              ? `Confirmar Pagamento Unificado (${transactions.length})`
+              : `Confirmar Baixa (${transactions.length})`}
           </button>
         </div>
       </motion.div>

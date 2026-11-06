@@ -1,4 +1,4 @@
-﻿// v1.2.0 - Performance: lazy loading tabs + extracted components
+// v1.2.0 - Performance: lazy loading tabs + extracted components
 import React, { useState, useRef, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import {
   LayoutDashboard, FileText, Building2, Settings, Bell, Wallet,
@@ -2653,11 +2653,11 @@ export default function App() {
           banks={safeBanks}
           initialDate={showPayBatchModal.length > 0 ? toInputDate(showPayBatchModal[0].vencimento) : undefined}
           onClose={() => setShowPayBatchModal(null)}
-          onConfirm={async (items, banco, dataPagamento) => {
+          onConfirm={async (items, banco, dataPagamento, options) => {
             // Só fecha o modal quando a baixa realmente concluiu; antes,
             // uma falha de rede fechava a tela e o título continuava pendente.
             try {
-              await markAsPaidBatch(items, banco, dataPagamento);
+              await markAsPaidBatch(items, banco, dataPagamento, options);
               setShowPayBatchModal(null);
             } catch (err: any) {
               showNotification(err?.message || 'Erro ao marcar como pago.', 'error');

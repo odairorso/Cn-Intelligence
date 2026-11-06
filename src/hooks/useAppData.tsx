@@ -110,7 +110,7 @@ type AppDataActions = {
   updateTransaction: (id: string, data: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   loadMoreTransactions: () => Promise<void>;
-  markAsPaidBatch: (itemsOrIds: (string | { id: string; juros?: number })[], banco?: string, dataPagamento?: string) => Promise<void>;
+  markAsPaidBatch: (itemsOrIds: (string | { id: string; juros?: number })[], banco?: string, dataPagamento?: string, options?: { unificar?: boolean; descricao?: string; empresa?: string }) => Promise<void>;
   importOFX: (ofxData: any[]) => Promise<void>;
   fixReceitasTipo: () => Promise<number>;
   dedupeMovimentos: () => Promise<number>;
@@ -536,7 +536,8 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
   const markAsPaidBatch = useCallback(async (
     itemsOrIds: (string | { id: string; juros?: number })[],
     banco?: string,
-    dataPagamento?: string
+    dataPagamento?: string,
+    options?: { unificar?: boolean; descricao?: string; empresa?: string }
   ) => {
     if (!Array.isArray(itemsOrIds) || itemsOrIds.length === 0) return;
     const items = itemsOrIds.map(item => (typeof item === 'string' ? { id: item } : item));
@@ -551,7 +552,17 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
 
     const today = new Date().toISOString().split('T')[0];
     const dataPag = dataPagamento || today;
-    await api.updateTransactionsBatch(items, banco || '', dataPag);
+    const result = await api.updateTransactionsBatch(items, banco || '', dataPag, options);
+
+    if (options?.unificar && result?.unifiedTransaction) {
+      const unifiedTx = result.unifiedTransaction;
+      setTransactions((prev) => [
+        unifiedTx,
+        ...prev.filter((t) => !ids.includes(String(t.id)))
+      ]);
+      showNotification(`${ids.length} parcelas unificadas em 1 pagamento com sucesso!`, 'success');
+      return;
+    }
     
     setTransactions((prev) => prev.map((t) => {
       const idStr = String(t.id);

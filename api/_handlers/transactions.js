@@ -583,7 +583,7 @@ export async function handleTransactionsBatchUpdate(req, res) {
   if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
   const isAdmin = req.authRole === 'admin';
 
-  const { ids: rawIds, items, jurosMap, banco, dataPagamento } = req.body;
+  const { ids: rawIds, items, jurosMap, banco, dataPagamento, unificar, descricaoUnificada, empresa: empresaParam } = req.body;
   const ids = (Array.isArray(items)
     ? items.map(it => (it && typeof it === 'object' ? String(it.id) : String(it)))
     : (Array.isArray(rawIds) ? rawIds.map(String) : [])
@@ -634,6 +634,139 @@ export async function handleTransactionsBatchUpdate(req, res) {
     const pDate = parseDateToPg(dataPagamento);
     const bancoValue = (banco && String(banco).trim() !== '') ? String(banco).trim() : null;
     const ownership = isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`;
+
+    // ── FLUXO UNIFICADO: Agrupar todas as parcelas em 1 único pagamento (PIX único) ──
+    if (unificar) {
+      const fullRows = isAdmin
+        ? await sql`
+            SELECT * FROM transactions 
+            WHERE (uid = ${uid} OR uid IS NULL) 
+              AND deleted_at IS NULL 
+              AND id = ANY(${ids}::uuid[])
+            ORDER BY vencimento ASC
+          `
+        : await sql`
+            SELECT * FROM transactions 
+            WHERE uid = ${uid}
+              AND deleted_at IS NULL 
+              AND id = ANY(${ids}::uuid[])
+            ORDER BY vencimento ASC
+          `;
+
+      if (fullRows.length === 0) {
+        return res.status(404).json({ error: 'Nenhum lançamento encontrado para unificar' });
+      }
+
+      let totalPrincipal = 0;
+      let totalJuros = 0;
+      const compositionLines = [];
+
+      fullRows.forEach((r, idx) => {
+        const idStr = String(r.id);
+        const jurosItem = finalJurosMap && finalJurosMap[idStr] !== undefined
+          ? Number(finalJurosMap[idStr]) || 0
+          : Number(r.juros || 0);
+        const val = Number(r.valor) || 0;
+        totalPrincipal += val;
+        totalJuros += jurosItem;
+
+        const vStr = r.vencimento ? new Date(r.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '-';
+        const docStr = r.numero_boleto ? `Doc/Boleto: ${r.numero_boleto}` : (r.descricao ? `Desc: ${r.descricao}` : '');
+        compositionLines.push(`${idx + 1}. ${r.fornecedor || 'Fornecedor'} (${r.empresa || '-'}) - R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${jurosItem > 0 ? ` (+ R$ ${jurosItem.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} juros)` : ''} - Venc: ${vStr}${docStr ? ` - ${docStr}` : ''}`);
+      });
+
+      const totalConsolidado = Math.round((totalPrincipal + totalJuros) * 100) / 100;
+
+      // Fornecedor comum ou principal
+      const uniqueFornecedores = [...new Set(fullRows.map(r => r.fornecedor).filter(Boolean))];
+      const fornecedorFinal = uniqueFornecedores.length === 1 ? uniqueFornecedores[0] : (uniqueFornecedores[0] || 'Pagamento Unificado');
+
+      // Tipo: RECEITA ou DESPESA
+      const tipoFinal = fullRows[0].tipo || 'DESPESA';
+
+      // Empresa: se parâmetro informado, usa. Senão, se todos iguais usa. Senão, tenta inferir do banco ou usa do primeiro
+      const uniqueEmpresas = [...new Set(fullRows.map(r => r.empresa).filter(Boolean))];
+      let empresaFinal = empresaParam || (uniqueEmpresas.length === 1 ? uniqueEmpresas[0] : null);
+      if (!empresaFinal && bancoValue) {
+        const upperBanco = bancoValue.toUpperCase();
+        const found = uniqueEmpresas.find(e => upperBanco.includes(e.toUpperCase()));
+        if (found) empresaFinal = found;
+      }
+      if (!empresaFinal) empresaFinal = fullRows[0].empresa || 'Geral';
+
+      // Conta Contábil: se todas iguais, usa ela. Senão pega a do primeiro que tiver
+      const uniqueContas = [...new Set(fullRows.map(r => r.conta_contabil_id).filter(Boolean))];
+      const contaContabilFinal = uniqueContas.length > 0 ? uniqueContas[0] : null;
+
+      // Descrição
+      const defaultDesc = `Pagamento unificado (${fullRows.length} parcelas) - ${fornecedorFinal}`;
+      const descricaoFinal = (descricaoUnificada && String(descricaoUnificada).trim() !== '')
+        ? String(descricaoUnificada).trim()
+        : defaultDesc;
+
+      // Observação detalhada com composição
+      const observacaoFinal = `Pagamento unificado via PIX/Transferência realizado em ${dataPagamento || 'hoje'}.
+Banco: ${bancoValue || 'Não informado'} | Total Quitado: R$ ${totalConsolidado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (Principal: R$ ${totalPrincipal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${totalJuros > 0 ? `, Juros: R$ ${totalJuros.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''})
+
+Composição das ${fullRows.length} parcelas quitadas:
+${compositionLines.join('\n')}`;
+
+      const vFinal = pDate || parseDateToPg(fullRows[fullRows.length - 1].vencimento) || parseDateToPg(fullRows[0].vencimento);
+
+      // Insere lançamento unificado
+      const inserted = await sql`
+        INSERT INTO transactions (
+          uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, conta_contabil_id, observacao, created_by, paid_at
+        )
+        VALUES (
+          ${uid},
+          ${fornecedorFinal},
+          ${descricaoFinal},
+          ${empresaFinal},
+          ${vFinal},
+          ${pDate},
+          ROUND(${totalConsolidado}::numeric, 2),
+          'PAGO',
+          ${bancoValue},
+          ${tipoFinal},
+          ${contaContabilFinal},
+          ${observacaoFinal},
+          ${uid},
+          NOW()
+        )
+        RETURNING *
+      `;
+
+      const newTxId = inserted[0].id;
+      const unifNote = ` [Unificado no pagamento ID ${newTxId}]`;
+
+      // Soft delete dos lançamentos originais
+      await sql`
+        UPDATE transactions
+        SET deleted_at = NOW(),
+            deleted_by = ${uid},
+            updated_at = NOW(),
+            observacao = CONCAT(COALESCE(observacao, ''), ${unifNote})
+        WHERE ${ownership} AND id = ANY(${ids}::uuid[])
+      `;
+
+      await auditLog(uid, 'UNIFY_BATCH', newTxId, { unified_ids: ids }, inserted[0]);
+
+      const formattedTx = {
+        ...inserted[0],
+        vencimento: inserted[0].vencimento ? new Date(inserted[0].vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
+        pagamento: inserted[0].pagamento ? new Date(inserted[0].pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
+        valor: Number(inserted[0].valor),
+        juros: Number(inserted[0].juros || 0),
+      };
+
+      return res.json({
+        message: 'Lançamentos unificados em 1 pagamento com sucesso',
+        unificado: true,
+        unifiedTransaction: formattedTx,
+        unifiedIds: ids
+      });
+    }
 
     // 1) Baixa de todos os títulos do lote (status, banco, data).
     await sql`UPDATE transactions

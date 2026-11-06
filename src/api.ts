@@ -325,8 +325,9 @@ export const api = {
   async updateTransactionsBatch(
     itemsOrIds: (string | { id: string; juros?: number })[],
     banco: string,
-    dataPagamento?: string
-  ): Promise<void> {
+    dataPagamento?: string,
+    options?: { unificar?: boolean; descricao?: string; empresa?: string }
+  ): Promise<{ message?: string; unificado?: boolean; unifiedTransaction?: Transaction; unifiedIds?: string[] }> {
     if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     const items = itemsOrIds.map(item => (typeof item === 'string' ? { id: item } : item));
     const ids = items.map(i => i.id);
@@ -341,9 +342,19 @@ export const api = {
     const res = await fetchWithSecurity(`${API_BASE}?route=transactions-batch-update`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids, items, jurosMap, banco, dataPagamento }),
+      body: JSON.stringify({
+        ids,
+        items,
+        jurosMap,
+        banco,
+        dataPagamento,
+        unificar: options?.unificar,
+        descricaoUnificada: options?.descricao,
+        empresa: options?.empresa,
+      }),
     });
     if (!res.ok) throw await buildHttpError(res, 'Failed to update transactions batch');
+    return await res.json();
   },
 
   async updateTransaction(id: string, data: Partial<Transaction>): Promise<Transaction> {
