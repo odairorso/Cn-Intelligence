@@ -440,17 +440,17 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis, companyOption
         const totalColor = isNaoPago ? '#f59e0b' : tipoColor;
 
         return `<tr style="background-color: ${rowBg}">
-          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:8pt">${i + 1}</td>
-          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;color:${tipoColor};font-size:8pt">${tipoText}</td>
-          <td style="padding:5px 6px;border:1px solid #e2e8f0;font-size:8.5pt"><b>${escapeHtml(tx.fornecedor || 'NÃO INFORMADO')}</b></td>
-          <td style="padding:5px 6px;border:1px solid #e2e8f0;font-size:8pt">${escapeHtml(tx.descricao || '-')}</td>
-          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:8pt">${escapeHtml(tx.empresa || '-')}</td>
-          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:8pt">${escapeHtml(tx.vencimento || '-')}</td>
-          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:8pt">${escapeHtml(tx.pagamento || '-')}</td>
-          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:right;font-size:8.5pt;color:${valorColor};font-weight:${isNaoPago ? 'bold' : 'normal'}">${(Number(tx.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:right;font-size:8pt;color:${jurosColor};font-weight:${isNaoPago ? 'bold' : 'normal'}">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
-          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:right;font-weight:bold;color:${totalColor};font-size:8.5pt">${(isRev ? '' : '-')}${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-          <td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-weight:${statusWeight};color:${statusColor};font-size:8pt">${escapeHtml(status)}</td>
+          <td style="padding:3px 3px;border:1px solid #e2e8f0;text-align:center;font-size:6.5pt">${i + 1}</td>
+          <td style="padding:3px 3px;border:1px solid #e2e8f0;text-align:center;font-weight:bold;color:${tipoColor};font-size:6.5pt">${tipoText}</td>
+          <td style="padding:3px 3px;border:1px solid #e2e8f0;font-size:6.5pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0"><b>${escapeHtml(tx.fornecedor || 'NÃO INFORMADO')}</b></td>
+          <td style="padding:3px 3px;border:1px solid #e2e8f0;font-size:6.5pt;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0">${escapeHtml(tx.descricao || '-')}</td>
+          <td style="padding:3px 3px;border:1px solid #e2e8f0;text-align:center;font-size:6.5pt">${escapeHtml(tx.empresa || '-')}</td>
+          <td style="padding:3px 3px;border:1px solid #e2e8f0;text-align:center;font-size:6.5pt">${escapeHtml(tx.vencimento || '-')}</td>
+          <td style="padding:3px 3px;border:1px solid #e2e8f0;text-align:center;font-size:6.5pt">${escapeHtml(tx.pagamento || '-')}</td>
+          <td style="padding:3px 3px;border:1px solid #e2e8f0;text-align:right;font-size:6.5pt;color:${valorColor};font-weight:${isNaoPago ? 'bold' : 'normal'}">${(Number(tx.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="padding:3px 3px;border:1px solid #e2e8f0;text-align:right;font-size:6.5pt;color:${jurosColor};font-weight:${isNaoPago ? 'bold' : 'normal'}">${Number(tx.juros || 0) > 0 ? Number(tx.juros).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</td>
+          <td style="padding:3px 3px;border:1px solid #e2e8f0;text-align:right;font-weight:bold;color:${totalColor};font-size:6.5pt">${(isRev ? '' : '-')}${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="padding:3px 3px;border:1px solid #e2e8f0;text-align:center;font-weight:${statusWeight};color:${statusColor};font-size:6.5pt">${escapeHtml(status)}</td>
         </tr>`;
       }).join('');
 
@@ -460,24 +460,25 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis, companyOption
   <meta charset="UTF-8">
   <title>${tipoLabel} - ${periodDisplay}</title>
   <style>
-    @page { margin: 0.8cm 1cm; size: A4 landscape; }
+    @page { margin: 0.8cm 1cm; size: A4 portrait; }
     * { box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 9.5pt; color: #333; line-height: 1.3; margin: 0; padding: 0; }
-    .header { border-bottom: 2px solid #3b82f6; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end; }
-    .header-info h1 { margin: 0; font-size: 16pt; color: #1e293b; text-transform: uppercase; font-weight: 800; }
-    .header-info p { margin: 3px 0 0; font-size: 8.5pt; color: #64748b; font-weight: 600; }
-    .summary-boxes { display: flex; gap: 10px; margin-bottom: 12px; }
-    .summary-box { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
-    .summary-box .label { font-size: 7.5pt; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 3px; letter-spacing: 0.5px; }
-    .summary-box .value { font-size: 13pt; font-weight: 800; color: #1e293b; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 7.5pt; color: #333; line-height: 1.3; margin: 0; padding: 0; }
+    .header { border-bottom: 2px solid #3b82f6; padding-bottom: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .header-info h1 { margin: 0; font-size: 13pt; color: #1e293b; text-transform: uppercase; font-weight: 800; }
+    .header-info p { margin: 2px 0 0; font-size: 7pt; color: #64748b; font-weight: 600; }
+    .summary-boxes { display: flex; gap: 6px; margin-bottom: 10px; }
+    .summary-box { flex: 1; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 7px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+    .summary-box .label { font-size: 6pt; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.3px; }
+    .summary-box .value { font-size: 9.5pt; font-weight: 800; color: #1e293b; }
     .summary-box.highlight { border-color: #f59e0b; background-color: #fffbeb; }
     .summary-box.critical { border-color: #ef4444; background-color: #fff5f5; }
     .summary-box.success { border-color: #10b981; background-color: #ecfdf5; }
-    
-    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-    th { background: #f8fafc; padding: 6px 5px; border: 1px solid #e2e8f0; text-align: left; font-weight: 800; text-transform: uppercase; font-size: 7.5pt; color: #475569; }
-    .total-row td { font-weight: 800; background: #f1f5f9 !important; border-top: 2px solid #334155; padding: 6px 5px !important; }
-    .footer { margin-top: 10px; font-size: 7.5pt; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 6px; font-weight: 600; page-break-inside: avoid; break-inside: avoid; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 4px; table-layout: fixed; }
+    th { background: #f8fafc; padding: 4px 3px; border: 1px solid #e2e8f0; text-align: left; font-weight: 800; text-transform: uppercase; font-size: 6pt; color: #475569; overflow: hidden; }
+    td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .total-row td { font-weight: 800; background: #f1f5f9 !important; border-top: 2px solid #334155; padding: 5px 3px !important; }
+    .footer { margin-top: 8px; font-size: 6.5pt; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 5px; font-weight: 600; page-break-inside: avoid; break-inside: avoid; }
     .footer p { margin: 0; padding: 0; }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -530,17 +531,17 @@ const RelatoriosTab = ({ globalStats, fetchStats, contasContabeis, companyOption
   <table>
     <thead>
       <tr>
-        <th style="width:30px;text-align:center">#</th>
-        <th style="width:70px;text-align:center">Tipo</th>
-        <th>Fornecedor</th>
-        <th>Descrição</th>
-        <th style="text-align:center">Empresa</th>
-        <th style="text-align:center">Vencimento</th>
-        <th style="text-align:center">Pagamento</th>
-        <th style="text-align:right">Valor</th>
-        <th style="text-align:right">Juros</th>
-        <th style="text-align:right">Total</th>
-        <th style="text-align:center">Status</th>
+        <th style="width:22px;text-align:center">#</th>
+        <th style="width:50px;text-align:center">Tipo</th>
+        <th style="width:19%">Fornecedor</th>
+        <th style="width:18%">Descrição</th>
+        <th style="width:50px;text-align:center">Empresa</th>
+        <th style="width:55px;text-align:center">Vencimento</th>
+        <th style="width:55px;text-align:center">Pagamento</th>
+        <th style="width:62px;text-align:right">Valor</th>
+        <th style="width:50px;text-align:right">Juros</th>
+        <th style="width:62px;text-align:right">Total</th>
+        <th style="width:50px;text-align:center">Status</th>
       </tr>
     </thead>
     <tbody>
