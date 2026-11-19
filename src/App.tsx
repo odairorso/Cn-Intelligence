@@ -582,10 +582,11 @@ export default function App() {
     showNotification(`Processando ${pdfFiles.length} boleto(s)...`, 'info');
 
     try {
+      let processedCount = 0;
       const processOnePdf = async (file: File): Promise<PdfImportDraft> => {
           const arrayBuffer = await file.arrayBuffer();
 
-          // Extrai texto com PDF.js primeiro (com timeout de 4s para nunca travar)
+          // Extract text with PDF.js (2s timeout — boletos are small, 1 page)
           let fullText = '';
           try {
             const pdfjsLib = await loadPdfJs();
@@ -597,10 +598,10 @@ export default function App() {
               }
             };
             const timeoutPromise = new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('PDF.js timeout')), 4000)
+              setTimeout(() => reject(new Error('PDF.js timeout')), 2000)
             );
             const pdf: any = await Promise.race([getPdf(), timeoutPromise]);
-            const maxPages = Math.min(3, pdf.numPages || 0);
+            const maxPages = Math.min(2, pdf.numPages || 0);
             for (let i = 1; i <= maxPages; i++) {
               const page = await pdf.getPage(i);
               const textContent = await page.getTextContent();
@@ -615,7 +616,27 @@ export default function App() {
           const local = extractBoletoData(fullText, file.name, safeSuppliers);
           local.fornecedor = resolveSupplierName(local.fornecedor, fullText, safeSuppliers);
 
-          // Se já extraiu bom texto, não precisa subir megabytes de base64 (upload instantâneo)
+          // Fast path: if local extraction got all 3 essential fields, skip Gemini (~instant)
+          const localComplete =
+            local.fornecedor !== 'Fornecedor não identificado' &&
+            !shouldRejectSupplierName(local.fornecedor) &&
+            local.vencimento &&
+            local.valor > 0;
+
+          if (localComplete && hasGoodText) {
+            console.log(`[boleto] ⚡ Fast path: local extraction complete for ${file.name}`);
+            processedCount++;
+            if (pdfFiles.length > 1) {
+              showNotification(`Processando ${processedCount}/${pdfFiles.length} boleto(s)...`, 'info');
+            }
+            return {
+              ...local,
+              numero_boleto: local.numero_boleto || extractLocalBoletoNumber(fullText),
+              tipo: 'DESPESA',
+            };
+          }
+
+          // Slow path: need Gemini AI for missing data or unreadable PDF
           let pdfBase64: string | undefined = undefined;
           if (!hasGoodText && file.size <= 3.0 * 1024 * 1024) {
             try {
@@ -637,11 +658,15 @@ export default function App() {
           ai.fornecedor = resolveSupplierName(ai.fornecedor, fullText, safeSuppliers);
 
           const fornecedor = (!shouldRejectSupplierName(ai.fornecedor) && ai.fornecedor) ? ai.fornecedor : local.fornecedor;
-          // Se a IA obteve vencimento/valor válidos, prioriza a IA. Caso contrário, cai no local.
           const vencimento = ai.vencimento || local.vencimento;
           const valor = ai.valor > 0 ? ai.valor : local.valor;
           const numero_boleto = (ai.numero_boleto || local.numero_boleto || '').toString().trim();
           const descricao = ai.descricao || local.descricao;
+
+          processedCount++;
+          if (pdfFiles.length > 1) {
+            showNotification(`Processando ${processedCount}/${pdfFiles.length} boleto(s)...`, 'info');
+          }
 
           return {
             ...ai,
@@ -653,10 +678,8 @@ export default function App() {
           };
       };
 
-      // Concorrência limitada: 2 PDFs por vez.
-      // Antes ia tudo de uma vez, estourando o limite do Gemini (429) e
-      // deixando a importação lenta em lotes grandes.
-      const concurrency = Math.min(2, pdfFiles.length);
+      // Higher concurrency: local extraction is instant, only Gemini calls are slow
+      const concurrency = Math.min(4, pdfFiles.length);
       const extractedRows: PdfImportDraft[] = Array.from({ length: pdfFiles.length });
       let nextIndex = 0;
       await Promise.all(Array.from({ length: concurrency }, async () => {

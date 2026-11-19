@@ -54,7 +54,7 @@ export async function handleExtractBoleto(req, res) {
 
     const ai = new GoogleGenAI({ apiKey });
     // A função serverless tem 60s, mas o usuário não: alvo de ~10s por boleto.
-    const GEMINI_TIME_BUDGET_MS = 20000;
+    const GEMINI_TIME_BUDGET_MS = 12000;
 
     // Uma chamada por modelo, com timeout próprio.
     const runModel = async (modelName, timeoutMs, contents, config) => {
@@ -103,7 +103,7 @@ export async function handleExtractBoleto(req, res) {
       const raced = modelsToTry.slice(0, 2);
       if (raced.length) {
         try {
-          return await Promise.any(raced.map((m, i) => runModel(m, i === 0 ? 12000 : 9000, contents, config)));
+          return await Promise.any(raced.map((m, i) => runModel(m, i === 0 ? 8000 : 6000, contents, config)));
         } catch { /* todos falharam: tenta o resto em sequência */ }
       }
 
