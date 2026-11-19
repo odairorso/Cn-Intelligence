@@ -102,15 +102,30 @@ export const parseLinhaDigitavel = (text: string) => {
 export const shouldRejectSupplierName = (name: string) => {
   const value = String(name || '').trim().toUpperCase();
   if (!value || value.length < 4) return true;
-  if (value.includes('DATA DO DOCUMENTO') || value.includes('VENCIMENTO') || value.includes('NOSSO NUMERO')) return true;
-  if (value.includes('AGENCIA') || value.includes('CÓDIGO') || value.includes('CODIGO') || value.includes('BENEFICI')) return true;
-  if (value.includes('LOCAL DE PAGAMENTO') || value.includes('PAGAVEL') || value.includes('INSTRUCOES')) return true;
-  if (value.includes('ESPECIE') || value.includes('CARTEIRA') || value.includes('USO DO BANCO')) return true;
+  if (value.includes('DATA DO DOCUMENTO') || value.includes('VENCIMENTO') || value.includes('NOSSO NUMERO') || value.includes('NOSSO NÚMERO')) return true;
+  if (value.includes('AGENCIA') || value.includes('AGÊNCIA') || value.includes('CÓDIGO') || value.includes('CODIGO') || value.includes('BENEFICI')) return true;
+  if (value.includes('LOCAL DE PAGAMENTO') || value.includes('PAGAVEL') || value.includes('PAGÁVEL') || value.includes('INSTRUCOES') || value.includes('INSTRUÇÕES')) return true;
+  if (value.includes('ESPECIE') || value.includes('ESPÉCIE') || value.includes('CARTEIRA') || value.includes('USO DO BANCO')) return true;
   if (value.includes('AVENIDA') || value.includes(' AV ') || value.includes('AV.') || value.includes('RUA') || value.includes('CEP')) return true;
+  if (value.includes('COMPENSACAO') || value.includes('COMPENSAÇÃO') || value.includes('HA DE COMPENSA') || value.includes('FICHA DE COMPENSA')) return true;
+  if (value.includes('AUTENTICACAO') || value.includes('AUTENTICAÇÃO') || value.includes('MECANICA') || value.includes('MECÂNICA')) return true;
+  if (value.includes('LINHA DIGITAVEL') || value.includes('LINHA DIGITÁVEL')) return true;
+  if (value.includes('SACADOR') || value.includes('AVALISTA') || value.includes('PAGADOR') || value.includes('RECIBO DO')) return true;
+  if (value.includes('VALOR DO DOCUMENTO') || value.includes('VALOR COBRADO') || value.includes('CORTE NA LINHA')) return true;
   const onlyNumericLike = value.replace(/[^0-9]/g, '').length >= Math.max(8, value.length - 2);
   if (onlyNumericLike) return true;
   if ((value.match(/[A-Z]/g) || []).length < 3) return true;
   return false;
+};
+
+export const cleanSupplierCandidate = (raw: string) => {
+  if (!raw) return '';
+  return raw
+    .split(/\s*[-–—]\s*\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/)[0]
+    .split(/\s*[-–—]\s*\d{3}[\.\s]?\d{3}[\.\s]?\d{3}[-\s]?\d{2}/)[0]
+    .split(/\s+(?:CNPJ|CPF|\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}|AG[ÊE]NCIA|C[ÓO]DIGO|DATA|ENDERE[ÇC]O|VENCIMENTO|NOSSO)/i)[0]
+    .trim()
+    .replace(/\s+/g, ' ');
 };
 
 export const looksLikePersonName = (value: string) => {
@@ -263,18 +278,18 @@ export const extractBoletoData = (text: string, fileName: string, suppliers: Sup
   let valor = 0;
 
   const fornecedorPatterns = [
-    /BENEFICI[AÁ]RIO[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
-    /CEDENTE[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF|\d{2}\/\d{2}\/\d{4})/i,
+    /BENEFICI[AÁ]RIO[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?=(?:\s+CNPJ|\s+CPF|\s*[-–—]\s*\d{2}|\s+\d{2}[\.\s]?\d{3}|\s+AG[ÊE]NCIA|\s+C[ÓO]DIGO|\s+DATA|\d{2}\/\d{2}\/\d{4}|$))/i,
+    /CEDENTE[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?=(?:\s+CNPJ|\s+CPF|\s*[-–—]\s*\d{2}|\s+\d{2}[\.\s]?\d{3}|\s+AG[ÊE]NCIA|\s+C[ÓO]DIGO|\s+DATA|\d{2}\/\d{2}\/\d{4}|$))/i,
     /VENDEDOR[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/i,
     /EMISSOR[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/i,
     /RAZ[AÃ]O SOCIAL[:\s]+([\w\u00C0-\u017E\s.&/-]+?)(?:\s+CNPJ|\s+CPF)/i,
-    /([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,60})\s+\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/i,
+    /([\w\u00C0-\u017E][\w\u00C0-\u017E\s.&/,-]{5,60})\s*[-–—:]?\s*(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/i,
   ];
 
   for (const pattern of fornecedorPatterns) {
     const match = normalizedText.match(pattern);
     if (match?.[1]) {
-      const candidate = match[1].trim().replace(/\s+/g, ' ');
+      const candidate = cleanSupplierCandidate(match[1]);
       if (!shouldRejectSupplierName(candidate)) { fornecedor = candidate; break; }
     }
   }
