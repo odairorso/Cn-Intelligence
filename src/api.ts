@@ -357,6 +357,21 @@ export const api = {
     return await res.json();
   },
 
+  async undoUnifyBatch(id: string): Promise<{
+    message?: string;
+    removedUnifiedId: string;
+    restoredTransactions: Transaction[];
+  }> {
+    if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
+    const res = await fetchWithSecurity(`${API_BASE}?route=transactions-unify-undo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) throw await buildHttpError(res, 'Falha ao desfazer unificação');
+    return await res.json();
+  },
+
   async updateTransaction(id: string, data: Partial<Transaction>): Promise<Transaction> {
     if (!apiAuth.isAuthenticated()) throw new Error('Autenticação necessária');
     const res = await fetchWithSecurity(`${API_BASE}?route=transactions&id=${id}`, {

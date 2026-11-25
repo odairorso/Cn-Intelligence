@@ -1,4 +1,4 @@
-import { sql, parseDateToPg } from '../_db.js';
+import { sql, parseDateToPg, transaction } from '../_db.js';
 import { normalizeBoletoNumber, sanitizeObject, handleError, getContaContabilId } from '../_utils.js';
 import { TransactionSchema, TransactionBatchSchema } from '../_schemas.js';
 
@@ -719,51 +719,54 @@ ${compositionLines.join('\n')}`;
       };
       const vFinal = pDate || toDateStr(fullRows[fullRows.length - 1].vencimento) || toDateStr(fullRows[0].vencimento);
 
-      // Insere lançamento unificado
-      const inserted = await sql`
-        INSERT INTO transactions (
-          uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, conta_contabil_id, observacao, created_by, paid_at
-        )
-        VALUES (
-          ${uid},
-          ${fornecedorFinal},
-          ${descricaoFinal},
-          ${empresaFinal},
-          ${vFinal},
-          ${pDate},
-          ROUND(${totalConsolidado}::numeric, 2),
-          'PAGO',
-          ${bancoValue},
-          ${tipoFinal},
-          ${contaContabilFinal},
-          ${observacaoFinal},
-          ${uid},
-          NOW()
-        )
-        RETURNING *
-      `;
+      // Execute unified payment atomically so partial failures roll back completely
+      const { insertedTx, newTxId } = await transaction(async () => {
+        const inserted = await sql`
+          INSERT INTO transactions (
+            uid, fornecedor, descricao, empresa, vencimento, pagamento, valor, status, banco, tipo, conta_contabil_id, observacao, created_by, paid_at
+          )
+          VALUES (
+            ${uid},
+            ${fornecedorFinal},
+            ${descricaoFinal},
+            ${empresaFinal},
+            ${vFinal},
+            ${pDate},
+            ROUND(${totalConsolidado}::numeric, 2),
+            'PAGO',
+            ${bancoValue},
+            ${tipoFinal},
+            ${contaContabilFinal},
+            ${observacaoFinal},
+            ${uid},
+            NOW()
+          )
+          RETURNING *
+        `;
 
-      const newTxId = inserted[0].id;
-      const unifNote = ` [Unificado no pagamento ID ${newTxId}]`;
+        const createdId = inserted[0].id;
+        const unifNote = ` [Unificado no pagamento ID ${createdId}]`;
 
-      // Soft delete dos lançamentos originais
-      await sql`
-        UPDATE transactions
-        SET deleted_at = NOW(),
-            deleted_by = ${uid},
-            updated_at = NOW(),
-            observacao = CONCAT(COALESCE(observacao, ''), ${unifNote}::text)
-        WHERE ${ownership} AND id = ANY(${ids}::uuid[])
-      `;
+        await sql`
+          UPDATE transactions
+          SET deleted_at = NOW(),
+              deleted_by = ${uid},
+              updated_at = NOW(),
+              observacao = CONCAT(COALESCE(observacao, ''), ${unifNote}::text)
+          WHERE ${ownership} AND id = ANY(${ids}::uuid[])
+        `;
 
-      await auditLog(uid, 'UNIFY_BATCH', newTxId, { unified_ids: ids }, inserted[0]);
+        return { insertedTx: inserted[0], newTxId: createdId };
+      });
+
+      await auditLog(uid, 'UNIFY_BATCH', newTxId, { unified_ids: ids }, insertedTx);
 
       const formattedTx = {
-        ...inserted[0],
-        vencimento: inserted[0].vencimento ? new Date(inserted[0].vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
-        pagamento: inserted[0].pagamento ? new Date(inserted[0].pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
-        valor: Number(inserted[0].valor),
-        juros: Number(inserted[0].juros || 0),
+        ...insertedTx,
+        vencimento: insertedTx.vencimento ? new Date(insertedTx.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
+        pagamento: insertedTx.pagamento ? new Date(insertedTx.pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
+        valor: Number(insertedTx.valor),
+        juros: Number(insertedTx.juros || 0),
       };
 
       return res.json({
@@ -777,33 +780,138 @@ ${compositionLines.join('\n')}`;
       return handleError(res, unifyErr, 'transactions.js UNIFY_BATCH');
     } }
 
-    // 1) Baixa de todos os títulos do lote (status, banco, data).
-    await sql`UPDATE transactions
-      SET status = 'PAGO', banco = ${bancoValue}, pagamento = ${pDate},
-          paid_at = COALESCE(paid_at, NOW()), updated_at = NOW()
-      WHERE ${ownership} AND id = ANY(${ids}::uuid[])`;
+    // Execute batch status + juros updates atomically
+    await transaction(async () => {
+      await sql`UPDATE transactions
+        SET status = 'PAGO', banco = ${bancoValue}, pagamento = ${pDate},
+            paid_at = COALESCE(paid_at, NOW()), updated_at = NOW()
+        WHERE ${ownership} AND id = ANY(${ids}::uuid[])`;
 
-    // 2) Só grava juros de quem realmente informou um valor.
-    //    Antes, ids sem juros no mapa eram gravados como 0 e apagavam
-    //    descontos/acréscimos já existentes no título.
-    const idsWithJuros = ids.filter((id) => {
-      const v = finalJurosMap ? finalJurosMap[id] : undefined;
-      return v !== undefined && v !== null && v !== '';
+      const idsWithJuros = ids.filter((id) => {
+        const v = finalJurosMap ? finalJurosMap[id] : undefined;
+        return v !== undefined && v !== null && v !== '';
+      });
+
+      if (idsWithJuros.length > 0) {
+        const jurosList = idsWithJuros.map((id) => Number(finalJurosMap[id]) || 0);
+        await sql`
+          UPDATE transactions t
+          SET juros = v.juros, updated_at = NOW()
+          FROM (SELECT * FROM unnest(${idsWithJuros}::uuid[], ${jurosList}::numeric[]) AS x(id, juros)) v
+          WHERE t.id = v.id
+            AND ${isAdmin ? sql`(t.uid = ${uid} OR t.uid IS NULL)` : sql`t.uid = ${uid}`}
+        `;
+      }
     });
-
-    if (idsWithJuros.length > 0) {
-      const jurosList = idsWithJuros.map((id) => Number(finalJurosMap[id]) || 0);
-      await sql`
-        UPDATE transactions t
-        SET juros = v.juros, updated_at = NOW()
-        FROM (SELECT * FROM unnest(${idsWithJuros}::uuid[], ${jurosList}::numeric[]) AS x(id, juros)) v
-        WHERE t.id = v.id
-          AND ${isAdmin ? sql`(t.uid = ${uid} OR t.uid IS NULL)` : sql`t.uid = ${uid}`}
-      `;
-    }
     return res.json({ message: 'Updated successfully' });
   } catch (e) {
     return handleError(res, e, 'transactions.js handleTransactionsBatchUpdate');
+  }
+}
+
+// POST /api?route=transactions-unify-undo
+export async function handleUndoUnifyBatch(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const uid = req.authUid;
+  if (!uid) return res.status(401).json({ error: 'Autenticação necessária' });
+  const isAdmin = req.authRole === 'admin';
+
+  const unifiedId = req.body?.id ? String(req.body.id).trim() : '';
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(unifiedId)) {
+    return res.status(400).json({ error: 'ID do lançamento unificado inválido.' });
+  }
+
+  const ownership = isAdmin ? sql`(uid = ${uid} OR uid IS NULL)` : sql`uid = ${uid}`;
+  const tagNote = ` [Unificado no pagamento ID ${unifiedId}]`;
+  const tagPattern = `%[Unificado no pagamento ID ${unifiedId}]%`;
+
+  try {
+    const unifiedRows = await sql`
+      SELECT * FROM transactions
+      WHERE id = ${unifiedId}::uuid
+        AND ${ownership}
+        AND deleted_at IS NULL
+    `;
+    if (!unifiedRows || unifiedRows.length === 0) {
+      return res.status(404).json({ error: 'Lançamento unificado não encontrado.' });
+    }
+
+    // Locate original items either by observacao tag or audit_logs fallback
+    const taggedRows = await sql`
+      SELECT id FROM transactions
+      WHERE ${ownership}
+        AND deleted_at IS NOT NULL
+        AND observacao LIKE ${tagPattern}
+    `;
+
+    let originalIds = taggedRows.map((r) => r.id);
+
+    if (originalIds.length === 0) {
+      const logs = await sql`
+        SELECT dados_antigos FROM audit_logs
+        WHERE tabela = 'transactions'
+          AND action = 'UNIFY_BATCH'
+          AND record_id = ${unifiedId}
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      const rawOld = logs?.[0]?.dados_antigos;
+      const parsedOld = typeof rawOld === 'string' ? JSON.parse(rawOld) : rawOld;
+      if (Array.isArray(parsedOld?.unified_ids)) {
+        originalIds = parsedOld.unified_ids.filter((itemId) => UUID_RE.test(String(itemId)));
+      }
+    }
+
+    if (originalIds.length === 0) {
+      return res.status(400).json({
+        error: 'Não foram encontradas parcelas originais vinculadas a este lançamento.'
+      });
+    }
+
+    const restored = await transaction(async () => {
+      const restoredRows = await sql`
+        UPDATE transactions
+        SET deleted_at = NULL,
+            deleted_by = NULL,
+            updated_at = NOW(),
+            observacao = NULLIF(TRIM(REPLACE(COALESCE(observacao, ''), ${tagNote}::text, '')), '')
+        WHERE ${ownership}
+          AND id = ANY(${originalIds}::uuid[])
+        RETURNING *
+      `;
+
+      await sql`
+        UPDATE transactions
+        SET deleted_at = NOW(),
+            deleted_by = ${uid},
+            updated_at = NOW(),
+            observacao = CONCAT(COALESCE(observacao, ''), ' [Unificação desfeita]')
+        WHERE id = ${unifiedId}::uuid
+          AND ${ownership}
+      `;
+
+      return restoredRows;
+    });
+
+    await auditLog(uid, 'UNDO_UNIFY_BATCH', unifiedId, unifiedRows[0], { restored_ids: originalIds });
+
+    const formattedRestored = restored.map((row) => ({
+      ...row,
+      vencimento: row.vencimento ? new Date(row.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '',
+      pagamento: row.pagamento ? new Date(row.pagamento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : undefined,
+      valor: Number(row.valor),
+      juros: Number(row.juros || 0),
+    }));
+
+    return res.json({
+      message: `${formattedRestored.length} lançamento(s) restaurado(s) com sucesso`,
+      removedUnifiedId: unifiedId,
+      restoredTransactions: formattedRestored,
+    });
+  } catch (e) {
+    return handleError(res, e, 'transactions.js handleUndoUnifyBatch');
   }
 }
 

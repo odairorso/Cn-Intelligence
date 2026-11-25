@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Search, ChevronDown, Layers } from 'lucide-react';
+import { Search, ChevronDown, Layers, RotateCcw } from 'lucide-react';
 import { Transaction, Supplier, Bank, TransactionStatus, ContaContabil } from '../types';
 import { cn, normalizeSupplierName, normalizeCompanyKey, todayInputDate, toInputDate, parseMoneyToNumber, matchesAccountType, stripAccents, formatBRL } from '../lib/utils';
 import { api } from '../api';
@@ -37,6 +37,7 @@ interface EditTxModalProps {
   contasContabeis: ContaContabil[];
   companyOptions: string[];
   onClose: () => void;
+  onUndoUnify?: (id: string) => Promise<void> | void;
   onSave: (
     id: string, 
     data: Partial<Transaction>,
@@ -48,8 +49,14 @@ interface EditTxModalProps {
   ) => Promise<void> | void;
 }
 
-const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOptions, onClose, onSave }: EditTxModalProps) => {
+const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOptions, onClose, onUndoUnify, onSave }: EditTxModalProps) => {
   const initialNumInfo = parseNumeroBoleto(transaction.numero_boleto);
+  const [confirmingUndoUnify, setConfirmingUndoUnify] = useState(false);
+  const [isUndoingUnify, setIsUndoingUnify] = useState(false);
+  const isUnifiedPayment = Boolean(
+    transaction.observacao &&
+    (transaction.observacao.includes('Composição das') || transaction.observacao.includes('Pagamento unificado'))
+  );
 
   const [formData, setFormData] = useState({
     ...transaction,
@@ -527,6 +534,62 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                 value={formData.pagamento}
                 onChange={e => setFormData({ ...formData, pagamento: e.target.value })}
               />
+            </div>
+          )}
+
+          {isUnifiedPayment && onUndoUnify && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                    <Layers size={14} /> Pagamento Unificado
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant mt-0.5">
+                    Caso tenha marcado algum boleto errado, você pode desfazer a unificação e restaurar as parcelas originais.
+                  </p>
+                </div>
+                {!confirmingUndoUnify ? (
+                  <button
+                    type="button"
+                    disabled={isSaving || isUndoingUnify}
+                    onClick={() => setConfirmingUndoUnify(true)}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-400/40 text-[11px] font-bold uppercase text-amber-300 hover:bg-amber-500/20 transition-all"
+                  >
+                    <RotateCcw size={12} /> Desfazer Unificação
+                  </button>
+                ) : (
+                  <div className="shrink-0 flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isUndoingUnify}
+                      onClick={() => setConfirmingUndoUnify(false)}
+                      className="px-2.5 py-1.5 rounded text-[11px] font-bold text-on-surface-variant hover:bg-white/5"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isUndoingUnify}
+                      onClick={async () => {
+                        setIsUndoingUnify(true);
+                        setSaveError(null);
+                        try {
+                          await onUndoUnify(String(transaction.id));
+                          onClose();
+                        } catch (err: any) {
+                          setSaveError(err?.message || 'Erro ao desfazer unificação.');
+                          setConfirmingUndoUnify(false);
+                        } finally {
+                          setIsUndoingUnify(false);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 text-[11px] font-black uppercase hover:bg-amber-400 transition-all disabled:opacity-60"
+                    >
+                      {isUndoingUnify ? 'Restaurando...' : 'Confirmar Estorno'}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

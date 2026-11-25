@@ -111,6 +111,7 @@ type AppDataActions = {
   deleteTransaction: (id: string) => Promise<void>;
   loadMoreTransactions: () => Promise<void>;
   markAsPaidBatch: (itemsOrIds: (string | { id: string; juros?: number })[], banco?: string, dataPagamento?: string, options?: { unificar?: boolean; descricao?: string; empresa?: string }) => Promise<void>;
+  undoUnifyBatch: (id: string) => Promise<void>;
   importOFX: (ofxData: any[]) => Promise<void>;
   fixReceitasTipo: () => Promise<number>;
   dedupeMovimentos: () => Promise<number>;
@@ -836,6 +837,16 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     const data = await api.extractBoleto(text, fileName);
     return data;
   }, []);
+  const undoUnifyBatch = useCallback(async (id: string) => {
+    const result = await api.undoUnifyBatch(id);
+    const restored = Array.isArray(result?.restoredTransactions) ? result.restoredTransactions : [];
+    setTransactions((prev) => [
+      ...restored,
+      ...prev.filter((t) => String(t.id) !== String(id))
+    ]);
+    showNotification(result?.message || 'Unificação desfeita com sucesso!', 'success');
+  }, [showNotification]);
+
   const importOFX = useCallback(async (ofxData: any[]) => {
     if (!apiAuth.isAuthenticated()) {
       showNotification('Faça login para importar.', 'error');
@@ -923,6 +934,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     loadMoreTransactions,
     markAsPaid,
     markAsPaidBatch,
+    undoUnifyBatch,
     importOFX,
     fixReceitasTipo,
     dedupeMovimentos,
@@ -953,7 +965,7 @@ export const AppDataProvider = ({ children }: AppDataProviderProps) => {
     importBoletoOFX,
   }), [
     login, logout, fetchTransactions, setTransactions, addTransaction, updateTransaction,
-    deleteTransaction, loadMoreTransactions, markAsPaid, markAsPaidBatch,
+    deleteTransaction, loadMoreTransactions, markAsPaid, markAsPaidBatch, undoUnifyBatch,
     importOFX, fixReceitasTipo, dedupeMovimentos, searchTransactions,
     fetchSuppliers, addSupplier, updateSupplier, deleteSupplier,
     mergeSuppliers, mergeSuppliersAuto, syncSuppliers,

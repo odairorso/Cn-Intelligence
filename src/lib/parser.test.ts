@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   normalizeBoletoNumber,
   supplierFromFileName,
-  shouldRejectSupplierName
+  shouldRejectSupplierName,
+  cleanSupplierCandidate,
+  extractBoletoData,
 } from './boletoParser';
 
 // Função de teste espelhada do parsing do OFX
@@ -47,6 +49,23 @@ describe('Boleto Parser and Utility Unit Tests', () => {
       expect(shouldRejectSupplierName('1234567890')).toBe(true);
       expect(shouldRejectSupplierName('ENERGISA')).toBe(false);
       expect(shouldRejectSupplierName('CLARO BRASIL')).toBe(false);
+      expect(shouldRejectSupplierName('HA DE COMPENSAÇÃO 237')).toBe(true);
+      expect(shouldRejectSupplierName('FICHA DE COMPENSACAO')).toBe(true);
+    });
+  });
+
+  describe('extractBoletoData (Bradesco / Editora regression)', () => {
+    it('should extract EDITORA E DISTRIBUIDORA EDUCACIONAL SA and ignore Ficha de Compensacao', () => {
+      const sample = `Sacador/Avalista Autenticação mecânica - Ficha de compensação 237 23793.39605 97062.336942 07999.999704 2 16340000007900
+        Vencimento 18/11/2026
+        Beneficiário EDITORA E DISTRIBUIDORA EDUCACIONAL SA - 38.733.648/0001-40
+        Agência/Código do beneficiário 3396-0/5977132
+        1 (=) Valor do Documento 79,00`;
+      const result = extractBoletoData(sample, 'boleto.pdf', []);
+      expect(cleanSupplierCandidate('EDITORA E DISTRIBUIDORA EDUCACIONAL SA - 38.733.648/0001-40')).toBe('EDITORA E DISTRIBUIDORA EDUCACIONAL SA');
+      expect(result.fornecedor).toBe('EDITORA E DISTRIBUIDORA EDUCACIONAL SA');
+      expect(result.valor).toBe(79);
+      expect(result.vencimento).toBe('18/11/2026');
     });
   });
 
