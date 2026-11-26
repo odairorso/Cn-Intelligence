@@ -6,6 +6,7 @@ import {
   cleanSupplierCandidate,
   extractBoletoData,
 } from './boletoParser';
+import { parseMoneyToNumber } from './utils';
 
 // Função de teste espelhada do parsing do OFX
 const parseOfxValue = (amtRaw: string): number => {
@@ -66,6 +67,14 @@ describe('Boleto Parser and Utility Unit Tests', () => {
       expect(result.fornecedor).toBe('EDITORA E DISTRIBUIDORA EDUCACIONAL SA');
       expect(result.valor).toBe(79);
       expect(result.vencimento).toBe('18/11/2026');
+    });
+  });
+
+  describe('parseMoneyToNumber', () => {
+    it('should not strip decimal point on JS float strings with >2 decimal places', () => {
+      expect(parseMoneyToNumber('530.0699999999999')).toBeCloseTo(530.07, 2);
+      expect(parseMoneyToNumber('1.500')).toBe(1500);
+      expect(parseMoneyToNumber('530,07')).toBe(530.07);
     });
   });
 

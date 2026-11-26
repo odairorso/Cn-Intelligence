@@ -58,7 +58,9 @@ export const parseMoneyToNumber = (value: unknown): number => {
 
   if (hasDot) {
     const parts = cleaned.split('.');
-    if (parts.length === 2 && parts[1].length > 0 && parts[1].length <= 2) {
+    // Single dot: only treat as thousands separator when strictly 3 digits follow (e.g. "1.500"),
+    // never when JS float precision produces many decimals (e.g. "530.0699999999999").
+    if (parts.length === 2 && parts[1].length !== 3) {
       const n = Number(cleaned);
       return Number.isFinite(n) ? n : 0;
     }

@@ -39,7 +39,7 @@ interface EditTxModalProps {
   onClose: () => void;
   onUndoUnify?: (id: string) => Promise<void> | void;
   onSave: (
-    id: string, 
+    id: string,
     data: Partial<Transaction>,
     partialInfo?: {
       saldoRestante: number;
@@ -66,7 +66,9 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
     banco: transaction.banco || '',
     tipo: transaction.tipo || 'DESPESA',
     juros: transaction.juros || 0,
-    valorPago: transaction.status === 'PAGO' ? String(Number(transaction.valor || 0) + Number(transaction.juros || 0)) : '',
+    valorPago: transaction.status === 'PAGO'
+      ? (Math.round((Number(transaction.valor || 0) + Number(transaction.juros || 0)) * 100) / 100).toFixed(2)
+      : '',
     numero_boleto_base: initialNumInfo.numero,
     ocorrencia: initialNumInfo.ocorrencia,
   });
@@ -127,7 +129,9 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
       banco: transaction.banco || '',
       tipo: transaction.tipo || 'DESPESA',
       juros: transaction.juros || 0,
-      valorPago: transaction.status === 'PAGO' ? String(Number(transaction.valor || 0) + Number(transaction.juros || 0)) : '',
+      valorPago: transaction.status === 'PAGO'
+        ? (Math.round((Number(transaction.valor || 0) + Number(transaction.juros || 0)) * 100) / 100).toFixed(2)
+        : '',
       numero_boleto_base: numInfo.numero,
       ocorrencia: numInfo.ocorrencia,
     });
@@ -184,7 +188,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
       juros: finalJuros,
       numero_boleto: numeroBoletoFinal
     };
-    
+
     delete (rest as any).numero_boleto_base;
     delete (rest as any).ocorrencia;
     delete (rest as any).valorPago;
@@ -316,9 +320,9 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                   <span className={formData.conta_contabil_id ? 'text-on-surface' : 'text-on-surface-variant'}>
                     {formData.conta_contabil_id
                       ? (() => {
-                          const conta = contasContabeis.find((c) => c.id === formData.conta_contabil_id);
-                          return conta ? `${conta.codigo} - ${conta.nome}` : 'Selecione a conta';
-                        })()
+                        const conta = contasContabeis.find((c) => c.id === formData.conta_contabil_id);
+                        return conta ? `${conta.codigo} - ${conta.nome}` : 'Selecione a conta';
+                      })()
                       : 'Selecione a conta'}
                   </span>
                   <ChevronDown className="text-on-surface-variant" size={16} />
@@ -367,7 +371,7 @@ const EditTxModal = ({ transaction, suppliers, banks, contasContabeis, companyOp
                               setFormData({ ...formData, conta_contabil_id: c.id });
                               try {
                                 localStorage.setItem(getDefaultContaKey(formData.empresa, formData.tipo), String(c.id));
-                              } catch {}
+                              } catch { }
                               setShowContaDropdown(false);
                               setSearchConta('');
                             }}
